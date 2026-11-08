@@ -1,0 +1,69 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #ffffff; --fg: #111827; --muted: #6b7280; --border: #d1d5db; --line: #e5e7eb;
+    --btn: #f9fafb; --btn-hover: #f3f4f6; --primary: #111827; --primary-fg: #fff; --primary-hover: #1f2937;
+    --warn-fg: #b45309; --warn-bg: #fffbeb; --warn-border: #fcd34d; --link: #2563eb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1f2124; --fg: #e5e7eb; --muted: #9ca3af; --border: #3f4449; --line: #2f3338;
+      --btn: #2a2d31; --btn-hover: #34383d; --primary: #e5e7eb; --primary-fg: #111827; --primary-hover: #ffffff;
+      --warn-fg: #fcd34d; --warn-bg: #3a2f10; --warn-border: #6b5416; --link: #60a5fa;
+    }
+  }
+  body { width: 260px; margin: 0; padding: 12px; font: 13px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--fg); background: var(--bg); }
+  h1 { font-size: 14px; margin: 0 0 10px; display: flex; align-items: center; gap: 8px; }
+  h1 img { width: 20px; height: 20px; }
+  .row { display: flex; gap: 6px; margin-bottom: 8px; }
+  button { flex: 1; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--btn); color: var(--fg); cursor: pointer; font: inherit; }
+  button:hover { background: var(--btn-hover); }
+  button.primary { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); }
+  button.primary:hover { background: var(--primary-hover); }
+  label.toggle { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-top: 1px solid var(--line); }
+  .muted { color: var(--muted); font-size: 12px; }
+  .warn { color: var(--warn-fg); background: var(--warn-bg); border: 1px solid var(--warn-border); border-radius: 6px; padding: 6px 8px; margin-bottom: 8px; font-size: 12px; }
+  a { color: var(--link); }
+  select { width: 100%; padding: 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--btn); color: var(--fg); font: inherit; margin-bottom: 8px; }
+  input[type=checkbox] { accent-color: var(--link); }
+  h1 .switch { margin-left: auto; position: relative; width: 38px; height: 22px; }
+  h1 .switch input { opacity: 0; width: 0; height: 0; }
+  h1 .switch span { position: absolute; inset: 0; border-radius: 22px; background: #9ca3af; transition: 150ms; cursor: pointer; }
+  h1 .switch span::before { content: ""; position: absolute; width: 16px; height: 16px; left: 3px; top: 3px; border-radius: 50%; background: #fff; transition: 150ms; }
+  h1 .switch input:checked + span { background: #16a34a; }
+  h1 .switch input:checked + span::before { transform: translateX(16px); }
+  body.off .row, body.off select, body.off label.toggle { opacity: 0.45; pointer-events: none; }
+  #host { font-weight: 600; }
+</style>
+</head>
+<body>
+  <h1><img src="icons/icon32.png" alt="" />Gytakusub <label class="switch" title="Master switch"><input type="checkbox" id="enabled" /><span></span></label></h1>
+  <div id="nokey" class="warn" style="display:none">No API key yet — <a href="#" id="openOptions2">add one in options</a>.</div>
+
+  <div class="row">
+    <button id="translate" class="primary">Translate visible (Alt+T)</button>
+  </div>
+  <div class="row">
+    <button id="toggle">Hide / show (Alt+Shift+T)</button>
+  </div>
+
+  <select id="model" title="Model">
+    <option value="claude-haiku-5-5">Claude Haiku 5.5 — fastest, cheapest</option>
+    <option value="claude-sonnet-5-5">Claude Sonnet 5.5 — better on dense pages</option>
+    <option value="claude-opus-5-5">Claude Opus 5.5 — best, most expensive</option>
+  </select>
+
+  <label class="toggle"><span>Auto-translate on <b id="host">this site</b></span><input type="checkbox" id="auto" /></label>
+  <label class="toggle"><span>Chapter context (names + recent lines)</span><input type="checkbox" id="useContext" /></label>
+
+  <div class="muted" id="state" style="margin-top:8px"></div>
+  <div class="row" style="margin-top:10px">
+    <button id="openOptions">Options</button>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

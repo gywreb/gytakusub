@@ -1,0 +1,46 @@
+{
+  "manifest_version": 3,
+  "name": "Gytakusub",
+  "version": "0.4.0",
+  "description": "Translate manga / comic pages in place using your own Claude API key. Works on any site.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "permissions": ["storage", "activeTab", "scripting"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["bubble.js", "typeset.js", "content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Gytakusub",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png"
+    }
+  },
+  "options_page": "options.html",
+  "commands": {
+    "translate-visible": {
+      "suggested_key": { "default": "Alt+T" },
+      "description": "Translate all images currently on screen"
+    },
+    "toggle-overlays": {
+      "suggested_key": { "default": "Alt+Shift+T" },
+      "description": "Show / hide translations on this page"
+    }
+  }
+}

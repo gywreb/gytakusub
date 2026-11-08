@@ -1,0 +1,30 @@
+name: Deploy web app to GitHub Pages
+on:
+  push:
+    branches: [main]
+    paths: ["web/**", ".github/workflows/pages.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check shared files are in sync
+        run: |
+          for f in bubble.js typeset.js prompt.js; do cmp "extension/$f" "web/$f" || { echo "::error::web/$f differs from extension/$f — run scripts/sync-shared.sh"; exit 1; }; done
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+      - id: deployment
+        uses: actions/deploy-pages@v4

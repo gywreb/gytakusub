@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Gytakusub</title>
+<meta name="description" content="Translate manga pages and screenshots with your own Claude API key." />
+<meta name="theme-color" content="#16181d" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Gytakusub" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="icon" href="icons/icon48.png" />
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<header class="top">
+  <img src="icons/icon48.png" alt="" class="logo" />
+  <h1>Gytakusub</h1>
+  <nav class="tabs" role="tablist">
+    <button class="tab active" data-mode="shots" role="tab">Screenshots</button>
+    <button class="tab" data-mode="chapter" role="tab">MangaDex chapter</button>
+  </nav>
+  <button id="btnSettings" class="icon" title="Settings" aria-label="Settings">⚙</button>
+</header>
+
+<main>
+  <section id="modeShots" class="mode">
+    <div id="drop" class="drop">
+      <p class="big">Add a manga page or screenshot</p>
+      <p class="muted">Take a screenshot in any app, then paste it here — or pick it from Photos.</p>
+      <div class="row">
+        <button id="btnPaste" class="primary">Paste image</button>
+        <label class="btn">Choose photos<input id="file" type="file" accept="image/*" multiple hidden /></label>
+      </div>
+      <p class="muted small">Tip: on iPhone, tap the screenshot preview → Share → Copy, then come back and tap Paste.</p>
+    </div>
+  </section>
+
+  <section id="modeChapter" class="mode hidden">
+    <form id="chapterForm" class="chapter-form">
+      <input id="chapterUrl" type="url" inputmode="url" placeholder="https://mangadex.org/chapter/…" required />
+      <button class="primary" type="submit">Load</button>
+    </form>
+    <p id="chapterInfo" class="muted small"></p>
+  </section>
+
+  <div id="toolbar" class="toolbar hidden">
+    <span id="progress" class="muted small"></span>
+    <label class="check"><input type="checkbox" id="showOriginal" /> Show originals</label>
+    <button id="btnClear" class="btn small">Clear</button>
+  </div>
+
+  <div id="pages" class="pages"></div>
+</main>
+
+<div id="toast" class="toast" hidden></div>
+
+<dialog id="settings">
+  <form method="dialog" class="settings">
+    <h2>Settings</h2>
+    <label>Claude API key
+      <div class="row"><input id="sApiKey" type="password" placeholder="sk-ant-api03-…" autocomplete="off" /><button type="button" id="sShow" class="btn">Show</button></div>
+      <span class="hint">From platform.claude.com → Settings → API keys. Stored only in this browser.</span>
+    </label>
+    <label>Model <select id="sModel"></select></label>
+    <label>Target language <input id="sTargetLang" type="text" placeholder="English" /></label>
+    <label>Glossary <textarea id="sGlossary" rows="3" placeholder="Gojo Satoru = Satoru Gojo"></textarea></label>
+    <label>Extra instructions <textarea id="sCustomPrompt" rows="2" placeholder="Keep the tone casual."></textarea></label>
+    <label class="check"><input type="checkbox" id="sUseContext" /> Chapter context (names + recent lines)</label>
+    <label class="check"><input type="checkbox" id="sUppercase" /> UPPERCASE lettering</label>
+    <label class="check"><input type="checkbox" id="sRtl" /> Right-to-left two-page spreads on wide screens</label>
+    <label>Image proxy (optional, for sites that block cross-origin image reads)
+      <input id="sProxy" type="url" placeholder="https://your-worker.workers.dev/?url=" />
+      <span class="hint">See worker.js in the repo for a free Cloudflare Worker.</span>
+    </label>
+    <div class="row end">
+      <button type="button" id="sTest" class="btn">Test key</button>
+      <button id="sSave" class="primary" value="save">Save</button>
+    </div>
+    <p id="sMsg" class="hint"></p>
+  </form>
+</dialog>
+
+<script src="bubble.js"></script>
+<script src="typeset.js"></script>
+<script type="module" src="app.js"></script>
+</body>
+</html>

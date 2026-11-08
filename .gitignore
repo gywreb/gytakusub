@@ -1,0 +1,5 @@
+node_modules/
+*.zip
+tests/fixtures/*.png
+tests/*.png
+.DS_Store

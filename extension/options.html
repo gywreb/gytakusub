@@ -1,0 +1,97 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Gytakusub options</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #ffffff; --fg: #111827; --muted: #6b7280; --border: #d1d5db; --field: #ffffff;
+    --btn: #f9fafb; --btn-hover: #f3f4f6; --primary: #111827; --primary-fg: #fff; --primary-hover: #1f2937; --link: #2563eb;
+    --ok-bg: #ecfdf5; --ok-fg: #065f46; --ok-border: #a7f3d0;
+    --err-bg: #fef2f2; --err-fg: #991b1b; --err-border: #fecaca;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1f2124; --fg: #e5e7eb; --muted: #9ca3af; --border: #3f4449; --field: #2a2d31;
+      --btn: #2a2d31; --btn-hover: #34383d; --primary: #e5e7eb; --primary-fg: #111827; --primary-hover: #ffffff; --link: #60a5fa;
+      --ok-bg: #0f2e22; --ok-fg: #6ee7b7; --ok-border: #1f5a40;
+      --err-bg: #3a1515; --err-fg: #fca5a5; --err-border: #6b2525;
+    }
+  }
+  body { max-width: 640px; margin: 32px auto; padding: 0 16px; font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--fg); background: var(--bg); }
+  h1 { font-size: 20px; display: flex; align-items: center; gap: 10px; }
+  h2 { font-size: 15px; margin: 28px 0 8px; }
+  label { display: block; font-weight: 600; margin: 14px 0 4px; }
+  input[type=text], input[type=password], textarea, select { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--field); color: var(--fg); font: inherit; }
+  textarea { min-height: 90px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; }
+  .hint { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .row input[type=text], .row input[type=password] { flex: 1; }
+  button { padding: 8px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--btn); color: var(--fg); cursor: pointer; font: inherit; }
+  button:hover { background: var(--btn-hover); }
+  button.primary { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); }
+  button.primary:hover { background: var(--primary-hover); }
+  .check { display: flex; align-items: center; gap: 8px; font-weight: 500; margin: 10px 0; }
+  input[type=checkbox] { accent-color: var(--link); }
+  #msg { margin-top: 16px; padding: 10px 12px; border-radius: 8px; display: none; }
+  #msg.ok { display: block; background: var(--ok-bg); color: var(--ok-fg); border: 1px solid var(--ok-border); }
+  #msg.err { display: block; background: var(--err-bg); color: var(--err-fg); border: 1px solid var(--err-border); }
+</style>
+</head>
+<body>
+  <h1><img src="icons/icon48.png" width="28" height="28" alt="" /> Gytakusub options</h1>
+
+  <h2>Claude API</h2>
+  <label for="apiKey">API key</label>
+  <div class="row">
+    <input id="apiKey" type="password" placeholder="sk-ant-api03-…" autocomplete="off" />
+    <button id="showKey" type="button">Show</button>
+    <button id="testKey" type="button">Test</button>
+  </div>
+  <div class="hint">Create one at console.anthropic.com → API keys. Billed to your Anthropic console account (separate from a Claude.ai subscription).</div>
+  <label class="check"><input type="checkbox" id="syncApiKey" /> Sync the key to my other browsers (stored in browser sync instead of this device only)</label>
+
+  <label for="model">Model</label>
+  <select id="model">
+    <option value="claude-haiku-5-5">Claude Haiku 5.5 — fastest, cheapest</option>
+    <option value="claude-sonnet-5-5">Claude Sonnet 5.5 — better on dense / stylised pages</option>
+    <option value="claude-opus-5-5">Claude Opus 5.5 — best quality, most expensive</option>
+  </select>
+
+  <h2>Translation</h2>
+  <label for="targetLang">Target language</label>
+  <input id="targetLang" type="text" placeholder="English" />
+
+  <label for="glossary">Glossary</label>
+  <textarea id="glossary" placeholder="One per line, e.g.&#10;Gojo Satoru = Satoru Gojo&#10;呪術 = jujutsu"></textarea>
+  <div class="hint">Names and terms the model must use exactly. Names it discovers on its own are remembered per tab automatically.</div>
+
+  <label for="customPrompt">Extra instructions</label>
+  <textarea id="customPrompt" placeholder="e.g. Keep the tone casual. Translate SFX as English onomatopoeia."></textarea>
+
+  <label class="check"><input type="checkbox" id="useContext" /> Chapter context — send names and the last ~40 translated lines of this tab with each page (better continuity, ~400 extra input tokens)</label>
+  <label class="check"><input type="checkbox" id="includeSource" /> Also transcribe the original text (slower, slightly more careful reading; useful for debugging)</label>
+  <label class="check"><input type="checkbox" id="uppercase" /> UPPERCASE lettering (comic style)</label>
+
+  <label for="autoSites">Auto-translate while scrolling on these sites</label>
+  <textarea id="autoSites" placeholder="mangadex.org"></textarea>
+  <div class="hint">One hostname per line. Easiest: open the site and flip the switch in the toolbar popup. Nothing is ever sent from other sites unless you click Translate.</div>
+
+  <h2>Appearance & sites</h2>
+  <label for="fontFamily">Font family</label>
+  <input id="fontFamily" type="text" placeholder='"Comic Neue", "Comic Sans MS", sans-serif' />
+  <div class="hint">Any font installed on this device. Leave empty for the default comic-style stack.</div>
+
+  <label for="excludedSites">Disabled on these sites</label>
+  <textarea id="excludedSites" placeholder="mail.google.com&#10;youtube.com"></textarea>
+
+  <div class="row" style="margin-top:20px">
+    <button id="save" class="primary" type="button">Save</button>
+    <button id="clearCache" type="button">Clear translation cache</button>
+  </div>
+  <div id="msg"></div>
+
+  <script src="options.js"></script>
+</body>
+</html>

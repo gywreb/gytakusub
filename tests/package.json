@@ -1,0 +1,12 @@
+{
+  "name": "gytakusub-tests",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "test": "node unit.test.mjs",
+    "detect": "node detect.cjs",
+    "e2e:extension": "node extension-e2e.cjs",
+    "e2e:web": "node web-e2e.mjs"
+  },
+  "devDependencies": { "canvas": "^3.1.0" }
+}
