@@ -31,7 +31,7 @@ const regionFor = (t) => an.regions.find((r) => iou(r.box, { x: t.box[0] * scale
 const items = demoItems.map((it, i) => ({ tag: regionFor(truth.find((t) => t.items.includes(i)))?.id ?? null, box: null, text: it.text, size: it.size, kind: it.kind }));
 const { placements, regionIds } = layout(an, items);
 const translated = createCanvas(W, H); const tctx = translated.getContext("2d");
-tctx.putImageData(erase(cv, pixels, an, regionIds), 0, 0);
+tctx.putImageData(erase(cv, pixels, an, regionIds).image, 0, 0);
 const drawn = globalThis.GyText.draw(tctx, placements, {});
 an.dispose();
 console.log("items", items.length, "drawn", drawn);

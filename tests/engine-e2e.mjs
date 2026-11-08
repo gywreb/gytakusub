@@ -32,7 +32,7 @@ const items = raw.map((it) => {
 });
 const { placements, regionIds } = layout(an, items);
 const t2 = Date.now();
-const clean = erase(cv, pixels, an, regionIds);
+const clean = erase(cv, pixels, an, regionIds).image;
 const t3 = Date.now();
 ctx.putImageData(clean, 0, 0);
 const drawn = GyText.draw(ctx, placements, {});

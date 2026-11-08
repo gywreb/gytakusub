@@ -181,7 +181,7 @@
     return {
       gytakusub: chrome.runtime.getManifest().version, when: new Date().toISOString(), page: location.href, image: e.src,
       natural: [img.naturalWidth, img.naturalHeight], displayed: [Math.round(img.getBoundingClientRect().width), Math.round(img.getBoundingClientRect().height)], objectFit: e.objectFit,
-      work: res.work, letter: res.letter, fromCache: res.fromCache,
+      work: res.work, letter: res.letter, fromCache: res.fromCache, timing: res.timing,
       settings: { model: settings.model, targetLang: settings.targetLang, fontFamily: settings.fontFamily, uppercase: settings.uppercase, useContext: settings.useContext },
       regions: res.regions, items: res.items, placements: res.placements,
     };
@@ -200,13 +200,20 @@
       const e = entries.get(img), id = String(++n).padStart(2, "0"), res = e.result;
       const rep = buildReport(img, e);
       files.push({ name: `page-${id}.json`, data: new TextEncoder().encode(JSON.stringify(rep, null, 1)) });
-      // debug render on a fresh (untainted) canvas
-      const c = document.createElement("canvas"); c.width = res.work.W; c.height = res.work.H;
-      const ctx = c.getContext("2d");
-      ctx.drawImage(e.cleanImg, 0, 0, res.work.W, res.work.H); drawDebug(ctx, res);
-      GyText.draw(ctx, res.placements, { fontFamily: settings.fontFamily, uppercase: settings.uppercase });
-      const png = await new Promise((r) => c.toBlob(r, "image/png"));
-      files.push({ name: `page-${id}.debug.png`, data: new Uint8Array(await png.arrayBuffer()) });
+      // debug render: the whole cleaned page (from the worker, cached answer, no model call) + boxes + text
+      try {
+        const msg = /^(blob|data):/i.test(e.src) ? { dataUrl: await blobToDataUrl(await (await fetch(e.src)).blob()) } : { url: e.src };
+        const full = await chrome.runtime.sendMessage({ type: "TRANSLATE", wantClean: true, ...msg });
+        if (full?.cleanDataUrl) {
+          const clean = await loadImage(full.cleanDataUrl);
+          const c = document.createElement("canvas"); c.width = res.work.W; c.height = res.work.H;
+          const ctx = c.getContext("2d");
+          ctx.drawImage(clean, 0, 0, res.work.W, res.work.H); drawDebug(ctx, res);
+          GyText.draw(ctx, res.placements, { fontFamily: settings.fontFamily, uppercase: settings.uppercase });
+          const png = await new Promise((r) => c.toBlob(r, "image/png"));
+          files.push({ name: `page-${id}.debug.png`, data: new Uint8Array(await png.arrayBuffer()) });
+        }
+      } catch (err) { rep.debugRenderError = String(err?.message || err); }
       // original bytes, through the background (page CORS does not apply there)
       try {
         const msg = /^(blob|data):/i.test(e.src) ? { dataUrl: await blobToDataUrl(await (await fetch(e.src)).blob()) } : { url: e.src };
@@ -334,33 +341,30 @@
   async function render(img, entry) {
     await ensureFont();
     const res = entry.result;
-    entry.cleanImg = await loadImage(res.cleanDataUrl); // the page with original lettering erased, at working resolution
+    // the erased areas only; the page's own image shows through everywhere else
+    entry.patches = await Promise.all(res.patches.map(async (p) => ({ ...p, img: await loadImage(p.dataUrl) })));
     const canvas = entry.canvas || document.createElement("canvas");
     canvas.className = "overlay";
     canvas.width = res.work.W; canvas.height = res.work.H;
     entry.img = img; entry.peek = -1;
     if (!entry.canvas) { entry.canvas = canvas; root.append(canvas); }
     drawOverlay(entry);
-    if (settings.debugOverlay) console.info("Gytakusub debug", { src: entry.src, work: res.work, natural: [res.width, res.height], items: res.items, regions: res.regions, placements: res.placements, letter: res.letter });
+    if (settings.debugOverlay) console.info("Gytakusub debug", { src: entry.src, work: res.work, natural: [res.width, res.height], timing: res.timing, fromCache: res.fromCache, items: res.items, regions: res.regions, placements: res.placements, letter: res.letter });
     entry.objectFit = getComputedStyle(img).objectFit;
     layout();
   }
 
-  /** Clean page + translations; while peeking, one bubble shows the original pixels instead. */
+  /** Erased patches + translations on a transparent canvas; while peeking, one bubble's patch is cleared so the original shows through. */
   function drawOverlay(entry) {
-    const { result: res, canvas, cleanImg, img } = entry;
+    const { result: res, canvas } = entry;
     const W = res.work.W, H = res.work.H;
     const ctx = canvas.getContext("2d");
     ctx.clearRect(0, 0, W, H);
-    ctx.drawImage(cleanImg, 0, 0, W, H);
+    for (const p of entry.patches) ctx.drawImage(p.img, p.x, p.y, p.w, p.h);
     if (settings.debugOverlay) drawDebug(ctx, res);
     const peek = res.placements[entry.peek];
     GyText.draw(ctx, peek ? res.placements.filter((p) => p !== peek) : res.placements, { fontFamily: settings.fontFamily, uppercase: settings.uppercase });
-    if (peek && img?.naturalWidth) {
-      // the original lettering, from the page's own <img>, mapped work → natural pixels
-      const sx = img.naturalWidth / W, sy = img.naturalHeight / H, r = peekRect(peek, res);
-      try { ctx.drawImage(img, r.x * sx, r.y * sy, r.w * sx, r.h * sy, r.x, r.y, r.w, r.h); } catch { /* image not decodable here; keep the translation */ }
-    }
+    if (peek) { const r = peekRect(peek, res); ctx.clearRect(r.x, r.y, r.w, r.h); }
   }
   // The area a peek reveals: the bubble when the line sits in one, else the text's footprint.
   function peekRect(p, res) {

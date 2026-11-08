@@ -9,7 +9,7 @@
  * @param {ImageData} img working-resolution page (same one analyze() saw)
  * @param {import("./analyze.js").Analysis} analysis
  * @param {Set<number>} regionIds regions that have translations to place
- * @returns {ImageData} cleaned page
+ * @returns {{image: ImageData, rois: Array<{x:number,y:number,w:number,h:number}>}} cleaned page and the areas that changed
  */
 export function erase(cv, img, analysis, regionIds) {
   const { W, H } = analysis;
@@ -87,5 +87,5 @@ export function erase(cv, img, analysis, regionIds) {
   const out = new cv.Mat(); cv.cvtColor(rgb, out, cv.COLOR_RGB2RGBA);
   const result = new ImageData(new Uint8ClampedArray(out.data), W, H);
   src.delete(); rgb.delete(); mask.delete(); out.delete();
-  return result;
+  return { image: result, rois: rois.map((r) => ({ x: r.x, y: r.y, w: r.w, h: r.h })) };
 }

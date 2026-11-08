@@ -54,7 +54,7 @@ export async function preparePage(bitmap, settings) {
 export async function finishPage(job, results, opts = {}) {
   const cv = await getCV();
   const { width, height, work } = job;
-  const items = [], placements = [], regions = [];
+  const items = [], placements = [], regions = [], rois = [];
   const canvas = new OffscreenCanvas(work.W, work.H);
   const ctx = canvas.getContext("2d");
   job.slices.forEach((s, idx) => {
@@ -67,12 +67,21 @@ export async function finishPage(job, results, opts = {}) {
     const { placements: pl, regionIds } = layout(an, local);
     for (const p of pl) placements.push({ ...p, rect: { x: p.rect.x + s.ox, y: p.rect.y + s.oy, w: p.rect.w, h: p.rect.h } });
     for (const r of an.regions) regions.push({ id: r.id, kind: r.kind, letter: r.letter, box: { x: r.box.x + s.ox, y: r.box.y + s.oy, w: r.box.w, h: r.box.h } });
-    const clean = regionIds.size ? erase(cv, s.imageData, an, regionIds) : s.imageData;
-    ctx.putImageData(clean, s.ox, s.oy);
+    const clean = regionIds.size ? erase(cv, s.imageData, an, regionIds) : { image: s.imageData, rois: [] };
+    ctx.putImageData(clean.image, s.ox, s.oy);
+    for (const r of clean.rois) rois.push({ x: r.x + s.ox, y: r.y + s.oy, w: r.w, h: r.h });
     an.dispose();
   });
   const letter = job.slices.length ? job.slices[0].analysis.letter : 0;
-  return { items, placements, regions, work, letter, canvas };
+  // Patches: just the areas the eraser changed, cut from the cleaned page. The
+  // extension ships these (a few KB each) instead of the whole page; the content
+  // script draws them over the image it already shows.
+  const patches = rois.map((r) => {
+    const c = new OffscreenCanvas(r.w, r.h);
+    c.getContext("2d").drawImage(canvas, r.x, r.y, r.w, r.h, 0, 0, r.w, r.h);
+    return { x: r.x, y: r.y, w: r.w, h: r.h, canvas: c };
+  });
+  return { items, placements, regions, work, letter, canvas, patches };
 }
 
 /** Red numbered stamps at the top-left of each text region. */

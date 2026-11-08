@@ -135,7 +135,7 @@ for (const [name, png, truthPath, itemsPath] of pages) {
 
   const inkIn = (data, inside, box, dark) => { let ink = 0, n = 0; for (let y = box.y; y < box.y + box.h; y++) for (let x = box.x; x < box.x + box.w; x++) { if (!inside(x, y)) continue; n++; const p = (y * W + x) * 4, l = (data[p] + data[p + 1] + data[p + 2]) / 3; if (dark ? l > 150 : l < 110) ink++; } return ink / Math.max(1, n); };
   T("erase removes the lettering from every bubble but keeps the outline", () => {
-    const clean = erase(cv, pixels, an, regionIds);
+    const clean = erase(cv, pixels, an, regionIds).image;
     for (const r of an.regions.filter((r) => r.kind === "bubble")) {
       const inside = an.insideOf(r.id);
       const before = inkIn(pixels.data, inside, r.box, r.dark), after = inkIn(clean.data, inside, r.box, r.dark);

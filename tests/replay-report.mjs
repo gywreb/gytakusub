@@ -50,7 +50,7 @@ for (const pg of summary.pages) {
   const regionsThen = rep.regions.map((r) => ({ id: r.id, kind: r.kind, letter: r.letter, box: r.box }));
   const items = rep.items.map((it) => ({ tag: it.tag, box: it.box, text: it.text, size: it.size, kind: it.kind }));
   const { placements, regionIds } = layout(an, items);
-  const clean = erase(cv, pixels, an, regionIds);
+  const clean = erase(cv, pixels, an, regionIds).image;
   const o = createCanvas(W, H), octx = o.getContext("2d"); octx.putImageData(clean, 0, 0);
   octx.lineWidth = 2; octx.font = `bold ${Math.round(W / 70)}px sans-serif`;
   for (const r of an.regions) { octx.strokeStyle = r.kind === "bubble" ? "rgba(220,38,38,.9)" : "rgba(37,99,235,.9)"; octx.strokeRect(r.box.x, r.box.y, r.box.w, r.box.h); octx.fillStyle = octx.strokeStyle; octx.fillText("#" + r.id, r.box.x + 2, r.box.y - 3); }

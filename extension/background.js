@@ -171,13 +171,13 @@ async function handleTranslate(msg, sender) {
   const tabId = sender.tab?.id ?? -1;
   const cacheKey = "cache:" + (await sha1(`${PROMPT_VERSION}|${settings.model}|${settings.targetLang}|${settings.includeSource}|${settings.useContext}|${msg.url || msg.dataUrl?.slice(0, 512) + msg.dataUrl?.length}`));
   const cached = (await chrome.storage.session.get(cacheKey))[cacheKey];
-
-  const fetchBytes = () => fetchImageBlob(msg);
+  const timing = {}; let t = performance.now();
+  const lap = (k) => { const n = performance.now(); timing[k] = Math.round(n - t); t = n; };
 
   // Cache holds the model's answer only (not image bytes, which would exhaust
   // storage.session after a few pages); the page is re-analysed on a hit.
-  const blob = await fetchBytes();
-  const job = await decode(blob);
+  const blob = await fetchImageBlob(msg); lap("fetch");
+  const job = await decode(blob); lap("analyze");
   let results, usage, newTerms = [];
   if (cached && !msg.force) {
     results = cached.results; usage = cached.usage;
@@ -197,8 +197,9 @@ async function handleTranslate(msg, sender) {
     try { await chrome.storage.session.set({ [cacheKey]: { results, usage } }); }
     catch (e) { console.warn("Gytakusub: cache write failed", e); }
   }
+  lap("model");
 
-  const page = await finishPage(job, results);
+  const page = await finishPage(job, results); lap("layout");
   // The user's own corrections to this page's lines live beside the cached answer
   // (a Redo asks the model again and drops them).
   const editsKey = "edits:" + cacheKey;
@@ -210,12 +211,20 @@ async function handleTranslate(msg, sender) {
   }
   if (tabId >= 0 && newTerms.length) await updateTabCtx(tabId, newTerms, page.items.map((i) => i.text));
   else if (tabId >= 0 && !cached) await updateTabCtx(tabId, [], page.items.map((i) => i.text));
-  const big = page.work.W * page.work.H > 2.6e6;
-  const cleanBlob = await page.canvas.convertToBlob(big ? { type: "image/jpeg", quality: 0.92 } : { type: "image/png" });
+  // Only the erased areas travel to the page (patches); the whole cleaned page
+  // is encoded only when asked for (diagnostic export).
+  const patches = await Promise.all(page.patches.map(async (p) => ({ x: p.x, y: p.y, w: p.w, h: p.h, dataUrl: await blobToDataUrl(await p.canvas.convertToBlob({ type: "image/png" })) })));
+  let cleanDataUrl = null;
+  if (msg.wantClean) {
+    const big = page.work.W * page.work.H > 2.6e6;
+    cleanDataUrl = await blobToDataUrl(await page.canvas.convertToBlob(big ? { type: "image/jpeg", quality: 0.92 } : { type: "image/png" }));
+  }
+  lap("encode");
+  timing.patchBytes = patches.reduce((s, p) => s + p.dataUrl.length, 0);
   return {
     items: page.items, placements: page.placements, regions: page.regions, letter: page.letter,
-    work: page.work, width: job.width, height: job.height, usage,
-    cleanDataUrl: await blobToDataUrl(cleanBlob), fromCache: !!(cached && !msg.force), cacheKey,
+    work: page.work, width: job.width, height: job.height, usage, timing,
+    patches, cleanDataUrl, fromCache: !!(cached && !msg.force), cacheKey,
   };
 }
 
