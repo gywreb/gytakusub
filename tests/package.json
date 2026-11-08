@@ -9,7 +9,8 @@
     "viz": "node engine-viz.mjs",
     "demo": "python3 make-demo-page.py fixtures && python3 make-pages.py fixtures 12",
     "assets": "node make-store-assets.mjs ../store/assets",
-    "vendor": "node ../scripts/vendor-opencv.mjs && node ../scripts/vendor-hyphen.mjs"
+    "vendor": "node ../scripts/vendor-opencv.mjs && node ../scripts/vendor-hyphen.mjs",
+    "replay": "node replay-report.mjs"
   },
   "devDependencies": {
     "canvas": "^3.1.0",

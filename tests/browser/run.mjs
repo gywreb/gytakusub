@@ -6,6 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
+import { execFileSync } from "node:child_process";
 import { createCanvas, loadImage } from "canvas";
 import { startMock } from "./mock-api.mjs";
 
@@ -92,6 +93,18 @@ if (!process.argv.includes("--bad-boxes")) {
 const rep = await sw.evaluate(async ({ tabId }) => chrome.tabs.sendMessage(tabId, { type: "DEBUG_REPORT" }), { tabId });
 const reportOk = rep && !rep.error && Array.isArray(rep.placements) && Array.isArray(rep.regions) && rep.work && rep.gytakusub;
 fs.writeFileSync(path.join(out, "report.json"), JSON.stringify(rep, null, 1));
+// one-click export: a .zip with original + debug render + json per page
+const [download, exp] = await Promise.all([
+  page.waitForEvent("download", { timeout: 30000 }),
+  sw.evaluate(async ({ tabId }) => chrome.tabs.sendMessage(tabId, { type: "EXPORT_REPORT" }), { tabId }),
+]);
+const zipPath = path.join(out, "report.zip"); await download.saveAs(zipPath);
+let zipOk = false;
+try {
+  const listing = execFileSync("unzip", ["-l", zipPath]).toString();
+  zipOk = exp?.ok && /summary\.json/.test(listing) && /page-01\.json/.test(listing) && /page-01\.debug\.png/.test(listing) && /page-01\.original\./.test(listing);
+  execFileSync("unzip", ["-tq", zipPath]); // CRCs
+} catch (e) { console.log("zip check:", e.message); zipOk = false; }
 
 // pixel diff between renders
 async function diff(a, b, name) {
@@ -131,6 +144,7 @@ for (const [i, d] of debugLogs.entries()) {
 }
 if (!debugLogs.length) { failures++; console.log("FAIL: no render happened"); }
 if (!reportOk) { failures++; console.log("FAIL: diagnostic report incomplete: " + JSON.stringify(rep).slice(0, 200)); }
+if (!zipOk) { failures++; console.log("FAIL: export zip missing files or corrupt: " + JSON.stringify(exp).slice(0, 200)); }
 if (peekChanged === false) { failures++; console.log("FAIL: hovering a bubble did not reveal the original"); }
 if (editOk === false) { failures++; console.log("FAIL: editing a line did not change the overlay"); }
 if (persisted === false) { failures++; console.log("FAIL: the edited line did not survive a reload"); }

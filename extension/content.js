@@ -59,7 +59,7 @@
   const bar = document.createElement("div"); bar.className = "bar"; bar.setAttribute("role", "toolbar"); bar.setAttribute("aria-label", "Gytakusub");
   const btnTranslate = document.createElement("button"); btnTranslate.setAttribute("aria-label", "Translate this image");
   const btnToggle = document.createElement("button"); btnToggle.setAttribute("aria-label", "Show or hide translation");
-  const btnReport = document.createElement("button"); btnReport.textContent = "Report"; btnReport.title = "Copy a diagnostic report and download the debug image"; btnReport.setAttribute("aria-label", "Copy diagnostic report");
+  const btnReport = document.createElement("button"); btnReport.textContent = "Report"; btnReport.title = "Download a diagnostic report for this page (original, debug render, JSON)"; btnReport.setAttribute("aria-label", "Copy diagnostic report");
   const status = document.createElement("span"); status.className = "status";
   bar.append(btnTranslate, btnToggle, btnReport, status);
   const toastEl = document.createElement("div"); toastEl.className = "toast"; toastEl.setAttribute("role", "status"); toastEl.setAttribute("aria-live", "polite"); toastEl.hidden = true;
@@ -186,24 +186,70 @@
       regions: res.regions, items: res.items, placements: res.placements,
     };
   }
-  async function report(img) {
-    const e = entries.get(img);
-    if (!e?.result) { toast("Translate the page first"); return; }
-    const json = JSON.stringify(buildReport(img, e), null, 1);
-    let copied = false;
-    try { await navigator.clipboard.writeText(json); copied = true; } catch { /* clipboard blocked: the download below still carries the data */ }
-    // debug render on a fresh (untainted) canvas: clean page + boxes + text
-    const res = e.result, c = document.createElement("canvas"); c.width = res.work.W; c.height = res.work.H;
-    const ctx = c.getContext("2d");
-    ctx.drawImage(e.cleanImg, 0, 0, res.work.W, res.work.H); drawDebug(ctx, res);
-    GyText.draw(ctx, res.placements, { fontFamily: settings.fontFamily, uppercase: settings.uppercase });
+  // Export: one .zip with, per translated page, the original image, the debug
+  // render (clean page + boxes + text) and the report JSON — nothing to capture by hand.
+  async function exportReport(imgs) {
+    const done = imgs.filter((i) => entries.get(i)?.status === "done" && entries.get(i).result);
+    if (!done.length) { toast("Nothing translated on this page yet"); return { ok: false }; }
+    toast(`Preparing report for ${done.length} page${done.length > 1 ? "s" : ""}…`, 20000);
+    const files = [];
     const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-    const download = (href, name) => { const a = document.createElement("a"); a.href = href; a.download = name; a.rel = "noopener"; document.documentElement.append(a); a.click(); a.remove(); };
-    c.toBlob((blob) => {
-      const url = URL.createObjectURL(blob); download(url, `gytakusub-report-${stamp}.png`); setTimeout(() => URL.revokeObjectURL(url), 10000);
-      if (!copied) download("data:application/json;charset=utf-8," + encodeURIComponent(json), `gytakusub-report-${stamp}.json`);
-      toast(copied ? "Report copied to the clipboard and debug image downloaded — paste the text and attach the image." : "Debug image and report JSON downloaded — attach both.", 6000);
-    }, "image/png");
+    const summary = { gytakusub: chrome.runtime.getManifest().version, when: new Date().toISOString(), page: location.href, userAgent: navigator.userAgent, pages: [] };
+    let n = 0;
+    for (const img of done.sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top)) {
+      const e = entries.get(img), id = String(++n).padStart(2, "0"), res = e.result;
+      const rep = buildReport(img, e);
+      files.push({ name: `page-${id}.json`, data: new TextEncoder().encode(JSON.stringify(rep, null, 1)) });
+      // debug render on a fresh (untainted) canvas
+      const c = document.createElement("canvas"); c.width = res.work.W; c.height = res.work.H;
+      const ctx = c.getContext("2d");
+      ctx.drawImage(e.cleanImg, 0, 0, res.work.W, res.work.H); drawDebug(ctx, res);
+      GyText.draw(ctx, res.placements, { fontFamily: settings.fontFamily, uppercase: settings.uppercase });
+      const png = await new Promise((r) => c.toBlob(r, "image/png"));
+      files.push({ name: `page-${id}.debug.png`, data: new Uint8Array(await png.arrayBuffer()) });
+      // original bytes, through the background (page CORS does not apply there)
+      try {
+        const msg = /^(blob|data):/i.test(e.src) ? { dataUrl: await blobToDataUrl(await (await fetch(e.src)).blob()) } : { url: e.src };
+        const r = await chrome.runtime.sendMessage({ type: "FETCH_IMAGE", ...msg });
+        if (r?.dataUrl) {
+          const [head, b64] = r.dataUrl.split(","); const ext = /png/.test(head) ? "png" : /webp/.test(head) ? "webp" : /gif/.test(head) ? "gif" : "jpg";
+          const bin = atob(b64), bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+          files.push({ name: `page-${id}.original.${ext}`, data: bytes });
+        }
+      } catch (err) { rep.originalError = String(err?.message || err); }
+      summary.pages.push({ id, image: e.src, items: res.items.length, regions: res.regions.length });
+    }
+    files.unshift({ name: "summary.json", data: new TextEncoder().encode(JSON.stringify(summary, null, 1)) });
+    const zip = makeZip(files);
+    const url = URL.createObjectURL(new Blob([zip], { type: "application/zip" }));
+    const a = document.createElement("a"); a.href = url; a.download = `gytakusub-report-${location.hostname}-${stamp}.zip`; a.rel = "noopener";
+    document.documentElement.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    toast(`Report downloaded (${done.length} page${done.length > 1 ? "s" : ""}, ${(zip.length / 1e6).toFixed(1)} MB). Attach the .zip.`, 7000);
+    return { ok: true, pages: done.length, bytes: zip.length, files: files.map((f) => f.name) };
+  }
+  function report(img) { return exportReport([img]); }
+
+  // Minimal ZIP writer (store, no compression): local headers + central directory.
+  const CRC_TABLE = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+  const crc32 = (d) => { let c = 0xffffffff; for (let i = 0; i < d.length; i++) c = CRC_TABLE[(c ^ d[i]) & 0xff] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
+  function makeZip(files) {
+    const enc = new TextEncoder(), parts = [], central = [];
+    let offset = 0;
+    const now = new Date(), dosTime = (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1), dosDate = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
+    const u16 = (v) => [v & 255, (v >>> 8) & 255], u32 = (v) => [v & 255, (v >>> 8) & 255, (v >>> 16) & 255, (v >>> 24) & 255];
+    for (const f of files) {
+      const name = enc.encode(f.name), crc = crc32(f.data), size = f.data.length;
+      const local = new Uint8Array([...u32(0x04034b50), ...u16(20), ...u16(0x0800), ...u16(0), ...u16(dosTime), ...u16(dosDate), ...u32(crc), ...u32(size), ...u32(size), ...u16(name.length), ...u16(0), ...name]);
+      parts.push(local, f.data);
+      central.push(new Uint8Array([...u32(0x02014b50), ...u16(20), ...u16(20), ...u16(0x0800), ...u16(0), ...u16(dosTime), ...u16(dosDate), ...u32(crc), ...u32(size), ...u32(size), ...u16(name.length), ...u16(0), ...u16(0), ...u16(0), ...u16(0), ...u32(0), ...u32(offset), ...name]));
+      offset += local.length + size;
+    }
+    const cdSize = central.reduce((s, c) => s + c.length, 0);
+    const end = new Uint8Array([...u32(0x06054b50), ...u16(0), ...u16(0), ...u16(files.length), ...u16(files.length), ...u32(cdSize), ...u32(offset), ...u16(0)]);
+    const out = new Uint8Array(offset + cdSize + end.length);
+    let p = 0; for (const c of [...parts, ...central, end]) { out.set(c, p); p += c.length; }
+    return out;
   }
 
   // ---------- queue (nearest-to-viewport first, limited parallelism) ----------
@@ -538,6 +584,7 @@
       case "PING": sendResponse({ ok: true }); break;
       case "TRANSLATE_VISIBLE": translateVisible(!!msg.force); sendResponse({ ok: true }); break;
       case "TOGGLE_OVERLAYS": allHidden = !allHidden; layout(); refreshBar(); sendResponse({ hidden: allHidden }); break;
+      case "EXPORT_REPORT": exportReport([...entries.keys()]).then(sendResponse, (e) => sendResponse({ error: e.message || String(e) })); return true;
       case "DEBUG_REPORT": {
         const img = [...entries.keys()].find((i) => entries.get(i)?.status === "done" && (msg.src ? srcOf(i) === msg.src : true));
         sendResponse(img ? buildReport(img, entries.get(img)) : { error: "No translated image" });

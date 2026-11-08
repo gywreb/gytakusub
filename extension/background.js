@@ -140,6 +140,27 @@ async function updateTabCtx(tabId, newTerms, newLines) {
   await chrome.storage.session.set({ [key]: mergeContext(await getTabCtx(tabId), newTerms, newLines) });
 }
 
+// ---------- image bytes (only http(s) URLs or inline data from our own content script) ----------
+
+const MAX_BYTES = 25 * 1024 * 1024;
+async function fetchImageBlob({ url, dataUrl }) {
+  let blob;
+  if (dataUrl) {
+    if (!/^data:image\//i.test(dataUrl)) throw new Error("Unsupported image data");
+    blob = dataUrlToBlob(dataUrl);
+  } else {
+    let u;
+    try { u = new URL(url); } catch { throw new Error("Invalid image URL"); }
+    if (!/^https?:$/.test(u.protocol)) throw new Error("Only http(s) images are supported");
+    const res = await fetch(u.href, { credentials: "omit" });
+    if (!res.ok) throw new Error(`Could not fetch image (${res.status})`);
+    blob = await res.blob();
+  }
+  if (blob.size > MAX_BYTES) throw new Error("Image is too large (over 25 MB)");
+  if (!blob.type.startsWith("image/")) blob = new Blob([await blob.arrayBuffer()], { type: "image/jpeg" });
+  return blob;
+}
+
 // ---------- main handler ----------
 
 async function handleTranslate(msg, sender) {
@@ -151,25 +172,7 @@ async function handleTranslate(msg, sender) {
   const cacheKey = "cache:" + (await sha1(`${PROMPT_VERSION}|${settings.model}|${settings.targetLang}|${settings.includeSource}|${settings.useContext}|${msg.url || msg.dataUrl?.slice(0, 512) + msg.dataUrl?.length}`));
   const cached = (await chrome.storage.session.get(cacheKey))[cacheKey];
 
-  // 1. bytes (only http(s) URLs or inline data from our own content script)
-  const MAX_BYTES = 25 * 1024 * 1024;
-  const fetchBytes = async () => {
-    let blob;
-    if (msg.dataUrl) {
-      if (!/^data:image\//i.test(msg.dataUrl)) throw new Error("Unsupported image data");
-      blob = dataUrlToBlob(msg.dataUrl);
-    } else {
-      let u;
-      try { u = new URL(msg.url); } catch { throw new Error("Invalid image URL"); }
-      if (!/^https?:$/.test(u.protocol)) throw new Error("Only http(s) images are supported");
-      const res = await fetch(u.href, { credentials: "omit" });
-      if (!res.ok) throw new Error(`Could not fetch image (${res.status})`);
-      blob = await res.blob();
-    }
-    if (blob.size > MAX_BYTES) throw new Error("Image is too large (over 25 MB)");
-    if (!blob.type.startsWith("image/")) blob = new Blob([await blob.arrayBuffer()], { type: "image/jpeg" });
-    return blob;
-  };
+  const fetchBytes = () => fetchImageBlob(msg);
 
   // Cache holds the model's answer only (not image bytes, which would exhaust
   // storage.session after a few pages); the page is re-analysed on a hit.
@@ -264,6 +267,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     case "TEST_KEY": reply(testKey()); return true;
     case "CLEAR_CACHE": reply(chrome.storage.session.clear().then(() => ({ ok: true }))); return true;
     case "EDIT_ITEM": reply(editItem(msg)); return true;
+    case "FETCH_IMAGE": reply(fetchImageBlob(msg).then(async (b) => ({ dataUrl: await blobToDataUrl(b), type: b.type }))); return true; // diagnostic export needs the original bytes
     case "ADD_GLOSSARY": reply(addGlossary(msg)); return true;
     case "RELAY_TO_TAB":
       reply(chrome.tabs.query({ active: true, currentWindow: true }).then(async ([tab]) => {

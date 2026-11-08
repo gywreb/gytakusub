@@ -14,6 +14,7 @@ async function init() {
   document.body.classList.toggle("off", !s.enabled);
   $("model").value = s.model;
   $("useContext").checked = !!s.useContext;
+  $("exportReport").style.display = s.debugOverlay ? "" : "none";
 
   const info = await chrome.runtime.sendMessage({ type: "ACTIVE_TAB_INFO" });
   currentHost = info?.host || null;
@@ -51,6 +52,13 @@ $("enabled").onchange = async (e) => {
 };
 $("translate").onclick = async () => { const r = await relay({ type: "TRANSLATE_VISIBLE" }, true); if (r?.error) $("state").textContent = r.error; else window.close(); };
 $("toggle").onclick = async () => { await relay({ type: "TOGGLE_OVERLAYS" }); init(); };
+$("exportReport").onclick = async () => {
+  const b = $("exportReport"); b.disabled = true; b.textContent = "Preparing…";
+  const r = await relay({ type: "EXPORT_REPORT" });
+  b.disabled = false; b.textContent = "Export debug report";
+  if (r?.error) $("state").textContent = "Export failed: " + r.error;
+  else if (r?.ok) $("state").textContent = `Report downloaded: ${r.pages} page${r.pages > 1 ? "s" : ""}`;
+};
 $("model").onchange = (e) => chrome.storage.sync.set({ model: e.target.value });
 $("useContext").onchange = (e) => chrome.storage.sync.set({ useContext: e.target.checked });
 $("site").onchange = async (e) => {

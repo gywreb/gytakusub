@@ -48,6 +48,7 @@ npm run test:browser  # the real extension + the web app in headless Chromium ag
 npm run viz -- fixtures/gen-03.png out.png --trace   # what the analyser saw, and why it rejected what it rejected
 npm run e2e           # full render of the demo page through the engine
 npm run vendor        # regenerate extension/vendor from the pinned packages (CI verifies)
+npm run replay -- report.zip   # reproduce a user's "Export debug report" offline (original + items → render)
 ```
 
 `GYT_CHANNEL=chrome npm run test:browser` uses an installed Chrome for Testing instead of Playwright's Chromium (branded Google Chrome ≥ 137 ignores `--load-extension`). Put your own pages in `tests/fixtures/real/` (git-ignored) for local tuning. Testing, verifying and merging a release branch step by step: [`docs/TESTING.md`](docs/TESTING.md).

@@ -31,7 +31,9 @@ Work through this list on a chapter you know. Tick what passes; for anything tha
 
 ### If something looks wrong
 
-Options → tick **Debug overlay** → *Save* → hover the page → *Redo*. Red boxes = bubbles found, blue = loose text found, green = where text went. Then hover the page again and click **Report** in the hover bar: it copies a diagnostic report to the clipboard and downloads `gytakusub-report-….png` (the debug render). Send me the pasted text and the PNG — that is everything I need to reproduce the page in the test harness. If the clipboard is blocked on that site, a `.json` is downloaded instead; attach it.
+Options → tick **Debug overlay** → *Save*. Then, with the chapter translated, click the toolbar icon → **Export debug report**. One `.zip` downloads with, for every translated page on that tab, the original image, the debug render (red = bubbles found, blue = loose text, green = where text went) and the report JSON. Attach the zip here — nothing to screenshot or copy. (The hover bar also has a **Report** button that exports just that one page.)
+
+On my side `npm run replay -- report.zip` reproduces every page offline, so the fix comes with a test against your actual page.
 
 Untick Debug overlay afterwards.
 
