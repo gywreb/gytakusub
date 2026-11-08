@@ -59,8 +59,9 @@
   const bar = document.createElement("div"); bar.className = "bar"; bar.setAttribute("role", "toolbar"); bar.setAttribute("aria-label", "Gytakusub");
   const btnTranslate = document.createElement("button"); btnTranslate.setAttribute("aria-label", "Translate this image");
   const btnToggle = document.createElement("button"); btnToggle.setAttribute("aria-label", "Show or hide translation");
+  const btnReport = document.createElement("button"); btnReport.textContent = "Report"; btnReport.title = "Copy a diagnostic report and download the debug image"; btnReport.setAttribute("aria-label", "Copy diagnostic report");
   const status = document.createElement("span"); status.className = "status";
-  bar.append(btnTranslate, btnToggle, status);
+  bar.append(btnTranslate, btnToggle, btnReport, status);
   const toastEl = document.createElement("div"); toastEl.className = "toast"; toastEl.setAttribute("role", "status"); toastEl.setAttribute("aria-live", "polite"); toastEl.hidden = true;
   shadow.append(style, root, bar, toastEl);
 
@@ -149,6 +150,7 @@
     btnTranslate.disabled = st === "working" || st === "queued";
     btnToggle.style.display = st === "done" ? "" : "none";
     btnToggle.textContent = e?.hidden || allHidden ? "Show" : "Hide";
+    btnReport.style.display = st === "done" && settings.debugOverlay ? "" : "none";
     status.textContent = e?.error ? "⚠ " + e.error : st === "done" && e.result ? `${e.result.items.length} lines` : "";
     status.style.display = status.textContent ? "" : "none";
   }
@@ -169,6 +171,40 @@
     const e = entries.get(hoverImg);
     if (e) { e.hidden = !e.hidden; refreshBar(); layout(); }
   });
+
+  btnReport.addEventListener("click", (ev) => { if (ev.isTrusted && hoverImg) report(hoverImg); });
+
+  // Diagnostic report: everything needed to reproduce a placement problem in the
+  // test harness — copied as JSON, plus the debug render as a PNG download.
+  function buildReport(img, e) {
+    const res = e.result;
+    return {
+      gytakusub: chrome.runtime.getManifest().version, when: new Date().toISOString(), page: location.href, image: e.src,
+      natural: [img.naturalWidth, img.naturalHeight], displayed: [Math.round(img.getBoundingClientRect().width), Math.round(img.getBoundingClientRect().height)], objectFit: e.objectFit,
+      work: res.work, letter: res.letter, fromCache: res.fromCache,
+      settings: { model: settings.model, targetLang: settings.targetLang, fontFamily: settings.fontFamily, uppercase: settings.uppercase, useContext: settings.useContext },
+      regions: res.regions, items: res.items, placements: res.placements,
+    };
+  }
+  async function report(img) {
+    const e = entries.get(img);
+    if (!e?.result) { toast("Translate the page first"); return; }
+    const json = JSON.stringify(buildReport(img, e), null, 1);
+    let copied = false;
+    try { await navigator.clipboard.writeText(json); copied = true; } catch { /* clipboard blocked: the download below still carries the data */ }
+    // debug render on a fresh (untainted) canvas: clean page + boxes + text
+    const res = e.result, c = document.createElement("canvas"); c.width = res.work.W; c.height = res.work.H;
+    const ctx = c.getContext("2d");
+    ctx.drawImage(e.cleanImg, 0, 0, res.work.W, res.work.H); drawDebug(ctx, res);
+    GyText.draw(ctx, res.placements, { fontFamily: settings.fontFamily, uppercase: settings.uppercase });
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    const download = (href, name) => { const a = document.createElement("a"); a.href = href; a.download = name; a.rel = "noopener"; document.documentElement.append(a); a.click(); a.remove(); };
+    c.toBlob((blob) => {
+      const url = URL.createObjectURL(blob); download(url, `gytakusub-report-${stamp}.png`); setTimeout(() => URL.revokeObjectURL(url), 10000);
+      if (!copied) download("data:application/json;charset=utf-8," + encodeURIComponent(json), `gytakusub-report-${stamp}.json`);
+      toast(copied ? "Report copied to the clipboard and debug image downloaded — paste the text and attach the image." : "Debug image and report JSON downloaded — attach both.", 6000);
+    }, "image/png");
+  }
 
   // ---------- queue (nearest-to-viewport first, limited parallelism) ----------
 
@@ -502,6 +538,11 @@
       case "PING": sendResponse({ ok: true }); break;
       case "TRANSLATE_VISIBLE": translateVisible(!!msg.force); sendResponse({ ok: true }); break;
       case "TOGGLE_OVERLAYS": allHidden = !allHidden; layout(); refreshBar(); sendResponse({ hidden: allHidden }); break;
+      case "DEBUG_REPORT": {
+        const img = [...entries.keys()].find((i) => entries.get(i)?.status === "done" && (msg.src ? srcOf(i) === msg.src : true));
+        sendResponse(img ? buildReport(img, entries.get(img)) : { error: "No translated image" });
+        break;
+      }
       case "GET_STATE": {
         let done = 0, working = 0;
         for (const e of entries.values()) { if (e.status === "done") done++; if (e.status === "working" || e.status === "queued") working++; }

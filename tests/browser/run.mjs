@@ -88,6 +88,11 @@ if (!process.argv.includes("--bad-boxes")) {
   await page.screenshot({ path: path.join(out, "6-after-edit-reload.png") });
 }
 
+// ---- diagnostic report (what the user sends when something is off) ----
+const rep = await sw.evaluate(async ({ tabId }) => chrome.tabs.sendMessage(tabId, { type: "DEBUG_REPORT" }), { tabId });
+const reportOk = rep && !rep.error && Array.isArray(rep.placements) && Array.isArray(rep.regions) && rep.work && rep.gytakusub;
+fs.writeFileSync(path.join(out, "report.json"), JSON.stringify(rep, null, 1));
+
 // pixel diff between renders
 async function diff(a, b, name) {
   const [A, B] = await Promise.all([loadImage(a), loadImage(b)]);
@@ -125,6 +130,7 @@ for (const [i, d] of debugLogs.entries()) {
   }
 }
 if (!debugLogs.length) { failures++; console.log("FAIL: no render happened"); }
+if (!reportOk) { failures++; console.log("FAIL: diagnostic report incomplete: " + JSON.stringify(rep).slice(0, 200)); }
 if (peekChanged === false) { failures++; console.log("FAIL: hovering a bubble did not reveal the original"); }
 if (editOk === false) { failures++; console.log("FAIL: editing a line did not change the overlay"); }
 if (persisted === false) { failures++; console.log("FAIL: the edited line did not survive a reload"); }

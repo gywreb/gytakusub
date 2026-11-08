@@ -31,10 +31,7 @@ Work through this list on a chapter you know. Tick what passes; for anything tha
 
 ### If something looks wrong
 
-Options → tick **Debug overlay** → *Save* → hover the page → *Redo*. Red boxes = bubbles found, blue = loose text found, green = where text went. Send me:
-- the screenshot with the boxes,
-- **F12** → *Console* → right-click the `Gytakusub debug` line → *Copy object* → paste,
-- and the original page image (right-click it → *Save image as*) if you can.
+Options → tick **Debug overlay** → *Save* → hover the page → *Redo*. Red boxes = bubbles found, blue = loose text found, green = where text went. Then hover the page again and click **Report** in the hover bar: it copies a diagnostic report to the clipboard and downloads `gytakusub-report-….png` (the debug render). Send me the pasted text and the PNG — that is everything I need to reproduce the page in the test harness. If the clipboard is blocked on that site, a `.json` is downloaded instead; attach it.
 
 Untick Debug overlay afterwards.
 

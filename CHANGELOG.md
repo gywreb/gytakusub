@@ -13,7 +13,7 @@ A rebuilt page engine. 1.0 found bubbles, erased lettering and fitted text with 
 - **Edit a line.** Double-click a translated bubble to correct the text; the correction stays for that page until you Redo. The same dialog can teach the glossary ("original term = translation") for later pages.
 - **Bundled lettering font** (Comic Neue Bold, SIL Open Font License) so pages look the same on every machine; Options → "Font family" still overrides it.
 - **Hyphenation** at syllable boundaries using Franklin Liang's algorithm (the `hyphen` package, vendored), tried only when an un-hyphenated layout does not fit.
-- **Debug overlay** (Options) drawing detected regions and text areas, and a `Gytakusub debug` console log, for reporting placement problems.
+- **Debug overlay** (Options) drawing detected regions and text areas, plus a **Report** button in the hover bar that copies a diagnostic JSON and downloads the debug render — one click to report a placement problem.
 - **Real-browser tests.** The actual extension and the web app run in headless Chromium against a mock Claude API on every push; detection, layout and erase are asserted against ground truth on thirteen synthetic pages (Spanish, Italian, Japanese).
 
 ### Changed
