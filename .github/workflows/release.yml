@@ -9,6 +9,8 @@ jobs:
   release:
     runs-on: ubuntu-latest
     permissions: { contents: write }
+    env:
+      HAS_CWS: ${{ secrets.CWS_REFRESH_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -30,7 +32,7 @@ jobs:
           files: dist/*.zip
           generate_release_notes: true
       - name: Upload to Chrome Web Store and submit for review
-        if: ${{ secrets.CWS_REFRESH_TOKEN != '' }}
+        if: env.HAS_CWS == 'true'
         env:
           CWS_EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
           CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
@@ -38,5 +40,5 @@ jobs:
           CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
         run: node scripts/cws-publish.mjs dist/*.zip
       - name: Skipped store upload
-        if: ${{ secrets.CWS_REFRESH_TOKEN == '' }}
+        if: env.HAS_CWS != 'true'
         run: echo "::notice::CWS secrets not set — zip attached to the GitHub Release only. See store/RELEASE-CHECKLIST.md § Automating updates."
