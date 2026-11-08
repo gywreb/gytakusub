@@ -56,14 +56,28 @@ export function analyze(cv, img) {
   // Merge, number regions in reading order (top-to-bottom, left-to-right in bands).
   let blocks = [], bubbles = [];
   for (const p of polarities) { blocks.push(...p.blocks); bubbles.push(...p.bubbles); }
+  // Bubbles do not nest: a light shape that holds another bubble is a background.
+  // B is inside A when all four corners of B's box fall on A's filled shape (a
+  // small bubble overlapping a big one has corners outside it).
+  const encloses = (A, B) => {
+    if (!A.fill || B.area >= 0.5 * A.area) return false;
+    const on = (x, y) => { const lx = x - A.box.x, ly = y - A.box.y; return lx >= 0 && ly >= 0 && lx < A.box.w && ly < A.box.h && A.fill[ly * A.box.w + lx] !== 0; };
+    const { x, y, w, h } = B.box;
+    return on(x, y) && on(x + w - 1, y) && on(x, y + h - 1) && on(x + w - 1, y + h - 1);
+  };
+  bubbles = bubbles.filter((A) => { const nests = bubbles.some((B) => B !== A && encloses(A, B)); if (nests) { trace("region", A.box, "encloses another bubble: a background"); for (const bl of A.blocks) bl.bubble = null; } return !nests; });
 
-  // Dialogue size: glyph-weighted median over bubble text (else all text).
-  // Regions whose lettering is far from it are sound effects or art, not dialogue.
+  // Dialogue size: letter-weighted median over all text blocks (real text carries
+  // far more letters than fragments on art; bubbles alone can be the wrong ones
+  // on a page whose real bubbles have no outline).
   const weighted = (bs) => { const v = []; for (const b of bs) for (let i = 0; i < Math.min(b.glyphCount, 40); i++) v.push(b.letter); return median(v); };
-  const pageLetter = weighted(blocks.filter((b) => b.bubble)) || weighted(blocks) || Math.max(8, W / 60);
+  const pageLetter = weighted(blocks) || Math.max(8, W / 60);
   // Dialogue on one page spans about half to twice the typical size (whispers,
   // shouts); what is further out is sound effects or art.
-  bubbles = bubbles.filter((b) => { const ok = b.letter >= 0.3 * pageLetter && b.letter <= 4 * pageLetter; if (!ok) { trace("region", b.box, "lettering size far from the page's dialogue", { letter: b.letter, pageLetter }); for (const bl of b.blocks) bl.bubble = null; } return ok; });
+  // Bubbles are kept whatever their lettering size: the page estimate is only as
+  // good as the page's bubbles (one shout bubble on a sparse page skews it), and
+  // a bubble has already shown it holds lettering. Loose text has no such
+  // evidence and is held to the dialogue size band.
   blocks = blocks.filter((b) => b.bubble || (b.letter >= 0.6 * pageLetter && b.letter <= 2.2 * pageLetter));
   const band = Math.max(1, Math.round(H / 24));
   const order = (a, b) => (Math.floor(a.box.y / band) - Math.floor(b.box.y / band)) || (a.box.x - b.box.x);
@@ -71,14 +85,27 @@ export function analyze(cv, img) {
   // Free text (no bubble around it) needs stronger evidence than lettering in a
   // bubble: a dense line of several letters. Fragments of art along a speed line
   // group into "lines" too, but sparsely.
-  const freeBlocks = blocks.filter((b) => {
-    if (b.bubble !== null || b.glyphCount < (b.dark ? 5 : 4) || b.components < 3) return false; // several separate marks, not one long fragment
-    if (b.letter < 0.8 * pageLetter) return false; // narration is not smaller than the dialogue
-    if (b.gbox.h > 1.8 * b.letter) return false; // one line of text is one row high; a cloud of fragments is not
+  // Free text (no bubble around it) needs stronger evidence than lettering in a
+  // bubble. Each candidate line must look like one row of letters; the lines are
+  // then merged into paragraphs (stacked with small gaps, or side by side for
+  // columns), and the paragraph as a whole must be a dense run of several
+  // separate letters — a short line like "ya es" counts through its paragraph.
+  const lineLike = blocks.filter((b) => {
+    if (b.bubble !== null) return false;
+    if (b.letter < 0.8 * pageLetter || b.letter > 2.2 * pageLetter) return false; // narration is dialogue-sized
+    // one row high — or a short stack of rows the closing already joined (several
+    // letters); a cloud of fragments is neither
+    if (b.gbox.h > 1.8 * b.letter && !(b.glyphCount >= 6 && b.gbox.h <= 4 * b.letter)) return false;
     const gs = b.glyphs.map((gi) => polarities[b.dark ? 1 : 0].glyphs[gi]);
-    const density = gs.reduce((s, g) => s + g.w, 0) / Math.max(1, b.gbox.w);
     let inkTall = 0, inkTot = 0; for (const g of gs) { inkTot += g.a; if (g.w <= 1.4 * g.h) inkTall += g.a; } // letters are not wider than tall (W and M aside)
-    return density >= 0.45 && b.gbox.w >= 1.2 * b.gbox.h && inkTall / inkTot >= 0.6;
+    return inkTall / inkTot >= 0.6;
+  });
+  const freeBlocks = mergeParagraphs(lineLike).filter((b) => {
+    if (b.glyphCount < (b.dark ? 5 : 4) || b.components < 3) return false; // several separate marks, not one long fragment
+    const gs = b.glyphs.map((gi) => polarities[b.dark ? 1 : 0].glyphs[gi]);
+    const density = gs.reduce((s, g) => s + g.w, 0) / Math.max(1, b.lineWidth || b.gbox.w);
+    const lines = b.lines || 1;
+    return density >= 0.45 && (lines >= 3 || b.gbox.w >= 1.2 * b.gbox.h);
   }).sort(order);
   const regions = [];
   let id = 1;
@@ -103,6 +130,32 @@ export function analyze(cv, img) {
     polarities,
     dispose() { for (const p of polarities) p.dispose(); },
   };
+}
+
+/** Agglomerative merge of text lines into paragraphs (same polarity, similar size, small gap, overlapping extent). */
+function mergeParagraphs(lines) {
+  const out = lines.map((b) => ({ ...b, gbox: { ...b.gbox }, box: { ...b.box }, glyphs: [...b.glyphs] }));
+  const gap = (a0, a1, b0, b1) => Math.max(a0, b0) - Math.min(a1, b1); // negative when overlapping
+  const overlapFrac = (a0, a1, b0, b1) => -gap(a0, a1, b0, b1) / Math.max(1, Math.min(a1 - a0, b1 - b0));
+  let merged = true;
+  while (merged) {
+    merged = false;
+    outer: for (let i = 0; i < out.length; i++) for (let j = i + 1; j < out.length; j++) {
+      const a = out[i], b = out[j];
+      if (a.dark !== b.dark) continue;
+      const L = Math.max(a.letter, b.letter);
+      if (Math.min(a.letter, b.letter) < 0.5 * L) continue;
+      const A = a.gbox, B = b.gbox;
+      const stacked = overlapFrac(A.x, A.x + A.w, B.x, B.x + B.w) >= 0.4 && gap(A.y, A.y + A.h, B.y, B.y + B.h) <= 1.3 * L;
+      const beside = overlapFrac(A.y, A.y + A.h, B.y, B.y + B.h) >= 0.4 && gap(A.x, A.x + A.w, B.x, B.x + B.w) <= 0.8 * L;
+      if (!stacked && !beside) continue;
+      const ux0 = Math.min(A.x, B.x), uy0 = Math.min(A.y, B.y), ux1 = Math.max(A.x + A.w, B.x + B.w), uy1 = Math.max(A.y + A.h, B.y + B.h);
+      const bx0 = Math.min(a.box.x, b.box.x), by0 = Math.min(a.box.y, b.box.y), bx1 = Math.max(a.box.x + a.box.w, b.box.x + b.box.w), by1 = Math.max(a.box.y + a.box.h, b.box.y + b.box.h);
+      out[i] = { ...a, gbox: { x: ux0, y: uy0, w: ux1 - ux0, h: uy1 - uy0 }, box: { x: bx0, y: by0, w: bx1 - bx0, h: by1 - by0 }, glyphs: a.glyphs.concat(b.glyphs), glyphCount: a.glyphCount + b.glyphCount, components: a.components + b.components, inkArea: a.inkArea + b.inkArea, letter: Math.max(a.letter, b.letter), lines: (a.lines || 1) + (b.lines || 1), lineWidth: (a.lineWidth || a.gbox.w) + (b.lineWidth || b.gbox.w) };
+      out.splice(j, 1); merged = true; break outer;
+    }
+  }
+  return out;
 }
 
 function analyzePolarity(cv, src, gray, base, W, H, dark) {
@@ -241,10 +294,12 @@ function analyzePolarity(cv, src, gray, base, W, H, dark) {
     const x = L[i * 5], y = L[i * 5 + 1], w = L[i * 5 + 2], h = L[i * 5 + 3], a = L[i * 5 + 4];
     const frac = a / (W * H), rbox = { x, y, w, h };
     const reject = (why, extra) => trace("region", rbox, why, { frac, blocks: inBlocks.length, ...extra });
-    if (frac < 0.0006 || frac > 0.12) { reject("area out of range"); continue; }
-    if (w > 0.6 * W || h > 0.45 * H || w * h > 0.15 * W * H) { reject("too large for a bubble"); continue; } // a bubble is never most of the page
+    if (frac < 0.0006 || frac > 0.2) { reject("area out of range"); continue; }
+    if (w > 0.8 * W || h > 0.6 * H || w * h > 0.3 * W * H) { reject("too large for a bubble"); continue; } // a bubble is never most of the page
     const touches = x <= 1 || y <= 1 || x + w >= W - 1 || y + h >= H - 1;
-    if (touches && frac > 0.02) { reject("touches the page edge"); continue; } // page/panel background, not a bubble
+    // Bubbles often bleed off the page or panel edge; a background touching the
+    // edge is large (and the content tests below catch what art it holds).
+    if (touches && frac > 0.08) { reject("touches the page edge"); continue; }
     if (a / (w * h) < 0.3) { reject("too ragged", { fill: a / (w * h) }); continue; } // gutters, sky between art
     // Text footprint: the blocks' union box (a vertical column of characters is
     // many small blocks) — but no larger than 3× their summed area, so two
@@ -275,7 +330,7 @@ function analyzePolarity(cv, src, gray, base, W, H, dark) {
     // fold) are not lettering, which is small relative to the bubble holding it;
     // and letters are dense within their own footprint.
     const letterHere = capHeight(inBlocks.map((b) => b.letter));
-    if (glyphCount <= 3 && letterHere > 0.25 * Math.min(w, h)) { reject("marks too large for the shape", { letter: letterHere, letters: glyphCount }); continue; }
+    if ((glyphCount <= 3 && letterHere > 0.25 * Math.min(w, h)) || letterHere > 0.55 * Math.min(w, h)) { reject("marks too large for the shape", { letter: letterHere, letters: glyphCount }); continue; } // sound effects enclose light gaps between their own strokes
     if (glyphCount < 8 && textInk / Math.max(1, textArea) < 0.06) { reject("marks too sparse in their footprint", { inkInFoot: textInk / Math.max(1, textArea), glyphCount }); continue; }
     // Glyph heights cluster across the whole region in real lettering (one or two
     // sizes); mechanical detail and foliage spread out.

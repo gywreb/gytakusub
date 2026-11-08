@@ -28,14 +28,14 @@ const missReasons = new Map();
 if (!args.length) { console.error("usage: node score-reports.mjs [--engine dir] <report.zip>..."); process.exit(2); }
 
 const inside = (r, cx, cy) => cx >= r.box.x && cy >= r.box.y && cx <= r.box.x + r.box.w && cy <= r.box.y + r.box.h;
-let T = { items: 0, covered: 0, asBubble: 0, dialogue: 0, regions: 0, waste: 0, pages: 0, ms: 0 };
+let T = { items: 0, covered: 0, asBubble: 0, dialogue: 0, asBubbleChars: 0, dialogueChars: 0, regions: 0, waste: 0, pages: 0, ms: 0 };
 console.log("report/page                 items covered asBubble regions waste  ms");
 for (const zip of args) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "gyt-score-"));
   execFileSync("unzip", ["-oq", zip, "-d", tmp]);
   const summary = JSON.parse(fs.readFileSync(path.join(tmp, "summary.json"), "utf8"));
   const label = path.basename(zip).replace(/^.*?gytakusub-report-/, "").replace(/-\d{4}-.*$/, "");
-  let S = { items: 0, covered: 0, asBubble: 0, dialogue: 0, regions: 0, waste: 0, pages: 0, ms: 0 };
+  let S = { items: 0, covered: 0, asBubble: 0, dialogue: 0, asBubbleChars: 0, dialogueChars: 0, regions: 0, waste: 0, pages: 0, ms: 0 };
   for (const pg of summary.pages) {
     const rep = JSON.parse(fs.readFileSync(path.join(tmp, `page-${pg.id}.json`), "utf8"));
     const orig = fs.readdirSync(tmp).find((f) => f.startsWith(`page-${pg.id}.original.`));
@@ -58,11 +58,21 @@ for (const zip of args) {
       else if (it.box) spots.push({ x: (it.box[0] + it.box[2] / 2) * W, y: (it.box[1] + it.box[3] / 2) * H, text: it.text, dialogue });
     }
     const used = new Set();
-    let covered = 0, asBubble = 0, dialogue = 0;
+    let covered = 0, asBubble = 0, dialogue = 0, asBubbleChars = 0, dialogueChars = 0;
     for (const sp of spots) {
-      if (sp.dialogue) dialogue++;
+      if (sp.dialogue) { dialogue++; dialogueChars += sp.text.length; }
       const r = an.regions.find((r) => inside(r, sp.x, sp.y));
-      if (r) { covered++; used.add(r.id); if (sp.dialogue && r.kind === "bubble") asBubble++; continue; }
+      if (r) {
+        covered++; used.add(r.id);
+        if (sp.dialogue && r.kind === "bubble") { asBubble++; asBubbleChars += sp.text.length; }
+        else if (sp.dialogue) {
+          const around = rejections.filter((j) => j.kind === "region" && inside(j, sp.x, sp.y)).sort((a, b) => a.box.w * a.box.h - b.box.w * b.box.h);
+          const why = "NOT-AS-BUBBLE " + (around.length ? around[0].why : "no bubble candidate");
+          missReasons.set(why, (missReasons.get(why) || 0) + 1);
+          if (showMisses) console.log(`   ${why} ${label}/${pg.id} ${JSON.stringify(sp.text).slice(0, 40)} ${around.length ? JSON.stringify(around[0].extra, (k, v) => (typeof v === "number" ? +v.toFixed(2) : v)).slice(0, 100) : ""}`);
+        }
+        continue;
+      }
       // explain the miss: the smallest rejected region (or block) around the spot
       const around = rejections.filter((j) => inside(j, sp.x, sp.y)).sort((a, b) => a.box.w * a.box.h - b.box.w * b.box.h);
       const why = around.length ? `${around[0].kind}: ${around[0].why}` : "no candidate at all";
@@ -70,13 +80,13 @@ for (const zip of args) {
       if (showMisses) console.log(`   MISS ${label}/${pg.id} ${JSON.stringify(sp.text).slice(0, 40)} ← ${why} ${around.length ? JSON.stringify(around[0].extra, (k, v) => (typeof v === "number" ? +v.toFixed(2) : v)).slice(0, 120) : ""}`);
     }
     const waste = an.regions.filter((r) => !used.has(r.id)).length;
-    S.items += spots.length; S.covered += covered; S.asBubble += asBubble; S.dialogue += dialogue; S.regions += an.regions.length; S.waste += waste; S.pages++; S.ms += ms;
+    S.items += spots.length; S.covered += covered; S.asBubble += asBubble; S.dialogue += dialogue; S.asBubbleChars += asBubbleChars; S.dialogueChars += dialogueChars; S.regions += an.regions.length; S.waste += waste; S.pages++; S.ms += ms;
     console.log(`${(label + "/" + pg.id).padEnd(28)}${String(spots.length).padStart(5)}${String(covered).padStart(8)}${(asBubble + "/" + dialogue).padStart(9)}${String(an.regions.length).padStart(8)}${String(waste).padStart(6)}${String(ms).padStart(5)}`);
     an.dispose();
   }
-  console.log(`${("= " + label).padEnd(28)}${String(S.items).padStart(5)}${String(S.covered).padStart(8)} (${(100 * S.covered / Math.max(1, S.items)).toFixed(0)}%)  bubbles ${S.asBubble}/${S.dialogue} (${(100 * S.asBubble / Math.max(1, S.dialogue)).toFixed(0)}%)  waste ${(S.waste / Math.max(1, S.pages)).toFixed(1)}/page`);
+  console.log(`${("= " + label).padEnd(28)}${String(S.items).padStart(5)}${String(S.covered).padStart(8)} (${(100 * S.covered / Math.max(1, S.items)).toFixed(0)}%)  bubbles ${S.asBubble}/${S.dialogue} (${(100 * S.asBubble / Math.max(1, S.dialogue)).toFixed(0)}%, by text ${(100 * S.asBubbleChars / Math.max(1, S.dialogueChars)).toFixed(0)}%)  waste ${(S.waste / Math.max(1, S.pages)).toFixed(1)}/page`);
   for (const k of Object.keys(T)) T[k] += S[k];
   fs.rmSync(tmp, { recursive: true, force: true });
 }
 console.log("\nmisses by nearest rejection:"); for (const [k, v] of [...missReasons].sort((a, b) => b[1] - a[1])) console.log(`  ${String(v).padStart(3)}  ${k}`);
-console.log(`\nTOTAL: coverage ${T.covered}/${T.items} = ${(100 * T.covered / Math.max(1, T.items)).toFixed(1)}%   dialogue recognised as a bubble ${T.asBubble}/${T.dialogue} = ${(100 * T.asBubble / Math.max(1, T.dialogue)).toFixed(1)}%   waste ${T.waste} regions over ${T.pages} pages = ${(T.waste / Math.max(1, T.pages)).toFixed(2)}/page   ${(T.ms / Math.max(1, T.pages)).toFixed(0)} ms/page`);
+console.log(`\nTOTAL: coverage ${T.covered}/${T.items} = ${(100 * T.covered / Math.max(1, T.items)).toFixed(1)}%   dialogue recognised as a bubble ${T.asBubble}/${T.dialogue} = ${(100 * T.asBubble / Math.max(1, T.dialogue)).toFixed(1)}% (by text ${(100 * T.asBubbleChars / Math.max(1, T.dialogueChars)).toFixed(1)}%)   waste ${T.waste} regions over ${T.pages} pages = ${(T.waste / Math.max(1, T.pages)).toFixed(2)}/page   ${(T.ms / Math.max(1, T.pages)).toFixed(0)} ms/page`);
