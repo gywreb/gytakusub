@@ -11,7 +11,7 @@ const scale = Math.min(1, 1600 / Math.max(img.width, img.height));
 const W = Math.round(img.width * scale), H = Math.round(img.height * scale);
 const c = createCanvas(W, H), ctx = c.getContext("2d"); ctx.drawImage(img, 0, 0, W, H);
 const t0 = Date.now();
-if (process.argv.includes("--trace")) globalThis.GYT_TRACE = (kind, box, why, extra) => { if (box.w * box.h > 60) console.log(`  rejected ${kind} ${JSON.stringify(box)}: ${why} ${JSON.stringify(extra, (k, v) => (typeof v === "number" ? +v.toFixed(3) : v))}`); };
+if (process.argv.includes("--trace")) globalThis.GYT_TRACE = (kind, box, why, extra) => { if (box.w * box.h > 60) console.log(`  ${why === "accepted" ? "accepted" : "rejected"} ${kind} ${JSON.stringify(box)}: ${why} ${JSON.stringify(extra, (k, v) => (typeof v === "number" ? +v.toFixed(3) : v))}`); };
 const an = analyze(cv, ctx.getImageData(0, 0, W, H), { detector });
 const ms = Date.now() - t0;
 ctx.lineWidth = 2; ctx.font = `bold ${Math.round(W / 70)}px sans-serif`;

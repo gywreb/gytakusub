@@ -2,10 +2,14 @@
 // fonts — so the page side (which has the fonts) only has to fit text into
 // rectangles. All coordinates are working-resolution pixels.
 //
-// A tagged item goes into its stamped region, full stop: the stamps are our
-// own numbering drawn on the image, so a matching tag is evidence the model
-// read the picture; its pixel box is not. Boxes only order speakers inside a
-// joined bubble, or place items that carry no tag.
+// A tagged item goes into its stamped region: the stamps are our own numbering
+// drawn on the image, so a matching tag is evidence the model read the
+// picture. The model's pixel box is the second witness: when it puts the text
+// squarely inside a *different* region, the number was misread (a stamp sits
+// at a corner and can land next to a neighbour's text) and the box decides.
+// Inside a region, each translation is anchored to the lettering it replaces:
+// it takes the largest rectangle of the shape around that lettering, never
+// another speaker's line.
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
@@ -23,18 +27,25 @@ export function layout(an, items) {
     if (!it.text) continue;
     const px = it.box ? { x: it.box[0] * W, y: it.box[1] * H, w: it.box[2] * W, h: it.box[3] * H } : null;
     let region = it.tag != null ? byId.get(it.tag) : null;
-    // A tag is trusted within reason: the model's own box drifts, but when its
-    // centre is nowhere near the stamped region the number was misread, and
-    // following it would erase and re-letter the wrong shape.
     if (region && px) {
-      const off = boxOffset(region.box, px);
-      const letters = region.kind === "bubble" ? region.ref.blocks.reduce((n, b) => n + b.glyphCount, 0) : region.ref.glyphCount;
-      const ratio = it.text.length / Math.max(1, letters); // translation length vs lettering found (≈1 for a right match)
-      if (off > 1 || (off > 0.5 && (ratio < 0.4 || ratio > 4))) region = null;
+      const cx = px.x + px.w / 2, cy = px.y + px.h / 2;
+      if (!inBox(region.box, cx, cy)) {
+        // The box's centre lies outside the stamped region. Inside another
+        // region's shape it names that one; otherwise the box merely drifted,
+        // unless it is nowhere near and the text length does not fit either.
+        const alt = holder(an, px, region);
+        if (alt) region = alt;
+        else {
+          const off = boxOffset(region.box, px);
+          const letters = region.kind === "bubble" ? region.ref.blocks.reduce((n, b) => n + b.glyphCount, 0) : region.ref.glyphCount;
+          const ratio = it.text.length / Math.max(1, letters); // translation length vs lettering found (≈1 for a right match)
+          if (off > 1 || (off > 0.5 && (ratio < 0.4 || ratio > 4))) region = null;
+        }
+      }
     }
     // A shape too narrow for the line (one letter per row) is not where it goes.
     if (region && region.kind === "bubble" && px && region.box.w < 3 * region.letter && it.text.length > 4) region = null;
-    if (!region && px && it.tag == null) region = nearestRegion(an.regions, px);
+    if (!region && px) region = nearestRegion(an, px);
     if (region) (groups.get(region.id) || groups.set(region.id, []).get(region.id)).push({ it, px });
     else if (px) loose.push({ it, px });
   }
@@ -46,24 +57,30 @@ export function layout(an, items) {
     const color = r.dark ? "#fff" : "#000";
     if (r.kind === "bubble") {
       const inside = an.insideOf(id), bbox = r.box;
-      if (members.length === 1) {
-        const rect = inscribedRect(inside, bbox) || inset(bbox, 0.78);
-        placements.push({ text: members[0].it.text, size: members[0].it.size, rect, letter, color, halo: false, tag: id, item: members[0].it.index ?? null });
-      } else {
-        // Joined bubble: order speakers top-to-bottom (by their boxes, else
-        // evenly), cut at the waists between them, inscribe each lobe.
-        const n = members.length;
-        const centres = members.map((m, i) => m.px ? m.px.y + m.px.h / 2 : bbox.y + bbox.h * (i + 0.5) / n);
-        const order = centres.map((c, i) => [c, i]).sort((a, b) => a[0] - b[0]);
-        const edges = [bbox.y];
-        for (let k = 0; k < n - 1; k++) edges.push(waistRow(inside, bbox, order[k][0], order[k + 1][0]));
-        edges.push(bbox.y + bbox.h);
-        order.forEach(([, i], k) => {
-          const ya = edges[k], yb = edges[k + 1];
-          const rect = inscribedRect(inside, bbox, ya, yb) || { x: bbox.x + bbox.w * 0.15, y: ya + (yb - ya) * 0.1, w: bbox.w * 0.7, h: (yb - ya) * 0.8 };
-          placements.push({ text: members[i].it.text, size: members[i].it.size, rect, letter, color, halo: false, tag: id, item: members[i].it.index ?? null });
-        });
-      }
+      // Each speaker's translation is anchored to the lettering it replaces (the
+      // detector's text block nearest its box; members without a box take the
+      // remaining blocks in reading order) and keeps off the other speakers' lines.
+      const anchors = assignAnchors(r.ref.blocks, members, bbox, letter);
+      // Smaller regions lying within this shape are never written over: the
+      // bubbles inside a light background that passed as a bubble, say.
+      const foreign = an.regions.filter((q) => q.id !== id && area(q.box) < area(bbox) && overlap(q.box, bbox) >= 0.5 * area(q.box)).map((q) => grow(q.box, letter * 0.3));
+      members.forEach((m, i) => {
+        const a = anchors[i];
+        // off limits: the other speakers' lettering, and everything past the cut
+        // between the two (the waist of a joined bubble, else midway between them)
+        const others = [...foreign];
+        anchors.forEach((o, j) => { if (j !== i) others.push(grow(o, letter * 0.5), beyondCut(inside, bbox, a, o)); });
+        const slack = 1.5 * letter;
+        const anchored = inscribedRect(inside, bbox, { anchor: a, exclude: others, slack });
+        // A translation needs room in proportion to the lettering it replaces, not
+        // all the room the shape has: a tall open shape would otherwise centre a
+        // short line far from where it was.
+        const rect = (anchored && capAround(anchored, Math.max(3.5 * a.w, 8 * letter), Math.max(3.5 * a.h, 4 * letter), a.x + a.w / 2, a.y + a.h / 2))
+          || inscribedRect(inside, bbox, { exclude: others })
+          || inscribedRect(inside, bbox)
+          || inset(bbox, 0.78);
+        placements.push({ text: m.it.text, size: m.it.size, rect, letter, color, halo: false, tag: id, item: m.it.index ?? null });
+      });
     } else {
       // Free text block: the translation takes the block's own footprint, with
       // a little room, and is drawn with a halo since it sits on artwork.
@@ -81,25 +98,110 @@ export function layout(an, items) {
   return { placements, regionIds: new Set(groups.keys()) };
 }
 
+const inBox = (b, x, y) => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h;
+const grow = (b, k) => ({ x: b.x - k, y: b.y - k, w: b.w + 2 * k, h: b.h + 2 * k });
+const area = (b) => b.w * b.h;
+const overlap = (a, b) => Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+
+/** Whether the region's shape (its interior for a bubble, its box otherwise) holds the point. */
+function shapeHolds(an, r, x, y) {
+  if (!inBox(r.box, x, y)) return false;
+  const inside = r.kind === "bubble" ? an.insideOf(r.id) : null;
+  return inside ? inside(x, y) : true;
+}
+
+/** Whether a region is big enough to hold the text the model boxed (a speck of a region never is). */
+const canHold = (r, px) => area(r.box) >= 0.25 * area(px);
+
+/** The smallest region other than `not` whose shape holds the box's centre, if any. */
+function holder(an, px, not) {
+  const cx = px.x + px.w / 2, cy = px.y + px.h / 2;
+  let best = null;
+  for (const r of an.regions) if (r !== not && canHold(r, px) && shapeHolds(an, r, cx, cy) && (!best || area(r.box) < area(best.box))) best = r;
+  return best;
+}
+
 /** How far the box's centre lies outside the region's box, in units of the region's size (0 = inside). */
 function boxOffset(rb, px) {
   const cx = px.x + px.w / 2, cy = px.y + px.h / 2;
   return Math.max(Math.max(rb.x - cx, cx - (rb.x + rb.w), 0) / Math.max(1, rb.w), Math.max(rb.y - cy, cy - (rb.y + rb.h), 0) / Math.max(1, rb.h));
 }
 
-function nearestRegion(regions, px) {
+/** The region an untagged box belongs to: most overlap, holding the centre; the smaller region on a tie (a bubble inside a background's box). */
+function nearestRegion(an, px) {
   const cx = px.x + px.w / 2, cy = px.y + px.h / 2;
   let best = null, bestScore = 0;
-  for (const r of regions) {
-    const b = r.box;
-    const ix = Math.max(0, Math.min(px.x + px.w, b.x + b.w) - Math.max(px.x, b.x));
-    const iy = Math.max(0, Math.min(px.y + px.h, b.y + b.h) - Math.max(px.y, b.y));
-    const overlap = (ix * iy) / Math.max(1, px.w * px.h);
-    const centreIn = cx >= b.x && cx <= b.x + b.w && cy >= b.y && cy <= b.y + b.h;
-    const score = overlap + (centreIn ? 0.5 : 0);
-    if (score > bestScore) { bestScore = score; best = r; }
+  for (const r of an.regions) {
+    if (!canHold(r, px)) continue;
+    const score = overlap(px, r.box) / Math.max(1, area(px)) + (shapeHolds(an, r, cx, cy) ? 0.5 : 0);
+    if (score > bestScore + 1e-6 || (Math.abs(score - bestScore) <= 1e-6 && best && area(r.box) < area(best.box))) { bestScore = score; best = r; }
   }
   return bestScore >= 0.5 ? best : null;
+}
+
+/**
+ * One anchor rectangle per member: the text block it replaces. Members with a
+ * box take the block their box overlaps most (any overlap); the rest take the
+ * unclaimed blocks in reading order; beyond that, the member's own box inside
+ * the bubble, else a point at the bubble's centre.
+ */
+function assignAnchors(blocks, members, bbox, letter) {
+  const free = blocks.map((b) => b.gbox).sort((a, b) => (a.y - b.y) || (a.x - b.x));
+  const anchors = new Array(members.length).fill(null);
+  // boxes first, best overlap first, so two members never claim one block
+  const claims = [];
+  members.forEach((m, i) => { if (m.px) for (const g of free) { const o = overlap(m.px, g); if (o > 0) claims.push({ i, g, o: o / Math.min(area(m.px), area(g)) }); } });
+  claims.sort((a, b) => b.o - a.o);
+  for (const c of claims) if (!anchors[c.i] && free.includes(c.g)) { anchors[c.i] = c.g; free.splice(free.indexOf(c.g), 1); }
+  members.forEach((m, i) => { if (!anchors[i] && free.length) anchors[i] = free.shift(); });
+  members.forEach((m, i) => {
+    if (anchors[i]) return;
+    const cx = bbox.x + bbox.w / 2, cy = bbox.y + bbox.h / 2;
+    anchors[i] = m.px && inBox(bbox, m.px.x + m.px.w / 2, m.px.y + m.px.h / 2) ? m.px : { x: cx - letter, y: cy - letter, w: 2 * letter, h: 2 * letter };
+  });
+  return anchors;
+}
+
+/**
+ * The part of the bubble that belongs to the speaker at `other` rather than at
+ * `mine`: everything past the cut between the two anchors. Stacked anchors are
+ * cut by a row, side-by-side ones by a column. The cut runs through the shape's
+ * waist between the two when there is one (a joined bubble: the shape is
+ * clearly narrower there than beside either anchor), otherwise midway between
+ * the anchors' facing edges.
+ */
+export function beyondCut(inside, bbox, mine, other) {
+  const mc = { x: mine.x + mine.w / 2, y: mine.y + mine.h / 2 }, oc = { x: other.x + other.w / 2, y: other.y + other.h / 2 };
+  const vertical = Math.abs(oc.y - mc.y) >= Math.abs(oc.x - mc.x);
+  const big = { x: bbox.x - 1, y: bbox.y - 1, w: bbox.w + 2, h: bbox.h + 2 };
+  if (vertical) {
+    const below = oc.y > mc.y;
+    const lo = below ? mine.y + mine.h : other.y + other.h, hi = below ? other.y : mine.y;
+    const pos = waist(inside, bbox, lo, hi, true) ?? (mc.y + oc.y) / 2;
+    return below ? { ...big, y: pos, h: big.y + big.h - pos } : { ...big, h: pos - big.y };
+  }
+  const right = oc.x > mc.x;
+  const lo = right ? mine.x + mine.w : other.x + other.w, hi = right ? other.x : mine.x;
+  const pos = waist(inside, bbox, lo, hi, false) ?? (mc.x + oc.x) / 2;
+  return right ? { ...big, x: pos, w: big.x + big.w - pos } : { ...big, w: pos - big.x };
+}
+
+/** Row (or column) between lo and hi where the shape is clearly narrowest — a joined bubble's waist — or null when there is none. */
+export function waist(inside, bbox, lo, hi, rows) {
+  if (hi - lo < 6) return null;
+  const step = Math.max(1, Math.round((hi - lo) / 40)), cross = Math.max(1, Math.round((rows ? bbox.w : bbox.h) / 80));
+  const width = (p) => { let n = 0; if (rows) { for (let x = bbox.x; x < bbox.x + bbox.w; x += cross) if (inside(x, p)) n++; } else { for (let y = bbox.y; y < bbox.y + bbox.h; y += cross) if (inside(p, y)) n++; } return n; };
+  let best = null, bestW = Infinity;
+  for (let p = lo; p <= hi; p += step) { const w = width(p); if (w < bestW) { bestW = w; best = p; } }
+  const ends = Math.min(width(lo), width(hi));
+  return ends > 0 && bestW < 0.8 * ends ? best : null;
+}
+
+/** The rectangle shrunk to at most maxW × maxH, centred as near (cx, cy) as it allows. */
+function capAround(r, maxW, maxH, cx, cy) {
+  const w = Math.min(r.w, maxW), h = Math.min(r.h, maxH);
+  const x = clamp(cx - w / 2, r.x, r.x + r.w - w), y = clamp(cy - h / 2, r.y, r.y + r.h - h);
+  return { x, y, w, h };
 }
 
 function inset(b, k) { return { x: b.x + b.w * (1 - k) / 2, y: b.y + b.h * (1 - k) / 2, w: b.w * k, h: b.h * k }; }
@@ -108,49 +210,71 @@ function clampRect(r, W, H) {
   return { x, y, w: clamp(r.w, 4, W - x), h: clamp(r.h, 4, H - y) };
 }
 
-/** Largest axis-aligned rectangle inside a pixel mask (rows sampled at `step`). */
-export function inscribedRect(inside, bbox, y0 = bbox.y, y1 = bbox.y + bbox.h) {
+/**
+ * Largest axis-aligned rectangle inside a pixel mask (rows sampled at `step`).
+ * With `anchor`, the rectangle must contain the anchor's centre (each row's run
+ * is the one through that x; the rows must span its y) and be centred within
+ * the anchor's own extent — or `slack` pixels of its centre, if that is more —
+ * so the text drawn in it stays where the lettering it replaces was, instead
+ * of drifting to wherever the shape has the most room. `exclude` rectangles
+ * count as outside the mask.
+ * @param {(x:number,y:number)=>boolean} inside
+ * @param {{x:number,y:number,w:number,h:number}} bbox
+ * @param {{anchor?:object, exclude?:object[], slack?:number}} [opts]
+ */
+export function inscribedRect(inside, bbox, opts = {}) {
   if (!inside) return null;
+  const { anchor = null, exclude = [], slack = 0 } = opts;
+  const ax = anchor ? anchor.x + anchor.w / 2 : null, ay = anchor ? anchor.y + anchor.h / 2 : null;
+  if (anchor && !inBox(bbox, ax, ay)) return null;
+  const tx = anchor ? Math.max(anchor.w / 2, slack) : 0, ty = anchor ? Math.max(anchor.h / 2, slack) : 0;
+  // the largest sub-rectangle of [x0,x1]×[y0,y1] whose centre lies within the tolerance of the anchor
+  const centred = (x0, x1, y0, y1) => {
+    if (!anchor) return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+    const cx = clamp((x0 + x1) / 2, ax - tx, ax + tx), cy = clamp((y0 + y1) / 2, ay - ty, ay + ty);
+    const hw = Math.min(cx - x0, x1 - cx), hh = Math.min(cy - y0, y1 - cy);
+    return { x: cx - hw, y: cy - hh, w: 2 * hw, h: 2 * hh };
+  };
   const step = Math.max(1, Math.round(Math.min(bbox.w, bbox.h) / 60));
+  const ok = (x, y) => inside(x, y) && !exclude.some((e) => inBox(e, x, y));
   const rows = [];
-  for (let y = Math.ceil(y0); y < y1; y += step) {
-    let best = null, runStart = null;
-    for (let x = bbox.x; x <= bbox.x + bbox.w; x += step) {
-      const inn = x < bbox.x + bbox.w && inside(x, y);
-      if (inn && runStart === null) runStart = x;
-      if (!inn && runStart !== null) { if (!best || x - runStart > best.w) best = { x: runStart, w: x - runStart }; runStart = null; }
+  for (let y = Math.ceil(bbox.y); y < bbox.y + bbox.h; y += step) {
+    let best = null;
+    if (anchor) {
+      // the run through the anchor's column
+      if (ok(ax, y)) {
+        let x0 = ax, x1 = ax;
+        while (x0 - step >= bbox.x && ok(x0 - step, y)) x0 -= step;
+        while (x1 + step <= bbox.x + bbox.w && ok(x1 + step, y)) x1 += step;
+        best = { x0, x1: x1 + step };
+      }
+    } else {
+      let runStart = null;
+      for (let x = bbox.x; x <= bbox.x + bbox.w; x += step) {
+        const inn = x < bbox.x + bbox.w && ok(x, y);
+        if (inn && runStart === null) runStart = x;
+        if (!inn && runStart !== null) { if (!best || x - runStart > best.x1 - best.x0) best = { x0: runStart, x1: x }; runStart = null; }
+      }
+      if (runStart !== null) { const end = bbox.x + bbox.w; if (!best || end - runStart > best.x1 - best.x0) best = { x0: runStart, x1: end }; }
     }
-    if (runStart !== null) { const end = bbox.x + bbox.w; if (!best || end - runStart > best.w) best = { x: runStart, w: end - runStart }; }
-    rows.push(best ? { y, x0: best.x, x1: best.x + best.w } : null);
+    rows.push(best ? { y, ...best } : null);
   }
   let bestArea = 0, bestRect = null;
   for (let i = 0; i < rows.length; i++) {
     if (!rows[i]) continue;
+    if (anchor && rows[i].y > ay) break;
     let x0 = rows[i].x0, x1 = rows[i].x1;
     for (let j = i; j < rows.length; j++) {
       if (!rows[j]) break;
       x0 = Math.max(x0, rows[j].x0); x1 = Math.min(x1, rows[j].x1);
       if (x1 <= x0) break;
-      const h = rows[j].y - rows[i].y + step, area = (x1 - x0) * h;
-      if (area > bestArea) { bestArea = area; bestRect = { x: x0, y: rows[i].y, w: x1 - x0, h }; }
+      if (anchor && rows[j].y + step <= ay) continue; // does not reach the anchor's row yet
+      const cand = centred(x0, x1, rows[i].y, rows[j].y + step), a = cand.w * cand.h;
+      if (a > bestArea) { bestArea = a; bestRect = cand; }
     }
   }
   if (!bestRect) return null;
   return inset(bestRect, 0.92); // letters should not kiss the outline
-}
-
-/** Row between ya and yb where the shape is narrowest (the waist of a joined bubble). */
-export function waistRow(inside, bbox, ya, yb) {
-  const lo = Math.min(ya, yb), hi = Math.max(ya, yb);
-  if (hi - lo < 6) return (lo + hi) / 2;
-  const step = Math.max(1, Math.round((hi - lo) / 40));
-  let best = (lo + hi) / 2, bestW = Infinity;
-  for (let y = lo; y <= hi; y += step) {
-    let w = 0;
-    for (let x = bbox.x; x < bbox.x + bbox.w; x += step) if (inside(x, y)) w++;
-    if (w < bestW) { bestW = w; best = y; }
-  }
-  return best;
 }
 
 /** Trim overlapping rectangles on the facing sides so no two texts share pixels. */
@@ -160,10 +284,11 @@ function separate(placements) {
     const ix = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
     const iy = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
     if (ix <= 0 || iy <= 0) continue;
+    const dx = ix / 2 + 0.5, dy = iy / 2 + 0.5; // half each, plus a pixel of air
     if (ix < iy) {
-      if (a.x + a.w / 2 < b.x + b.w / 2) { a.w -= ix / 2; b.x += ix / 2; b.w -= ix / 2; } else { b.w -= ix / 2; a.x += ix / 2; a.w -= ix / 2; }
+      if (a.x + a.w / 2 < b.x + b.w / 2) { a.w -= dx; b.x += dx; b.w -= dx; } else { b.w -= dx; a.x += dx; a.w -= dx; }
     } else {
-      if (a.y + a.h / 2 < b.y + b.h / 2) { a.h -= iy / 2; b.y += iy / 2; b.h -= iy / 2; } else { b.h -= iy / 2; a.y += iy / 2; a.h -= iy / 2; }
+      if (a.y + a.h / 2 < b.y + b.h / 2) { a.h -= dy; b.y += dy; b.h -= dy; } else { b.h -= dy; a.y += dy; a.h -= dy; }
     }
     a.w = Math.max(8, a.w); a.h = Math.max(8, a.h); b.w = Math.max(8, b.w); b.h = Math.max(8, b.h);
   }

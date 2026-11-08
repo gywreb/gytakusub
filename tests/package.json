@@ -11,7 +11,8 @@
     "assets": "node make-store-assets.mjs ../store/assets",
     "vendor": "node ../scripts/vendor-opencv.mjs && node ../scripts/vendor-hyphen.mjs && node ../scripts/vendor-detector.mjs",
     "replay": "node replay-report.mjs",
-    "score": "node score-reports.mjs"
+    "score": "node score-reports.mjs",
+    "score:layout": "node layout-score.mjs"
   },
   "devDependencies": {
     "canvas": "^3.1.0",

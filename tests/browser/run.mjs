@@ -34,7 +34,7 @@ const context = await chromium.launchPersistentContext(profile, {
 });
 let sw = context.serviceWorkers()[0] || (await context.waitForEvent("serviceworker"));
 await sw.evaluate(async () => {
-  await chrome.storage.sync.set({ enabled: true, enabledSites: ["127.0.0.1"], debugOverlay: true, useContext: false, includeSource: false });
+  await chrome.storage.sync.set({ enabled: true, enabledSites: ["127.0.0.1"], debugOverlay: true, peekOnHover: true, useContext: false, includeSource: false });
   await chrome.storage.local.set({ apiKey: "sk-ant-test" });
 });
 await new Promise((r) => setTimeout(r, 300)); // let syncRegistration run

@@ -210,6 +210,7 @@ export function analyze(cv, img, opts = {}) {
     for (let yy = y; yy < y + h; yy += 3) for (let xx = x; xx < x + w; xx += 3) { const p = yy * W + xx; if (L[p] !== li) continue; r += srcData[p * 4]; g += srcData[p * 4 + 1]; bb += srcData[p * 4 + 2]; n++; }
     const color = n ? [Math.round(r / n), Math.round(g / n), Math.round(bb / n)] : (pi ? [0, 0, 0] : [255, 255, 255]);
     const bubble = { id: 0, box: rbox, area: a, color, dark: !!pi, letter, blocks: inBlocks, labelId: li, labels: P.labels, fill };
+    trace("bubble", rbox, "accepted", { frac, blocks: inBlocks.length, fill: a / (w * h), holeFrac: holes / Math.max(1, filled), solidity: hullArea ? a / hullArea : 1, inText: holes > 0 ? holesInText / holes : 1, letter });
     bubbles.push(bubble);
   }
   // bubbles do not nest: a shape that holds another bubble is a background
@@ -220,7 +221,7 @@ export function analyze(cv, img, opts = {}) {
     return on(x, y) && on(x + w - 1, y) && on(x, y + h - 1) && on(x + w - 1, y + h - 1);
   };
   const kept = bubbles.filter((A) => { const nests = bubbles.some((B) => B !== A && encloses(A, B)); if (nests) trace("region", A.box, "encloses another bubble: a background"); return !nests; });
-  for (const b of kept) for (const p of b.blocks) p.bubble = b;
+  for (const b of kept) { for (const p of b.blocks) p.bubble = b; if (!b.dark) widenInterior(cv, pol[0], b, W, H); }
 
   // ---- regions in reading order: bubbles, then loose paragraphs ----
   const band = Math.max(1, Math.round(H / 24));
@@ -246,6 +247,7 @@ export function analyze(cv, img, opts = {}) {
   for (const p of paragraphs) if (p.bubble) p.region = p.bubble.id;
 
   src.delete(); gray.delete(); base.delete();
+  for (const b of kept) if (b.widened) trace("bubble", b.box, "interior widened", { from: b.lightBox, area: b.area, interior: b.interiorArea });
   return {
     W, H, letter: pageLetter, regions, bubbles: kept, blocks: paragraphs, lines, learned: true,
     insideOf(regionId) {
@@ -260,4 +262,69 @@ export function analyze(cv, img, opts = {}) {
     polarities: pol.map((P) => ({ dark: P.dark, inkMask: P.ink, regionLabels: P.labels, dispose() { P.ink.delete(); P.light.delete(); P.labels.delete(); P.stats.delete(); } })),
     dispose() { for (const P of pol) { P.ink.delete(); P.light.delete(); P.labels.delete(); P.stats.delete(); } },
   };
+}
+
+/**
+ * A bubble's usable interior is what its outline encloses, not only its flat
+ * light pixels. A bubble shaded with screentone or a gradient has a light
+ * region that is a fragment of the real shape (the light threshold stops at the
+ * tone), and text laid out in that fragment comes out tiny. So, for light
+ * bubbles, the interior is grown from the light region over everything that is
+ * not *structural* ink — ink components longer than a few letters: the outline,
+ * the tail, drawn art — within a window around the shape. Tone dots, mid-greys
+ * and the lettering itself are all passable; whatever those passable pixels
+ * enclose is filled in. A result that reaches the window's edge (where that is
+ * not the page edge), balloons past the light region or loses the shape's
+ * convexity leaked through a gap in the outline and is discarded: the light
+ * region stays as it was. Replaces `box` and `fill` on success; `labelId` (the
+ * flat surface, used by the eraser) is untouched.
+ */
+function widenInterior(cv, P, b, W, H) {
+  const { x, y, w, h } = b.box;
+  const mx = Math.round(w * 0.3) + 4, my = Math.round(h * 0.3) + 4;
+  const wx0 = Math.max(0, x - mx), wy0 = Math.max(0, y - my), wx1 = Math.min(W, x + w + mx), wy1 = Math.min(H, y + h + my);
+  const ww = wx1 - wx0, wh = wy1 - wy0;
+  if (ww < 8 || wh < 8) return;
+  // structural ink: components longer than 2.5 letters in the window
+  const roi = P.ink.roi(new cv.Rect(wx0, wy0, ww, wh)), lab = new cv.Mat(), st = new cv.Mat(), ce = new cv.Mat();
+  const n = cv.connectedComponentsWithStats(roi, lab, st, ce, 8, cv.CV_32S);
+  const S = st.data32S, Lk = lab.data32S, limit = 2.5 * Math.max(4, b.letter);
+  const big = new Uint8Array(n);
+  for (let i = 1; i < n; i++) if (Math.max(S[i * 5 + 2], S[i * 5 + 3]) > limit) big[i] = 1;
+  const pass = new cv.Mat(wh, ww, cv.CV_8UC1), pd = pass.data;
+  for (let i = 0; i < ww * wh; i++) pd[i] = big[Lk[i]] ? 0 : 255;
+  roi.delete(); lab.delete(); st.delete(); ce.delete();
+  // passable components seeded by the light region
+  const lab2 = new cv.Mat(), st2 = new cv.Mat(), ce2 = new cv.Mat();
+  const n2 = cv.connectedComponentsWithStats(pass, lab2, st2, ce2, 4, cv.CV_32S);
+  const L = P.labels.data32S, L2 = lab2.data32S, S2 = st2.data32S;
+  const seeded = new Uint8Array(n2);
+  for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) if (L[yy * W + xx] === b.labelId) seeded[L2[(yy - wy0) * ww + (xx - wx0)]] = 1;
+  seeded[0] = 0;
+  let area = 0, bx0 = ww, by0 = wh, bx1 = 0, by1 = 0;
+  for (let i = 1; i < n2; i++) if (seeded[i]) { area += S2[i * 5 + 4]; bx0 = Math.min(bx0, S2[i * 5]); by0 = Math.min(by0, S2[i * 5 + 1]); bx1 = Math.max(bx1, S2[i * 5] + S2[i * 5 + 2]); by1 = Math.max(by1, S2[i * 5 + 1] + S2[i * 5 + 3]); }
+  const leaked = (bx0 <= 0 && wx0 > 0) || (by0 <= 0 && wy0 > 0) || (bx1 >= ww && wx1 < W) || (by1 >= wh && wy1 < H) || area > 3 * b.area;
+  if (!leaked && area > 1.05 * b.area) {
+    const m = new cv.Mat(wh, ww, cv.CV_8UC1), md = m.data;
+    for (let i = 0; i < ww * wh; i++) md[i] = seeded[L2[i]] ? 255 : 0;
+    const contours = new cv.MatVector(), hier = new cv.Mat();
+    cv.findContours(m, contours, hier, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+    let best = -1, bestA = 0, hullA = 0;
+    for (let k = 0; k < contours.size(); k++) {
+      const ct = contours.get(k), ar = cv.contourArea(ct);
+      if (ar > bestA) { bestA = ar; best = k; const hull = new cv.Mat(); cv.convexHull(ct, hull); hullA = cv.contourArea(hull); hull.delete(); }
+      ct.delete();
+    }
+    if (best >= 0 && hullA && bestA / hullA >= 0.5) {
+      m.setTo(new cv.Scalar(0)); cv.drawContours(m, contours, best, new cv.Scalar(255), -1);
+      const ct = contours.get(best), r = cv.boundingRect(ct); ct.delete();
+      const fill = new Uint8Array(r.width * r.height);
+      for (let yy = 0; yy < r.height; yy++) for (let xx = 0; xx < r.width; xx++) fill[yy * r.width + xx] = md[(r.y + yy) * ww + r.x + xx];
+      b.lightBox = b.box; b.interiorArea = bestA; b.widened = true;
+      b.box = { x: wx0 + r.x, y: wy0 + r.y, w: r.width, h: r.height };
+      b.fill = fill;
+    }
+    contours.delete(); hier.delete(); m.delete();
+  }
+  pass.delete(); lab2.delete(); st2.delete(); ce2.delete();
 }

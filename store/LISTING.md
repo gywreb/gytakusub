@@ -29,7 +29,7 @@ YOU STAY IN CONTROL
 • Master switch, per-site enable, per-site auto-translate.
 • Glossary for names and terms; custom instructions; model choice (Haiku for speed, Sonnet/Opus for difficult pages).
 • Results are cached for the browser session so re-reading costs nothing.
-• Hover a translated bubble to peek at the original; double-click to correct a line or add a term to the glossary.
+• Double-click a translated bubble to correct a line or add a term to the glossary; an option lets you peek at the original by hovering.
 
 REQUIREMENTS
 You need a Claude API key from platform.claude.com (pay-per-use; Claude Max and Team subscriptions include monthly API credit). The key is stored only in your browser.
@@ -51,7 +51,7 @@ Gytakusub is an independent, open-source reading aid (MIT licence, source on Git
 
 **What's new in 1.1.0** (paste into the version notes if the dashboard asks)
 ```
-Rebuilt page engine: text is found by an open-source detector running locally in your browser, bubbles by OpenCV, original lettering is removed by inpainting (artwork and outlines untouched), Japanese vertical text and dark bubbles are handled, and a bundled font keeps pages consistent. Hover a bubble to peek at the original; double-click to edit a line or teach the glossary. Fixes translations being placed in the wrong panel on the first render.
+Rebuilt page engine: text is found by an open-source detector running locally in your browser, bubbles by OpenCV, original lettering is removed by inpainting (artwork and outlines untouched), Japanese vertical text and dark bubbles are handled, and a bundled font keeps pages consistent. Double-click a bubble to edit a line or teach the glossary (an option adds hover-to-peek at the original). Fixes translations being placed in the wrong panel on the first render.
 ```
 
 ## Privacy practices tab

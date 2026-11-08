@@ -24,11 +24,14 @@ export function erase(cv, img, analysis, regionIds) {
   };
 
   // Learned analysis: the lettering is the ink inside each detected text box (grown
-  // by a third of a letter), as connected components that stay inside that window —
-  // an outline or a stroke of art crossing the window is not a letter.
+  // by a third of a letter across the lines and most of a letter along them, where
+  // the detector tends to stop short of a last glyph), as connected components that
+  // stay inside that window — an outline or a stroke of art crossing the window is
+  // not a letter.
   const paintTextBox = (pol, b, letter) => {
-    const pad = Math.max(2, Math.round(letter * 0.35));
-    const x0 = Math.max(0, b.gbox.x - pad), y0 = Math.max(0, b.gbox.y - pad), x1 = Math.min(W, b.gbox.x + b.gbox.w + pad), y1 = Math.min(H, b.gbox.y + b.gbox.h + pad);
+    const across = Math.max(2, Math.round(letter * 0.35)), along = Math.max(3, Math.round(letter * 0.7));
+    const padX = b.vertical ? across : along, padY = b.vertical ? along : across;
+    const x0 = Math.max(0, b.gbox.x - padX), y0 = Math.max(0, b.gbox.y - padY), x1 = Math.min(W, b.gbox.x + b.gbox.w + padX), y1 = Math.min(H, b.gbox.y + b.gbox.h + padY);
     const w = x1 - x0, h = y1 - y0; if (w < 2 || h < 2) return;
     const roi = pol.inkMask.roi(new cv.Rect(x0, y0, w, h)), lab = new cv.Mat(), st = new cv.Mat(), ce = new cv.Mat();
     const n = cv.connectedComponentsWithStats(roi, lab, st, ce, 8, cv.CV_32S);

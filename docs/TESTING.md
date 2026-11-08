@@ -22,7 +22,7 @@ Work through this list on a chapter you know. Tick what passes; for anything tha
 2. **One page.** Hover a page → *Translate*. Lettering is erased (bubble surface reconstructed, outline intact) and English sits inside each bubble.
 3. **Auto-translate while scrolling** on a site you enabled it for. Pages translate as they come into view; the *first* render of each page is already right (this was the 1.0 bug — Redo is no longer needed to fix placement).
 4. **Japanese chapter** (vertical text). Bubbles are found; English is stacked in short lines inside tall bubbles; sound effects drawn as art are left alone.
-5. **Peek.** Rest the pointer on a translated bubble for half a second → the original lettering appears; move off → translation returns.
+5. **Peek** (Options → tick *Peek at the original* first; it is off by default). Rest the pointer on a translated bubble for half a second → the original lettering appears; move off → translation returns.
 6. **Edit.** Double-click a translated bubble → change the text → **Ctrl+Enter**. The bubble updates. Scroll away and back: it stays. *Redo* on that page replaces it with a fresh translation.
 7. **Glossary.** In the same dialog, fill "original term = translation" → *Add*. Options → Glossary shows the new line.
 8. **Hide / Show** (hover bar or **Alt+Shift+T**) and **Alt+T** (translate everything on screen) still work.
@@ -33,7 +33,9 @@ Work through this list on a chapter you know. Tick what passes; for anything tha
 
 Options → tick **Debug overlay** → *Save*. Then, with the chapter translated, click the toolbar icon → **Export debug report**. One `.zip` downloads with, for every translated page on that tab, the original image, the debug render (red = bubbles found, blue = loose text, green = where text went) and the report JSON. Attach the zip here — nothing to screenshot or copy. (The hover bar also has a **Report** button that exports just that one page.)
 
-On my side `npm run replay -- report.zip` reproduces every page offline, so the fix comes with a test against your actual page.
+On my side `npm run replay -- report.zip` reproduces every page offline, so the fix comes with a test against your actual page, and `node layout-score.mjs *.zip` (in `tests/`) measures where translations land over every page you have ever exported — a change ships only if those numbers do not go down.
+
+The report's `summary.json` also lists images that failed (`failed`: URL, size, error), so a "Could not fetch image" toast is reproducible without a screenshot.
 
 Untick Debug overlay afterwards.
 

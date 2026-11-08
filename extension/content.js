@@ -14,7 +14,7 @@
 
   /** @type {Map<HTMLImageElement, {status:string, src:string, canvas?:HTMLCanvasElement, hidden:boolean, result?:any, error?:string, objectFit?:string}>} */
   const entries = new Map();
-  let settings = { enabled: true, autoSites: [], enabledSites: [], uppercase: false, fontFamily: "", excludedSites: "", peekOnHover: true };
+  let settings = { enabled: true, autoSites: [], enabledSites: [], uppercase: false, fontFamily: "", excludedSites: "", peekOnHover: false };
   let allHidden = false;
   let hoverImg = null;
 
@@ -68,8 +68,11 @@
   const mount = () => { if (document.documentElement && !host.isConnected) document.documentElement.append(host); };
   if (document.body) mount(); else document.addEventListener("DOMContentLoaded", mount, { once: true });
 
-  let toastTimer = null;
-  function toast(msg, ms = 3500) {
+  let toastTimer = null, lastToast = { msg: "", at: 0 };
+  /** `once`: the same message is not repeated within a minute (auto-translate retrying a stubborn image). */
+  function toast(msg, ms = 3500, once = false) {
+    if (once && msg === lastToast.msg && Date.now() - lastToast.at < 60000) return;
+    lastToast = { msg, at: Date.now() };
     toastEl.textContent = msg;
     toastEl.hidden = false;
     clearTimeout(toastTimer);
@@ -226,6 +229,8 @@
       } catch (err) { rep.originalError = String(err?.message || err); }
       summary.pages.push({ id, image: e.src, items: res.items.length, regions: res.regions.length });
     }
+    // images that failed on this tab (e.g. a site refusing the download): the URL and the error, so the failure is reproducible
+    summary.failed = imgs.filter((i) => entries.get(i)?.status === "error").map((i) => ({ image: srcOf(i), size: [i.naturalWidth, i.naturalHeight], error: entries.get(i).error }));
     files.unshift({ name: "summary.json", data: new TextEncoder().encode(JSON.stringify(summary, null, 1)) });
     const zip = makeZip(files);
     const url = URL.createObjectURL(new Blob([zip], { type: "application/zip" }));
@@ -268,7 +273,7 @@
     if (!active()) { toast("Gytakusub is off on this site"); return; }
     const e = entries.get(img);
     if (e && (e.status === "working" || e.status === "queued")) return;
-    entries.set(img, { ...(e || { hidden: false }), status: "queued", src: srcOf(img), error: undefined });
+    entries.set(img, { ...(e || { hidden: false }), status: "queued", src: srcOf(img), error: undefined, failures: e && e.src === srcOf(img) ? e.failures : 0 });
     queue.push({ img, force });
     refreshBar();
     pump();
@@ -321,8 +326,19 @@
       } else {
         msg.url = src;
       }
-      const res = await chrome.runtime.sendMessage(msg);
+      let res = await chrome.runtime.sendMessage(msg);
       if (!res) throw new Error("No response from background worker");
+      if (res.error && msg.url && /Could not fetch image \((401|403|404|429|5\d\d)\)|Failed to fetch/.test(res.error)) {
+        // The site refused the worker's request (it carries no referrer and no
+        // cookies — hotlink protection). The page itself is allowed to read the
+        // image when it is same-origin or served with CORS headers: try from here.
+        try {
+          const blob = await (await fetch(src)).blob();
+          if (!blob.type.startsWith("image/")) throw new Error("not an image");
+          res = await chrome.runtime.sendMessage({ type: "TRANSLATE", force, dataUrl: await blobToDataUrl(blob) });
+          if (!res) throw new Error("No response from background worker");
+        } catch (e2) { console.info("Gytakusub: page-side fetch did not help either", e2?.message || e2); }
+      }
       if (res.error) throw new Error(res.error);
       if (srcOf(img) !== src) { entries.delete(img); return; } // image changed while we worked
       entry.result = res;
@@ -332,7 +348,8 @@
     } catch (e) {
       entry.status = "error";
       entry.error = e.message || String(e);
-      toast("Gytakusub: " + entry.error, 6000);
+      entry.failures = (entry.failures || 0) + 1;
+      toast("Gytakusub: " + entry.error, 6000, true);
       console.warn("Gytakusub", e);
     }
     refreshBar();
@@ -565,7 +582,8 @@
         for (const r of recs) {
           if (!r.isIntersecting || !isEligible(r.target)) continue;
           const e = entries.get(r.target);
-          if (!e || (e.status === "done" && srcOf(r.target) !== e.src) || e.status === "error") enqueue(r.target);
+          // an image that failed twice is left alone (a site that refuses the download will refuse again)
+          if (!e || (e.status === "done" && srcOf(r.target) !== e.src) || (e.status === "error" && (e.failures || 0) < 2)) enqueue(r.target);
         }
       }, { rootMargin: "200% 0px" });
       const observeAll = () => { for (const img of document.images) if (isEligible(img)) io.observe(img); };

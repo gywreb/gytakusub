@@ -24,7 +24,7 @@ export const DEFAULT_SETTINGS = {
   syncApiKey: false,
   excludedSites: "",
   debugOverlay: false, // draw detection boxes and log results (for diagnosing placement)
-  peekOnHover: true, // hovering a translated bubble shows the original lettering
+  peekOnHover: false, // hovering a translated bubble shows the original lettering (off by default: it flickers while reading)
   // Image prep
   maxLongEdge: 1600, // px sent to Claude for a normal page
   stripWidth: 1000, // px width for tall webtoon strips

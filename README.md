@@ -27,7 +27,7 @@ The copies under `extension/` are canonical; `node scripts/sync-shared.mjs` copi
 1. The page is downscaled (≤1600 px; tall webtoon strips are sliced) and **text is found locally** by a learned detector; lines are snapped to the ink and merged into paragraphs, and the flat light or dark shape around a paragraph becomes a bubble if lettering is all it contains. Each region gets a numbered red stamp.
 2. Claude (vision) is asked, per piece of text, *which numbered region it is in* — set-of-mark prompting, far more reliable than asking a language model for coordinates. The tag decides placement; the model's pixel box is only a hint for ordering speakers in a joined bubble.
 3. The original lettering is inpainted away inside the bubble (outline untouched) and the translation is typeset into the largest rectangle inside the bubble shape, sized from the original lettering. Free text over artwork is inpainted in place and drawn with a halo.
-4. Names and the last ~40 translated lines are carried across pages for consistent translation. Hover a bubble to peek at the original; double-click to edit the line or teach the glossary.
+4. Names and the last ~40 translated lines are carried across pages for consistent translation. Double-click a bubble to edit the line or teach the glossary; Options can add hover-to-peek at the original.
 
 ## Setup
 
