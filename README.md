@@ -25,7 +25,7 @@ Both share the same engine: `bubble.js` (local bubble detection, flood-fill, let
 
 ## Releasing
 
-Store listing copy, permission justifications and the submission checklist live in `store/`. `scripts/build-zip.sh` builds the upload; pushing a tag `vX.Y.Z` (matching `extension/manifest.json`) attaches it to a GitHub Release.
+Store listing copy, permission justifications and the submission checklist live in `store/`. Release a new version with `node scripts/release.mjs X.Y.Z` (any OS): it bumps the manifest, tests, tags and pushes; CI builds the zip, publishes a GitHub Release and uploads to the Chrome Web Store when the `CWS_*` secrets are configured.
 
 ## Development
 

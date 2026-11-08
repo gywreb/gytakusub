@@ -49,11 +49,11 @@ Paste the rejection email to me verbatim. The two likely reasons and what we'd d
 - [ ] After a week with no issues: Distribution → **Public**, if you want it discoverable.
 
 ## Updating later
-Bump `version` in `extension/manifest.json`, run the tests, push a tag `v1.0.1` — CI attaches the zip to a GitHub Release; upload that zip in the dashboard → *Package → Upload new package* → Submit. Listing text only needs changing when behaviour changes.
+Run `node scripts/release.mjs 1.0.1` from the repo folder (any OS). CI tests, zips, creates the GitHub Release and — once the secrets below exist — uploads to the store and submits for review. Listing text only needs changing when behaviour changes.
 
 ## Automating updates (one-time, ~15 min) — after the first version is approved
 
-Later versions are then one command: `./scripts/release.sh 1.0.1` → CI tests, zips, creates the GitHub Release, uploads to the store and submits for review. Listing text and screenshots stay as they are.
+Later versions are then one command from the repo folder — Windows PowerShell, macOS or Linux: `node scripts/release.mjs 1.0.1` (`./scripts/release.sh` is the same thing for Unix shells) → CI tests, zips, creates the GitHub Release, uploads to the store and submits for review. Listing text and screenshots stay as they are.
 
 1. **Google Cloud project**: https://console.cloud.google.com → New project (e.g. `gytakusub-ci`).
 2. **Enable the API**: APIs & Services → Library → search **Chrome Web Store API** → Enable.
