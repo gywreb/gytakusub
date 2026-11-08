@@ -34,7 +34,7 @@ for n in g.node:
 del g.node[:]; g.node.extend(nodes); g.initializer.extend(consts)
 onnx.checker.check_model(m); onnx.save(m, sys.argv[2]); print('rewrote', k, 'HardSigmoid nodes')
 `;
-execFileSync("python3", ["-I", "-c", py, src, out], { stdio: "inherit" });
+execFileSync("python3", ["-c", py, src, out], { stdio: "inherit" });
 const info = { source: "@gutenye/ocr-models@" + pkg.version, model: "ch_PP-OCRv4_det_infer.onnx (PaddleOCR, Apache-2.0)", rewrite: "HardSigmoid → Mul/Add/Clip", bytes: fs.statSync(out).size };
 fs.writeFileSync(path.join(root, "extension", "vendor", "ppocr-det.json"), JSON.stringify(info, null, 2) + "\n");
 console.log("vendored", out, info.bytes, "bytes");
