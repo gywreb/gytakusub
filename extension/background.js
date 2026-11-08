@@ -7,7 +7,7 @@
 import { callClaude, mergeContext, apiHeaders, API_URL } from "./prompt.js";
 import { preparePage, finishPage } from "./engine/page.js";
 
-const PROMPT_VERSION = 5; // bump when the prompt/coordinate format changes so old cache entries are ignored
+const PROMPT_VERSION = 6; // bump when the prompt/coordinate format changes so old cache entries are ignored
 
 export const DEFAULT_SETTINGS = {
   enabled: true, // master switch

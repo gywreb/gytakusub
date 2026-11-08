@@ -35,7 +35,7 @@ def character(cx, cy, s, dark=False):
 truth = []  # ground-truth text regions: {"box":[x,y,w,h], "kind":"bubble"|"block", "items":[item indices]}
 
 def bubble(cx, cy, rx, ry, text, size=30, tail=None, jagged=False):
-    truth.append({"box": [round(cx - rx), round(cy - ry), round(2 * rx), round(2 * ry)], "kind": "bubble", "items": [len(items)]})
+    truth.append({"box": [round(cx - rx), round(cy - ry), round(2 * rx), round(2 * ry)], "kind": "bubble", "shape": "jagged" if jagged else "ellipse", "items": [len(items)]})
     if jagged:
         pts = []
         n = 28
@@ -84,7 +84,7 @@ panel((40, 1220, 1160, 1660))
 d.rectangle([70, 1250, 470, 1330], fill="white", outline="black", width=5)
 f = ImageFont.truetype(FONT, 24)
 d.text((90, 1270), "Tres horas después...", font=f, fill="black")
-truth.append({"box": [70, 1250, 400, 80], "kind": "bubble", "items": [len(items)]})
+truth.append({"box": [70, 1250, 400, 80], "kind": "bubble", "shape": "rect", "items": [len(items)]})
 items.append({"box": [90, 1270, 300, 30], "text": "Three hours later...", "size": "small", "kind": "narration"})
 # free narration straight on the halftone (no box): a text block the engine must inpaint
 d.text((620, 1250), "Mientras tanto, en la ciudad...", font=f, fill="black")
@@ -100,7 +100,7 @@ d.ellipse([766, 1306, 1114, 1444], fill="white")
 f2 = ImageFont.truetype(FONT, 26)
 d.text((850, 1350), "¿Y si no vuelve?", font=f2, fill="black")
 d.text((870, 1470), "Volverá.", font=f2, fill="black")
-truth.append({"box": [760, 1300, 380, 260], "kind": "bubble", "items": [len(items), len(items) + 1]})
+truth.append({"box": [760, 1300, 380, 260], "kind": "bubble", "shape": "joined", "items": [len(items), len(items) + 1]})
 items.append({"box": [850, 1350, 210, 30], "text": "And if he doesn't come back?", "size": "normal"})
 items.append({"box": [870, 1470, 110, 30], "text": "He will.", "size": "normal"})
 

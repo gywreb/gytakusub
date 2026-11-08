@@ -7,6 +7,7 @@
       190
     ],
     "kind": "bubble",
+    "shape": "jagged",
     "items": [
       0
     ]
@@ -19,6 +20,7 @@
       180
     ],
     "kind": "bubble",
+    "shape": "ellipse",
     "items": [
       1
     ]
@@ -31,6 +33,7 @@
       190
     ],
     "kind": "bubble",
+    "shape": "ellipse",
     "items": [
       2
     ]
@@ -43,6 +46,7 @@
       170
     ],
     "kind": "bubble",
+    "shape": "ellipse",
     "items": [
       3
     ]
@@ -55,6 +59,7 @@
       80
     ],
     "kind": "bubble",
+    "shape": "rect",
     "items": [
       4
     ]
@@ -79,6 +84,7 @@
       260
     ],
     "kind": "bubble",
+    "shape": "joined",
     "items": [
       6,
       7

@@ -17,8 +17,8 @@ export function buildPrompt(settings, ctx, slice) {
     : "";
   const hasTags = slice.tagTo >= slice.tagFrom;
   const tagLine = hasTags
-    ? `Some speech bubbles are stamped with a small red circle containing a number (${slice.tagFrom}–${slice.tagTo}), placed at the bubble's top-left corner. Ignore the stamps when reading the text.`
-    : `No bubbles are stamped on this image.`;
+    ? `Text regions (speech bubbles, captions, and some loose lettering) are stamped with a small red circle containing a number (${slice.tagFrom}–${slice.tagTo}), placed at the region's top-left corner. Ignore the stamps when reading the text. A stamp may occasionally sit on artwork that is not text: return nothing for it — never invent text for a stamp.`
+    : `No regions are stamped on this image.`;
   return `You are translating one page (or one slice of a long strip) of a manga, manhwa or comic into ${settings.targetLang}.
 
 The image is exactly ${slice.cw} pixels wide and ${slice.ch} pixels tall. The origin (0,0) is the top-left corner; x grows to the right (max ${slice.cw}), y grows downward (max ${slice.ch}).
@@ -27,7 +27,7 @@ ${tagLine}
 Find EVERY piece of dialogue and written text in the image: speech bubbles, thought bubbles, narration boxes, and signs. Do NOT include sound effects / onomatopoeia drawn as part of the artwork.
 
 For each item return:
-- "tag": the number of the stamped bubble the text is inside, or null if the text is not inside a stamped bubble. One tag per item; if one stamped bubble contains two separate pieces of text, return two items with the same tag.
+- "tag": the number of the stamped region the text is inside, or null if the text is not inside a stamped region. One tag per item; if one stamped bubble contains two separate pieces of text, return two items with the same tag.
 - "box": [x, y, w, h] in PIXELS of this image: x,y = top-left corner of the text, w = width, h = height. Measure x against the ${slice.cw}px width and y against the ${slice.ch}px height independently. The box must tightly enclose the TEXT itself, not the whole bubble. Required for every item, most important for items with tag null.
 - "kind": one of "bubble", "narration", "sign".
 - "size": the lettering size relative to normal dialogue on this page: "small" (whispers, asides, tiny notes), "normal", or "large" (shouting, big bold lettering).

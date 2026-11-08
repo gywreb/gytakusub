@@ -7,7 +7,7 @@
     "test:browser": "node browser/run.mjs --out /tmp/gyt-browser/good && node browser/run.mjs --bad-boxes --out /tmp/gyt-browser/bad-boxes && node browser/web.mjs --out /tmp/gyt-browser/web",
     "e2e": "node engine-e2e.mjs fixtures/demo-page.png fixtures/demo-items.json /tmp/gyt-e2e.png",
     "viz": "node engine-viz.mjs",
-    "demo": "python3 make-demo-page.py fixtures",
+    "demo": "python3 make-demo-page.py fixtures && python3 make-pages.py fixtures 8",
     "assets": "node make-store-assets.mjs ../store/assets",
     "vendor": "node ../scripts/vendor-opencv.mjs && node ../scripts/vendor-hyphen.mjs"
   },

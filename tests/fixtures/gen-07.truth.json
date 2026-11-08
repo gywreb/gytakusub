@@ -1,0 +1,47 @@
+[
+ {
+  "box": [
+   67,
+   167,
+   277,
+   215
+  ],
+  "kind": "bubble",
+  "shape": "ellipse",
+  "items": [
+   0
+  ],
+  "lang": "es",
+  "dark": false
+ },
+ {
+  "box": [
+   458,
+   60,
+   227,
+   147
+  ],
+  "kind": "bubble",
+  "shape": "jagged",
+  "items": [
+   1
+  ],
+  "lang": "es",
+  "dark": false
+ },
+ {
+  "box": [
+   731,
+   639,
+   223,
+   140
+  ],
+  "kind": "bubble",
+  "shape": "jagged",
+  "items": [
+   2
+  ],
+  "lang": "es",
+  "dark": false
+ }
+]

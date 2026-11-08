@@ -1,0 +1,76 @@
+[
+ {
+  "box": [
+   654,
+   243,
+   368,
+   179
+  ],
+  "kind": "bubble",
+  "shape": "jagged",
+  "items": [
+   0
+  ],
+  "lang": "es",
+  "dark": false
+ },
+ {
+  "box": [
+   659,
+   61,
+   399,
+   165
+  ],
+  "kind": "bubble",
+  "shape": "jagged",
+  "items": [
+   1
+  ],
+  "lang": "es",
+  "dark": false
+ },
+ {
+  "box": [
+   546,
+   672,
+   237,
+   213
+  ],
+  "kind": "bubble",
+  "shape": "ellipse",
+  "items": [
+   2
+  ],
+  "lang": "es",
+  "dark": false
+ },
+ {
+  "box": [
+   650,
+   1185,
+   372,
+   225
+  ],
+  "kind": "bubble",
+  "shape": "ellipse",
+  "items": [
+   3
+  ],
+  "lang": "es",
+  "dark": true
+ },
+ {
+  "box": [
+   724,
+   1473,
+   232,
+   25
+  ],
+  "kind": "block",
+  "items": [
+   4
+  ],
+  "lang": "es",
+  "dark": false
+ }
+]

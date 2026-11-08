@@ -7,10 +7,18 @@
 // `analysis.dispose()` when done with it.
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+// Diagnostics: set globalThis.GYT_TRACE = (kind, box, reason, extra) => … to hear
+// why a text block or light region was rejected (tests/engine-viz.mjs --trace).
+const trace = (...a) => { if (globalThis.GYT_TRACE) globalThis.GYT_TRACE(...a); };
 const odd = (n) => (n % 2 ? n : n + 1);
 const median = (a) => { if (!a.length) return 0; const t = Float64Array.from(a).sort(); return t[t.length >> 1]; };
 // Cap height of the lettering: the 80th percentile of glyph heights (caps and
 // ascenders) — the median would track x-height in mixed-case text.
+/** Height at which half of the ink lies: letters dominate, fragments and dots do not. */
+function inkMedianHeight(gs) {
+  const t = [...gs].sort((a, b) => a.h - b.h); let tot = 0; for (const g of t) tot += g.a;
+  let acc = 0; for (const g of t) { acc += g.a; if (acc >= tot / 2) return g.h; } return t.length ? t[t.length - 1].h : 0;
+}
 const capHeight = (a) => { if (!a.length) return 0; const t = Float64Array.from(a).sort(); return t[Math.min(t.length - 1, Math.floor(t.length * 0.8))]; };
 
 /**
@@ -112,33 +120,48 @@ function analyzePolarity(cv, src, gray, base, W, H, dark) {
     if (w > W * 0.6 || h > H * 0.5 || h < minH) continue;
     const members = perBlock.get(i) || [];
     const good = members.filter((g) => glyphs[g].ok);
-    if (good.length < 1) continue;
+    const box = { x, y, w, h };
+    if (good.length < 1) { if (members.length) trace("block", box, "no glyph-sized components", { members: members.length }); continue; }
     // most of the ink in a text block belongs to glyph-sized components (art fails this)
     let inkAll = 0, inkGood = 0;
     for (const g of members) { inkAll += glyphs[g].a; if (glyphs[g].ok) inkGood += glyphs[g].a; }
-    if (inkGood / inkAll < 0.6) continue;
+    if (inkGood / inkAll < 0.6) { trace("block", box, "ink mostly in non-glyph components", { ratio: inkGood / inkAll }); continue; }
     if (good.length === 1 && glyphs[good[0]].h < minH * 2) continue; // a lone speck
+    // Letters of one font share a height; a cloud of art fragments does not.
+    // Weighted by ink, so dashes, dots and punctuation (little ink, odd heights)
+    // do not disqualify a real line of text.
     const heights = good.map((g) => glyphs[g].h);
-    const letter = capHeight(heights), mid = median(heights);
-    // letters of one font share a height; a cloud of art fragments does not
-    if (good.length >= 3 && median(heights.map((v) => Math.abs(v - mid))) / mid > 0.45) continue;
-    if (letter < W / 200) continue; // smaller than any readable lettering at this resolution
+    const mid = inkMedianHeight(good.map((gi) => glyphs[gi])); // the height where half the ink lies (not skewed by stroke fragments)
+    if (good.length >= 3) {
+      let inkNear = 0, inkTot = 0;
+      for (const gi of good) { const g = glyphs[gi]; inkTot += g.a; if (g.h >= 0.55 * mid && g.h <= 1.6 * mid) inkNear += g.a; }
+      if (inkNear / inkTot < 0.6) { trace("block", box, "inconsistent glyph heights", { heights, inkNear: inkNear / inkTot }); continue; }
+    }
+    const letter = capHeight(heights.filter((h) => h >= 0.55 * mid)); // cap height of the letters proper, not of a stray dash
+    if (letter < W / 200) { trace("block", box, "lettering too small", { letter }); continue; }
     // Stroke width: letters of one font share it (relative to their height);
     // hair, shading and mechanical detail do not. Max distance-transform value
     // inside a glyph ≈ half its stroke width.
-    if (good.length >= 3) {
+    const core = good.filter((gi) => glyphs[gi].h >= 0.55 * mid); // the letters proper (see above)
+    {
       const roi = ink.roi(new cv.Rect(x, y, w, h)), dt = new cv.Mat();
       cv.distanceTransform(roi, dt, cv.DIST_L2, 3);
       const D = dt.data32F, ratios = [];
-      for (const gi of good) {
+      let blobs = 0;
+      for (const gi of core) {
         const g = glyphs[gi]; let mx = 0;
         for (let yy = g.y - y; yy < g.y - y + g.h; yy++) for (let xx = g.x - x; xx < g.x - x + g.w; xx++) { const v = D[yy * w + xx]; if (v > mx) mx = v; }
         ratios.push((2 * mx) / g.h);
+        // a solid blob (eye, dot, filled shape): thick all the way through and well filled
+        if ((2 * mx) / Math.min(g.w, g.h) >= 0.85 && g.a / (g.w * g.h) >= 0.6 && g.h >= minH * 2) blobs++;
       }
       roi.delete(); dt.delete();
+      if (core.length && blobs === core.length) { trace("block", box, "solid blobs, not lettering", { blobs }); continue; } // eyes, buttons, dots
+      if (core.length >= 3) {
       const mr = median(ratios);
-      if (mr < 0.06 || mr > 0.7) continue; // hairline scratches or solid blobs
-      if (median(ratios.map((v) => Math.abs(v - mr))) / mr > 0.6) continue; // inconsistent strokes: not one font
+      if (mr < 0.06 || mr > 0.7) { trace("block", box, "stroke width out of range", { mr }); continue; } // hairline scratches or solid blobs
+      if (median(ratios.map((v) => Math.abs(v - mr))) / mr > 0.6) { trace("block", box, "inconsistent stroke widths", { ratios }); continue; } // not one font
+      }
     }
     const inkArea = good.reduce((s, g) => s + glyphs[g].a, 0);
     blocks.push({ box: { x, y, w, h }, letter, glyphCount: good.length, glyphs: good, inkArea, label: i, dark, bubble: null, region: null });
@@ -155,13 +178,20 @@ function analyzePolarity(cv, src, gray, base, W, H, dark) {
   const ln = cv.connectedComponentsWithStats(light, ll, ls, lc, 4, cv.CV_32S);
   const L = ls.data32S, labels = ll.data32S;
   const sample = (x, y) => (x < 0 || y < 0 || x >= W || y >= H) ? 0 : labels[y * W + x];
-  const owner = (b) => { // which light region holds this block: majority of samples just outside its box
-    const { x, y, w, h } = b.box, d = 3, votes = new Map();
-    for (const [sx, sy] of [[x - d, y + h / 2], [x + w + d, y + h / 2], [x + w / 2, y - d], [x + w / 2, y + h + d], [x - d, y - d], [x + w + d, y - d], [x - d, y + h + d], [x + w + d, y + h + d]]) {
-      const v = sample(Math.round(sx), Math.round(sy)); if (v) votes.set(v, (votes.get(v) || 0) + 1);
-    }
+  // Which light region holds a text block: the majority light label among the
+  // block's own non-ink pixels (the bubble surface between the letters), with a
+  // thin ring outside the box as a tie-breaker. Sampling only outside the box
+  // let wide lettering vote for the panel behind its bubble.
+  const inkData = ink.data;
+  const owner = (b) => {
+    const { x, y, w, h } = b.box, votes = new Map(), step = Math.max(1, Math.round(Math.min(w, h) / 12));
+    let samples = 0;
+    const vote = (sx, sy, wgt) => { const v = sample(sx, sy); samples += wgt; if (v) votes.set(v, (votes.get(v) || 0) + wgt); };
+    for (let yy = y; yy < y + h; yy += step) for (let xx = x; xx < x + w; xx += step) { if (inkData[yy * W + xx]) continue; vote(xx, yy, 1); }
+    const d = 3;
+    for (let t = 0; t <= 1; t += 0.125) { vote(Math.round(x + w * t), y - d, 0.5); vote(Math.round(x + w * t), y + h + d, 0.5); vote(x - d, Math.round(y + h * t), 0.5); vote(x + w + d, Math.round(y + h * t), 0.5); }
     let best = 0, n = 0; for (const [k, v] of votes) if (v > n) { best = k; n = v; }
-    return n >= 3 ? best : 0;
+    return n >= 0.3 * samples ? best : 0;
   };
   const byLight = new Map();
   for (const b of blocks) { const o = owner(b); if (o) (byLight.get(o) || byLight.set(o, []).get(o)).push(b); }
@@ -169,17 +199,24 @@ function analyzePolarity(cv, src, gray, base, W, H, dark) {
   const srcData = src.data;
   for (const [i, inBlocks] of byLight) {
     const x = L[i * 5], y = L[i * 5 + 1], w = L[i * 5 + 2], h = L[i * 5 + 3], a = L[i * 5 + 4];
-    const frac = a / (W * H);
-    if (frac < 0.0006 || frac > 0.12) continue;
-    if (w > 0.6 * W || h > 0.45 * H || w * h > 0.15 * W * H) continue; // a bubble is never most of the page
+    const frac = a / (W * H), rbox = { x, y, w, h };
+    const reject = (why, extra) => trace("region", rbox, why, { frac, blocks: inBlocks.length, ...extra });
+    if (frac < 0.0006 || frac > 0.12) { reject("area out of range"); continue; }
+    if (w > 0.6 * W || h > 0.45 * H || w * h > 0.15 * W * H) { reject("too large for a bubble"); continue; } // a bubble is never most of the page
     const touches = x <= 1 || y <= 1 || x + w >= W - 1 || y + h >= H - 1;
-    if (touches && frac > 0.02) continue; // page/panel background, not a bubble
-    if (a / (w * h) < 0.3) continue; // too ragged (gutters, sky between art)
-    const textArea = inBlocks.reduce((s, b) => s + b.box.w * b.box.h, 0);
+    if (touches && frac > 0.02) { reject("touches the page edge"); continue; } // page/panel background, not a bubble
+    if (a / (w * h) < 0.3) { reject("too ragged", { fill: a / (w * h) }); continue; } // gutters, sky between art
+    // Text footprint: the blocks' union box (a vertical column of characters is
+    // many small blocks) — but no larger than 3× their summed area, so two
+    // distant specks cannot claim a big region.
+    const sumArea = inBlocks.reduce((s, b) => s + b.box.w * b.box.h, 0);
+    const ux0 = Math.min(...inBlocks.map((b) => b.box.x)), uy0 = Math.min(...inBlocks.map((b) => b.box.y));
+    const ux1 = Math.max(...inBlocks.map((b) => b.box.x + b.box.w)), uy1 = Math.max(...inBlocks.map((b) => b.box.y + b.box.h));
+    const textArea = Math.min((ux1 - ux0) * (uy1 - uy0), 3 * sumArea);
     const glyphCount = inBlocks.reduce((s, b) => s + b.glyphCount, 0);
-    if (glyphCount < 2) continue;
-    if (glyphCount < 4 && textArea / a < 0.1) continue; // two specks in a big light shape: eyes in a face, not a bubble
-    if (textArea / a < 0.04) continue; // text is incidental: a background with a small label on it
+    if (glyphCount < 2) { reject("fewer than two glyphs", { glyphCount }); continue; }
+    if (glyphCount < 4 && textArea / a < 0.1) { reject("a few specks in a big shape", { glyphCount, textFrac: textArea / a }); continue; } // eyes in a face, not a bubble
+    if (textArea / a < 0.04) { reject("text is incidental", { textFrac: textArea / a }); continue; } // a background with a small label on it
     // A bubble is a flat light shape whose only content is lettering. Its holes
     // (filled outline minus light pixels) must be small and mostly glyphs; a
     // panel background with a character drawn on it fails both.
@@ -201,9 +238,9 @@ function analyzePolarity(cv, src, gray, base, W, H, dark) {
     contours.delete(); hier.delete(); m.delete(); roi.delete();
     const holes = Math.max(0, filled - a);
     const textInk = inBlocks.reduce((s, b) => s + b.inkArea, 0);
-    if (holes / Math.max(1, filled) > 0.3) continue; // too much drawn inside: a background, not a bubble
-    if (holes > 0 && textInk / holes < 0.45) continue; // what is inside is mostly not lettering
-    if (hullArea && a / hullArea < 0.45) continue; // ragged shape (sky between branches, gutters)
+    if (holes / Math.max(1, filled) > 0.3) { reject("too much drawn inside", { holeFrac: holes / filled }); continue; } // a background, not a bubble
+    if (holes > 0 && textInk / holes < 0.45) { reject("content inside is not lettering", { inkFrac: textInk / holes }); continue; }
+    if (hullArea && a / hullArea < 0.45) { reject("not convex enough", { solidity: a / hullArea }); continue; } // sky between branches, gutters
     // bubble colour: mean of the region's own pixels
     let r = 0, g = 0, bb = 0, n = 0;
     for (let yy = y; yy < y + h; yy += 3) for (let xx = x; xx < x + w; xx += 3) {
@@ -212,7 +249,7 @@ function analyzePolarity(cv, src, gray, base, W, H, dark) {
     }
     const color = n ? [Math.round(r / n), Math.round(g / n), Math.round(bb / n)] : (dark ? [0, 0, 0] : [255, 255, 255]);
     const letter = capHeight(inBlocks.flatMap((b) => b.glyphs.map((gi) => glyphs[gi].h)));
-    if (letter < W / 180) continue; // "text" too small to be lettering (eye highlights, dots)
+    if (letter < W / 180) { reject("lettering too small", { letter }); continue; } // eye highlights, dots
     const bubble = { id: 0, box: { x, y, w, h }, area: a, color, dark, letter, blocks: inBlocks, labelId: i, labels: ll, fill };
     for (const b of inBlocks) b.bubble = bubble;
     bubbles.push(bubble);
