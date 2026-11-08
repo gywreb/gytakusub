@@ -260,19 +260,13 @@
         }
         placements.push({ text, rect, color: G.isDark(color) ? "#fff" : "#000", target: sizeFor(g.letter, mul), minSize: Math.max(7, Math.round(base * 0.4)) });
       } else if (box) {
-        const pad = Math.max(4, Math.min(box.w, box.h) * 0.16);
-        let zone = clampRect({ x: box.x - pad, y: box.y - pad, w: box.w + 2 * pad, h: box.h + 2 * pad }, page);
-        // A wrong, oversized model box must not wipe artwork: cap the zone to
-        // ~2.5× the area this text needs at page size, centred on the box.
-        const need = text.length * pageLetter * 0.55 * pageLetter * 1.15 * 2.5;
-        if (zone.w * zone.h > need) {
-          const k = Math.sqrt(need / (zone.w * zone.h));
-          zone = clampRect({ x: zone.x + zone.w * (1 - k) / 2, y: zone.y + zone.h * (1 - k) / 2, w: zone.w * k, h: zone.h * k }, page);
-        }
-        const erased = G.eraseTextZone(ctx, pixels, zone, { radius: Math.max(3, Math.round(base * 0.12)) });
+        // No bubble region: erase glyph-sized ink around the model's box (line
+        // art and outlines are protected inside the eraser); the returned rect
+        // is the real extent of the lettering, which may exceed the box.
+        const erased = G.eraseTextZone(ctx, pixels, box, { letter: pageLetter });
         if (erased) {
-          const letter = G.estimateLetterSize(pixels, zone, null);
-          placements.push({ text, rect: zone, color: G.isDark(erased.color) ? "#fff" : "#000", target: sizeFor(letter, mul), minSize: Math.max(7, Math.round(base * 0.5)), erasedZone: true });
+          const letter = G.estimateLetterSize(pixels, erased.rect, null);
+          placements.push({ text, rect: clampRect(erased.rect, page), color: G.isDark(erased.color) ? "#fff" : "#000", target: sizeFor(letter, mul), minSize: Math.max(7, Math.round(base * 0.5)), erasedZone: true });
         } else {
           // Text over artwork: translucent box built around the text at page size.
           const size = Math.round(pageLetter * mul);

@@ -435,54 +435,110 @@
   }
 
   /**
-   * Erase lettering inside a rectangular zone without knowing the bubble
-   * outline: light pixels in the zone (dilated by `r` px so thin dark strokes
-   * are swallowed) are painted in the zone's own light colour. Returns false
-   * when the zone is mostly dark (text over artwork) so the caller can fall
-   * back to a translucent box.
+   * Erase lettering near a text box without knowing the bubble outline.
+   * Only GLYPH-SIZED ink components (height ≈ lettering size) are painted over,
+   * so bubble outlines, line art and logos survive even if the model's box is
+   * wrong. Components may extend past `core` (the model's box) up to `search`.
+   * Returns null when the zone has no glyph-sized ink or too little flat
+   * background (text over artwork) — the caller then draws a translucent box.
+   *
+   * @returns {null | { color:[r,g,b], rect:{x,y,w,h} }}  rect = extent of erased glyphs ∪ core
    */
-  function eraseTextZone(ctx, img, zone, opts = {}) {
+  function eraseTextZone(ctx, img, core, opts = {}) {
     const { data, width: W, height: H } = img;
-    const r = opts.radius ?? 4;
-    const lightThr = opts.lightThreshold ?? 150;
-    const x0 = Math.max(0, Math.floor(zone.x)), y0 = Math.max(0, Math.floor(zone.y));
-    const x1 = Math.min(W, Math.ceil(zone.x + zone.w)), y1 = Math.min(H, Math.ceil(zone.y + zone.h));
+    const L = opts.letter || Math.max(10, W / 42); // page lettering size in px
+    const r = opts.radius ?? Math.max(2, Math.round(L * 0.12));
+    const inkThr = opts.inkThreshold ?? 110, lightThr = opts.lightThreshold ?? 150;
+    const grow = opts.search ?? 0.5;
+    const x0 = Math.max(0, Math.floor(core.x - core.w * grow)), y0 = Math.max(0, Math.floor(core.y - core.h * grow));
+    const x1 = Math.min(W, Math.ceil(core.x + core.w * (1 + grow))), y1 = Math.min(H, Math.ceil(core.y + core.h * (1 + grow)));
     const zw = x1 - x0, zh = y1 - y0;
-    if (zw < 2 || zh < 2) return false;
-    const light = new Uint8Array(zw * zh);
+    if (zw < 4 || zh < 4) return null;
+
+    // Classify pixels: ink / light / other.
+    const ink = new Uint8Array(zw * zh);
     let nLight = 0, sr = 0, sg = 0, sb = 0;
     for (let y = 0; y < zh; y++) for (let x = 0; x < zw; x++) {
       const i = ((y + y0) * W + (x + x0)) * 4;
-      if (lum(data[i], data[i + 1], data[i + 2]) >= lightThr) {
-        light[y * zw + x] = 1; nLight++; sr += data[i]; sg += data[i + 1]; sb += data[i + 2];
+      const l = lum(data[i], data[i + 1], data[i + 2]);
+      if (l < inkThr) ink[y * zw + x] = 1;
+      else if (l >= lightThr) { nLight++; sr += data[i]; sg += data[i + 1]; sb += data[i + 2]; }
+    }
+    if (nLight < 0.35 * zw * zh) return null; // not on a light background
+    const color = [Math.round(sr / nLight), Math.round(sg / nLight), Math.round(sb / nLight)];
+
+    // Connected components of ink (8-connected). Glyph-sized components that
+    // touch the core box are erased, and inclusion chains outward: any glyph
+    // within ~1.5 letters of an erased one joins too (a line of text is a chain
+    // of neighbours), so a too-small model box still clears the whole lettering.
+    const label = new Int32Array(zw * zh);
+    const stack = new Int32Array(zw * zh);
+    const keep = new Uint8Array(zw * zh);
+    const maxH = L * 2.4, maxW = L * 10, near = L * 1.5;
+    const comps = [];
+    let inkArea = 0, next = 0;
+    for (let s0 = 0; s0 < zw * zh; s0++) {
+      if (!ink[s0] || label[s0]) continue;
+      next++;
+      let sp = 0, n = 0, bx0 = zw, bx1 = -1, by0 = zh, by1 = -1;
+      stack[sp++] = s0; label[s0] = next;
+      const pix = [];
+      while (sp > 0) {
+        const p = stack[--sp]; const x = p % zw, y = (p - x) / zw;
+        n++; pix.push(p);
+        if (x < bx0) bx0 = x; if (x > bx1) bx1 = x; if (y < by0) by0 = y; if (y > by1) by1 = y;
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+          const xx = x + dx, yy = y + dy;
+          if (xx < 0 || yy < 0 || xx >= zw || yy >= zh) continue;
+          const q = yy * zw + xx;
+          if (ink[q] && !label[q]) { label[q] = next; stack[sp++] = q; }
+        }
+      }
+      inkArea += n;
+      const h = by1 - by0 + 1, w = bx1 - bx0 + 1;
+      if (h <= maxH && w <= maxW && n >= 2) comps.push({ pix, bx0, bx1, by0, by1, used: false });
+    }
+    // Seed: glyphs overlapping the core box (in zone coordinates); then chain.
+    let ex0 = core.x - x0, ey0 = core.y - y0, ex1 = core.x + core.w - x0, ey1 = core.y + core.h - y0;
+    let erasedArea = 0, changed = true, any = false;
+    while (changed) {
+      changed = false;
+      for (const c of comps) {
+        if (c.used) continue;
+        if (c.bx1 >= ex0 - near && c.bx0 <= ex1 + near && c.by1 >= ey0 - near && c.by0 <= ey1 + near) {
+          c.used = true; changed = true; any = true;
+          for (const p of c.pix) keep[p] = 1;
+          erasedArea += c.pix.length;
+          ex0 = Math.min(ex0, c.bx0); ey0 = Math.min(ey0, c.by0); ex1 = Math.max(ex1, c.bx1); ey1 = Math.max(ey1, c.by1);
+        }
       }
     }
-    if (nLight < (opts.minLightFrac ?? 0.55) * zw * zh) return false;
-    const color = [Math.round(sr / nLight), Math.round(sg / nLight), Math.round(sb / nLight)];
-    // Separable dilation (max filter), horizontal then vertical.
-    const tmpM = new Uint8Array(zw * zh), dil = new Uint8Array(zw * zh);
-    for (let y = 0; y < zh; y++) for (let x = 0; x < zw; x++) {
-      let v = 0;
-      for (let d = -r; d <= r && !v; d++) { const xx = x + d; if (xx >= 0 && xx < zw && light[y * zw + xx]) v = 1; }
-      tmpM[y * zw + x] = v;
-    }
-    for (let y = 0; y < zh; y++) for (let x = 0; x < zw; x++) {
-      let v = 0;
-      for (let d = -r; d <= r && !v; d++) { const yy = y + d; if (yy >= 0 && yy < zh && tmpM[yy * zw + x]) v = 1; }
-      dil[y * zw + x] = v;
-    }
+    if (!any || (erasedArea < 0.3 * inkArea && erasedArea < L * L)) return null; // mostly artwork here
+
+    // Paint: dilate the kept glyph pixels by r, but never over non-glyph ink.
     const out = ctx.createImageData(zw, zh);
     const od = out.data;
-    for (let k = 0; k < zw * zh; k++) {
-      if (!dil[k]) continue;
-      od[k * 4] = color[0]; od[k * 4 + 1] = color[1]; od[k * 4 + 2] = color[2]; od[k * 4 + 3] = 255;
+    for (let y = 0; y < zh; y++) for (let x = 0; x < zw; x++) {
+      const p = y * zw + x;
+      if (ink[p] && !keep[p]) continue; // protected line art / outline
+      let hit = keep[p];
+      for (let dy = -r; dy <= r && !hit; dy++) for (let dx = -r; dx <= r && !hit; dx++) {
+        const xx = x + dx, yy = y + dy;
+        if (xx >= 0 && yy >= 0 && xx < zw && yy < zh && keep[yy * zw + xx]) hit = 1;
+      }
+      if (!hit) continue;
+      od[p * 4] = color[0]; od[p * 4 + 1] = color[1]; od[p * 4 + 2] = color[2]; od[p * 4 + 3] = 255;
     }
     const tmp = (typeof OffscreenCanvas !== "undefined")
       ? new OffscreenCanvas(zw, zh)
       : Object.assign(document.createElement("canvas"), { width: zw, height: zh });
     tmp.getContext("2d").putImageData(out, 0, 0);
     ctx.drawImage(tmp, x0, y0);
-    return { color };
+
+    // Text area: extent of what we erased ∪ the core box, padded a little.
+    const pad = L * 0.3;
+    const rx0 = ex0 + x0 - pad, ry0 = ey0 + y0 - pad, rx1 = ex1 + x0 + 1 + pad, ry1 = ey1 + y0 + 1 + pad;
+    return { color, rect: { x: Math.max(0, rx0), y: Math.max(0, ry0), w: Math.min(W, rx1) - Math.max(0, rx0), h: Math.min(H, ry1) - Math.max(0, ry0) } };
   }
 
   /** True if (x,y) is inside a findBubble result (row-span ∩ col-span). */
