@@ -6,13 +6,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: 22 }
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: tests/package-lock.json
       - run: for f in extension/*.js extension/engine/*.js web/*.js; do node --check "$f"; done
+      # node-canvas ships prebuilt binaries; when that download fails it builds from
+      # source, which needs these libraries (the build takes ~1 min).
+      - run: sudo apt-get install -y --no-install-recommends libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev >/dev/null
+      - run: cd tests && npm ci --no-audit --no-fund
       # Vendored libraries must match what the vendoring scripts produce from the pinned packages.
-      - run: cd tests && npm install --no-audit --no-fund && npm run vendor && git diff --exit-code -- ../extension/vendor || { echo "::error::extension/vendor differs from scripts/vendor-*.mjs output"; exit 1; }
-      - run: pip install --quiet pillow && cd tests && npm run demo # synthetic test page (fixtures/*.png are git-ignored)
+      - run: cd tests && npm run vendor && git diff --exit-code -- ../extension/vendor || { echo "::error::extension/vendor differs from scripts/vendor-*.mjs output"; exit 1; }
+      - run: pip install --quiet pillow && cd tests && npm run demo # synthetic test pages (fixtures/*.png are git-ignored)
       - run: cd tests && npm test
-      # Real-browser test: the actual extension in headless Chrome against a mock API.
+      # Real-browser tests: the actual extension and the web app in headless Chromium against a mock API.
       - run: cd tests && npx playwright install --with-deps chromium
       - run: cd tests && npm run test:browser
       - uses: actions/upload-artifact@v4
