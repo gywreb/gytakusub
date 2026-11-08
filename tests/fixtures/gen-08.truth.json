@@ -31,40 +31,40 @@
  },
  {
   "box": [
-   785,
-   188,
-   270,
-   184
+   797,
+   98,
+   323,
+   230
   ],
   "kind": "bubble",
-  "shape": "ellipse",
+  "shape": "jagged",
   "items": [
    2
   ],
   "lang": "es",
-  "dark": false
+  "dark": true
  },
  {
   "box": [
-   301,
-   931,
-   247,
-   233
+   129,
+   1033,
+   323,
+   169
   ],
   "kind": "bubble",
-  "shape": "rect",
+  "shape": "ellipse",
   "items": [
    3
   ],
   "lang": "es",
-  "dark": false
+  "dark": true
  },
  {
   "box": [
-   648,
-   955,
-   350,
-   238
+   769,
+   927,
+   242,
+   205
   ],
   "kind": "bubble",
   "shape": "ellipse",

@@ -7,7 +7,7 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
 A rebuilt page engine. 1.0 found bubbles, erased lettering and fitted text with hand-written heuristics that were tuned one reported page at a time; each fix risked the last one. 1.1 replaces that layer with [OpenCV](https://opencv.org/) (WebAssembly, bundled, runs locally) and a test corpus the engine must pass before anything ships. See `docs/adr/0001-dependencies.md` for the reasoning.
 
 ### Added
-- **OpenCV-based page analysis.** Lettering is found first (glyph components → text blocks, judged by stroke width and glyph height consistency), then the flat light or dark shapes that contain only lettering become bubbles. Japanese vertical text, dark bubbles with white lettering, captions and free narration on screentone are all handled; eyes, sound effects and panel backgrounds are rejected on principle rather than by size alone.
+- **Learned text detection.** Text lines are found by PaddleOCR's PP-OCRv4 detector (Apache-2.0, 4.7 MB), run locally by OpenCV's dnn module from the bundled WebAssembly — no server, no extra runtime. OpenCV geometry then snaps each box to the ink, merges lines into paragraphs, and accepts the flat light or dark shape around a paragraph as a bubble when its only content is the lettering. Measured on 172 real pages from the user's exports: false regions 5.7 → 0.9 per page, same bubble recognition, coverage 93 → 94%. See `docs/adr/0002-learned-text-detection.md`. The rule-based analyser remains as a fallback.
 - **Inpainting instead of painting.** Original lettering is removed with Telea inpainting inside the bubble (outlines untouched) and in a small region for free text, so the bubble's own surface and simple art behind loose text are reconstructed.
 - **Hover to peek.** Rest the pointer on a translated bubble for a moment to see the original lettering; move away to get the translation back. Options → "Peek at the original" turns it off.
 - **Edit a line.** Double-click a translated bubble to correct the text; the correction stays for that page until you Redo. The same dialog can teach the glossary ("original term = translation") for later pages.
@@ -32,7 +32,8 @@ The detector was reworked against the first real exports (850 px JPEG pages with
 ### Known limitations
 - Telea inpainting smooths periodic screentone behind free narration (the dots blur where the letters were). Bubbles are unaffected.
 - Detailed artwork (armour, faces, foliage) is still stamped as a text region a few times per page; the model is told to return nothing for such stamps, so the cost is tokens, not wrong text. Dialogue in bubbles the detector misses (~15% on the pages seen so far) is placed by the model's box with a halo instead of inside the bubble.
-- Package size grew by ~6 MB (the OpenCV WebAssembly), compiled once by the browser and cached.
+- Package size grew by ~11 MB (OpenCV WebAssembly 6 MB, text detector 4.7 MB), compiled/parsed once per worker start and cached by the browser.
+- Analysis takes ~2 s per page in the browser (the detector), before the model call; pages translated while scrolling fast queue behind each other. A faster runtime (WebGPU) is the planned 1.2 improvement.
 
 ## [1.0.0] — 2026-11-08
 

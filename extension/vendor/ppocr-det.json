@@ -1,0 +1,6 @@
+{
+  "source": "@gutenye/ocr-models@1.4.2",
+  "model": "ch_PP-OCRv4_det_infer.onnx (PaddleOCR, Apache-2.0)",
+  "rewrite": "HardSigmoid → Mul/Add/Clip",
+  "bytes": 4746747
+}

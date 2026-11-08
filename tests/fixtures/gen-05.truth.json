@@ -1,13 +1,13 @@
 [
  {
   "box": [
-   303,
-   154,
-   239,
-   362
+   440,
+   106,
+   196,
+   339
   ],
   "kind": "bubble",
-  "shape": "rect",
+  "shape": "jagged",
   "items": [
    0
   ],
@@ -16,15 +16,30 @@
  },
  {
   "box": [
-   796,
-   70,
-   334,
-   73
+   102,
+   640,
+   160,
+   366
   ],
   "kind": "bubble",
-  "shape": "rect",
+  "shape": "ellipse",
   "items": [
    1
+  ],
+  "lang": "ja",
+  "dark": false
+ },
+ {
+  "box": [
+   575,
+   1168,
+   219,
+   321
+  ],
+  "kind": "bubble",
+  "shape": "ellipse",
+  "items": [
+   2
   ],
   "lang": "ja",
   "dark": false

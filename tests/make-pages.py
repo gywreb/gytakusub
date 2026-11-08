@@ -211,13 +211,14 @@ class Page:
         self.occupied = []
         d.rectangle(box, outline="black", width=6)
         tone = rng.random() < 0.7
-        spacing, r, color = rng.choice([9, 11, 13]), rng.choice([1.8, 2.0, 2.4]), rng.choice([(110, 110, 110), (130, 130, 130), (90, 90, 90)])
+        # real screentone is fine: ~5–7 px dot pitch at this resolution, dots about a pixel
+        spacing, r, color = rng.choice([5, 6, 7]), rng.choice([0.9, 1.1, 1.3]), rng.choice([(70, 70, 70), (90, 90, 90), (110, 110, 110), (125, 125, 125)])
         if tone:
             self.halftone((x0 + 8, y0 + 8, x1 - 8, y1 - 8), spacing=spacing, r=r, color=color)
         # Letterers do not put bare black text on dense dark tone (it gets a halo or
         # lighter tone); the engine does not promise to find it either — the model's
         # own box places such text, with a halo.
-        light_tone = color[0] >= 110 and r <= 2.0
+        light_tone = r <= 1.1 and color[0] >= 110
         w, h = x1 - x0, y1 - y0
         # a character low in the panel
         if rng.random() < 0.8 and h > 300:

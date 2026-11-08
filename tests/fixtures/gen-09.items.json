@@ -14,9 +14,9 @@
  {
   "tag": null,
   "box": [
-   727,
-   361,
-   168,
+   834,
+   176,
+   186,
    78
   ],
   "text": "Calm down, it isn't over yet.",
@@ -26,9 +26,9 @@
  {
   "tag": null,
   "box": [
-   734,
-   171,
-   265,
+   231,
+   1016,
+   203,
    25
   ],
   "text": "Since when did you know?",
@@ -38,10 +38,10 @@
  {
   "tag": null,
   "box": [
-   284,
-   1172,
-   153,
-   30
+   156,
+   1267,
+   118,
+   69
   ],
   "text": "From the very beginning.",
   "size": "normal",
@@ -50,37 +50,13 @@
  {
   "tag": null,
   "box": [
-   163,
-   916,
-   192,
-   25
-  ],
-  "text": "Three hours later...",
-  "size": "small",
-  "kind": "narration"
- },
- {
-  "tag": null,
-  "box": [
-   734,
-   1082,
-   314,
+   760,
+   997,
+   200,
    39
   ],
-  "text": "And if he doesn't come back?",
+  "text": "Three hours later...",
   "size": "normal",
   "kind": "bubble"
- },
- {
-  "tag": null,
-  "box": [
-   687,
-   917,
-   198,
-   28
-  ],
-  "text": "He will.",
-  "size": "small",
-  "kind": "narration"
  }
 ]

@@ -38,13 +38,37 @@
  {
   "tag": null,
   "box": [
-   764,
-   975,
-   243,
-   34
+   854,
+   1064,
+   218,
+   30
   ],
   "text": "From the very beginning.",
   "size": "normal",
   "kind": "bubble"
+ },
+ {
+  "tag": null,
+  "box": [
+   870,
+   1232,
+   129,
+   51
+  ],
+  "text": "Three hours later...",
+  "size": "normal",
+  "kind": "bubble"
+ },
+ {
+  "tag": null,
+  "box": [
+   835,
+   916,
+   193,
+   25
+  ],
+  "text": "And if he doesn't come back?",
+  "size": "small",
+  "kind": "narration"
  }
 ]

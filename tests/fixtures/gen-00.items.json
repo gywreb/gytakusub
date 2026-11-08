@@ -26,10 +26,10 @@
  {
   "tag": null,
   "box": [
-   142,
-   1318,
-   130,
-   51
+   278,
+   736,
+   113,
+   60
   ],
   "text": "Since when did you know?",
   "size": "normal",
@@ -38,13 +38,37 @@
  {
   "tag": null,
   "box": [
-   568,
-   1231,
-   95,
+   757,
+   753,
+   260,
    51
   ],
   "text": "From the very beginning.",
   "size": "normal",
   "kind": "bubble"
+ },
+ {
+  "tag": null,
+  "box": [
+   848,
+   1348,
+   169,
+   90
+  ],
+  "text": "Three hours later...",
+  "size": "normal",
+  "kind": "bubble"
+ },
+ {
+  "tag": null,
+  "box": [
+   818,
+   1193,
+   211,
+   28
+  ],
+  "text": "And if he doesn't come back?",
+  "size": "small",
+  "kind": "narration"
  }
 ]

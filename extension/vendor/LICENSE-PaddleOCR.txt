@@ -1,0 +1,8 @@
+ppocr-det.onnx is the PP-OCRv4 text detection model from PaddleOCR
+(https://github.com/PaddlePaddle/PaddleOCR), Copyright (c) 2020 PaddlePaddle
+Authors, licensed under the Apache License, Version 2.0
+(http://www.apache.org/licenses/LICENSE-2.0). The ONNX export was taken from the
+@gutenye/ocr-models npm package (MIT); the only modification is a graph rewrite
+of HardSigmoid nodes into Mul/Add/Clip (scripts/vendor-detector.mjs) so that
+OpenCV 4.5's dnn module can run it. Distributed under the same Apache-2.0
+terms; see the NOTICE requirements of that license.

@@ -46,10 +46,10 @@
  },
  {
   "box": [
-   691,
-   905,
-   389,
-   175
+   793,
+   995,
+   340,
+   168
   ],
   "kind": "bubble",
   "shape": "ellipse",
@@ -57,6 +57,36 @@
    3
   ],
   "lang": "es",
-  "dark": true
+  "dark": false
+ },
+ {
+  "box": [
+   765,
+   1185,
+   339,
+   144
+  ],
+  "kind": "bubble",
+  "shape": "ellipse",
+  "items": [
+   4
+  ],
+  "lang": "es",
+  "dark": false
+ },
+ {
+  "box": [
+   734,
+   900,
+   396,
+   57
+  ],
+  "kind": "bubble",
+  "shape": "rect",
+  "items": [
+   5
+  ],
+  "lang": "es",
+  "dark": false
  }
 ]

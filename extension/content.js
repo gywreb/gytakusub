@@ -181,7 +181,7 @@
     return {
       gytakusub: chrome.runtime.getManifest().version, when: new Date().toISOString(), page: location.href, image: e.src,
       natural: [img.naturalWidth, img.naturalHeight], displayed: [Math.round(img.getBoundingClientRect().width), Math.round(img.getBoundingClientRect().height)], objectFit: e.objectFit,
-      work: res.work, letter: res.letter, fromCache: res.fromCache, timing: res.timing,
+      work: res.work, letter: res.letter, fromCache: res.fromCache, timing: res.timing, engine: res.engine,
       settings: { model: settings.model, targetLang: settings.targetLang, fontFamily: settings.fontFamily, uppercase: settings.uppercase, useContext: settings.useContext },
       regions: res.regions, items: res.items, placements: res.placements,
     };
@@ -349,7 +349,7 @@
     entry.img = img; entry.peek = -1;
     if (!entry.canvas) { entry.canvas = canvas; root.append(canvas); }
     drawOverlay(entry);
-    if (settings.debugOverlay) console.info("Gytakusub debug", { src: entry.src, work: res.work, natural: [res.width, res.height], timing: res.timing, fromCache: res.fromCache, items: res.items, regions: res.regions, placements: res.placements, letter: res.letter });
+    if (settings.debugOverlay) console.info("Gytakusub debug", { src: entry.src, engine: res.engine, work: res.work, natural: [res.width, res.height], timing: res.timing, fromCache: res.fromCache, items: res.items, regions: res.regions, placements: res.placements, letter: res.letter });
     entry.objectFit = getComputedStyle(img).objectFit;
     layout();
   }

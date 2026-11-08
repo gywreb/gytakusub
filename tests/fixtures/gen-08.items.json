@@ -27,9 +27,9 @@
   "tag": null,
   "box": [
    849,
-   245,
-   142,
-   69
+   198,
+   218,
+   30
   ],
   "text": "Since when did you know?",
   "size": "normal",
@@ -38,10 +38,10 @@
  {
   "tag": null,
   "box": [
-   336,
-   1013,
-   178,
-   69
+   185,
+   1103,
+   211,
+   30
   ],
   "text": "From the very beginning.",
   "size": "normal",
@@ -50,9 +50,9 @@
  {
   "tag": null,
   "box": [
-   701,
-   1054,
-   244,
+   812,
+   1010,
+   157,
    39
   ],
   "text": "Three hours later...",

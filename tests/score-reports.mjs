@@ -14,7 +14,7 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 import { createCanvas, loadImage } from "canvas";
-import { cv } from "./cv-node.mjs";
+import { cv, detector } from "./cv-node.mjs";
 
 const args = process.argv.slice(2);
 let engineDir = path.resolve("../extension/engine");
@@ -45,7 +45,7 @@ for (const zip of args) {
     const c = createCanvas(W, H), ctx = c.getContext("2d"); ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, W, H); ctx.drawImage(img, 0, 0, W, H);
     const t0 = Date.now();
     rejections = [];
-    const an = analyze(cv, ctx.getImageData(0, 0, W, H));
+    const an = analyze(cv, ctx.getImageData(0, 0, W, H), { detector });
     const ms = Date.now() - t0;
     // where the model saw text: the stamped region it named (as the report recorded
     // it) when it gave one, else the centre of its own box
@@ -54,14 +54,19 @@ for (const zip of args) {
       if (!it.text) continue;
       const reg = it.tag != null ? rep.regions.find((r) => r.id === it.tag) : null;
       const dialogue = it.kind === "bubble"; // the model's own kind: speech/thought bubble vs narration/sign
-      if (reg) spots.push({ x: reg.box.x + reg.box.w / 2, y: reg.box.y + reg.box.h / 2, text: it.text, dialogue });
-      else if (it.box) spots.push({ x: (it.box[0] + it.box[2] / 2) * W, y: (it.box[1] + it.box[3] / 2) * H, text: it.text, dialogue });
+      // where the text is: the stamped region the model named (as the report recorded
+      // it) and/or the centre of the model's own box — either may be wrong, so an
+      // item counts as found if any of its witnesses lands in a detected region
+      const pts = [];
+      if (reg) pts.push({ x: reg.box.x + reg.box.w / 2, y: reg.box.y + reg.box.h / 2 });
+      if (it.box) pts.push({ x: (it.box[0] + it.box[2] / 2) * W, y: (it.box[1] + it.box[3] / 2) * H });
+      if (pts.length) spots.push({ pts, x: pts[0].x, y: pts[0].y, text: it.text, dialogue });
     }
     const used = new Set();
     let covered = 0, asBubble = 0, dialogue = 0, asBubbleChars = 0, dialogueChars = 0;
     for (const sp of spots) {
       if (sp.dialogue) { dialogue++; dialogueChars += sp.text.length; }
-      const r = an.regions.find((r) => inside(r, sp.x, sp.y));
+      let r = null; for (const pt of sp.pts) { r = an.regions.find((q) => inside(q, pt.x, pt.y) && q.kind === "bubble") || an.regions.find((q) => inside(q, pt.x, pt.y)); if (r?.kind === "bubble") break; }
       if (r) {
         covered++; used.add(r.id);
         if (sp.dialogue && r.kind === "bubble") { asBubble++; asBubbleChars += sp.text.length; }

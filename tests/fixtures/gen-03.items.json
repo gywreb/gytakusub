@@ -38,34 +38,34 @@
  {
   "tag": null,
   "box": [
-   113,
-   825,
-   46,
-   110
-  ],
-  "text": "From the very beginning.",
-  "size": "normal",
-  "kind": "bubble"
- },
- {
-  "tag": null,
-  "box": [
-   332,
+   222,
    643,
-   84,
+   112,
    32
   ],
-  "text": "Three hours later...",
+  "text": "From the very beginning.",
   "size": "small",
   "kind": "narration"
  },
  {
   "tag": null,
   "box": [
-   1023,
-   719,
-   35,
-   197
+   851,
+   684,
+   130,
+   30
+  ],
+  "text": "Three hours later...",
+  "size": "normal",
+  "kind": "bubble"
+ },
+ {
+  "tag": null,
+  "box": [
+   153,
+   1240,
+   40,
+   259
   ],
   "text": "And if he doesn't come back?",
   "size": "normal",
@@ -74,10 +74,10 @@
  {
   "tag": null,
   "box": [
-   179,
-   1245,
-   238,
-   39
+   1017,
+   1310,
+   35,
+   140
   ],
   "text": "He will.",
   "size": "normal",

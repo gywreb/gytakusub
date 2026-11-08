@@ -15,6 +15,7 @@ jobs:
       # source, which needs these libraries (the build takes ~1 min).
       - run: sudo apt-get install -y --no-install-recommends libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev >/dev/null
       - run: cd tests && npm ci --no-audit --no-fund
+      - run: pip install --quiet onnx numpy # the detector vendoring script rewrites one ONNX op
       # Vendored libraries must match what the vendoring scripts produce from the pinned packages.
       - run: cd tests && npm run vendor && git diff --exit-code -- ../extension/vendor || { echo "::error::extension/vendor differs from scripts/vendor-*.mjs output"; exit 1; }
       - run: cd tests && npm test

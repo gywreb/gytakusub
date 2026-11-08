@@ -9,7 +9,7 @@ import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { createCanvas, loadImage, registerFont } from "canvas";
-import { cv } from "./cv-node.mjs";
+import { cv, detector } from "./cv-node.mjs";
 import { analyze } from "../extension/engine/analyze.js";
 import { layout } from "../extension/engine/layout.js";
 import { erase } from "../extension/engine/erase.js";
@@ -44,7 +44,7 @@ for (const pg of summary.pages) {
   const c = createCanvas(W, H), ctx = c.getContext("2d"); ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, W, H); ctx.drawImage(img, 0, 0, W, H);
   const pixels = ctx.getImageData(0, 0, W, H);
   const t0 = Date.now();
-  const an = analyze(cv, pixels);
+  const an = analyze(cv, pixels, { detector });
   // regions: same numbering as the report (single slice; strips were numbered page-wide the same way)
   const regionsNow = an.regions.map((r) => ({ id: r.id, kind: r.kind, letter: r.letter, box: r.box }));
   const regionsThen = rep.regions.map((r) => ({ id: r.id, kind: r.kind, letter: r.letter, box: r.box }));

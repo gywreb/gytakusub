@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { createCanvas, loadImage, registerFont } from "canvas";
-import { cv } from "./cv-node.mjs";
+import { cv, detector } from "./cv-node.mjs";
 import { analyze } from "../extension/engine/analyze.js";
 import { layout } from "../extension/engine/layout.js";
 import { erase } from "../extension/engine/erase.js";
@@ -81,12 +81,14 @@ for (const [name, png, truthPath, itemsPath] of pages) {
   const sc = (b) => ({ x: b[0] * scale, y: b[1] * scale, w: b[2] * scale, h: b[3] * scale });
   const T = (t, fn) => test(`[${name}] ${t}`, fn);
 
-  const an = analyze(cv, pixels);
+  const an = analyze(cv, pixels, { detector });
   const matched = new Map(); // truth index → region
   T("every ground-truth region is detected with the right kind (IoU ≥ 0.6)", () => {
     truth.forEach((t, i) => {
       const tb = sc(t.box);
-      const r = an.regions.find((r) => iou(r.box, tb) >= 0.6 && r.kind === t.kind) || an.regions.find((r) => t.kind === "bubble" && r.kind === "bubble" && contains(r.box, tb, 0.02));
+      // a detected text box may hug the letters more tightly than the generator's text box
+      const r = an.regions.find((r) => iou(r.box, tb) >= 0.6 && r.kind === t.kind) || an.regions.find((r) => t.kind === "bubble" && r.kind === "bubble" && contains(r.box, tb, 0.02))
+        || an.regions.find((r) => t.kind === "block" && r.kind === "block" && contains(tb, r.box, 0.15) && r.box.w >= 0.6 * tb.w);
       assert.ok(r, `truth #${i} (${t.kind} ${JSON.stringify(t.box)}) not found among ${JSON.stringify(an.regions.map((r) => [r.kind, r.box]))}`);
       matched.set(i, r);
     });
@@ -100,7 +102,7 @@ for (const [name, png, truthPath, itemsPath] of pages) {
     for (const r of an.regions) assert.ok(r.letter >= 11 && r.letter <= 34, `letter ${r.letter} for ${JSON.stringify(r.box)}`);
   });
   if (name === "demo") T("analysis is deterministic", () => {
-    const again = analyze(cv, pixels);
+    const again = analyze(cv, pixels, { detector });
     assert.deepEqual(again.regions.map((r) => [r.id, r.kind, r.box, r.letter]), an.regions.map((r) => [r.id, r.kind, r.box, r.letter]));
     again.dispose();
   });

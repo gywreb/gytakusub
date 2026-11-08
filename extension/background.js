@@ -222,7 +222,7 @@ async function handleTranslate(msg, sender) {
   lap("encode");
   timing.patchBytes = patches.reduce((s, p) => s + p.dataUrl.length, 0);
   return {
-    items: page.items, placements: page.placements, regions: page.regions, letter: page.letter,
+    items: page.items, placements: page.placements, regions: page.regions, letter: page.letter, engine: page.engine,
     work: page.work, width: job.width, height: job.height, usage, timing,
     patches, cleanDataUrl, fromCache: !!(cached && !msg.force), cacheKey,
   };

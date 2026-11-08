@@ -23,9 +23,42 @@ export function erase(cv, img, analysis, regionIds) {
     for (let y = g.y; y < g.y + g.h; y++) for (let x = g.x; x < g.x + g.w; x++) { const p = y * W + x; if (labels[p] === lbl) md[p] = 255; }
   };
 
+  // Learned analysis: the lettering is the ink inside each detected text box (grown
+  // by a third of a letter), as connected components that stay inside that window —
+  // an outline or a stroke of art crossing the window is not a letter.
+  const paintTextBox = (pol, b, letter) => {
+    const pad = Math.max(2, Math.round(letter * 0.35));
+    const x0 = Math.max(0, b.gbox.x - pad), y0 = Math.max(0, b.gbox.y - pad), x1 = Math.min(W, b.gbox.x + b.gbox.w + pad), y1 = Math.min(H, b.gbox.y + b.gbox.h + pad);
+    const w = x1 - x0, h = y1 - y0; if (w < 2 || h < 2) return;
+    const roi = pol.inkMask.roi(new cv.Rect(x0, y0, w, h)), lab = new cv.Mat(), st = new cv.Mat(), ce = new cv.Mat();
+    const n = cv.connectedComponentsWithStats(roi, lab, st, ce, 8, cv.CV_32S);
+    const S = st.data32S, Lb = lab.data32S;
+    const keep = new Uint8Array(n);
+    for (let i = 1; i < n; i++) {
+      const cx = S[i * 5], cy = S[i * 5 + 1], cw = S[i * 5 + 2], ch = S[i * 5 + 3];
+      const touches = cx <= 0 || cy <= 0 || cx + cw >= w || cy + ch >= h;
+      if (!touches && ch <= 2.5 * letter) keep[i] = 1;
+    }
+    for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) { const l = Lb[yy * w + xx]; if (l && keep[l]) md[(y0 + yy) * W + x0 + xx] = 255; }
+    roi.delete(); lab.delete(); st.delete(); ce.delete();
+  };
+
   for (const r of analysis.regions) {
     if (!regionIds.has(r.id)) continue;
     const pol = analysis.polarities[r.dark ? 1 : 0];
+    if (analysis.learned) {
+      const letter = Math.max(4, r.letter);
+      const blocks = r.kind === "bubble" ? r.ref.blocks : [r.ref];
+      for (const b of blocks) paintTextBox(pol, b, b.letter || letter);
+      const pad = Math.round(letter * 0.8);
+      const tx0 = Math.min(...blocks.map((b) => b.gbox.x)) - pad, ty0 = Math.min(...blocks.map((b) => b.gbox.y)) - pad;
+      const tx1 = Math.max(...blocks.map((b) => b.gbox.x + b.gbox.w)) + pad, ty1 = Math.max(...blocks.map((b) => b.gbox.y + b.gbox.h)) + pad;
+      const roi = { x: Math.max(0, Math.round(tx0)), y: Math.max(0, Math.round(ty0)) };
+      roi.w = Math.max(1, Math.min(W, Math.round(tx1)) - roi.x); roi.h = Math.max(1, Math.min(H, Math.round(ty1)) - roi.y);
+      if (r.kind === "bubble") rois.push({ ...roi, radius: 3, confine: r.ref.labelId, labels: pol.regionLabels.data32S, dark: r.dark });
+      else rois.push({ ...roi, radius: Math.max(3, Math.round(letter * 0.3)) });
+      continue;
+    }
     const glyphLabels = pol.glyphLabels.data32S, regionLabels = pol.regionLabels.data32S;
     const letter = Math.max(4, r.letter);
     if (r.kind === "bubble") {

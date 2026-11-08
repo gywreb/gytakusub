@@ -3,7 +3,7 @@
 //   node engine-viz.mjs <page.png> <out.png> [--trace]   (--trace prints why candidates were rejected)
 import fs from "node:fs";
 import { createCanvas, loadImage } from "canvas";
-import { cv } from "./cv-node.mjs";
+import { cv, detector } from "./cv-node.mjs";
 import { analyze } from "../extension/engine/analyze.js";
 
 const img = await loadImage(process.argv[2]);
@@ -12,7 +12,7 @@ const W = Math.round(img.width * scale), H = Math.round(img.height * scale);
 const c = createCanvas(W, H), ctx = c.getContext("2d"); ctx.drawImage(img, 0, 0, W, H);
 const t0 = Date.now();
 if (process.argv.includes("--trace")) globalThis.GYT_TRACE = (kind, box, why, extra) => { if (box.w * box.h > 60) console.log(`  rejected ${kind} ${JSON.stringify(box)}: ${why} ${JSON.stringify(extra, (k, v) => (typeof v === "number" ? +v.toFixed(3) : v))}`); };
-const an = analyze(cv, ctx.getImageData(0, 0, W, H));
+const an = analyze(cv, ctx.getImageData(0, 0, W, H), { detector });
 const ms = Date.now() - t0;
 ctx.lineWidth = 2; ctx.font = `bold ${Math.round(W / 70)}px sans-serif`;
 for (const b of an.blocks) { ctx.strokeStyle = b.bubble ? "rgba(37,99,235,.5)" : "rgba(37,99,235,.95)"; ctx.lineWidth = b.bubble ? 1 : 2; ctx.strokeRect(b.box.x, b.box.y, b.box.w, b.box.h); }

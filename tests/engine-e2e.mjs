@@ -3,7 +3,7 @@
 //   node engine-e2e.mjs <page.png> <items.json> <out.png>
 import fs from "node:fs";
 import { createCanvas, loadImage, registerFont } from "canvas";
-import { cv } from "./cv-node.mjs";
+import { cv, detector } from "./cv-node.mjs";
 import { analyze } from "../extension/engine/analyze.js";
 import { layout } from "../extension/engine/layout.js";
 import { erase } from "../extension/engine/erase.js";
@@ -19,7 +19,7 @@ const W = Math.round(img.width * scale), H = Math.round(img.height * scale);
 const c = createCanvas(W, H), ctx = c.getContext("2d"); ctx.drawImage(img, 0, 0, W, H);
 const pixels = ctx.getImageData(0, 0, W, H);
 const t0 = Date.now();
-const an = analyze(cv, pixels);
+const an = analyze(cv, pixels, { detector });
 const t1 = Date.now();
 // items: pixel boxes → fractions; assign tags by overlap like a model reading stamps would
 const raw = JSON.parse(fs.readFileSync(itemsPath, "utf8")); // boxes in natural-page pixels

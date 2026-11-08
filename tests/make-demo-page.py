@@ -22,7 +22,7 @@ def halftone(box, spacing=9, r=2.2, color=(70, 70, 70)):
 def panel(box, tone=True):
     d.rectangle(box, outline="black", width=6)
     if tone:
-        halftone((box[0] + 8, box[1] + 8, box[2] - 8, box[3] - 8), spacing=11, r=2.0, color=(120, 120, 120))
+        halftone((box[0] + 8, box[1] + 8, box[2] - 8, box[3] - 8), spacing=6, r=1.1, color=(120, 120, 120))
 
 def character(cx, cy, s, dark=False):
     skin = (40, 40, 40) if dark else "white"
