@@ -1,19 +1,42 @@
-name: Release extension zip
+name: Release
+# Triggered by ./scripts/release.sh (pushes a vX.Y.Z tag). Builds the store zip,
+# publishes a GitHub Release, and uploads + submits to the Chrome Web Store.
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
 jobs:
-  zip:
+  release:
     runs-on: ubuntu-latest
     permissions: { contents: write }
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
       - name: Check version matches tag
+        if: startsWith(github.ref, 'refs/tags/')
         run: |
           v=$(node -p "require('./extension/manifest.json').version"); [ "v$v" = "${GITHUB_REF_NAME}" ] || { echo "::error::manifest version $v != tag ${GITHUB_REF_NAME}"; exit 1; }
+      - name: Syntax + unit tests
+        run: |
+          for f in extension/*.js web/*.js; do node --check "$f"; done
+          cd tests && npm install --no-audit --no-fund && npm test
       - name: Build store zip
         run: ./scripts/build-zip.sh
-      - uses: softprops/action-gh-release@v2
+      - name: GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
         with:
           files: dist/*.zip
           generate_release_notes: true
+      - name: Upload to Chrome Web Store and submit for review
+        if: ${{ secrets.CWS_REFRESH_TOKEN != '' }}
+        env:
+          CWS_EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
+          CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+          CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+          CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+        run: node scripts/cws-publish.mjs dist/*.zip
+      - name: Skipped store upload
+        if: ${{ secrets.CWS_REFRESH_TOKEN == '' }}
+        run: echo "::notice::CWS secrets not set — zip attached to the GitHub Release only. See store/RELEASE-CHECKLIST.md § Automating updates."
