@@ -7,6 +7,7 @@ import path from "node:path";
 
 const OUT = process.argv[2] || "../store/assets";
 fs.mkdirSync(OUT, { recursive: true });
+registerFont("../extension/fonts/ComicNeue-Bold.ttf", { family: "Gytakusub Comic", weight: "bold" });
 registerFont("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", { family: "DemoSans", weight: "bold" });
 registerFont("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", { family: "DemoSans", weight: "normal" });
 
@@ -40,7 +41,7 @@ G.detectBubbles = (px) => { const c = origDetect(px); lastSlice = { cands: c.map
 
 const T = await import("../web/translator.js");
 const page = await loadImage("fixtures/demo-page.png");
-const settings = { ...T.DEFAULT_SETTINGS, apiKey: "sk-demo", fontFamily: '"DemoSans"' };
+const settings = { ...T.DEFAULT_SETTINGS, apiKey: "sk-demo" }; // default stack → bundled "Gytakusub Comic"
 const result = await T.translateImage(page, settings);
 const { original, translated, drawn } = T.renderPage(page, result, settings, 1700);
 console.log("items", result.items.length, "drawn", drawn, "tagged", result.items.filter((i) => i.tag != null).length);

@@ -1,7 +1,7 @@
 // Gytakusub Web – service worker: cache the app shell so it opens instantly
 // (and offline for screenshot mode). Translation requests always go to the network.
-const CACHE = "gytakusub-v2";
-const SHELL = ["./", "./index.html", "./style.css", "./app.js", "./translator.js", "./sources.js", "./prompt.js", "./bubble.js", "./typeset.js", "./manifest.webmanifest", "./icons/icon48.png", "./icons/icon192.png", "./icons/icon512.png", "./icons/apple-touch-icon.png"];
+const CACHE = "gytakusub-v3";
+const SHELL = ["./", "./index.html", "./style.css", "./app.js", "./translator.js", "./sources.js", "./prompt.js", "./bubble.js", "./typeset.js", "./manifest.webmanifest", "./icons/icon48.png", "./icons/icon192.png", "./icons/icon512.png", "./icons/apple-touch-icon.png", "./fonts/ComicNeue-Bold.ttf"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));

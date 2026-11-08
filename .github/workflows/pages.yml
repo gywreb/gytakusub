@@ -21,7 +21,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Check shared files are in sync
         run: |
-          for f in bubble.js typeset.js prompt.js; do cmp "extension/$f" "web/$f" || { echo "::error::web/$f differs from extension/$f — run scripts/sync-shared.sh"; exit 1; }; done
+          for f in bubble.js typeset.js prompt.js fonts/ComicNeue-Bold.ttf; do cmp "extension/$f" "web/$f" || { echo "::error::web/$f differs from extension/$f — run scripts/sync-shared.sh"; exit 1; }; done
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

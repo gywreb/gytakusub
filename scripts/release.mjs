@@ -23,6 +23,8 @@ if (out("git rev-parse --abbrev-ref HEAD") !== "main") { console.error("Switch t
 // 1. sync shared files (extension/ is canonical)
 for (const f of ["bubble.js", "typeset.js", "prompt.js"]) fs.copyFileSync(`extension/${f}`, `web/${f}`);
 for (const f of fs.readdirSync("extension/icons")) if (/^icon\d+\.png$/.test(f)) fs.copyFileSync(`extension/icons/${f}`, `web/icons/${f}`);
+fs.mkdirSync("web/fonts", { recursive: true });
+for (const f of fs.readdirSync("extension/fonts")) fs.copyFileSync(`extension/fonts/${f}`, `web/fonts/${f}`);
 
 // 2. checks + tests
 const check = (file) => {

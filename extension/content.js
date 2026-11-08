@@ -185,6 +185,24 @@
 
   // ---------- translation ----------
 
+  // Bundled lettering font (fonts/ComicNeue-Bold.ttf, declared web-accessible).
+  // Loaded once per page; render waits for it so the first page isn't typeset
+  // in a fallback face. Failure is non-fatal: the fallback stack is used.
+  let fontReady = null;
+  function ensureFont() {
+    if (fontReady) return fontReady;
+    fontReady = (async () => {
+      if (typeof FontFace === "undefined" || !document.fonts) return false;
+      try {
+        const face = new FontFace("Gytakusub Comic", `url(${chrome.runtime.getURL("fonts/ComicNeue-Bold.ttf")})`, { weight: "700", style: "normal" });
+        await face.load();
+        document.fonts.add(face);
+        return true;
+      } catch (e) { console.warn("Gytakusub: bundled font unavailable, using fallback", e); return false; }
+    })();
+    return fontReady;
+  }
+
   const blobToDataUrl = (blob) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(blob); });
   const loadImage = (dataUrl) => new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error("Could not decode image")); im.src = dataUrl; });
 
@@ -220,6 +238,7 @@
   }
 
   async function render(img, entry) {
+    await ensureFont();
     const src = await loadImage(entry.result.imageDataUrl);
     const scale = Math.min(1, MAX_CANVAS_EDGE / Math.max(src.naturalWidth, src.naturalHeight));
     const W = Math.max(1, Math.round(src.naturalWidth * scale));

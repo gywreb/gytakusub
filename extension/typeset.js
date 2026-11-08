@@ -6,7 +6,9 @@
 ((root) => {
   "use strict";
   const G = root.GyT;
-  const DEFAULT_FONT = '"Comic Neue", "Comic Sans MS", "Arial Rounded MT Bold", "Trebuchet MS", sans-serif';
+  // The bundled face ("Gytakusub Comic" = Comic Neue Bold, SIL OFL) comes first;
+  // the rest is the fallback stack if the font file could not be loaded.
+  const DEFAULT_FONT = '"Gytakusub Comic", "Comic Neue", "Comic Sans MS", "Arial Rounded MT Bold", "Trebuchet MS", sans-serif';
   const SIZE_MUL = { small: 0.75, normal: 1, large: 1.3 };
 
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
