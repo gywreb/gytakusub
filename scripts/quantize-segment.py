@@ -68,11 +68,19 @@ def main():
 
     pre = a.dst + ".pre.onnx"
     quant_pre_process(a.src, pre, skip_symbolic_shape=True)  # shape inference + optimisation for quantisation
+    # The detection head (Ultralytics names it model.<last>) decodes boxes with a
+    # softmax over distance bins and scales them by the stride: int8 there loses
+    # the detections entirely, so it stays float. The backbone and neck carry the
+    # weight and are quantised per channel.
+    pm = onnx.load(pre)
+    last = max(int(n.name.split("/")[1].split(".")[1]) for n in pm.graph.node if n.name.startswith("/model.") and n.name.split("/")[1].split(".")[1].isdigit())
+    exclude = [n.name for n in pm.graph.node if n.name.startswith(f"/model.{last}/")]
+    print(f"keeping the head (/model.{last}/, {len(exclude)} nodes) in float")
     quantize_static(
         pre, a.dst, Pages(files, name, size),
         quant_format=QuantFormat.QDQ, per_channel=True, reduce_range=False,
         activation_type=QuantType.QUInt8, weight_type=QuantType.QInt8,
-        calibrate_method=CalibrationMethod.MinMax,
+        calibrate_method=CalibrationMethod.MinMax, nodes_to_exclude=exclude,
     )
     os.remove(pre)
     print(f"wrote {a.dst}: {os.path.getsize(a.src) / 1e6:.1f} MB → {os.path.getsize(a.dst) / 1e6:.1f} MB")

@@ -87,14 +87,20 @@ for (const [name, png, truthPath, itemsPath] of pages) {
     truth.forEach((t, i) => {
       const tb = sc(t.box);
       // a detected text box may hug the letters more tightly than the generator's text box
-      const r = an.regions.find((r) => iou(r.box, tb) >= 0.6 && r.kind === t.kind) || an.regions.find((r) => t.kind === "bubble" && r.kind === "bubble" && contains(r.box, tb, 0.02))
+      let r = an.regions.find((r) => iou(r.box, tb) >= 0.6 && r.kind === t.kind) || an.regions.find((r) => t.kind === "bubble" && r.kind === "bubble" && contains(r.box, tb, 0.02))
         || an.regions.find((r) => t.kind === "block" && r.kind === "block" && contains(tb, r.box, 0.15) && r.box.w >= 0.6 * tb.w);
+      // a joined bubble may come back as one region per lobe (the segmentation model
+      // separates them): the lobes together must cover the truth box
+      if (!r && t.kind === "bubble") {
+        const parts = an.regions.filter((q) => q.kind === "bubble" && contains(tb, q.box, 0.08));
+        if (parts.length >= 2) { const u = { x: Math.min(...parts.map((q) => q.box.x)), y: Math.min(...parts.map((q) => q.box.y)) }; u.w = Math.max(...parts.map((q) => q.box.x + q.box.w)) - u.x; u.h = Math.max(...parts.map((q) => q.box.y + q.box.h)) - u.y; if (iou(u, tb) >= 0.6) { r = parts[0]; r.parts = parts; } }
+      }
       assert.ok(r, `truth #${i} (${t.kind} ${JSON.stringify(t.box)}) not found among ${JSON.stringify(an.regions.map((r) => [r.kind, r.box]))}`);
       matched.set(i, r);
     });
   });
   T("no false regions (faces, sound effects, panel backgrounds)", () => {
-    const ids = new Set([...matched.values()].map((r) => r.id));
+    const ids = new Set([...matched.values()].flatMap((r) => (r.parts || [r]).map((q) => q.id)));
     const extra = an.regions.filter((r) => !ids.has(r.id));
     assert.equal(extra.length, 0, "extra regions: " + JSON.stringify(extra.map((r) => [r.kind, r.box, r.letter])));
   });
@@ -109,7 +115,11 @@ for (const [name, png, truthPath, itemsPath] of pages) {
   // items tagged like a model reading the stamps
   const items = rawItems.map((it, i) => {
     const ti = truth.findIndex((t) => t.items.includes(i));
-    return { tag: matched.get(ti)?.id ?? null, box: null, text: it.text, size: it.size, kind: it.kind };
+    const r = matched.get(ti);
+    // a joined bubble found as separate lobes: its items go to the lobes top to bottom
+    const parts = r?.parts && r.parts.slice().sort((a, b) => a.box.y - b.box.y);
+    const tag = parts ? parts[Math.min(parts.length - 1, truth[ti].items.indexOf(i))].id : r?.id ?? null;
+    return { tag, box: null, text: it.text, size: it.size, kind: it.kind };
   });
   const { placements, regionIds } = layout(an, items);
   T("every item is placed inside its region", () => {
@@ -125,7 +135,8 @@ for (const [name, png, truthPath, itemsPath] of pages) {
   });
   if (name === "demo") T("joined bubble: two speakers get two stacked, non-overlapping areas", () => {
     const joined = matched.get(truth.findIndex((t) => t.items.length === 2));
-    const ps = placements.filter((p) => p.tag === joined.id);
+    const ids = new Set((joined.parts || [joined]).map((q) => q.id));
+    const ps = placements.filter((p) => ids.has(p.tag));
     assert.equal(ps.length, 2);
     const [a, b] = ps.sort((p, q) => p.rect.y - q.rect.y);
     assert.ok(a.rect.y + a.rect.h <= b.rect.y + 1, "stacked without overlap");
@@ -134,14 +145,16 @@ for (const [name, png, truthPath, itemsPath] of pages) {
     for (let i = 0; i < placements.length; i++) for (let j = i + 1; j < placements.length; j++) assert.ok(iou(placements[i].rect, placements[j].rect) === 0);
   });
 
-  const inkIn = (data, inside, box, dark) => { let ink = 0, n = 0; for (let y = box.y; y < box.y + box.h; y++) for (let x = box.x; x < box.x + box.w; x++) { if (!inside(x, y)) continue; n++; const p = (y * W + x) * 4, l = (data[p] + data[p + 1] + data[p + 2]) / 3; if (dark ? l > 150 : l < 110) ink++; } return ink / Math.max(1, n); };
+  // ink where the lettering was: inside the shape, within the detected text boxes grown by a few pixels
+  // (a learned mask may run along the outline, whose ink is not the eraser's business)
+  const inkIn = (data, inside, box, dark, blocks, letter) => { const pad = Math.min(4, letter / 2); const inText = (x, y) => blocks.some((b) => x >= b.gbox.x - pad && x < b.gbox.x + b.gbox.w + pad && y >= b.gbox.y - pad && y < b.gbox.y + b.gbox.h + pad); let ink = 0, n = 0; for (let y = box.y; y < box.y + box.h; y++) for (let x = box.x; x < box.x + box.w; x++) { if (!inside(x, y) || !inText(x, y)) continue; n++; const p = (y * W + x) * 4, l = (data[p] + data[p + 1] + data[p + 2]) / 3; if (dark ? l > 150 : l < 110) ink++; } return ink / Math.max(1, n); };
   T("erase removes the lettering from every bubble but keeps the outline", () => {
     const clean = erase(cv, pixels, an, regionIds).image;
     for (const r of an.regions.filter((r) => r.kind === "bubble")) {
       const inside = an.insideOf(r.id);
-      const before = inkIn(pixels.data, inside, r.box, r.dark), after = inkIn(clean.data, inside, r.box, r.dark);
+      const before = inkIn(pixels.data, inside, r.box, r.dark, r.ref.blocks, r.letter), after = inkIn(clean.data, inside, r.box, r.dark, r.ref.blocks, r.letter);
       assert.ok(before > 0.004, `bubble ${r.id} had lettering (${before})`);
-      assert.ok(after < Math.max(0.003, 0.12 * before), `bubble ${r.id} still has lettering after erase: ${after} (before ${before})`);
+      assert.ok(after < Math.max(0.01, 0.1 * before), `bubble ${r.id} still has lettering after erase: ${after} (before ${before})`);
     }
     // outline check: dark pixels along the border of a light elliptical bubble survive
     const ti = truth.findIndex((t) => t.kind === "bubble" && !t.dark && t.shape === "ellipse");

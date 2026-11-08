@@ -28,6 +28,7 @@ const missReasons = new Map();
 if (!args.length) { console.error("usage: node score-reports.mjs [--engine dir] <report.zip>..."); process.exit(2); }
 
 const inside = (r, cx, cy) => cx >= r.box.x && cy >= r.box.y && cx <= r.box.x + r.box.w && cy <= r.box.y + r.box.h;
+const WASTE_KINDS = {};
 let T = { items: 0, covered: 0, asBubble: 0, dialogue: 0, asBubbleChars: 0, dialogueChars: 0, regions: 0, waste: 0, pages: 0, ms: 0 };
 console.log("report/page                 items covered asBubble regions waste  ms");
 for (const zip of args) {
@@ -84,7 +85,12 @@ for (const zip of args) {
       missReasons.set(why, (missReasons.get(why) || 0) + 1);
       if (showMisses) console.log(`   MISS ${label}/${pg.id} ${JSON.stringify(sp.text).slice(0, 40)} ← ${why} ${around.length ? JSON.stringify(around[0].extra, (k, v) => (typeof v === "number" ? +v.toFixed(2) : v)).slice(0, 120) : ""}`);
     }
-    const waste = an.regions.filter((r) => !used.has(r.id)).length;
+    const wasted = an.regions.filter((r) => !used.has(r.id)), waste = wasted.length;
+    // what the unused regions are: a segmented bubble with lettering inside (the model
+    // answered nothing for it in this run — often because it was never stamped then),
+    // a segmented bubble with no lettering (the segmenter's false positive, or text the
+    // detector missed), a rule-based bubble, or a loose text block
+    for (const r of wasted) { const k = r.kind !== "bubble" ? "block" : r.ref.segmented ? (r.ref.blocks.length ? "segmented+text" : "segmented-empty") : "rule-bubble"; WASTE_KINDS[k] = (WASTE_KINDS[k] || 0) + 1; }
     S.items += spots.length; S.covered += covered; S.asBubble += asBubble; S.dialogue += dialogue; S.asBubbleChars += asBubbleChars; S.dialogueChars += dialogueChars; S.regions += an.regions.length; S.waste += waste; S.pages++; S.ms += ms;
     console.log(`${(label + "/" + pg.id).padEnd(28)}${String(spots.length).padStart(5)}${String(covered).padStart(8)}${(asBubble + "/" + dialogue).padStart(9)}${String(an.regions.length).padStart(8)}${String(waste).padStart(6)}${String(ms).padStart(5)}`);
     an.dispose();
@@ -94,4 +100,5 @@ for (const zip of args) {
   fs.rmSync(tmp, { recursive: true, force: true });
 }
 console.log("\nmisses by nearest rejection:"); for (const [k, v] of [...missReasons].sort((a, b) => b[1] - a[1])) console.log(`  ${String(v).padStart(3)}  ${k}`);
+console.log(`waste by kind: ${JSON.stringify(WASTE_KINDS)}`);
 console.log(`\nTOTAL: coverage ${T.covered}/${T.items} = ${(100 * T.covered / Math.max(1, T.items)).toFixed(1)}%   dialogue recognised as a bubble ${T.asBubble}/${T.dialogue} = ${(100 * T.asBubble / Math.max(1, T.dialogue)).toFixed(1)}% (by text ${(100 * T.asBubbleChars / Math.max(1, T.dialogueChars)).toFixed(1)}%)   waste ${T.waste} regions over ${T.pages} pages = ${(T.waste / Math.max(1, T.pages)).toFixed(2)}/page   ${(T.ms / Math.max(1, T.pages)).toFixed(0)} ms/page`);

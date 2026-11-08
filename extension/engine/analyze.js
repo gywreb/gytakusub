@@ -196,7 +196,10 @@ export function analyze(cv, img, opts = {}) {
     };
   };
 
-  if (opts.instances) return finish(bubblesFromInstances(opts.instances, opts.bubbleClasses, paragraphs, pageLetter, G, W, H));
+  // Bubbles the segmentation model found come first and claim their lettering.
+  // Lettering it left outside any mask still goes through the light-region
+  // rules below (the model misses some shapes — heavily toned bubbles, say).
+  const segBubbles = opts.instances ? bubblesFromInstances(opts.instances, opts.bubbleClasses, paragraphs, pageLetter, G, W, H) : [];
 
   // ---- which light region holds each paragraph (majority of its non-ink pixels) ----
   const ownerOf = (p) => {
@@ -208,7 +211,7 @@ export function analyze(cv, img, opts = {}) {
     return n >= 0.3 * samples ? best : 0;
   };
   const byLight = new Map(); // `${polarity}:${label}` → paragraphs
-  for (const p of paragraphs) { const o = ownerOf(p); if (o) { const k = `${p.dark ? 1 : 0}:${o}`; (byLight.get(k) || byLight.set(k, []).get(k)).push(p); } }
+  for (const p of paragraphs) { if (p.bubble) continue; const o = ownerOf(p); if (o) { const k = `${p.dark ? 1 : 0}:${o}`; (byLight.get(k) || byLight.set(k, []).get(k)).push(p); } }
 
   // ---- bubble candidates: shape and content tests on the light region ----
   const bubbles = [];
@@ -267,19 +270,20 @@ export function analyze(cv, img, opts = {}) {
     const { x, y, w, h } = B.box;
     return on(x, y) && on(x + w - 1, y) && on(x, y + h - 1) && on(x + w - 1, y + h - 1);
   };
-  const kept = bubbles.filter((A) => { const nests = bubbles.some((B) => B !== A && encloses(A, B)); if (nests) trace("region", A.box, "encloses another bubble: a background"); return !nests; });
-  for (const b of kept) { for (const p of b.blocks) p.bubble = b; if (!b.dark) widenInterior(cv, pol[0], b, W, H); }
+  // a rule-based shape that holds a segmented bubble is a background around it, not another bubble
+  const ruleKept = bubbles.filter((A) => { const nests = bubbles.concat(segBubbles).some((B) => B !== A && encloses(A, B)); if (nests) trace("region", A.box, "encloses another bubble: a background"); return !nests; });
+  for (const b of ruleKept) { for (const p of b.blocks) p.bubble = b; if (!b.dark) widenInterior(cv, pol[0], b, W, H); }
 
-  for (const b of kept) if (b.widened) trace("bubble", b.box, "interior widened", { from: b.lightBox, area: b.area, interior: b.interiorArea });
-  return finish(kept);
+  for (const b of ruleKept) if (b.widened) trace("bubble", b.box, "interior widened", { from: b.lightBox, area: b.area, interior: b.interiorArea });
+  return finish(segBubbles.concat(ruleKept));
 }
 
 /**
  * Bubbles as a segmentation model returned them: each instance's mask is the
  * interior, the lettering inside is whatever detected paragraphs have their
  * centre in the mask, and the bubble is dark when its surface is. Instances
- * are filtered for the bubble classes, a plausible size and a mask that is
- * mostly solid (a few stray pixels are not a bubble).
+ * are filtered for the bubble classes, a plausible size, a mask that is
+ * mostly solid (a few stray pixels are not a bubble) and lettering inside.
  */
 function bubblesFromInstances(instances, bubbleClasses, paragraphs, pageLetter, G, W, H) {
   const bubbles = [];
@@ -293,6 +297,10 @@ function bubblesFromInstances(instances, bubbleClasses, paragraphs, pageLetter, 
     if (frac < 0.0004 || frac > 0.3 || area < 0.3 * w * h) { trace("region", inst.box, "segment rejected", { frac, fill: area / (w * h) }); continue; }
     const inside = (px, py) => { const lx = px - x, ly = py - y; return lx >= 0 && ly >= 0 && lx < w && ly < h && m[ly * w + lx] !== 0; };
     const blocks = paragraphs.filter((p) => !p.bubble && inside((p.gbox.x + p.gbox.w / 2) | 0, (p.gbox.y + p.gbox.h / 2) | 0));
+    // No lettering inside: a round face, a cloud, an empty balloon. Not a region —
+    // a stamp there would invite the model to invent text, and the eraser must
+    // never touch a shape that holds no letters.
+    if (!blocks.length) { trace("region", inst.box, "segment without lettering", { score: inst.score }); continue; }
     // surface luminance without the lettering: dark bubble when the mask is mostly dark
     let inkArea = 0; for (const p of blocks) inkArea += p.inkArea || 0;
     const dark = lum / Math.max(1, area) < 110;

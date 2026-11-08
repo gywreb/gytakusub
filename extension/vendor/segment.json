@@ -1,0 +1,14 @@
+{
+  "source": "https://huggingface.co/kitsumed/yolov8m_seg-speech-bubble (model_dynamic.onnx), quantized to int8 by scripts/quantize-segment.py on 55 pages, detection head in float",
+  "license": "GPL-3.0 (model card); Ultralytics AGPL-3.0 (ONNX metadata)",
+  "file": "kitsumed-int8.onnx",
+  "bytes": 43267244,
+  "sha256": "56f5362ca8e43d280ec2618224947fb812f507a2b80a7d72fbf273dd2b232590",
+  "classes": [
+    "speech bubble"
+  ],
+  "inputSize": 512,
+  "conf": 0.25,
+  "iou": 0.45,
+  "maskThreshold": 0.5
+}

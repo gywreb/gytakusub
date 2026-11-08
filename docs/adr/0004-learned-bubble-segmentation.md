@@ -1,8 +1,9 @@
 # ADR 0004 — Bubbles from a learned segmentation model
 
-Status: **proposed** — plumbing built and tested (2026-11-09); the switch is
-gated on the measurement below. Supersedes the bubble half of ADR 0002 (the
-light-region tests) if adopted; ADR 0003's layout invariants stay.
+Status: **accepted for 1.1.1 on `feature/learned-layout`** (2026-11-09),
+pending the user's live test and the licensing decision below. Supersedes the
+bubble half of ADR 0002 (the light-region tests become the fallback); ADR
+0003's layout invariants stay.
 
 ## Context
 
@@ -65,7 +66,72 @@ Files: `kitsumed/yolov8m_seg-speech-bubble` → `model_dynamic.onnx` (109 MB) or
 the user's exported pages); whether the result ships inside the package or is
 fetched on first run and cached is decided by its size.
 
-## Measurement before any switch
+## Measurement (2026-11-09, 270 pages from 12 exports)
+
+Model: `kitsumed/yolov8m_seg-speech-bubble`, int8 (head in float), 512 px
+input, conf 0.25, hybrid with the light-region rules for unclaimed lettering.
+Of the two candidates it was the only one that found the white bubbles
+reliably: Koharu's YOLO26-s model returned mostly panel frames on these
+Spanish scanlation pages and missed five of five white bubbles on one of them
+(it did find a heavily toned bubble the kitsumed model missed — neither model
+handles tone reliably, which is why the rules stay as fallback).
+
+| `score-reports.mjs` (model answers as witness) | rules only | + segmenter |
+|---|---|---|
+| dialogue recognised as a bubble | 92.4% (by text 95.0%) | **98.8% (99.4%)** |
+| lines covered by a region | 93.5% | **95.4%** |
+| regions without an answer, per page | 0.61 | 0.99* |
+| analysis per page (Node, wasm) | 0.61 s | 2.51 s |
+
+\* Of 89 such regions on 90 pages: 40 segmented bubbles *with* lettering that
+the recorded run had no answer for (the model never saw a stamp there in that
+run — this metric cannot see new regions fairly), 21 loose text blocks and 20
+rule-based bubbles (as before), 8 segmented bubbles without lettering (now
+dropped before stamping).
+
+| `layout-score.mjs` | rules only | + segmenter |
+|---|---|---|
+| lines placed by halo (no bubble found) | 190 | **102** |
+| rendered size under 0.7× the original | 9.6% | **8.7%** |
+| 10th-percentile rendered size | 0.71 | **0.74** |
+| translations over un-erased lettering | 70 | **57** |
+| rectangle over its own lettering | 96.1% | 94.6% |
+| rectangles narrower than 3 letters | 136 | 153 |
+| shared bubbles: every line over its own | 89.3% | 83.3% (317 vs 458 shared placements: the model separates joined bubbles) |
+
+The two small regressions come from mask edges: at 512 px input a prototype
+cell is ~9 page pixels at 850 px width, so masks are blobby and sometimes
+tighter than the outline. The ADR 0003 floor (never less room than the
+lettering) bounds the damage; a larger input (640: +1.1 s on CPU) or WebGPU
+would sharpen them.
+
+Synthetic corpus: the model splits the joined bubble into its two lobes and
+sees the stick figures' round heads as bubbles (dropped: no lettering inside);
+the tests accept a truth bubble covered by several lobes and measure erasure
+where the lettering was. 100 assertions pass with the model in place.
+
+## Licensing (decision for the owner, recorded here)
+
+- The model card says GPL-3.0; the ONNX metadata says Ultralytics AGPL-3.0,
+  which is Ultralytics' position for every model trained with its code unless
+  an enterprise licence is bought. The training data is not described.
+- For the owner's own use (the only install today) there is nothing to do.
+- For a Chrome Web Store build, the simplest compliant path is to publish the
+  extension itself under **AGPL-3.0** (the code is already open source; MIT
+  code can be relicensed by its author; the store allows AGPL extensions and
+  requires nothing more than the source being available, which it is). The
+  alternative is to keep the model out of the package and fetch it on first
+  run as an optional component (the extension works without it), which keeps
+  MIT for the code but is a weaker separation argument. Training our own
+  bubble segmenter on permissively licensed pages would remove the question;
+  the user's exports cannot be that data.
+- What other translators do is not something I could verify; Koharu
+  (Apache/MIT code) ships this same model and leaves the weights under their
+  own licence.
+- Koharu's YOLO26-s model is excluded regardless: its lineage is a
+  Manga109-trained model, and Manga109 is research-use only.
+
+## Measurement before any switch (procedure)
 
 Same corpus, same tools, model loaded via `GYT_SEGMENT=<file.onnx>`:
 
@@ -77,11 +143,11 @@ Same corpus, same tools, model loaded via `GYT_SEGMENT=<file.onnx>`:
 - analysis time per page (segmentation is reported separately as
   `timing.segment`) in Node and in Chrome.
 
-The segmenter ships only if dialogue-as-bubble and false regions improve and
-no rendered-size row gets worse. If the first candidate is too slow on the
-single-threaded wasm (expected 2–5 s/page for an M-size model at 640 px),
-the WebGPU execution provider (ORT's webgpu bundle, 29 MB wasm) is
-the next step before giving up on the model.
+The segmenter ships only if dialogue-as-bubble improves and no rendered-size
+row gets worse (both held). Speed is the open cost: ~2 s/page on the
+single-threaded wasm at 512 px. The WebGPU execution provider (ORT's webgpu
+bundle, 29 MB wasm) is the next step; it cannot be tested in this environment
+or in headless CI and needs the user's machine.
 
 ## What is already tested
 
