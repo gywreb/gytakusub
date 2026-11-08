@@ -53,13 +53,17 @@ Store listing it is a decision to take explicitly (a GPL model file loaded as
 data by MIT code, or training a bubble segmenter on permissively licensed
 pages — the user's exports cannot be that data).
 
-The build environment cannot reach huggingface.co, so the model file is
-downloaded by hand and vendored with
-`node scripts/vendor-segment.mjs <file.onnx> --source … --license …`. A 100 MB
-fp32 file should be quantized first (static int8 with ONNX Runtime's
-quantization tools, calibrated on the user's exported pages); whether the
-result ships inside the package or is fetched on first run and cached is
-decided by its size.
+The build environment cannot reach huggingface.co (unless the account's
+allowed domains include `huggingface.co` and the Xet storage host
+`cas-bridge.xethub.hf.co`), so the model file is downloaded by hand and
+vendored with `node scripts/vendor-segment.mjs <file.onnx> --source … --license …`.
+Files: `kitsumed/yolov8m_seg-speech-bubble` → `model_dynamic.onnx` (109 MB) or
+`model.pt` (54.8 MB, exported here with Ultralytics to a static 640 ONNX);
+`ogkalu/comic-speech-bubble-detector-yolov8m` → `comic-speech-bubble-detector.pt`
+(52 MB, boxes only). A 100 MB fp32 file is quantized first
+(`scripts/quantize-segment.py`: static int8, QDQ, per-channel, calibrated on
+the user's exported pages); whether the result ships inside the package or is
+fetched on first run and cached is decided by its size.
 
 ## Measurement before any switch
 
