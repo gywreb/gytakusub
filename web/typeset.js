@@ -300,6 +300,27 @@
       a.w = Math.max(8, a.w); a.h = Math.max(8, a.h); b.w = Math.max(8, b.w); b.h = Math.max(8, b.h);
     }
 
+    // Debug overlay: detected bubbles (red, numbered), model boxes (blue, item
+    // index), final text rects (green). Enabled from Options → Debug overlay.
+    if (opts.debug) {
+      ctx.save();
+      ctx.lineWidth = Math.max(1, W / 600);
+      ctx.font = `bold ${Math.max(10, W / 60)}px sans-serif`;
+      for (const b of bubbles) {
+        const bb = { x: b.box[0] * W, y: b.box[1] * H, w: b.box[2] * W, h: b.box[3] * H };
+        ctx.strokeStyle = validTags.has(b.id) ? "rgba(220,38,38,.9)" : "rgba(220,38,38,.4)";
+        ctx.strokeRect(bb.x, bb.y, bb.w, bb.h);
+        ctx.fillStyle = "rgba(220,38,38,.9)"; ctx.fillText("#" + b.id, bb.x + 3, bb.y + W / 60);
+      }
+      prepared.forEach(({ it, box }, i) => {
+        if (!box) return;
+        ctx.strokeStyle = "rgba(37,99,235,.9)"; ctx.setLineDash([6, 4]); ctx.strokeRect(box.x, box.y, box.w, box.h); ctx.setLineDash([]);
+        ctx.fillStyle = "rgba(37,99,235,.9)"; ctx.fillText(`${i}${it.tag != null ? "→#" + it.tag : ""}`, box.x + 3, box.y + box.h - 4);
+      });
+      for (const p of placements) { ctx.strokeStyle = "rgba(22,163,74,.9)"; ctx.strokeRect(p.rect.x, p.rect.y, p.rect.w, p.rect.h); }
+      ctx.restore();
+    }
+
     // Pass 5: paint translucent boxes, then draw all text.
     for (const p of placements) {
       if (p.boxFill) { ctx.fillStyle = "rgba(255,255,255,0.9)"; roundRect(ctx, p.rect.x, p.rect.y, p.rect.w, p.rect.h, p.boxFill); ctx.fill(); }

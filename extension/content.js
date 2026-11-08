@@ -236,7 +236,8 @@
     canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext("2d");
     ctx.clearRect(0, 0, W, H);
-    G.typeset(ctx, pixels, entry.result, W, H, { fontFamily: settings.fontFamily, uppercase: settings.uppercase });
+    G.typeset(ctx, pixels, entry.result, W, H, { fontFamily: settings.fontFamily, uppercase: settings.uppercase, debug: !!settings.debugOverlay });
+    if (settings.debugOverlay) console.info("Gytakusub debug", { src: entry.src, W, H, natural: [src.naturalWidth, src.naturalHeight], items: entry.result.items, bubbles: entry.result.bubbles.map((b) => ({ id: b.id, box: b.box })) });
 
     if (!entry.canvas) { entry.canvas = canvas; root.append(canvas); }
     entry.objectFit = getComputedStyle(img).objectFit;

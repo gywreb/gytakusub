@@ -1,6 +1,6 @@
 const $ = (id) => document.getElementById(id);
 const FIELDS = ["model", "targetLang", "glossary", "customPrompt", "fontFamily", "excludedSites"];
-const CHECKS = ["useContext", "includeSource", "uppercase", "syncApiKey"];
+const CHECKS = ["useContext", "includeSource", "uppercase", "syncApiKey", "debugOverlay"];
 
 function show(kind, text) {
   const m = $("msg");

@@ -24,6 +24,7 @@ export const DEFAULT_SETTINGS = {
   fontFamily: "",
   syncApiKey: false,
   excludedSites: "",
+  debugOverlay: false, // draw detection boxes and log results (for diagnosing placement)
   // Image prep
   maxLongEdge: 1600, // px sent to Claude for a normal page
   stripWidth: 1000, // px width for tall webtoon strips
