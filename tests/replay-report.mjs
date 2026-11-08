@@ -48,7 +48,16 @@ for (const pg of summary.pages) {
   // regions: same numbering as the report (single slice; strips were numbered page-wide the same way)
   const regionsNow = an.regions.map((r) => ({ id: r.id, kind: r.kind, letter: r.letter, box: r.box }));
   const regionsThen = rep.regions.map((r) => ({ id: r.id, kind: r.kind, letter: r.letter, box: r.box }));
-  const items = rep.items.map((it) => ({ tag: it.tag, box: it.box, text: it.text, size: it.size, kind: it.kind }));
+  // The report's tags number the regions the user's build found. If detection has
+  // changed since, re-match each item by geometry: the region now containing the
+  // centre of the stamped region it named (else of its own box).
+  const items = rep.items.map((it) => {
+    const then = it.tag != null ? rep.regions.find((r) => r.id === it.tag) : null;
+    const cx = then ? then.box.x + then.box.w / 2 : it.box ? (it.box[0] + it.box[2] / 2) * W : null;
+    const cy = then ? then.box.y + then.box.h / 2 : it.box ? (it.box[1] + it.box[3] / 2) * H : null;
+    const now = cx == null ? null : an.regions.find((r) => cx >= r.box.x && cy >= r.box.y && cx <= r.box.x + r.box.w && cy <= r.box.y + r.box.h);
+    return { tag: now ? now.id : null, box: it.box, text: it.text, size: it.size, kind: it.kind };
+  });
   const { placements, regionIds } = layout(an, items);
   const clean = erase(cv, pixels, an, regionIds).image;
   const o = createCanvas(W, H), octx = o.getContext("2d"); octx.putImageData(clean, 0, 0);

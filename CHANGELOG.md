@@ -26,9 +26,12 @@ A rebuilt page engine. 1.0 found bubbles, erased lettering and fitted text with 
 - Translations displaced from, or oversized for, a correctly detected bubble on the first render (the tag/box issue above).
 - Text spilling into a neighbouring bubble; inconsistent sizes across a page; erased line art on banner pages; partially erased lettering when the model's box was too small (all made moot by the new engine, and covered by the corpus tests).
 
+### Validated on real pages
+The detector was reworked against the first real exports (850 px JPEG pages with 8 px Latin capitals; Japanese pages): line grouping from glyph components only, width-aware letter counts, evidence rules for lettering (alignment, letters per row, height clustering, density). Scored with the model's own answer as witness (`tests/score-reports.mjs`), tuned on one export and validated on two untouched ones: dialogue recognised as a bubble rose from 49% to 83% (hold-outs 64→88%, 49→84%) with coverage and false regions unchanged. The eraser now ships only the inpainted patches (≈10% of the bytes of a full page), and every result carries per-stage timings.
+
 ### Known limitations
 - Telea inpainting smooths periodic screentone behind free narration (the dots blur where the letters were). Bubbles are unaffected.
-- Detailed artwork can occasionally be stamped as a text region; the model is told to return nothing for such stamps, so the only cost is the stamp.
+- Detailed artwork (armour, faces, foliage) is still stamped as a text region a few times per page; the model is told to return nothing for such stamps, so the cost is tokens, not wrong text. Dialogue in bubbles the detector misses (~15% on the pages seen so far) is placed by the model's box with a halo instead of inside the bubble.
 - Package size grew by ~6 MB (the OpenCV WebAssembly), compiled once by the browser and cached.
 
 ## [1.0.0] — 2026-11-08

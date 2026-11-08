@@ -118,8 +118,12 @@
     for (const p of placements) {
       const text = opts.uppercase ? p.text.toUpperCase() : p.text;
       // `letter` is the original cap height; Comic Neue's cap height is ~0.72 em.
+      // Inside a bubble the translation may grow up to 30% beyond the original
+      // size when there is room (letterers fill a roomy bubble a little); over
+      // artwork it keeps the original size.
       const target = p.letter * 1.45 * (SIZE_MUL[p.size] || 1);
-      const fit = fitText(text, p.rect, setFont, measure, { maxSize: target, minSize: Math.max(7, target * 0.45) });
+      const inBubble = p.tag != null && !p.halo;
+      const fit = fitText(text, p.rect, setFont, measure, { maxSize: inBubble ? target * 1.3 : target, minSize: Math.max(7, target * 0.45) });
       drawLines(ctx, fit, p.rect, p.color, family, p.halo);
       n++;
     }
