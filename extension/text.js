@@ -64,23 +64,25 @@
   }
 
   /**
-   * Largest font size (≤ target) whose wrapped lines fit in rect. Prefers no
-   * hyphens; accepts hyphenation when the unhyphenated fit would be much smaller.
+   * Largest font size (≤ target) whose wrapped lines fit in rect. At each size the
+   * un-hyphenated wrap is tried first; hyphenation is a fallback for when it does
+   * not fit (TeX's hyphen penalty, in spirit), and a clean fit wins unless it is
+   * much smaller than the best hyphenated one.
    */
   function fitText(text, rect, setFont, measure, opts = {}) {
     const minSize = Math.max(6, Math.round(opts.minSize ?? 8));
     const maxSize = Math.max(minSize, Math.floor(Math.min(opts.maxSize ?? 72, rect.h)));
     const lh = opts.lineHeightRatio ?? 1.15;
-    let clean = null, hyph = null;
-    for (let size = maxSize; size >= minSize; size--) {
+    const fits = (w) => !w.broken && w.lines.length * size * lh <= rect.h && Math.max(0, ...w.lines.map(measure)) <= rect.w;
+    let clean = null, hyph = null, size;
+    for (size = maxSize; size >= minSize; size--) {
       setFont(size);
-      const { lines, broken, hyphens } = wrapInfo(measure, text, rect.w);
-      if (broken) continue;
-      const totalH = lines.length * size * lh, widest = Math.max(0, ...lines.map(measure));
-      if (totalH > rect.h || widest > rect.w) continue;
-      const fit = { size, lines, lineHeight: size * lh, hyphens };
-      if (!hyphens) { clean = fit; break; }
-      if (!hyph) hyph = fit;
+      const plain = wrapInfo(measure, text, rect.w, { hyphenate: false });
+      if (fits(plain)) { clean = { size, lines: plain.lines, lineHeight: size * lh, hyphens: 0 }; break; }
+      if (!hyph) {
+        const h = wrapInfo(measure, text, rect.w);
+        if (h.hyphens && fits(h)) hyph = { size, lines: h.lines, lineHeight: size * lh, hyphens: h.hyphens };
+      }
     }
     if (clean && (!hyph || clean.size >= hyph.size * (opts.hyphenRatio ?? 0.75))) return clean;
     if (hyph) return hyph;
