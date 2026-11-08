@@ -1,7 +1,7 @@
 node_modules/
 *.zip
 !dist/*.zip
-tests/fixtures/*.png
+# generated fixtures ARE committed (tests/fixtures/*.png) so CI and every machine test the same pages
 tests/*.png
 .DS_Store
 /package-lock.json

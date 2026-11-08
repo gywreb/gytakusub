@@ -2,10 +2,10 @@
  {
   "tag": null,
   "box": [
-   135,
-   230,
-   142,
-   90
+   538,
+   121,
+   154,
+   60
   ],
   "text": "It can't be!",
   "size": "normal",
@@ -14,10 +14,10 @@
  {
   "tag": null,
   "box": [
-   511,
-   118,
-   120,
-   30
+   134,
+   684,
+   164,
+   104
   ],
   "text": "Calm down, it isn't over yet.",
   "size": "normal",
@@ -26,12 +26,24 @@
  {
   "tag": null,
   "box": [
-   765,
-   640,
-   154,
-   138
+   900,
+   627,
+   140,
+   55
   ],
   "text": "Since when did you know?",
+  "size": "small",
+  "kind": "narration"
+ },
+ {
+  "tag": null,
+  "box": [
+   798,
+   1254,
+   139,
+   34
+  ],
+  "text": "From the very beginning.",
   "size": "normal",
   "kind": "bubble"
  }

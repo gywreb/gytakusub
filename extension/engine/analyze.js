@@ -164,7 +164,10 @@ function analyzePolarity(cv, src, gray, base, W, H, dark) {
       }
     }
     const inkArea = good.reduce((s, g) => s + glyphs[g].a, 0);
-    blocks.push({ box: { x, y, w, h }, letter, glyphCount: good.length, glyphs: good, inkArea, label: i, dark, bubble: null, region: null });
+    // footprint of the lettering itself (the closed component can be inflated by art it touched)
+    const gx0 = Math.min(...good.map((g) => glyphs[g].x)), gy0 = Math.min(...good.map((g) => glyphs[g].y));
+    const gx1 = Math.max(...good.map((g) => glyphs[g].x + glyphs[g].w)), gy1 = Math.max(...good.map((g) => glyphs[g].y + glyphs[g].h));
+    blocks.push({ box: { x, y, w, h }, gbox: { x: gx0, y: gy0, w: gx1 - gx0, h: gy1 - gy0 }, letter, glyphCount: good.length, glyphs: good, inkArea, label: i, dark, bubble: null, region: null });
   }
 
   // --- light regions → bubbles (must contain text, text must matter in them) ---
@@ -209,14 +212,17 @@ function analyzePolarity(cv, src, gray, base, W, H, dark) {
     // Text footprint: the blocks' union box (a vertical column of characters is
     // many small blocks) — but no larger than 3× their summed area, so two
     // distant specks cannot claim a big region.
-    const sumArea = inBlocks.reduce((s, b) => s + b.box.w * b.box.h, 0);
-    const ux0 = Math.min(...inBlocks.map((b) => b.box.x)), uy0 = Math.min(...inBlocks.map((b) => b.box.y));
-    const ux1 = Math.max(...inBlocks.map((b) => b.box.x + b.box.w)), uy1 = Math.max(...inBlocks.map((b) => b.box.y + b.box.h));
+    const sumArea = inBlocks.reduce((s, b) => s + b.gbox.w * b.gbox.h, 0);
+    const ux0 = Math.min(...inBlocks.map((b) => b.gbox.x)), uy0 = Math.min(...inBlocks.map((b) => b.gbox.y));
+    const ux1 = Math.max(...inBlocks.map((b) => b.gbox.x + b.gbox.w)), uy1 = Math.max(...inBlocks.map((b) => b.gbox.y + b.gbox.h));
     const textArea = Math.min((ux1 - ux0) * (uy1 - uy0), 3 * sumArea);
     const glyphCount = inBlocks.reduce((s, b) => s + b.glyphCount, 0);
     if (glyphCount < 2) { reject("fewer than two glyphs", { glyphCount }); continue; }
     if (glyphCount < 4 && textArea / a < 0.1) { reject("a few specks in a big shape", { glyphCount, textFrac: textArea / a }); continue; } // eyes in a face, not a bubble
-    if (textArea / a < 0.04) { reject("text is incidental", { textFrac: textArea / a }); continue; } // a background with a small label on it
+    // Little text in a big shape is a label on a background — unless the text sits
+    // in the middle of the shape, which is how lettering sits in a bubble.
+    const centred = Math.abs((ux0 + ux1) / 2 - (x + w / 2)) < 0.25 * w && Math.abs((uy0 + uy1) / 2 - (y + h / 2)) < 0.25 * h;
+    if (textArea / a < 0.04 && !(centred && glyphCount >= 3 && textArea / a >= 0.008)) { reject("text is incidental", { textFrac: textArea / a, centred }); continue; }
     // A bubble is a flat light shape whose only content is lettering. Its holes
     // (filled outline minus light pixels) must be small and mostly glyphs; a
     // panel background with a character drawn on it fails both.

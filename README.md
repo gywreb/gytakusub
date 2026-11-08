@@ -43,7 +43,7 @@ Store listing copy, permission justifications and the submission checklist live 
 ```sh
 cd tests && npm install
 npm run demo          # generate the synthetic test pages (needs python3 + Pillow)
-npm test              # engine tests: detection vs ground truth, layout, erase, text fitting (9 pages, 72 assertions)
+npm test              # engine tests: detection vs ground truth, layout, erase, text fitting (13 pages, 100 assertions)
 npm run test:browser  # the real extension + the web app in headless Chromium against a mock Claude API
 npm run viz -- fixtures/gen-03.png out.png --trace   # what the analyser saw, and why it rejected what it rejected
 npm run e2e           # full render of the demo page through the engine

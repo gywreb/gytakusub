@@ -1,0 +1,32 @@
+[
+ {
+  "box": [
+   850,
+   114,
+   268,
+   177
+  ],
+  "kind": "bubble",
+  "shape": "ellipse",
+  "items": [
+   0
+  ],
+  "lang": "es",
+  "dark": false
+ },
+ {
+  "box": [
+   110,
+   625,
+   280,
+   177
+  ],
+  "kind": "bubble",
+  "shape": "ellipse",
+  "items": [
+   1
+  ],
+  "lang": "es",
+  "dark": false
+ }
+]

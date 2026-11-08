@@ -38,10 +38,10 @@
  {
   "tag": null,
   "box": [
-   833,
-   687,
-   104,
-   30
+   983,
+   719,
+   92,
+   220
   ],
   "text": "From the very beginning.",
   "size": "normal",
@@ -50,10 +50,10 @@
  {
   "tag": null,
   "box": [
-   311,
-   1387,
-   90,
-   34
+   402,
+   1298,
+   46,
+   257
   ],
   "text": "Three hours later...",
   "size": "normal",
@@ -62,24 +62,12 @@
  {
   "tag": null,
   "box": [
-   637,
-   1355,
-   35,
-   112
+   887,
+   1311,
+   46,
+   147
   ],
   "text": "And if he doesn't come back?",
-  "size": "normal",
-  "kind": "bubble"
- },
- {
-  "tag": null,
-  "box": [
-   969,
-   1309,
-   35,
-   253
-  ],
-  "text": "He will.",
   "size": "normal",
   "kind": "bubble"
  }

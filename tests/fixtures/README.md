@@ -12,7 +12,7 @@ stamps right but places badly. Screenshots and the debug log land in `--out`.
 
 ## Procedural pages (`npm run demo` → `gen-NN.*`)
 
-`make-pages.py` lays out eight deterministic pages mixing Latin (Spanish,
+`make-pages.py` lays out twelve deterministic pages mixing Latin (Spanish,
 Italian) and Japanese (vertical and horizontal) lettering, light and dark
 bubbles of three shapes, caption boxes, free narration straight on screentone,
 and large sound effects the engine must ignore. Each page has `*.truth.json`
@@ -20,5 +20,9 @@ and large sound effects the engine must ignore. Each page has `*.truth.json`
 model answer). `engine.test.mjs` runs detection, layout and erase assertions
 over every page; `node engine-viz.mjs <png> <out.png> --trace` shows what the
 analyser saw and why it rejected what it rejected.
+
+The generated PNGs and JSON are committed so CI and every machine test the
+same pages (regenerating needs Pillow and a Noto CJK font; `GYT_NO_CJK=1`
+produces a different, Latin-only set and is only for machines without the font).
 
 `fixtures/real/` is git-ignored: put your own pages there for local tuning.

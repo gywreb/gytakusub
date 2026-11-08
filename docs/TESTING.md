@@ -55,7 +55,7 @@ then open `http://localhost:8080` in Brave, ⚙ → paste the API key → *Save*
 
 Open https://github.com/gywreb/gytakusub/actions?query=branch%3Arelease%2F1.1 — the latest **Tests** run must be green. It covers:
 - syntax of every script, and that the vendored OpenCV/hyphen files match what the vendoring scripts produce;
-- 72 engine assertions on nine synthetic pages (detection against ground truth, placement inside bubbles, lettering erased, outlines kept);
+- 100 engine assertions on thirteen synthetic pages (detection against ground truth, placement inside bubbles, lettering erased, outlines kept);
 - the real extension in headless Chromium against a mock Claude API: first render = Redo = cached render, every tagged line inside its bubble, the drifted-box scenario, peek, edit, persistence;
 - the web app in headless Chromium.
 

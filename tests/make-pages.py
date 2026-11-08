@@ -17,7 +17,9 @@ from PIL import Image, ImageDraw, ImageFont
 
 LATIN = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 CJK_CANDIDATES = ["/usr/share/fonts/opentype/noto/NotoSansCJK-Black.ttc", "/usr/share/fonts/truetype/fonts-japanese-gothic.ttf"]
-CJK = next((p for p in CJK_CANDIDATES if os.path.exists(p)), None)
+CJK = None if os.environ.get("GYT_NO_CJK") else next((p for p in CJK_CANDIDATES if os.path.exists(p)), None)
+if CJK is None and not os.environ.get("GYT_NO_CJK"):
+    sys.exit("No CJK font found (install fonts-noto-cjk) — the generated set would differ from the committed one. Set GYT_NO_CJK=1 to generate Latin-only pages anyway.")
 
 ES = ["¡No puede ser!", "Tranquilo, todavía no ha terminado.", "¿Desde cuándo lo sabías?", "Desde el principio.", "Tres horas después...",
       "¿Y si no vuelve?", "Volverá.", "Mientras tanto, en la ciudad...", "No te muevas.", "Esto no ha acabado.", "¿Quién eres tú?", "Vámonos ya."]
@@ -138,9 +140,14 @@ class Page:
             tb = self.draw_v(cx, cy, text, font, ink, ry * 2 * inner) if ry > rx * 1.1 else self.draw_h(cx, cy, text, font, ink, rx * 2 * inner)
         else:
             size = rng.choice([22, 26, 30, 34])
-            font = ImageFont.truetype(LATIN, size)
             i = rng.randrange(len(ES))
             text = (ES if lang == "es" else IT)[i % (len(ES) if lang == "es" else len(IT))]
+            # letterers keep the text inside the shape: shrink until the lines fit the height
+            while True:
+                font = ImageFont.truetype(LATIN, size)
+                lines = self.h_lines(text, font, rx * 2 * inner)
+                if len(lines) * size * 1.15 <= ry * 2 * inner * 0.95 or size <= 16: break
+                size -= 2
             tb = self.draw_h(cx, cy, text, font, ink, rx * 2 * inner)
         self.truth.append({"box": [round(cx - rx), round(cy - ry), round(2 * rx), round(2 * ry)], "kind": "bubble", "shape": shape, "items": kind_items, "lang": lang, "dark": dark})
         self.items.append({"box": tb, "text": EN[len(self.items) % len(EN)], "size": "normal", "kind": "bubble"})
@@ -204,8 +211,13 @@ class Page:
         self.occupied = []
         d.rectangle(box, outline="black", width=6)
         tone = rng.random() < 0.7
+        spacing, r, color = rng.choice([9, 11, 13]), rng.choice([1.8, 2.0, 2.4]), rng.choice([(110, 110, 110), (130, 130, 130), (90, 90, 90)])
         if tone:
-            self.halftone((x0 + 8, y0 + 8, x1 - 8, y1 - 8), spacing=rng.choice([9, 11, 13]), r=rng.choice([1.8, 2.0, 2.4]), color=rng.choice([(110, 110, 110), (130, 130, 130), (90, 90, 90)]))
+            self.halftone((x0 + 8, y0 + 8, x1 - 8, y1 - 8), spacing=spacing, r=r, color=color)
+        # Letterers do not put bare black text on dense dark tone (it gets a halo or
+        # lighter tone); the engine does not promise to find it either — the model's
+        # own box places such text, with a halo.
+        light_tone = color[0] >= 110 and r <= 2.0
         w, h = x1 - x0, y1 - y0
         # a character low in the panel
         if rng.random() < 0.8 and h > 300:
@@ -233,7 +245,7 @@ class Page:
             cy0 = y0 + 30
             if self.free((cx0, cy0, cx0 + cw, cy0 + 70)): self.caption(cx0, cy0, cw, lang)
         # free narration on the tone
-        if tone and rng.random() < 0.4 and w > 500:
+        if tone and light_tone and rng.random() < 0.5 and w > 500:
             fx = x0 + 40; fy = y0 + h * 0.62
             if self.free((fx, fy, fx + 360, fy + 40)): self.free_text(fx, fy, lang, 360)
         # sound effect to be ignored

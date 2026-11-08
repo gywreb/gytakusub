@@ -2,10 +2,10 @@
  {
   "tag": null,
   "box": [
-   342,
-   189,
-   90,
-   34
+   245,
+   238,
+   78,
+   30
   ],
   "text": "It can't be!",
   "size": "normal",
@@ -14,10 +14,10 @@
  {
   "tag": null,
   "box": [
-   910,
-   394,
-   90,
-   34
+   967,
+   172,
+   92,
+   220
   ],
   "text": "Calm down, it isn't over yet.",
   "size": "normal",
@@ -26,10 +26,10 @@
  {
   "tag": null,
   "box": [
-   161,
-   1298,
-   35,
-   84
+   769,
+   197,
+   40,
+   227
   ],
   "text": "Since when did you know?",
   "size": "normal",
@@ -38,10 +38,10 @@
  {
   "tag": null,
   "box": [
-   346,
-   1134,
-   128,
-   30
+   780,
+   1285,
+   40,
+   97
   ],
   "text": "From the very beginning.",
   "size": "normal",
@@ -50,25 +50,13 @@
  {
   "tag": null,
   "box": [
-   851,
-   1135,
-   78,
-   30
+   1018,
+   1236,
+   46,
+   147
   ],
   "text": "Three hours later...",
   "size": "normal",
   "kind": "bubble"
- },
- {
-  "tag": null,
-  "box": [
-   740,
-   920,
-   251,
-   32
-  ],
-  "text": "And if he doesn't come back?",
-  "size": "small",
-  "kind": "narration"
  }
 ]

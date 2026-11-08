@@ -16,13 +16,13 @@
  },
  {
   "box": [
-   650,
-   101,
-   154,
-   394
+   645,
+   155,
+   240,
+   178
   ],
   "kind": "bubble",
-  "shape": "ellipse",
+  "shape": "rect",
   "items": [
    1
   ],
@@ -31,25 +31,25 @@
  },
  {
   "box": [
-   565,
-   687,
-   144,
-   370
+   921,
+   118,
+   213,
+   369
   ],
   "kind": "bubble",
-  "shape": "ellipse",
+  "shape": "rect",
   "items": [
    2
   ],
   "lang": "ja",
-  "dark": false
+  "dark": true
  },
  {
   "box": [
-   858,
-   623,
-   258,
-   156
+   60,
+   714,
+   151,
+   333
   ],
   "kind": "bubble",
   "shape": "ellipse",
@@ -61,15 +61,45 @@
  },
  {
   "box": [
-   636,
-   1178,
-   176,
-   420
+   198,
+   623,
+   352,
+   73
   ],
   "kind": "bubble",
-  "shape": "jagged",
+  "shape": "rect",
   "items": [
    4
+  ],
+  "lang": "ja",
+  "dark": false
+ },
+ {
+  "box": [
+   946,
+   615,
+   188,
+   405
+  ],
+  "kind": "bubble",
+  "shape": "ellipse",
+  "items": [
+   5
+  ],
+  "lang": "ja",
+  "dark": false
+ },
+ {
+  "box": [
+   127,
+   1190,
+   343,
+   150
+  ],
+  "kind": "bubble",
+  "shape": "ellipse",
+  "items": [
+   6
   ],
   "lang": "ja",
   "dark": false

@@ -1,0 +1,107 @@
+[
+ {
+  "box": [
+   215,
+   122,
+   316,
+   168
+  ],
+  "kind": "bubble",
+  "shape": "ellipse",
+  "items": [
+   0
+  ],
+  "lang": "it",
+  "dark": false
+ },
+ {
+  "box": [
+   686,
+   312,
+   251,
+   176
+  ],
+  "kind": "bubble",
+  "shape": "ellipse",
+  "items": [
+   1
+  ],
+  "lang": "it",
+  "dark": false
+ },
+ {
+  "box": [
+   664,
+   113,
+   406,
+   142
+  ],
+  "kind": "bubble",
+  "shape": "ellipse",
+  "items": [
+   2
+  ],
+  "lang": "it",
+  "dark": false
+ },
+ {
+  "box": [
+   176,
+   1104,
+   368,
+   166
+  ],
+  "kind": "bubble",
+  "shape": "rect",
+  "items": [
+   3
+  ],
+  "lang": "it",
+  "dark": false
+ },
+ {
+  "box": [
+   70,
+   900,
+   378,
+   57
+  ],
+  "kind": "bubble",
+  "shape": "rect",
+  "items": [
+   4
+  ],
+  "lang": "it",
+  "dark": false
+ },
+ {
+  "box": [
+   675,
+   994,
+   432,
+   216
+  ],
+  "kind": "bubble",
+  "shape": "ellipse",
+  "items": [
+   5
+  ],
+  "lang": "it",
+  "dark": true
+ },
+ {
+  "box": [
+   650,
+   900,
+   271,
+   62
+  ],
+  "kind": "bubble",
+  "shape": "rect",
+  "items": [
+   6
+  ],
+  "lang": "it",
+  "dark": false
+ }
+]

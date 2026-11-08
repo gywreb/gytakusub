@@ -25,7 +25,7 @@ code on top of those primitives.
 | Image primitives (threshold, median blur, connected components with stats, contours, convex hull, distance transform, morphology, inpainting) | **OpenCV.js 4.5.5** (official WebAssembly build, from the `opencv-bindings` npm package), vendored by `scripts/vendor-opencv.mjs` | Decades of correctness work we cannot match; inpainting alone is not something to hand-roll. Runs locally in the service worker / Web Worker, so no privacy or cost change. |
 | Hyphenation | **`hyphen`** (Liang's TeX patterns, en-US), vendored by `scripts/vendor-hyphen.mjs` | Syllable breaks are a solved problem; our "words ≥ 8 letters at ratio 0.6" rule was a guess. |
 | Real-browser tests | **Playwright** (dev dependency only) | The bugs that hurt were integration bugs (timing, cache, browser APIs) that node-canvas harnesses cannot see. |
-| Bubble policy, layout, erase mask construction, text fitting | **Our code** (`extension/engine/*.js`, `extension/text.js`) | These encode what a manga bubble *is*; no package does that for comics, and the logic is small once it sits on real primitives. Every rule is covered by `tests/engine.test.mjs` across nine synthetic pages with ground truth. |
+| Bubble policy, layout, erase mask construction, text fitting | **Our code** (`extension/engine/*.js`, `extension/text.js`) | These encode what a manga bubble *is*; no package does that for comics, and the logic is small once it sits on real primitives. Every rule is covered by `tests/engine.test.mjs` across thirteen synthetic pages with ground truth. |
 
 ### What we considered and did not take
 

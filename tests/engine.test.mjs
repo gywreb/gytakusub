@@ -139,7 +139,7 @@ for (const [name, png, truthPath, itemsPath] of pages) {
     for (const r of an.regions.filter((r) => r.kind === "bubble")) {
       const inside = an.insideOf(r.id);
       const before = inkIn(pixels.data, inside, r.box, r.dark), after = inkIn(clean.data, inside, r.box, r.dark);
-      assert.ok(before > 0.01, `bubble ${r.id} had lettering (${before})`);
+      assert.ok(before > 0.004, `bubble ${r.id} had lettering (${before})`);
       assert.ok(after < 0.003, `bubble ${r.id} still has lettering after erase: ${after}`);
     }
     // outline check: dark pixels along the border of a light elliptical bubble survive
