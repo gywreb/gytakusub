@@ -14,6 +14,26 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const TEXTS = ["I never thought it would come to this.", "Wait!", "Are you sure about that?", "We leave at dawn. No excuses.",
   "That's impossible...", "Behind you!", "Fine. Have it your way.", "Nobody told me anything about a test.", "Hm.", "Run."];
 
+/** Red stamp circles → their top-left corners, in reading order. */
+function findStamps(px) {
+  const { width: W, height: H, data } = px;
+  const seen = new Uint8Array(W * H), out = [];
+  const isRed = (p) => data[p * 4] > 190 && data[p * 4 + 1] < 70 && data[p * 4 + 2] < 120;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const p0 = y * W + x; if (seen[p0] || !isRed(p0)) continue;
+    let minX = x, minY = y, maxX = x, maxY = y, n = 0; const stack = [p0]; seen[p0] = 1;
+    while (stack.length) {
+      const p = stack.pop(); n++; const cx = p % W, cy = (p / W) | 0;
+      if (cx < minX) minX = cx; if (cx > maxX) maxX = cx; if (cy < minY) minY = cy; if (cy > maxY) maxY = cy;
+      for (const q of [p - 1, p + 1, p - W, p + W]) if (q >= 0 && q < W * H && !seen[q] && isRed(q)) { seen[q] = 1; stack.push(q); }
+    }
+    const r = (maxX - minX + 1) / 2;
+    if (n > 40 && r >= 6 && Math.abs((maxY - minY) - (maxX - minX)) <= 3) out.push({ x: minX - 1, y: minY - 1, r });
+  }
+  const band = Math.max(1, Math.round(H / 24));
+  return out.sort((a, b) => (Math.floor(a.y / band) - Math.floor(b.y / band)) || (a.x - b.x));
+}
+
 export function startMock(port, pageImage, opts = {}) {
   const calls = [];
   const srv = http.createServer(async (req, res) => {
@@ -35,16 +55,25 @@ export function startMock(port, pageImage, opts = {}) {
       const imgPart = content.find((c) => c.type === "image");
       const img = await loadImage(Buffer.from(imgPart.source.data, "base64"));
       const c = createCanvas(img.width, img.height); const ctx = c.getContext("2d"); ctx.drawImage(img, 0, 0);
-      // "read" the stamps the way the model would: the engine's own regions, in order
-      const an = analyze(cv, ctx.getImageData(0, 0, img.width, img.height));
-      const m = prompt.match(/\((\d+)[–-](\d+)\)/); const tagFrom = m ? +m[1] : 1;
-      const items = an.regions.map((r, i) => ({
-        tag: tagFrom + i, kind: "bubble", size: "normal", text: TEXTS[i % TEXTS.length],
-        // badBoxes: correct tag, but the box drifts like a model that is weak at pixel coordinates
-        box: opts.badBoxes
-          ? [Math.round(r.box.x + r.box.w * 0.9), Math.round(r.box.y + r.box.h * 1.1), Math.round(r.box.w * 1.3), Math.round(r.box.h * 1.1)]
-          : [Math.round(r.box.x + r.box.w * 0.2), Math.round(r.box.y + r.box.h * 0.25), Math.round(r.box.w * 0.6), Math.round(r.box.h * 0.5)],
-      }));
+      // "Read" the stamps the way the model would: find the red marks, number them
+      // in reading order (that is how the engine numbers them), and answer for every
+      // tag the prompt announced. Boxes come from re-analysing the slice when a
+      // region sits under the stamp, else a rough guess — like a model's would.
+      const m = prompt.match(/\((\d+)[–-](\d+)\)/); const tagFrom = m ? +m[1] : 1, tagTo = m ? +m[2] : 0;
+      const px = ctx.getImageData(0, 0, img.width, img.height);
+      const stamps = findStamps(px);
+      const an = analyze(cv, px);
+      const items = stamps.slice(0, tagTo - tagFrom + 1).map((st, i) => {
+        const r = an.regions.find((q) => Math.abs(q.box.x - st.x) < st.r * 3 && Math.abs(q.box.y - st.y) < st.r * 3);
+        const box = r ? r.box : { x: st.x, y: st.y, w: st.r * 14, h: st.r * 7 };
+        return {
+          tag: tagFrom + i, kind: "bubble", size: "normal", text: TEXTS[i % TEXTS.length],
+          // badBoxes: correct tag, but the box drifts like a model that is weak at pixel coordinates
+          box: opts.badBoxes
+            ? [Math.round(box.x + box.w * 0.9), Math.round(box.y + box.h * 1.1), Math.round(box.w * 1.3), Math.round(box.h * 1.1)]
+            : [Math.round(box.x + box.w * 0.2), Math.round(box.y + box.h * 0.25), Math.round(box.w * 0.6), Math.round(box.h * 0.5)],
+        };
+      });
       an.dispose();
       calls.push({ w: img.width, h: img.height, n: items.length });
       res.writeHead(200, { "Content-Type": "application/json", ...cors });
