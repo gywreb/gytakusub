@@ -10,6 +10,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createCanvas, loadImage } from "canvas";
 import { cv, detector } from "./cv-node.mjs";
+import { detectText } from "../extension/engine/detect.js";
 import { getOrt } from "../extension/engine/ort.js";
 import { loadSegmenter, segment, letterbox, nms } from "../extension/engine/segment.js";
 import { analyze } from "../extension/engine/analyze.js";
@@ -64,8 +65,9 @@ for (const [layoutName, file] of Object.entries(models)) {
       assert.ok(Math.abs(fill - want) < 0.12, `${t.shape}: fill ${fill.toFixed(2)} vs ${want.toFixed(2)}`);
     }
   });
-  await test(`[${layoutName}] analysis takes the instances as its bubbles`, () => {
-    const an = analyze(cv, pixels, { detector, instances, bubbleClasses: seg.bubbleClasses });
+  await test(`[${layoutName}] analysis takes the instances as its bubbles`, async () => {
+    const lines = await detectText(cv, detector, pixels);
+    const an = analyze(cv, pixels, { lines, instances, bubbleClasses: seg.bubbleClasses });
     assert.ok(an.segmented && an.learned);
     assert.equal(an.bubbles.length, truth.length);
     for (const b of an.bubbles) assert.ok(b.blocks.length >= 1, `bubble ${JSON.stringify(b.box)} has its lettering`);

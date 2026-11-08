@@ -28,7 +28,7 @@ const sigmoid = (v) => 1 / (1 + Math.exp(-v));
  */
 
 /**
- * @param {typeof import("../vendor/ort/ort.wasm.bundle.min.mjs")} ort
+ * @param {typeof import("../vendor/ort/ort.bundle.js")} ort
  * @param {Uint8Array} bytes the .onnx model
  * @param {Partial<Segmenter> & {inputSize?: number}} [cfg]
  * @returns {Promise<Segmenter>}

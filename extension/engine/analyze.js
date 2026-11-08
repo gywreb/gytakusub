@@ -7,7 +7,7 @@
 //
 // Coordinates are pixels of the analysed image. The result keeps label maps
 // for erase/layout; call `analysis.dispose()` when done with it.
-import { detectText } from "./detect.js";
+import { detectTextSync } from "./detect.js";
 import { analyzeHeuristic, mergeParagraphs } from "./analyze-heuristic.js";
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -18,16 +18,18 @@ const trace = (...a) => { if (globalThis.GYT_TRACE) globalThis.GYT_TRACE(...a); 
 /**
  * @param {typeof import("../vendor/opencv.js")} cv
  * @param {ImageData} img
- * @param {{detector?: object, instances?: import("./segment.js").Instance[]|null, bubbleClasses?: Set<number>}} [opts]
- *   detector: from detect.js loadDetector; without it the heuristic analyser runs.
+ * @param {{detector?: object, lines?: import("./detect.js").Line[], instances?: import("./segment.js").Instance[]|null, bubbleClasses?: Set<number>}} [opts]
+ *   lines: text lines from detect.js detectText (run by the caller, which can await it);
+ *   detector: from detect.js loadDetector, used here only for the synchronous OpenCV
+ *   backend when `lines` is not given; with neither, the heuristic analyser runs.
  *   instances: from segment.js — the bubbles as a learned segmentation model sees them;
  *   with them, bubbles are the model's masks and the light-region rules are not used.
  * @returns {import("./analyze-heuristic.js").Analysis}
  */
 export function analyze(cv, img, opts = {}) {
-  if (!opts.detector) return analyzeHeuristic(cv, img);
+  if (!opts.lines && !opts.detector) return analyzeHeuristic(cv, img);
   const W = img.width, H = img.height;
-  const lines = detectText(cv, opts.detector, img, { maxSide: opts.maxSide ?? 960 });
+  const lines = opts.lines || detectTextSync(cv, opts.detector, img, { maxSide: opts.maxSide ?? 960 });
   const src = cv.matFromImageData(img);
   const gray = new cv.Mat(); cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
   const base = new cv.Mat(); cv.medianBlur(gray, base, odd(clamp(Math.round(W / 320), 3, 7)));

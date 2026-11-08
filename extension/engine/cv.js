@@ -38,11 +38,16 @@ let detectorReady = null;
 export function getDetector(overrides = {}) {
   if (!detectorReady) {
     detectorReady = (async () => {
+      let cv, bytes;
       try {
-        const cv = await getCV();
-        const bytes = overrides.modelBytes || new Uint8Array(await (await fetch(new URL("../vendor/ppocr-det.onnx", import.meta.url))).arrayBuffer());
-        return loadDetector(cv, bytes);
+        cv = await getCV();
+        bytes = overrides.modelBytes || new Uint8Array(await (await fetch(new URL("../vendor/ppocr-det.onnx", import.meta.url))).arrayBuffer());
       } catch (e) { console.warn("Gytakusub: text detector unavailable, using heuristics", e); return null; }
+      // ONNX Runtime first (about four times faster than OpenCV's dnn on wasm); dnn if it will not start
+      try { return await loadDetector(cv, bytes, { ort: getOrt(overrides.wasmBinary ? { wasmBinary: overrides.wasmBinary } : {}) }); }
+      catch (e) { console.warn("Gytakusub: ONNX Runtime unavailable for the text detector, using OpenCV dnn", e); }
+      try { return await loadDetector(cv, bytes); }
+      catch (e) { console.warn("Gytakusub: text detector unavailable, using heuristics", e); return null; }
     })();
   }
   return detectorReady;

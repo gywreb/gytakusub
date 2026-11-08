@@ -5,6 +5,7 @@
 import { getCV, getDetector, getSegmenter } from "./cv.js";
 import { analyze } from "./analyze.js";
 import { segment } from "./segment.js";
+import { detectText } from "./detect.js";
 import { layout } from "./layout.js";
 import { erase } from "./erase.js";
 import { sliceGeometry, normalizeItems } from "../prompt.js";
@@ -32,9 +33,12 @@ export async function preparePage(bitmap, settings) {
     const imageData = ctx.getImageData(0, 0, cw, ch);
     // bubbles from the segmentation model when there is one; the analysis then
     // only has to read the text inside them
+    const t0 = Date.now();
+    const lines = detector ? await detectText(cv, detector, imageData) : null;
+    const detectMs = Date.now() - t0;
     const seg = segmenter ? await segment(segmenter, imageData) : null;
-    const analysis = analyze(cv, imageData, { detector, instances: seg ? seg.instances : null, bubbleClasses: segmenter?.bubbleClasses });
-    analysis.segmentMs = seg ? seg.ms : 0;
+    const analysis = analyze(cv, imageData, { detector, lines, instances: seg ? seg.instances : null, bubbleClasses: segmenter?.bubbleClasses });
+    analysis.segmentMs = seg ? seg.ms : 0; analysis.detectMs = detectMs;
     const tagFrom = nextId;
     for (const r of analysis.regions) r.id = nextId++; // page-wide numbering
     const tagTo = nextId - 1;
@@ -82,6 +86,7 @@ export async function finishPage(job, results, opts = {}) {
   const first = job.slices[0]?.analysis;
   const engine = !first ? "heuristic" : first.segmented ? "segmented" : first.learned ? "learned" : "heuristic";
   const segmentMs = job.slices.reduce((n, s) => n + (s.analysis.segmentMs || 0), 0);
+  const detectMs = job.slices.reduce((n, s) => n + (s.analysis.detectMs || 0), 0);
   // Patches: just the areas the eraser changed, cut from the cleaned page. The
   // extension ships these (a few KB each) instead of the whole page; the content
   // script draws them over the image it already shows.
@@ -90,7 +95,7 @@ export async function finishPage(job, results, opts = {}) {
     c.getContext("2d").drawImage(canvas, r.x, r.y, r.w, r.h, 0, 0, r.w, r.h);
     return { x: r.x, y: r.y, w: r.w, h: r.h, canvas: c };
   });
-  return { items, placements, regions, work, letter, canvas, patches, engine, segmentMs };
+  return { items, placements, regions, work, letter, canvas, patches, engine, segmentMs, detectMs };
 }
 
 /** Red numbered stamps at the top-left of each text region. */

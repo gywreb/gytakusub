@@ -2,7 +2,7 @@
 // because a module service worker cannot use dynamic import(); the wasm is
 // fetched from the vendored copy next to this module (or supplied by a host
 // that has no fetch for files, such as the Node tests).
-import * as ort from "../vendor/ort/ort.wasm.bundle.min.mjs";
+import * as ort from "../vendor/ort/ort.bundle.js";
 
 let configured = false;
 

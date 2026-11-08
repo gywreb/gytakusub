@@ -76,7 +76,7 @@ Same corpus, same tools, model loaded via `GYT_SEGMENT=<file.onnx>`:
 The segmenter ships only if dialogue-as-bubble and false regions improve and
 no rendered-size row gets worse. If the first candidate is too slow on the
 single-threaded wasm (expected 2–5 s/page for an M-size model at 640 px),
-the WebGPU execution provider (`ort.webgpu.bundle.min.mjs`, 29 MB wasm) is
+the WebGPU execution provider (ORT's webgpu bundle, 29 MB wasm) is
 the next step before giving up on the model.
 
 ## What is already tested

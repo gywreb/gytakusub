@@ -22,6 +22,7 @@ A rebuilt page engine. 1.0 found bubbles, erased lettering and fitted text with 
 - **Toned bubbles.** A bubble shaded with screentone or a gradient used to offer only its flat light fragment as text area, so the translation came out tiny. The usable interior is now what the outline encloses (grown from the light region over tone dots, mid-greys and lettering, bounded by structural ink); hairline gaps are sealed, open tail tips are cut off, and a leak through a wide opening keeps the old interior. Dark bubbles are unchanged.
 - Text fitting keeps words whole and lets a line run slightly past its box before it ever breaks a word letter by letter; the smallest size it will go to is 35% of the original (was 45%).
 - Erasing reaches most of a letter beyond each detected line along its direction, catching the last glyph the detector sometimes stops short of.
+- **ONNX Runtime Web** (Microsoft, MIT; 15 MB wasm, ~4 MB compressed) is bundled and runs the text detector: analysis drops from 2.1 s to 0.7 s per page on the user's exports, with the same lines found. OpenCV's dnn stays as the fallback if the runtime cannot start. The same runtime is the host for a learned bubble segmentation model (`docs/adr/0004-learned-bubble-segmentation.md`): the engine takes its masks as bubble interiors when `vendor/segment.onnx` is present, which it is not yet — the model file is chosen and measured first.
 - An image the site refuses to serve to the extension (hotlink protection, "Could not fetch image (403)") is fetched again by the page itself when it may (same-origin or CORS); an image that still fails is not retried on every scroll, and the same error is not toasted again within a minute. Failed images are listed in the debug report (`summary.failed`).
 - The service worker now returns a cleaned page plus text placements; the content script only draws text. Content scripts no longer carry the engine (a few KB instead of hundreds).
 - Text fitting tries every size without hyphens first and hyphenates only when nothing else fits, instead of hyphenating eagerly at line ends.
@@ -37,8 +38,8 @@ The detector was reworked against the first real exports (850 px JPEG pages with
 ### Known limitations
 - Telea inpainting smooths periodic screentone behind free narration (the dots blur where the letters were). Bubbles are unaffected.
 - Detailed artwork (armour, faces, foliage) is still stamped as a text region a few times per page; the model is told to return nothing for such stamps, so the cost is tokens, not wrong text. Dialogue in bubbles the detector misses (~15% on the pages seen so far) is placed by the model's box with a halo instead of inside the bubble.
-- Package size grew by ~11 MB (OpenCV WebAssembly 6 MB, text detector 4.7 MB), compiled/parsed once per worker start and cached by the browser.
-- Analysis takes ~2 s per page in the browser (the detector), before the model call; pages translated while scrolling fast queue behind each other. A faster runtime (WebGPU) is the planned 1.2 improvement.
+- Package size grew by ~26 MB unpacked (OpenCV WebAssembly 6 MB, ONNX Runtime 15 MB, text detector 4.7 MB; ~11 MB compressed), compiled/parsed once per worker start and cached by the browser.
+- Analysis takes ~0.7 s per page in the browser before the model call; pages translated while scrolling fast still queue behind each other. WebGPU is the next step if a bubble segmentation model is adopted.
 
 ## [1.0.0] — 2026-11-08
 

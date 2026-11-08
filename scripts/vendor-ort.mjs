@@ -12,8 +12,10 @@ const pkgDir = path.join(root, "tests", "node_modules", "onnxruntime-web");
 const pkg = JSON.parse(fs.readFileSync(path.join(pkgDir, "package.json"), "utf8"));
 const out = path.join(root, "extension", "vendor", "ort");
 fs.mkdirSync(out, { recursive: true });
-for (const f of ["ort.wasm.bundle.min.mjs", "ort-wasm-simd-threaded.wasm"]) fs.copyFileSync(path.join(pkgDir, "dist", f), path.join(out, f));
+// the ESM bundle is renamed .js: some static hosts do not serve .mjs as JavaScript
+fs.copyFileSync(path.join(pkgDir, "dist", "ort.wasm.bundle.min.mjs"), path.join(out, "ort.bundle.js"));
+fs.copyFileSync(path.join(pkgDir, "dist", "ort-wasm-simd-threaded.wasm"), path.join(out, "ort-wasm-simd-threaded.wasm"));
 const lic = ["LICENSE", "LICENSE.txt", "LICENSE.md"].map((f) => path.join(pkgDir, f)).find(fs.existsSync);
 fs.writeFileSync(path.join(out, "LICENSE-onnxruntime.txt"), lic ? fs.readFileSync(lic) : `onnxruntime-web ${pkg.version} — ${pkg.license} License, Copyright (c) Microsoft Corporation. https://github.com/microsoft/onnxruntime\n`);
-fs.writeFileSync(path.join(out, "VERSION.json"), JSON.stringify({ package: "onnxruntime-web", version: pkg.version, files: ["ort.wasm.bundle.min.mjs", "ort-wasm-simd-threaded.wasm"] }, null, 2) + "\n");
+fs.writeFileSync(path.join(out, "VERSION.json"), JSON.stringify({ package: "onnxruntime-web", version: pkg.version, files: { "ort.bundle.js": "dist/ort.wasm.bundle.min.mjs", "ort-wasm-simd-threaded.wasm": "dist/ort-wasm-simd-threaded.wasm" } }, null, 2) + "\n");
 console.log(`vendored onnxruntime-web ${pkg.version} into extension/vendor/ort/`);
