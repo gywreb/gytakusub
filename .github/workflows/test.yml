@@ -9,3 +9,9 @@ jobs:
         with: { node-version: 22 }
       - run: for f in extension/*.js web/*.js; do node --check "$f"; done
       - run: cd tests && npm install --no-audit --no-fund && npm test
+      # Real-browser test: the actual extension in headless Chrome against a mock API.
+      - run: cd tests && npx playwright install --with-deps chrome
+      - run: cd tests && npm run test:browser
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: browser-renders, path: /tmp/gyt-browser/**/*.png, if-no-files-found: ignore }

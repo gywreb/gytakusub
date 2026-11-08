@@ -107,7 +107,7 @@ export function renderPage(img, result, settings, maxEdge = 2200) {
   octx.drawImage(img, 0, 0, W, H);
   const pixels = octx.getImageData(0, 0, W, H);
   const overlay = document.createElement("canvas"); overlay.width = W; overlay.height = H;
-  const drawn = G.typeset(overlay.getContext("2d"), pixels, result, W, H, { fontFamily: settings.fontFamily, uppercase: settings.uppercase });
+  const { drawn } = G.typeset(overlay.getContext("2d"), pixels, result, W, H, { fontFamily: settings.fontFamily, uppercase: settings.uppercase });
   const translated = document.createElement("canvas"); translated.width = W; translated.height = H;
   const tctx = translated.getContext("2d");
   tctx.drawImage(original, 0, 0); tctx.drawImage(overlay, 0, 0);

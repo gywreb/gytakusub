@@ -255,8 +255,8 @@
     canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext("2d");
     ctx.clearRect(0, 0, W, H);
-    G.typeset(ctx, pixels, entry.result, W, H, { fontFamily: settings.fontFamily, uppercase: settings.uppercase, debug: !!settings.debugOverlay });
-    if (settings.debugOverlay) console.info("Gytakusub debug", { src: entry.src, W, H, natural: [src.naturalWidth, src.naturalHeight], items: entry.result.items, bubbles: entry.result.bubbles.map((b) => ({ id: b.id, box: b.box })) });
+    const { placements } = G.typeset(ctx, pixels, entry.result, W, H, { fontFamily: settings.fontFamily, uppercase: settings.uppercase, debug: !!settings.debugOverlay });
+    if (settings.debugOverlay) console.info("Gytakusub debug", { src: entry.src, W, H, natural: [src.naturalWidth, src.naturalHeight], items: entry.result.items, bubbles: entry.result.bubbles.map((b) => ({ id: b.id, box: b.box })), placements });
 
     if (!entry.canvas) { entry.canvas = canvas; root.append(canvas); }
     entry.objectFit = getComputedStyle(img).objectFit;
@@ -318,12 +318,13 @@
 
   // ---------- bulk / auto ----------
 
-  function translateVisible() {
+  function translateVisible(force = false) {
     if (!active()) { toast("Gytakusub is off on this site"); return; }
-    const imgs = visibleImages().filter((i) => !["done", "working", "queued"].includes(entries.get(i)?.status));
+    const skip = force ? ["working", "queued"] : ["done", "working", "queued"];
+    const imgs = visibleImages().filter((i) => !skip.includes(entries.get(i)?.status));
     if (!imgs.length) { toast("No untranslated images on screen"); return; }
     toast(`Translating ${imgs.length} image${imgs.length > 1 ? "s" : ""}…`);
-    for (const img of imgs) enqueue(img);
+    for (const img of imgs) enqueue(img, force);
   }
 
   let io = null, mo = null;
@@ -355,7 +356,7 @@
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     switch (msg?.type) {
       case "PING": sendResponse({ ok: true }); break;
-      case "TRANSLATE_VISIBLE": translateVisible(); sendResponse({ ok: true }); break;
+      case "TRANSLATE_VISIBLE": translateVisible(!!msg.force); sendResponse({ ok: true }); break;
       case "TOGGLE_OVERLAYS": allHidden = !allHidden; layout(); refreshBar(); sendResponse({ hidden: allHidden }); break;
       case "GET_STATE": {
         let done = 0, working = 0;

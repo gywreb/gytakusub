@@ -3,15 +3,17 @@
   "private": true,
   "type": "commonjs",
   "scripts": {
-    "test": "node unit.test.mjs && node eraser-test.mjs",
+    "test": "node unit.test.mjs && node eraser-test.mjs && node extension-e2e.cjs fixtures/demo-page.png /tmp/gyt-e2e.png fixtures/demo-items.json && node web-e2e.mjs fixtures/demo-page.png /tmp/gyt-web-e2e.png",
     "detect": "node detect.cjs",
     "e2e:extension": "node extension-e2e.cjs",
     "e2e:web": "node web-e2e.mjs",
     "demo": "python3 make-demo-page.py fixtures",
     "stress": "node typeset-stress.mjs typeset-stress.png",
-    "assets": "node make-store-assets.mjs ../store/assets"
+    "assets": "node make-store-assets.mjs ../store/assets",
+    "test:browser": "node browser/run.mjs --out /tmp/gyt-browser/good && node browser/run.mjs --bad-boxes --out /tmp/gyt-browser/bad-boxes"
   },
   "devDependencies": {
-    "canvas": "^3.1.0"
+    "canvas": "^3.1.0",
+    "playwright": "^1.65.0"
   }
 }

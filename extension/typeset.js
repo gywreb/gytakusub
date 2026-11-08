@@ -161,7 +161,7 @@
    * @param pixels   ImageData of the page at W×H
    * @param result   { items:[{tag,box,size,text}], bubbles:[candidate] } from the translator
    * @param opts     { fontFamily?, uppercase? }
-   * @returns number of items drawn
+   * @returns {{drawn:number, placements:Array<{tag:(number|null), rect:{x:number,y:number,w:number,h:number}}>}}
    */
   function typeset(ctx, pixels, result, W, H, opts = {}) {
     const { items = [], bubbles = [] } = result;
@@ -181,20 +181,12 @@
     }
     const byTag = new Map();
     for (const p of prepared) if (p.it.tag != null && candById.has(p.it.tag)) (byTag.get(p.it.tag) || byTag.set(p.it.tag, []).get(p.it.tag)).push(p);
-    const validTags = new Set();
-    for (const [tag, ps] of byTag) {
-      const cand = candById.get(tag);
-      const cb = { x: cand.box[0] * W, y: cand.box[1] * H, w: cand.box[2] * W, h: cand.box[3] * H };
-      const boxes = ps.map((p) => p.box).filter(Boolean);
-      if (!boxes.length) { validTags.add(tag); continue; }
-      const centresInside = boxes.every((b) => {
-        const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
-        return cx >= cb.x - cb.w * 0.1 && cx <= cb.x + cb.w * 1.1 && cy >= cb.y - cb.h * 0.1 && cy <= cb.y + cb.h * 1.1;
-      });
-      const ux1 = Math.min(...boxes.map((b) => b.x)), uy1 = Math.min(...boxes.map((b) => b.y));
-      const ux2 = Math.max(...boxes.map((b) => b.x + b.w)), uy2 = Math.max(...boxes.map((b) => b.y + b.h));
-      if (centresInside && cand.areaFrac * W * H <= 6 * (ux2 - ux1) * (uy2 - uy1)) validTags.add(tag);
-    }
+    // A tag is authoritative. The stamps are our own numbering drawn on the
+    // image, so a matching tag is evidence the model read the picture; its pixel
+    // box is not (models drift at coordinates, and a box-gated tag silently fell
+    // back to the drifted box — text in the wrong panel, oversized). The box is
+    // only used to order speakers inside a joined bubble, or when there is no tag.
+    const validTags = new Set(byTag.keys());
 
     // Pass 1b: resolve regions.
     const regions = new Map();
@@ -260,7 +252,7 @@
           const [ya, yb] = g.cuts.get(idx);
           rect = inscribedRect(inside, bbox, ya, yb) || { x: bbox.x + bbox.w * 0.15, y: ya + (yb - ya) * 0.1, w: bbox.w * 0.7, h: (yb - ya) * 0.8 };
         }
-        placements.push({ text, rect, color: G.isDark(color) ? "#fff" : "#000", target: sizeFor(g.letter, mul), minSize: Math.max(7, Math.round(base * 0.4)) });
+        placements.push({ text, rect, tag: it.tag, color: G.isDark(color) ? "#fff" : "#000", target: sizeFor(g.letter, mul), minSize: Math.max(7, Math.round(base * 0.4)) });
       } else if (box) {
         // No bubble region: erase glyph-sized ink around the model's box (line
         // art and outlines are protected inside the eraser); the returned rect
@@ -268,7 +260,7 @@
         const erased = G.eraseTextZone(ctx, pixels, box, { letter: pageLetter });
         if (erased) {
           const letter = G.estimateLetterSize(pixels, erased.rect, null);
-          placements.push({ text, rect: clampRect(erased.rect, page), color: G.isDark(erased.color) ? "#fff" : "#000", target: sizeFor(letter, mul), minSize: Math.max(7, Math.round(base * 0.5)), erasedZone: true });
+          placements.push({ text, rect: clampRect(erased.rect, page), tag: null, color: G.isDark(erased.color) ? "#fff" : "#000", target: sizeFor(letter, mul), minSize: Math.max(7, Math.round(base * 0.5)), erasedZone: true });
         } else {
           // Text over artwork: translucent box built around the text at page size.
           const size = Math.round(pageLetter * mul);
@@ -282,7 +274,7 @@
           const bpad = size * 0.4;
           const rect = { x: box.x + box.w / 2 - tw / 2 - bpad, y: box.y + box.h / 2 - th / 2 - bpad, w: tw + 2 * bpad, h: th + 2 * bpad };
           rect.x = clamp(rect.x, 0, W - rect.w); rect.y = clamp(rect.y, 0, H - rect.h);
-          placements.push({ text, rect, color: "#000", fixed: { size, lines, lineHeight: lh }, boxFill: bpad });
+          placements.push({ text, rect, tag: null, color: "#000", fixed: { size, lines, lineHeight: lh }, boxFill: bpad });
         }
       }
     }
@@ -333,7 +325,7 @@
       drawLines(ctx, fit, p.rect, p.color, family);
       drawn++;
     }
-    return drawn;
+    return { drawn, placements: placements.map((p) => ({ tag: p.tag ?? null, rect: { x: Math.round(p.rect.x), y: Math.round(p.rect.y), w: Math.round(p.rect.w), h: Math.round(p.rect.h) } })) };
   }
 
   G.typeset = typeset;
