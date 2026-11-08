@@ -162,73 +162,95 @@
       jobs.push({ it, box, key });
     }
 
-    // Pass 2: paint regions once; measure original lettering.
+    // Pass 2: paint regions once; measure original lettering per region.
+    const letters = [];
     for (const g of regions.values()) {
       paintRegion(ctx, g.region);
       g.letter = G.estimateLetterSize(pixels, innerRect(g.region.bbox, g.region.fillRatio), g.region.inside);
+      if (g.letter) letters.push(g.letter);
     }
+    // Page-wide lettering size: the median of the per-bubble estimates is far
+    // more stable than any single one. Individual bubbles may deviate a little.
+    const median = (a) => { const t = [...a].sort((x, y) => x - y); return t.length ? t[Math.floor(t.length / 2)] : 0; };
+    const pageLetter = clamp(median(letters) || base, base * 0.6, base * 1.3);
+    const sizeFor = (letter, mul) => clamp(letter ? clamp(letter, pageLetter * 0.8, pageLetter * 1.25) : pageLetter, base * 0.55, base * 1.5) * mul;
 
-    // Pass 3: typeset.
-    let drawn = 0;
+    // Pass 3: decide every text placement (and any extra erasing) BEFORE drawing
+    // any text, so later paint can never cover earlier lettering.
+    const placements = [];
+    const extraErase = [];
     for (const { it, box, key } of jobs) {
       const text = opts.uppercase ? it.text.toUpperCase() : it.text;
       const mul = SIZE_MUL[it.size] || 1;
       if (key) {
         const g = regions.get(key);
         const { bbox, fillRatio, color } = g.region;
-        const textColor = G.isDark(color) ? "#fff" : "#000";
+        const inner = innerRect(bbox, fillRatio);
         let rect;
         if (g.items.length === 1) {
-          rect = box ? unionRect(innerRect(bbox, fillRatio), box, bbox) : innerRect(bbox, fillRatio);
-        } else if (box) {
-          const px = box.w * 0.15, py = box.h * 0.15;
-          rect = clampRect({ x: box.x - px, y: box.y - py, w: box.w + 2 * px, h: box.h + 2 * py }, bbox);
+          // The detected bubble is authoritative; the model's box is not used
+          // to grow the text area (its coordinates are approximate).
+          rect = inner;
         } else {
+          // Joined bubble: split the interior between its speakers in reading
+          // order (vertical bands), nudged toward each one's own box when given.
           const idx = g.items.findIndex((j) => j.it === it), n = g.items.length;
-          const inner = innerRect(bbox, fillRatio);
           rect = { x: inner.x, y: inner.y + (inner.h / n) * idx, w: inner.w, h: inner.h / n };
+          if (box) {
+            const bx = clampRect({ x: box.x - box.w * 0.15, y: box.y - box.h * 0.15, w: box.w * 1.3, h: box.h * 1.3 }, inner);
+            if (bx.w * bx.h > rect.w * rect.h * 0.5) rect = bx;
+          }
         }
-        const target = clamp(g.letter || base, base * 0.7, base * 1.4) * mul;
-        const fit = G.fitText(text, rect, setFont, measure, { maxSize: target, minSize: Math.max(7, Math.round(base * 0.4)) });
-        drawLines(ctx, fit, rect, textColor, family);
-        drawn++;
+        placements.push({ text, rect, color: G.isDark(color) ? "#fff" : "#000", target: sizeFor(g.letter, mul), minSize: Math.max(7, Math.round(base * 0.4)) });
       } else if (box) {
-        // No bubble region: erase lettering inside the text box if it is mostly
-        // light (bubble cut by a panel border), else a translucent box.
         const pad = Math.max(4, Math.min(box.w, box.h) * 0.16);
         const zone = clampRect({ x: box.x - pad, y: box.y - pad, w: box.w + 2 * pad, h: box.h + 2 * pad }, page);
         const erased = G.eraseTextZone(ctx, pixels, zone, { radius: Math.max(3, Math.round(base * 0.12)) });
         if (erased) {
           const letter = G.estimateLetterSize(pixels, zone, null);
-          const target = clamp(letter || base, base * 0.7, base * 1.4) * mul;
-          const textColor = G.isDark(erased.color) ? "#fff" : "#000";
-          const grow = { x: zone.x - zone.w * 0.08, y: zone.y - zone.h * 0.08, w: zone.w * 1.16, h: zone.h * 1.16 };
-          const fit = G.fitText(text, grow, setFont, measure, { maxSize: target, minSize: Math.max(7, Math.round(base * 0.55)) });
-          if (fit.lines.length * fit.lineHeight > grow.h * 1.3 || fit.broken) {
-            const need = { x: grow.x, y: grow.y + grow.h / 2 - (fit.lines.length * fit.lineHeight) / 2 - pad, w: grow.w, h: fit.lines.length * fit.lineHeight + 2 * pad };
-            G.eraseTextZone(ctx, pixels, clampRect(need, page), { radius: 3, minLightFrac: 0 });
-          }
-          drawLines(ctx, fit, grow, textColor, family);
-          drawn++;
-          continue;
+          placements.push({ text, rect: zone, color: G.isDark(erased.color) ? "#fff" : "#000", target: sizeFor(letter, mul), minSize: Math.max(7, Math.round(base * 0.5)), erasedZone: true });
+        } else {
+          // Text over artwork: translucent box built around the text at page size.
+          const size = Math.round(pageLetter * mul);
+          setFont(size);
+          const lh = size * 1.15;
+          const words = text.split(/\s+/).filter(Boolean);
+          const totalW = measure(words.join(" "));
+          const idealW = Math.max(box.w, G.longestWordWidth(measure, text), Math.sqrt(totalW * lh * 2.4));
+          const lines = G.wrap(measure, text, idealW);
+          const tw = Math.max(...lines.map(measure)), th = lines.length * lh;
+          const bpad = size * 0.4;
+          const rect = { x: box.x + box.w / 2 - tw / 2 - bpad, y: box.y + box.h / 2 - th / 2 - bpad, w: tw + 2 * bpad, h: th + 2 * bpad };
+          rect.x = clamp(rect.x, 0, W - rect.w); rect.y = clamp(rect.y, 0, H - rect.h);
+          placements.push({ text, rect, color: "#000", fixed: { size, lines, lineHeight: lh }, boxFill: bpad });
         }
-        const size = Math.round(base * mul);
-        setFont(size);
-        const lh = size * 1.15;
-        const words = text.split(/\s+/).filter(Boolean);
-        const totalW = measure(words.join(" "));
-        const idealW = Math.max(box.w, G.longestWordWidth(measure, text), Math.sqrt(totalW * lh * 2.4));
-        const lines = G.wrap(measure, text, idealW);
-        const tw = Math.max(...lines.map(measure)), th = lines.length * lh;
-        const bpad = size * 0.4;
-        const rect = { x: box.x + box.w / 2 - tw / 2 - bpad, y: box.y + box.h / 2 - th / 2 - bpad, w: tw + 2 * bpad, h: th + 2 * bpad };
-        rect.x = clamp(rect.x, 0, W - rect.w); rect.y = clamp(rect.y, 0, H - rect.h);
-        ctx.fillStyle = "rgba(255,255,255,0.9)";
-        roundRect(ctx, rect.x, rect.y, rect.w, rect.h, bpad);
-        ctx.fill();
-        drawLines(ctx, { size, lines, lineHeight: lh }, rect, "#000", family);
-        drawn++;
       }
+    }
+
+    // Pass 4: resolve overlaps between text rectangles by trimming the side of
+    // each that faces the other (never let two translations share pixels).
+    for (let i = 0; i < placements.length; i++) for (let j = i + 1; j < placements.length; j++) {
+      const a = placements[i].rect, b = placements[j].rect;
+      const ix = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+      const iy = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+      if (ix <= 0 || iy <= 0) continue;
+      if (ix < iy) { // separate horizontally
+        if (a.x + a.w / 2 < b.x + b.w / 2) { a.w -= ix / 2; b.x += ix / 2; b.w -= ix / 2; } else { b.w -= ix / 2; a.x += ix / 2; a.w -= ix / 2; }
+      } else { // separate vertically
+        if (a.y + a.h / 2 < b.y + b.h / 2) { a.h -= iy / 2; b.y += iy / 2; b.h -= iy / 2; } else { b.h -= iy / 2; a.y += iy / 2; a.h -= iy / 2; }
+      }
+      a.w = Math.max(8, a.w); a.h = Math.max(8, a.h); b.w = Math.max(8, b.w); b.h = Math.max(8, b.h);
+    }
+
+    // Pass 5: paint translucent boxes, then draw all text.
+    for (const p of placements) {
+      if (p.boxFill) { ctx.fillStyle = "rgba(255,255,255,0.9)"; roundRect(ctx, p.rect.x, p.rect.y, p.rect.w, p.rect.h, p.boxFill); ctx.fill(); }
+    }
+    let drawn = 0;
+    for (const p of placements) {
+      const fit = p.fixed || G.fitText(p.text, p.rect, setFont, measure, { maxSize: p.target, minSize: p.minSize });
+      drawLines(ctx, fit, p.rect, p.color, family);
+      drawn++;
     }
     return drawn;
   }
