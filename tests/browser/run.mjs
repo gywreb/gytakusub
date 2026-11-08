@@ -25,7 +25,9 @@ fs.writeFileSync(pj, fs.readFileSync(pj, "utf8").replace(/export const API_URL =
 const { srv, calls } = await startMock(PORT, pageImage, { badBoxes: process.argv.includes("--bad-boxes") });
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), "gyt-prof-"));
 const context = await chromium.launchPersistentContext(profile, {
-  channel: "chrome", headless: false,
+  // Branded Google Chrome ≥137 ignores --load-extension; Playwright's Chromium and
+  // Chrome for Testing keep it. CI installs chromium; set GYT_CHANNEL=chrome locally.
+  channel: process.env.GYT_CHANNEL || "chromium", headless: false,
   args: ["--headless=new", "--no-sandbox", `--disable-extensions-except=${ext}`, `--load-extension=${ext}`, "--window-size=1200,900"],
   viewport: { width: 1200, height: 900 },
 });

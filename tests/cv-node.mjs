@@ -11,3 +11,7 @@ import { ImageData } from "canvas";
 globalThis.ImageData ??= ImageData; // engine/erase.js constructs ImageData like a browser would
 const { getCV } = await import("../extension/engine/cv.js");
 export const cv = await getCV({ wasmBinary: fs.readFileSync(path.join(here, "../extension/vendor/opencv_js.wasm")) });
+// Emscripten's Node branch installs process-wide handlers that turn any unhandled
+// rejection into a wasm abort (exit code 7, source dump) — masking the real error.
+process.removeAllListeners("unhandledRejection");
+process.removeAllListeners("uncaughtException");
