@@ -23,7 +23,7 @@ fs.cpSync(extSrc, ext, { recursive: true });
 const pj = path.join(ext, "prompt.js");
 fs.writeFileSync(pj, fs.readFileSync(pj, "utf8").replace(/export const API_URL = "[^"]+"/, `export const API_URL = "http://127.0.0.1:${PORT}/v1/messages"`));
 
-const { srv, calls } = await startMock(PORT, pageImage, { badBoxes: process.argv.includes("--bad-boxes") });
+const { srv, calls } = await startMock(PORT, pageImage, { badBoxes: process.argv.includes("--bad-boxes"), truth: pageImage.replace(/-page\.png$/, "-truth.json") });
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), "gyt-prof-"));
 const context = await chromium.launchPersistentContext(profile, {
   // Branded Google Chrome ≥137 ignores --load-extension; Playwright's Chromium and

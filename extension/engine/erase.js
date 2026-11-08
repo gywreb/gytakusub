@@ -30,21 +30,27 @@ export function erase(cv, img, analysis, regionIds) {
     const letter = Math.max(4, r.letter);
     if (r.kind === "bubble") {
       const b = r.ref, { x, y, w, h } = b.box;
-      // Lettering = ink components that sit inside the bubble, are glyph-sized
-      // relative to it, and touch its surface (the outline fails all three).
+      // Lettering = the detected text blocks' components, plus glyph-sized ink
+      // within a letter of them (accents, punctuation, bits the grouping missed).
+      // Never a sweep of the whole shape: if this "bubble" is really a face or a
+      // sleeve, the art in it must survive a wrong tag.
       const seen = new Set();
       for (const bl of b.blocks) for (const gi of bl.glyphs) seen.add(gi);
+      const nearText = (g) => b.blocks.some((bl) => g.x + g.w >= bl.gbox.x - letter && g.x <= bl.gbox.x + bl.gbox.w + letter && g.y + g.h >= bl.gbox.y - letter && g.y <= bl.gbox.y + bl.gbox.h + letter);
       for (let gi = 1; gi < pol.glyphs.length; gi++) {
         const g = pol.glyphs[gi]; if (!g || seen.has(gi)) continue;
         if (g.x < x + 1 || g.y < y + 1 || g.x + g.w > x + w - 1 || g.y + g.h > y + h - 1) continue;
-        if (g.a > 0.2 * b.area || g.h > 3 * letter) continue;
+        if (g.a > 0.2 * b.area || g.h > 1.6 * letter || !nearText(g)) continue;
         // adjacent to the bubble surface?
         const cx = g.x + (g.w >> 1), cy = g.y + (g.h >> 1), d = 2;
         const near = [[g.x - d, cy], [g.x + g.w + d, cy], [cx, g.y - d], [cx, g.y + g.h + d]].some(([sx, sy]) => sx >= 0 && sy >= 0 && sx < W && sy < H && regionLabels[sy * W + sx] === b.labelId);
         if (near) seen.add(gi);
       }
+      // the inpaint ROI is the lettering's neighbourhood, not the whole shape
+      const tx0 = Math.max(x, Math.min(...b.blocks.map((bl) => bl.gbox.x)) - 2 * letter), ty0 = Math.max(y, Math.min(...b.blocks.map((bl) => bl.gbox.y)) - 2 * letter);
+      const tx1 = Math.min(x + w, Math.max(...b.blocks.map((bl) => bl.gbox.x + bl.gbox.w)) + 2 * letter), ty1 = Math.min(y + h, Math.max(...b.blocks.map((bl) => bl.gbox.y + bl.gbox.h)) + 2 * letter);
       for (const gi of seen) paintGlyph(glyphLabels, gi, pol.glyphs[gi]);
-      rois.push({ x, y, w, h, radius: 3, confine: b.labelId, labels: regionLabels, dark: r.dark });
+      rois.push({ x: Math.round(tx0), y: Math.round(ty0), w: Math.max(1, Math.round(tx1 - tx0)), h: Math.max(1, Math.round(ty1 - ty0)), radius: 3, confine: b.labelId, labels: regionLabels, dark: r.dark });
     } else {
       const bl = r.ref, { x, y, w, h } = bl.box;
       for (const gi of bl.glyphs) paintGlyph(glyphLabels, gi, pol.glyphs[gi]);

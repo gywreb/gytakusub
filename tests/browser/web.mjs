@@ -33,7 +33,7 @@ const statik = http.createServer((req, res) => {
   fs.createReadStream(p).pipe(res);
 });
 await new Promise((r) => statik.listen(WEB_PORT, "127.0.0.1", r));
-const { srv: api, calls } = await startMock(API_PORT, pageImage, { badBoxes: process.argv.includes("--bad-boxes") });
+const { srv: api, calls } = await startMock(API_PORT, pageImage, { badBoxes: process.argv.includes("--bad-boxes"), truth: pageImage.replace(/-page\.png$/, "-truth.json") });
 
 const browser = await chromium.launch({ channel: process.env.GYT_CHANNEL || "chromium", headless: true });
 const page = await browser.newPage({ viewport: { width: 900, height: 1200 } });

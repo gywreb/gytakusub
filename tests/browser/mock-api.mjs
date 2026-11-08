@@ -6,8 +6,6 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createCanvas, loadImage } from "canvas";
-import { cv } from "../cv-node.mjs";
-import { analyze } from "../../extension/engine/analyze.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -57,24 +55,32 @@ export function startMock(port, pageImage, opts = {}) {
       const c = createCanvas(img.width, img.height); const ctx = c.getContext("2d"); ctx.drawImage(img, 0, 0);
       // "Read" the stamps the way the model would: find the red marks, number them
       // in reading order (that is how the engine numbers them), and answer for every
-      // tag the prompt announced. Boxes come from re-analysing the slice when a
-      // region sits under the stamp, else a rough guess — like a model's would.
+      // tag the prompt announced. Boxes come from the page's ground truth (scaled to
+      // the slice) — the mock plays an attentive model; --bad-boxes drifts them.
       const m = prompt.match(/\((\d+)[–-](\d+)\)/); const tagFrom = m ? +m[1] : 1, tagTo = m ? +m[2] : 0;
       const px = ctx.getImageData(0, 0, img.width, img.height);
       const stamps = findStamps(px);
-      const an = analyze(cv, px);
-      const items = stamps.slice(0, tagTo - tagFrom + 1).map((st, i) => {
-        const r = an.regions.find((q) => Math.abs(q.box.x - st.x) < st.r * 3 && Math.abs(q.box.y - st.y) < st.r * 3);
-        const box = r ? r.box : { x: st.x, y: st.y, w: st.r * 14, h: st.r * 7 };
+      const truth = opts.truth ? JSON.parse(fs.readFileSync(opts.truth, "utf8")) : [];
+      const sc = img.width / (opts.truthWidth || 1200);
+      // the engine numbers bubbles first (in reading order), then loose text blocks;
+      // the stamps alone do not say which is which, the ground truth does
+      const matched = stamps.map((st) => {
+        let best = null, bd = Infinity;
+        for (const t of truth) { const d = Math.hypot(t.box[0] * sc - st.x, t.box[1] * sc - st.y); if (d < bd) { bd = d; best = t; } }
+        return { st, truth: best && bd < st.r * 6 ? best : null };
+      });
+      const band = Math.max(1, Math.round(img.height / 24));
+      matched.sort((a, b) => ((a.truth?.kind === "block") - (b.truth?.kind === "block")) || (Math.floor(a.st.y / band) - Math.floor(b.st.y / band)) || (a.st.x - b.st.x));
+      const items = matched.slice(0, tagTo - tagFrom + 1).map(({ st, truth: best }, i) => {
+        const box = best ? { x: best.box[0] * sc, y: best.box[1] * sc, w: best.box[2] * sc, h: best.box[3] * sc } : { x: st.x, y: st.y, w: st.r * 14, h: st.r * 7 };
         return {
           tag: tagFrom + i, kind: "bubble", size: "normal", text: TEXTS[i % TEXTS.length],
           // badBoxes: correct tag, but the box drifts like a model that is weak at pixel coordinates
           box: opts.badBoxes
-            ? [Math.round(box.x + box.w * 0.9), Math.round(box.y + box.h * 1.1), Math.round(box.w * 1.3), Math.round(box.h * 1.1)]
+            ? [Math.round(box.x + box.w * 0.6), Math.round(box.y + box.h * 0.7), Math.round(box.w * 1.3), Math.round(box.h * 1.1)] // the 80th-percentile drift seen on real pages
             : [Math.round(box.x + box.w * 0.2), Math.round(box.y + box.h * 0.25), Math.round(box.w * 0.6), Math.round(box.h * 0.5)],
         };
       });
-      an.dispose();
       calls.push({ w: img.width, h: img.height, n: items.length });
       res.writeHead(200, { "Content-Type": "application/json", ...cors });
       return res.end(JSON.stringify({ content: [{ type: "text", text: JSON.stringify({ items, terms: [] }) }], usage: { input_tokens: 1000, output_tokens: 200 } }));

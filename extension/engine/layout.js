@@ -23,7 +23,18 @@ export function layout(an, items) {
     if (!it.text) continue;
     const px = it.box ? { x: it.box[0] * W, y: it.box[1] * H, w: it.box[2] * W, h: it.box[3] * H } : null;
     let region = it.tag != null ? byId.get(it.tag) : null;
-    if (!region && px) region = nearestRegion(an.regions, px);
+    // A tag is trusted within reason: the model's own box drifts, but when its
+    // centre is nowhere near the stamped region the number was misread, and
+    // following it would erase and re-letter the wrong shape.
+    if (region && px) {
+      const off = boxOffset(region.box, px);
+      const letters = region.kind === "bubble" ? region.ref.blocks.reduce((n, b) => n + b.glyphCount, 0) : region.ref.glyphCount;
+      const ratio = it.text.length / Math.max(1, letters); // translation length vs lettering found (≈1 for a right match)
+      if (off > 1 || (off > 0.5 && (ratio < 0.4 || ratio > 4))) region = null;
+    }
+    // A shape too narrow for the line (one letter per row) is not where it goes.
+    if (region && region.kind === "bubble" && px && region.box.w < 3 * region.letter && it.text.length > 4) region = null;
+    if (!region && px && it.tag == null) region = nearestRegion(an.regions, px);
     if (region) (groups.get(region.id) || groups.set(region.id, []).get(region.id)).push({ it, px });
     else if (px) loose.push({ it, px });
   }
@@ -68,6 +79,12 @@ export function layout(an, items) {
 
   separate(placements);
   return { placements, regionIds: new Set(groups.keys()) };
+}
+
+/** How far the box's centre lies outside the region's box, in units of the region's size (0 = inside). */
+function boxOffset(rb, px) {
+  const cx = px.x + px.w / 2, cy = px.y + px.h / 2;
+  return Math.max(Math.max(rb.x - cx, cx - (rb.x + rb.w), 0) / Math.max(1, rb.w), Math.max(rb.y - cy, cy - (rb.y + rb.h), 0) / Math.max(1, rb.h));
 }
 
 function nearestRegion(regions, px) {

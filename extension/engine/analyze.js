@@ -299,7 +299,7 @@ function analyzePolarity(cv, src, gray, base, W, H, dark) {
     const touches = x <= 1 || y <= 1 || x + w >= W - 1 || y + h >= H - 1;
     // Bubbles often bleed off the page or panel edge; a background touching the
     // edge is large (and the content tests below catch what art it holds).
-    if (touches && frac > 0.08) { reject("touches the page edge"); continue; }
+    if (touches && frac > 0.2) { reject("touches the page edge"); continue; }
     if (a / (w * h) < 0.3) { reject("too ragged", { fill: a / (w * h) }); continue; } // gutters, sky between art
     // Text footprint: the blocks' union box (a vertical column of characters is
     // many small blocks) — but no larger than 3× their summed area, so two
