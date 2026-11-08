@@ -4,3 +4,5 @@ node_modules/
 tests/fixtures/*.png
 tests/*.png
 .DS_Store
+/package-lock.json
+/node_modules/
