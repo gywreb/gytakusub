@@ -86,7 +86,12 @@
     }
     if (clean && (!hyph || clean.size >= hyph.size * (opts.hyphenRatio ?? 0.75))) return clean;
     if (hyph) return hyph;
+    // Nothing fits even at the minimum size. Words are kept whole and allowed to
+    // run past the box a little (a letterer lets a long word kiss the outline)
+    // before they are ever cut letter by letter, which is unreadable.
     setFont(minSize);
+    const whole = wrapInfo(measure, text, rect.w, { hyphenate: false });
+    if (Math.max(0, ...whole.lines.map(measure)) <= rect.w * 1.3) return { size: minSize, lines: whole.lines, lineHeight: minSize * lh, hyphens: 0, overflow: true };
     const { lines } = wrapInfo(measure, text, rect.w, { force: true });
     return { size: minSize, lines, lineHeight: minSize * lh, hyphens: 0, forced: true };
   }
@@ -123,7 +128,7 @@
       // artwork it keeps the original size.
       const target = p.letter * 1.45 * (SIZE_MUL[p.size] || 1);
       const inBubble = p.tag != null && !p.halo;
-      const fit = fitText(text, p.rect, setFont, measure, { maxSize: inBubble ? target * 1.3 : target, minSize: Math.max(7, target * 0.45) });
+      const fit = fitText(text, p.rect, setFont, measure, { maxSize: inBubble ? target * 1.3 : target, minSize: Math.max(7, target * 0.35) });
       drawLines(ctx, fit, p.rect, p.color, family, p.halo);
       n++;
     }

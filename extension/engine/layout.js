@@ -60,7 +60,12 @@ export function layout(an, items) {
       // Each speaker's translation is anchored to the lettering it replaces (the
       // detector's text block nearest its box; members without a box take the
       // remaining blocks in reading order) and keeps off the other speakers' lines.
-      const anchors = assignAnchors(r.ref.blocks, members, bbox, letter);
+      // The lettering to anchor to: the bubble's text blocks, minus specks (a row
+      // of tone dots the detector read as a 4 px line next to the real text).
+      const blocks = r.ref.blocks, biggest = Math.max(...blocks.map((b) => area(b.gbox)));
+      const lettering = blocks.filter((b) => b.letter >= 0.5 * letter && area(b.gbox) >= 0.1 * biggest);
+      const anchors = assignAnchors(lettering.length ? lettering : blocks, members, bbox, letter);
+      const anchoredToLettering = anchors.map((a) => a.fromLettering === true);
       // Smaller regions lying within this shape are never written over: the
       // bubbles inside a light background that passed as a bubble, say.
       const foreign = an.regions.filter((q) => q.id !== id && area(q.box) < area(bbox) && overlap(q.box, bbox) >= 0.5 * area(q.box)).map((q) => grow(q.box, letter * 0.3));
@@ -70,15 +75,16 @@ export function layout(an, items) {
         // between the two (the waist of a joined bubble, else midway between them)
         const others = [...foreign];
         anchors.forEach((o, j) => { if (j !== i) others.push(grow(o, letter * 0.5), beyondCut(inside, bbox, a, o)); });
-        const slack = 1.5 * letter;
-        const anchored = inscribedRect(inside, bbox, { anchor: a, exclude: others, slack });
-        // A translation needs room in proportion to the lettering it replaces, not
-        // all the room the shape has: a tall open shape would otherwise centre a
-        // short line far from where it was.
-        const rect = (anchored && capAround(anchored, Math.max(3.5 * a.w, 8 * letter), Math.max(3.5 * a.h, 4 * letter), a.x + a.w / 2, a.y + a.h / 2))
+        const slack = Math.max(1.5 * letter, 0.15 * Math.min(bbox.w, bbox.h));
+        let rect = inscribedRect(inside, bbox, { anchor: a, exclude: others, slack })
           || inscribedRect(inside, bbox, { exclude: others })
           || inscribedRect(inside, bbox)
           || inset(bbox, 0.78);
+        // Invariant: the translation never gets less room than the lettering it
+        // replaces — that area is erased and is, by definition, inside the bubble.
+        // Whatever the shape analysis got wrong, the text cannot come out smaller
+        // than the original for lack of space.
+        if (anchoredToLettering[i]) rect = union([rect, clip(a, bbox)]);
         placements.push({ text: m.it.text, size: m.it.size, rect, letter, color, halo: false, tag: id, item: m.it.index ?? null });
       });
     } else {
@@ -98,6 +104,8 @@ export function layout(an, items) {
   return { placements, regionIds: new Set(groups.keys()) };
 }
 
+const union = (bs) => { const x0 = Math.min(...bs.map((b) => b.x)), y0 = Math.min(...bs.map((b) => b.y)); return { x: x0, y: y0, w: Math.max(...bs.map((b) => b.x + b.w)) - x0, h: Math.max(...bs.map((b) => b.y + b.h)) - y0 }; };
+const clip = (b, to) => { const x0 = Math.max(b.x, to.x), y0 = Math.max(b.y, to.y), x1 = Math.min(b.x + b.w, to.x + to.w), y1 = Math.min(b.y + b.h, to.y + to.h); return x1 > x0 && y1 > y0 ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : b; };
 const inBox = (b, x, y) => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h;
 const grow = (b, k) => ({ x: b.x - k, y: b.y - k, w: b.w + 2 * k, h: b.h + 2 * k });
 const area = (b) => b.w * b.h;
@@ -140,13 +148,15 @@ function nearestRegion(an, px) {
 }
 
 /**
- * One anchor rectangle per member: the text block it replaces. Members with a
- * box take the block their box overlaps most (any overlap); the rest take the
- * unclaimed blocks in reading order; beyond that, the member's own box inside
- * the bubble, else a point at the bubble's centre.
+ * One anchor rectangle per member: the lettering it replaces. A lone member
+ * takes all of the bubble's lettering. Otherwise members with a box take the
+ * block their box overlaps most (any overlap); the rest take the unclaimed
+ * blocks in reading order; beyond that, the member's own box inside the
+ * bubble, else a point at the bubble's centre.
  */
 function assignAnchors(blocks, members, bbox, letter) {
-  const free = blocks.map((b) => b.gbox).sort((a, b) => (a.y - b.y) || (a.x - b.x));
+  if (members.length === 1 && blocks.length) return [{ ...union(blocks.map((b) => b.gbox)), fromLettering: true }];
+  const free = blocks.map((b) => ({ ...b.gbox, fromLettering: true })).sort((a, b) => (a.y - b.y) || (a.x - b.x));
   const anchors = new Array(members.length).fill(null);
   // boxes first, best overlap first, so two members never claim one block
   const claims = [];
@@ -195,13 +205,6 @@ export function waist(inside, bbox, lo, hi, rows) {
   for (let p = lo; p <= hi; p += step) { const w = width(p); if (w < bestW) { bestW = w; best = p; } }
   const ends = Math.min(width(lo), width(hi));
   return ends > 0 && bestW < 0.8 * ends ? best : null;
-}
-
-/** The rectangle shrunk to at most maxW × maxH, centred as near (cx, cy) as it allows. */
-function capAround(r, maxW, maxH, cx, cy) {
-  const w = Math.min(r.w, maxW), h = Math.min(r.h, maxH);
-  const x = clamp(cx - w / 2, r.x, r.x + r.w - w), y = clamp(cy - h / 2, r.y, r.y + r.h - h);
-  return { x, y, w, h };
 }
 
 function inset(b, k) { return { x: b.x + b.w * (1 - k) / 2, y: b.y + b.h * (1 - k) / 2, w: b.w * k, h: b.h * k }; }

@@ -273,11 +273,20 @@ export function analyze(cv, img, opts = {}) {
  * not *structural* ink — ink components longer than a few letters: the outline,
  * the tail, drawn art — within a window around the shape. Tone dots, mid-greys
  * and the lettering itself are all passable; whatever those passable pixels
- * enclose is filled in. A result that reaches the window's edge (where that is
- * not the page edge), balloons past the light region or loses the shape's
- * convexity leaked through a gap in the outline and is discarded: the light
- * region stays as it was. Replaces `box` and `fill` on success; `labelId` (the
- * flat surface, used by the eraser) is untouched.
+ * enclose is filled in.
+ *
+ * Openings in the outline are handled in two ways. Structural ink is thickened
+ * by a pixel or two, so an outline drawn thinner than the downscale's
+ * anti-aliasing does not let the flood slip through a hairline gap. Then the
+ * flooded mask is opened (eroded, then dilated) by about a sixty-fifth of the
+ * page width, which cuts the channels a real opening makes — a tail whose
+ * tip is not closed, a gap where art crosses the outline — and keeps only what
+ * the light region still touches; the body of a bubble is never that thin. If
+ * what remains still reaches the window's edge (where that is not the page
+ * edge), balloons past three times the light area or loses convexity, the
+ * leak was wide and the light region stays as it was. Replaces `box` and
+ * `fill` on success; `labelId` (the flat surface, used by the eraser) is
+ * untouched.
  */
 function widenInterior(cv, P, b, W, H) {
   const { x, y, w, h } = b.box;
@@ -285,46 +294,65 @@ function widenInterior(cv, P, b, W, H) {
   const wx0 = Math.max(0, x - mx), wy0 = Math.max(0, y - my), wx1 = Math.min(W, x + w + mx), wy1 = Math.min(H, y + h + my);
   const ww = wx1 - wx0, wh = wy1 - wy0;
   if (ww < 8 || wh < 8) return;
-  // structural ink: components longer than 2.5 letters in the window
-  const roi = P.ink.roi(new cv.Rect(wx0, wy0, ww, wh)), lab = new cv.Mat(), st = new cv.Mat(), ce = new cv.Mat();
-  const n = cv.connectedComponentsWithStats(roi, lab, st, ce, 8, cv.CV_32S);
-  const S = st.data32S, Lk = lab.data32S, limit = 2.5 * Math.max(4, b.letter);
-  const big = new Uint8Array(n);
-  for (let i = 1; i < n; i++) if (Math.max(S[i * 5 + 2], S[i * 5 + 3]) > limit) big[i] = 1;
-  const pass = new cv.Mat(wh, ww, cv.CV_8UC1), pd = pass.data;
-  for (let i = 0; i < ww * wh; i++) pd[i] = big[Lk[i]] ? 0 : 255;
-  roi.delete(); lab.delete(); st.delete(); ce.delete();
-  // passable components seeded by the light region
-  const lab2 = new cv.Mat(), st2 = new cv.Mat(), ce2 = new cv.Mat();
-  const n2 = cv.connectedComponentsWithStats(pass, lab2, st2, ce2, 4, cv.CV_32S);
-  const L = P.labels.data32S, L2 = lab2.data32S, S2 = st2.data32S;
-  const seeded = new Uint8Array(n2);
-  for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) if (L[yy * W + xx] === b.labelId) seeded[L2[(yy - wy0) * ww + (xx - wx0)]] = 1;
-  seeded[0] = 0;
-  let area = 0, bx0 = ww, by0 = wh, bx1 = 0, by1 = 0;
-  for (let i = 1; i < n2; i++) if (seeded[i]) { area += S2[i * 5 + 4]; bx0 = Math.min(bx0, S2[i * 5]); by0 = Math.min(by0, S2[i * 5 + 1]); bx1 = Math.max(bx1, S2[i * 5] + S2[i * 5 + 2]); by1 = Math.max(by1, S2[i * 5 + 1] + S2[i * 5 + 3]); }
-  const leaked = (bx0 <= 0 && wx0 > 0) || (by0 <= 0 && wy0 > 0) || (bx1 >= ww && wx1 < W) || (by1 >= wh && wy1 < H) || area > 3 * b.area;
-  if (!leaked && area > 1.05 * b.area) {
-    const m = new cv.Mat(wh, ww, cv.CV_8UC1), md = m.data;
-    for (let i = 0; i < ww * wh; i++) md[i] = seeded[L2[i]] ? 255 : 0;
-    const contours = new cv.MatVector(), hier = new cv.Mat();
-    cv.findContours(m, contours, hier, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
-    let best = -1, bestA = 0, hullA = 0;
-    for (let k = 0; k < contours.size(); k++) {
-      const ct = contours.get(k), ar = cv.contourArea(ct);
-      if (ar > bestA) { bestA = ar; best = k; const hull = new cv.Mat(); cv.convexHull(ct, hull); hullA = cv.contourArea(hull); hull.delete(); }
-      ct.delete();
-    }
-    if (best >= 0 && hullA && bestA / hullA >= 0.5) {
-      m.setTo(new cv.Scalar(0)); cv.drawContours(m, contours, best, new cv.Scalar(255), -1);
+  const mats = [];
+  const mat = (m) => { mats.push(m); return m; };
+  try {
+    // structural ink: components longer than 2.5 letters in the window, thickened
+    const roi = mat(P.ink.roi(new cv.Rect(wx0, wy0, ww, wh))), lab = mat(new cv.Mat()), st = mat(new cv.Mat()), ce = mat(new cv.Mat());
+    const n = cv.connectedComponentsWithStats(roi, lab, st, ce, 8, cv.CV_32S);
+    const S = st.data32S, Lk = lab.data32S, limit = 2.5 * Math.max(4, b.letter);
+    const big = new Uint8Array(n);
+    for (let i = 1; i < n; i++) if (Math.max(S[i * 5 + 2], S[i * 5 + 3]) > limit) big[i] = 1;
+    const structural = mat(new cv.Mat(wh, ww, cv.CV_8UC1)), sd = structural.data;
+    for (let i = 0; i < ww * wh; i++) sd[i] = big[Lk[i]] ? 255 : 0;
+    const seal = mat(cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(W > 1200 ? 5 : 3, W > 1200 ? 5 : 3)));
+    cv.dilate(structural, structural, seal);
+    const pass = mat(new cv.Mat()); cv.bitwise_not(structural, pass);
+    // passable components seeded by the light region
+    const lab2 = mat(new cv.Mat()), st2 = mat(new cv.Mat()), ce2 = mat(new cv.Mat());
+    const n2 = cv.connectedComponentsWithStats(pass, lab2, st2, ce2, 4, cv.CV_32S);
+    const L = P.labels.data32S, L2 = lab2.data32S;
+    const seeded = new Uint8Array(n2);
+    const isSeed = (xx, yy) => xx >= x && yy >= y && xx < x + w && yy < y + h && L[yy * W + xx] === b.labelId;
+    for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) if (L[yy * W + xx] === b.labelId) seeded[L2[(yy - wy0) * ww + (xx - wx0)]] = 1;
+    seeded[0] = 0;
+    const flood = mat(new cv.Mat(wh, ww, cv.CV_8UC1)), fd = flood.data;
+    for (let i = 0; i < ww * wh; i++) fd[i] = seeded[L2[i]] ? 255 : 0;
+    // cut thin channels: open, keep what the light region touches, grow back within the flood
+    const cut = Math.max(7, Math.min(25, Math.round(W / 65))) | 1; // an open tail tip is ~10 px at 850 px; a bubble body is never that thin
+    const k = mat(cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(cut, cut)));
+    const opened = mat(new cv.Mat()); cv.morphologyEx(flood, opened, cv.MORPH_OPEN, k);
+    const lab3 = mat(new cv.Mat()), st3 = mat(new cv.Mat()), ce3 = mat(new cv.Mat());
+    const n3 = cv.connectedComponentsWithStats(opened, lab3, st3, ce3, 4, cv.CV_32S);
+    const L3 = lab3.data32S, keep = new Uint8Array(n3);
+    for (let yy = 0; yy < wh; yy++) for (let xx = 0; xx < ww; xx++) { const l = L3[yy * ww + xx]; if (l && !keep[l] && isSeed(wx0 + xx, wy0 + yy)) keep[l] = 1; }
+    const body = mat(new cv.Mat(wh, ww, cv.CV_8UC1)), bd = body.data;
+    for (let i = 0; i < ww * wh; i++) bd[i] = keep[L3[i]] ? 255 : 0;
+    cv.dilate(body, body, k); cv.bitwise_and(body, flood, body);
+    // leak guard on what remains
+    let area = 0, bx0 = ww, by0 = wh, bx1 = 0, by1 = 0;
+    for (let yy = 0; yy < wh; yy++) for (let xx = 0; xx < ww; xx++) if (bd[yy * ww + xx]) { area++; if (xx < bx0) bx0 = xx; if (xx + 1 > bx1) bx1 = xx + 1; if (yy < by0) by0 = yy; if (yy + 1 > by1) by1 = yy + 1; }
+    const edge = (bx0 <= 0 && wx0 > 0) || (by0 <= 0 && wy0 > 0) || (bx1 >= ww && wx1 < W) || (by1 >= wh && wy1 < H);
+    if (edge || area > 3 * b.area) { trace("bubble", b.box, "interior not widened", { edge, area, light: b.area, ratio: area / b.area }); return; }
+    if (area <= 1.05 * b.area) return;
+    const contours = new cv.MatVector(), hier = mat(new cv.Mat());
+    try {
+      cv.findContours(body, contours, hier, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+      let best = -1, bestA = 0, hullA = 0;
+      for (let i = 0; i < contours.size(); i++) {
+        const ct = contours.get(i), ar = cv.contourArea(ct);
+        if (ar > bestA) { bestA = ar; best = i; const hull = new cv.Mat(); cv.convexHull(ct, hull); hullA = cv.contourArea(hull); hull.delete(); }
+        ct.delete();
+      }
+      if (best < 0 || !hullA) return;
+      if (bestA / hullA < 0.5) { trace("bubble", b.box, "interior not widened", { solidity: bestA / hullA }); return; }
+      body.setTo(new cv.Scalar(0)); cv.drawContours(body, contours, best, new cv.Scalar(255), -1);
       const ct = contours.get(best), r = cv.boundingRect(ct); ct.delete();
       const fill = new Uint8Array(r.width * r.height);
-      for (let yy = 0; yy < r.height; yy++) for (let xx = 0; xx < r.width; xx++) fill[yy * r.width + xx] = md[(r.y + yy) * ww + r.x + xx];
+      for (let yy = 0; yy < r.height; yy++) for (let xx = 0; xx < r.width; xx++) fill[yy * r.width + xx] = bd[(r.y + yy) * ww + r.x + xx];
       b.lightBox = b.box; b.interiorArea = bestA; b.widened = true;
       b.box = { x: wx0 + r.x, y: wy0 + r.y, w: r.width, h: r.height };
       b.fill = fill;
-    }
-    contours.delete(); hier.delete(); m.delete();
-  }
-  pass.delete(); lab2.delete(); st2.delete(); ce2.delete();
+    } finally { contours.delete(); }
+  } finally { for (const m of mats) m.delete(); }
 }

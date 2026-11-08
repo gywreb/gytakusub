@@ -13,7 +13,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import { createCanvas, loadImage } from "canvas";
+import { createCanvas, loadImage, registerFont } from "canvas";
 import { cv, detector } from "./cv-node.mjs";
 import { analyze } from "../extension/engine/analyze.js";
 import { layout } from "../extension/engine/layout.js";
@@ -23,8 +23,23 @@ const verbose = args.includes("--verbose");
 const zips = args.filter((a) => a.endsWith(".zip"));
 if (!zips.length) { console.error("usage: node layout-score.mjs <report.zip> [...] [--verbose]"); process.exit(2); }
 
+// the page-side text fitter, to measure what size the text really ends up at
+registerFont("../extension/fonts/ComicNeue-Bold.ttf", { family: "Gytakusub Comic", weight: "bold" });
+new Function(fs.readFileSync("../extension/vendor/hyphen-en.js", "utf8"))();
+new Function(fs.readFileSync("../extension/text.js", "utf8"))();
+const GyText = globalThis.GyText;
+const fitCanvas = createCanvas(10, 10), fitCtx = fitCanvas.getContext("2d");
+const SIZE_MUL = { small: 0.8, normal: 1, large: 1.3 };
+/** Rendered font size relative to the original letter height (1 = same size as the original lettering), plus how the fit ended. */
+function rendered(p) {
+  const target = p.letter * 1.45 * (SIZE_MUL[p.size] || 1), inBubble = p.tag != null && !p.halo;
+  const setFont = (size) => { fitCtx.font = `bold ${size}px "Gytakusub Comic"`; }, measure = (t) => fitCtx.measureText(t).width;
+  const fit = GyText.fitText(p.text, p.rect, setFont, measure, { maxSize: inBubble ? target * 1.3 : target, minSize: Math.max(7, target * 0.35) });
+  return { ratio: fit.size / (p.letter * 1.45), forced: !!fit.forced, overflow: !!fit.overflow, hyphens: fit.hyphens || 0 };
+}
+
 const inter = (a, b) => Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
-const tot = { pages: 0, placements: 0, bubble: 0, anchored: 0, roomy: 0, fill: 0, covers: 0, loose: 0, tiny: 0, centreOut: 0, multi: 0, multiDistinct: 0, ms: 0 };
+const tot = { pages: 0, placements: 0, bubble: 0, anchored: 0, roomy: 0, fill: 0, covers: 0, loose: 0, tiny: 0, centreOut: 0, multi: 0, multiDistinct: 0, ms: 0, ratios: [], small: 0, forced: 0, overflow: 0, hyphens: 0 };
 const seen = new Set();
 
 
@@ -70,6 +85,9 @@ for (const zipPath of zips) {
     const byRegion = new Map();
     for (const p of placements) {
       tot.placements++;
+      const r0 = rendered(p);
+      tot.ratios.push(r0.ratio); if (r0.ratio < 0.7) tot.small++; if (r0.forced) tot.forced++; if (r0.overflow) tot.overflow++; tot.hyphens += r0.hyphens;
+      if (verbose && (r0.ratio < 0.7 || r0.forced)) console.log(`  ${path.basename(zipPath)} page ${pg.id} ${r0.forced ? "FORCED-BREAK" : "SMALL " + r0.ratio.toFixed(2)} rect=${JSON.stringify({ x: Math.round(p.rect.x), y: Math.round(p.rect.y), w: Math.round(p.rect.w), h: Math.round(p.rect.h) })} letter=${p.letter.toFixed(1)} "${p.text.slice(0, 40)}"`);
       if (p.covers = unerased.some((b) => inter(p.rect, b.gbox) > 0.2 * b.gbox.w * b.gbox.h)) tot.covers++;
       if (p.tag == null || p.halo) { tot.loose++; continue; }
       const r = an.regions.find((q) => q.id === p.tag);
@@ -96,4 +114,7 @@ console.log(`pages ${tot.pages}, placements ${tot.placements} (loose/halo ${tot.
 console.log(`  anchored to own lettering: ${pct(tot.anchored, tot.bubble)}   roomy (≥ lettering box): ${pct(tot.roomy, tot.bubble)}   mean fill of bubble: ${pct(tot.fill, tot.bubble)}`);
 console.log(`  rect centre outside shape: ${tot.centreOut}   narrow (< 3 letters): ${tot.tiny}   covers un-erased lettering: ${tot.covers}`);
 console.log(`  shared bubbles: ${tot.multi} placements, each over its own line: ${pct(tot.multiDistinct, tot.multi)}`);
+const sorted = tot.ratios.slice().sort((a, b) => a - b), q = (f) => (sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(f * sorted.length))].toFixed(2) : "n/a");
+console.log(`  rendered size / original letter: median ${q(0.5)}, 10th percentile ${q(0.1)}, below 0.7: ${tot.small} (${pct(tot.small, tot.placements)})`);
+console.log(`  fits: letter-broken ${tot.forced}, whole-word overflow ${tot.overflow}, hyphenated lines ${tot.hyphens}`);
 console.log(`  analysis ${tot.pages ? Math.round(tot.ms / tot.pages) : 0} ms/page`);
