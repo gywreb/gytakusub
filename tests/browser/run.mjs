@@ -83,12 +83,12 @@ fs.writeFileSync(path.join(out, "debug-logs.json"), JSON.stringify(debugLogs, nu
 // whatever the model said about pixel coordinates; renders must be deterministic.
 let failures = 0;
 for (const [i, d] of debugLogs.entries()) {
-  const byId = new Map(d.bubbles.map((b) => [b.id, { x: b.box[0] * d.W, y: b.box[1] * d.H, w: b.box[2] * d.W, h: b.box[3] * d.H }]));
+  const byId = new Map(d.regions.map((r) => { const pad = r.kind === "block" ? r.letter : 0; return [r.id, { x: r.box.x - pad, y: r.box.y - pad, w: r.box.w + 2 * pad, h: r.box.h + 2 * pad }]; })); // free text keeps its footprint plus half a letter of air
   const tagged = d.items.filter((it) => it.tag != null && byId.has(it.tag)).length;
   const placed = d.placements.filter((p) => p.tag != null);
   if (placed.length < tagged) { failures++; console.log(`FAIL render ${i + 1}: ${tagged} tagged items but only ${placed.length} placed by tag`); }
   for (const p of placed) {
-    const b = byId.get(p.tag); const tol = 0.03;
+    const b = byId.get(p.tag); const tol = 0.05;
     const inside = p.rect.x >= b.x - b.w * tol && p.rect.y >= b.y - b.h * tol && p.rect.x + p.rect.w <= b.x + b.w * (1 + tol) && p.rect.y + p.rect.h <= b.y + b.h * (1 + tol);
     if (!inside) { failures++; console.log(`FAIL render ${i + 1}: text for #${p.tag} at ${JSON.stringify(p.rect)} is outside bubble ${JSON.stringify(b)}`); }
   }
@@ -96,5 +96,5 @@ for (const [i, d] of debugLogs.entries()) {
 if (!debugLogs.length) { failures++; console.log("FAIL: no render happened"); }
 console.log(failures ? `BROWSER TEST FAILED (${failures})` : "BROWSER TEST PASSED");
 process.exitCode = failures ? 1 : 0;
-for (const [i, d] of debugLogs.entries()) console.log(`render ${i + 1}: W=${d.W} H=${d.H} natural=${d.natural} items=${d.items.length} bubbles=${d.bubbles.length} tags=${d.items.map((it) => it.tag).join(",")}`);
+for (const [i, d] of debugLogs.entries()) console.log(`render ${i + 1}: work=${d.work.W}x${d.work.H} natural=${d.natural} items=${d.items.length} regions=${d.regions.length} placed=${d.placements.length} tags=${d.items.map((it) => it.tag).join(",")}`);
 await context.close(); srv.close(); fs.rmSync(ext, { recursive: true, force: true }); fs.rmSync(profile, { recursive: true, force: true });

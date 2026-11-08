@@ -34,3 +34,17 @@ bubble.js, typeset.js, prompt.js   shared engine (copied from ../extension — r
 sw.js, manifest.webmanifest        PWA shell
 worker.js                          optional Cloudflare image proxy
 ```
+
+## Running locally
+
+The engine, vendored libraries (OpenCV.js, hyphen), `prompt.js`, `text.js`, fonts
+and icons are shared with the extension and are **not** committed under `web/`.
+Copy them in first, then serve the folder (it needs a server because of the
+module worker and wasm):
+
+```sh
+./scripts/sync-shared.sh
+cd web && python3 -m http.server 8080
+```
+
+GitHub Pages runs the same sync step before deploying.

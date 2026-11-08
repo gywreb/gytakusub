@@ -1,14 +1,13 @@
 // Gytakusub – background service worker.
-// Responsibilities: fetch image bytes (bypassing page CORS), downscale/slice,
-// detect speech-bubble candidates locally and stamp numbered marks on them
-// (set-of-mark prompting), call the Claude Messages API with vision, cache
-// results, keep per-tab glossary context, and relay keyboard commands.
+// Responsibilities: fetch image bytes (bypassing page CORS), run the page
+// engine (OpenCV analysis, numbered stamps for set-of-mark prompting, erase +
+// layout after the model answers), call the Claude Messages API with vision,
+// cache translations, keep per-tab glossary context, relay keyboard commands.
 
-import "./bubble.js"; // defines globalThis.GyT
-import { callClaude, normalizeItems, stampMarks, candidatesToBubbles, sliceGeometry, mergeContext, apiHeaders, API_URL } from "./prompt.js";
-const G = globalThis.GyT;
+import { callClaude, mergeContext, apiHeaders, API_URL } from "./prompt.js";
+import { preparePage, finishPage } from "./engine/page.js";
 
-const PROMPT_VERSION = 4; // bump when the prompt/coordinate format changes so old cache entries are ignored
+const PROMPT_VERSION = 5; // bump when the prompt/coordinate format changes so old cache entries are ignored
 
 export const DEFAULT_SETTINGS = {
   enabled: true, // master switch
@@ -50,7 +49,7 @@ async function updateBadge() {
 // sites the user enabled, and injected on demand elsewhere (popup / hotkey).
 
 const CS_ID = "gytakusub-main";
-const CS_FILES = ["bubble.js", "typeset.js", "content.js"];
+const CS_FILES = ["vendor/hyphen-en.js", "text.js", "content.js"];
 
 function hostPatterns(hosts) {
   const out = [];
@@ -122,29 +121,9 @@ async function sha1(str) {
 
 // Returns slices with the image bytes Claude will see (bubbles stamped with
 // numbered marks) plus the detected bubble candidates in full-image fractions.
-async function prepareSlices(blob, settings) {
+async function decode(blob) {
   const bitmap = await createImageBitmap(blob);
-  const W = bitmap.width, H = bitmap.height;
-  const slices = [];
-  const bubbles = [];
-  for (const s of sliceGeometry(W, H, settings)) {
-    const cw = Math.max(1, Math.round(s.w * s.scale));
-    const ch = Math.max(1, Math.round(s.h * s.scale));
-    const canvas = new OffscreenCanvas(cw, ch);
-    const ctx = canvas.getContext("2d", { willReadFrequently: true });
-    ctx.fillStyle = "#fff";
-    ctx.fillRect(0, 0, cw, ch);
-    ctx.drawImage(bitmap, s.x, s.y, s.w, s.h, 0, 0, cw, ch);
-    const cands = G.detectBubbles(ctx.getImageData(0, 0, cw, ch));
-    const firstId = bubbles.length + 1;
-    bubbles.push(...candidatesToBubbles(cands, s, cw, ch, W, H, firstId));
-    stampMarks(ctx, cands, cw, firstId);
-    const jpeg = await canvas.convertToBlob({ type: "image/jpeg", quality: 0.82 });
-    const dataUrl = await blobToDataUrl(jpeg);
-    slices.push({ b64: dataUrl.split(",")[1], mediaType: "image/jpeg", x: s.x, y: s.y, w: s.w, h: s.h, cw, ch, tagFrom: firstId, tagTo: firstId + cands.length - 1 });
-  }
-  bitmap.close();
-  return { slices, bubbles, width: W, height: H };
+  try { return await preparePage(bitmap, await getSettings()); } finally { bitmap.close(); }
 }
 
 // ---------- per-tab chapter context (names + recent dialogue) ----------
@@ -191,45 +170,40 @@ async function handleTranslate(msg, sender) {
     return blob;
   };
 
-  // Cache holds the translation only (not the image bytes, which would exhaust
-  // storage.session after a few pages); bytes are re-fetched on a hit.
-  if (cached && !msg.force) {
-    const blob = await fetchBytes();
-    return { ...cached, imageDataUrl: msg.dataUrl || (await blobToDataUrl(blob)), fromCache: true };
-  }
+  // Cache holds the model's answer only (not image bytes, which would exhaust
+  // storage.session after a few pages); the page is re-analysed on a hit.
   const blob = await fetchBytes();
+  const job = await decode(blob);
+  let results, usage, newTerms = [];
+  if (cached && !msg.force) {
+    results = cached.results; usage = cached.usage;
+  } else {
+    const ctx = await getTabCtx(tabId);
+    const withRetry = async (slice) => {
+      try { return await callClaude(settings, slice, ctx); }
+      catch (e) {
+        if (/Claude API (429|529|503)/.test(e.message)) { await new Promise((r) => setTimeout(r, 2500)); return callClaude(settings, slice, ctx); }
+        throw e;
+      }
+    };
+    const raw = await Promise.all(job.slices.map(withRetry));
+    results = raw.map((r) => ({ items: r.items }));
+    usage = { input_tokens: 0, output_tokens: 0 };
+    for (const r of raw) { newTerms.push(...r.terms); if (r.usage) { usage.input_tokens += r.usage.input_tokens || 0; usage.output_tokens += r.usage.output_tokens || 0; } }
+    try { await chrome.storage.session.set({ [cacheKey]: { results, usage } }); }
+    catch (e) { console.warn("Gytakusub: cache write failed", e); }
+  }
 
-  // 2. prepare (downscale, detect bubbles, stamp marks)
-  const { slices, bubbles, width, height } = await prepareSlices(blob, settings);
-
-  // 3. translate each slice (slices of one strip run in parallel)
-  const ctx = await getTabCtx(tabId);
-  const withRetry = async (slice) => {
-    try { return await callClaude(settings, slice, ctx); }
-    catch (e) {
-      if (/Claude API (429|529|503)/.test(e.message)) { await new Promise((r) => setTimeout(r, 2500)); return callClaude(settings, slice, ctx); }
-      throw e;
-    }
+  const page = await finishPage(job, results);
+  if (tabId >= 0 && newTerms.length) await updateTabCtx(tabId, newTerms, page.items.map((i) => i.text));
+  else if (tabId >= 0 && !cached) await updateTabCtx(tabId, [], page.items.map((i) => i.text));
+  const big = page.work.W * page.work.H > 2.6e6;
+  const cleanBlob = await page.canvas.convertToBlob(big ? { type: "image/jpeg", quality: 0.92 } : { type: "image/png" });
+  return {
+    items: page.items, placements: page.placements, regions: page.regions, letter: page.letter,
+    work: page.work, width: job.width, height: job.height, usage,
+    cleanDataUrl: await blobToDataUrl(cleanBlob), fromCache: !!(cached && !msg.force),
   };
-  const results = await Promise.all(slices.map(withRetry));
-
-  const items = [];
-  const usage = { input_tokens: 0, output_tokens: 0 };
-  const newTerms = [];
-  slices.forEach((s, idx) => {
-    const r = results[idx];
-    items.push(...normalizeItems(r.items, s, width, height));
-    newTerms.push(...r.terms);
-    if (r.usage) { usage.input_tokens += r.usage.input_tokens || 0; usage.output_tokens += r.usage.output_tokens || 0; }
-  });
-  if (tabId >= 0) await updateTabCtx(tabId, newTerms, items.map((i) => i.text));
-
-  // 4. the content script needs the pixels for painting; hand back the original bytes
-  const originalDataUrl = msg.dataUrl || (await blobToDataUrl(blob));
-  const cacheable = { items, bubbles, width, height, usage };
-  try { await chrome.storage.session.set({ [cacheKey]: cacheable }); }
-  catch (e) { console.warn("Gytakusub: cache write failed", e); }
-  return { ...cacheable, imageDataUrl: originalDataUrl };
 }
 
 async function testKey() {

@@ -1,9 +1,21 @@
-// Gytakusub Web – translation pipeline in the browser main thread.
-// Mirrors the extension's background worker: downscale/slice, detect bubbles,
-// stamp marks, call Claude, normalise, then typeset onto a canvas.
-import { callClaude, normalizeItems, stampMarks, candidatesToBubbles, sliceGeometry, mergeContext, apiHeaders, API_URL } from "./prompt.js";
+// Gytakusub Web – translation pipeline. The page engine (OpenCV analysis,
+// stamps, erase, layout) runs in engine-worker.js; this module calls Claude
+// and draws the text, mirroring the extension's service worker + content script.
+import { callClaude, mergeContext, apiHeaders, API_URL } from "./prompt.js";
 
-const G = globalThis.GyT;
+const GyText = globalThis.GyText;
+
+let worker = null, seq = 0;
+const pending = new Map();
+function rpc(msg, transfer = []) {
+  if (!worker) {
+    worker = new Worker("./engine-worker.js", { type: "module" });
+    worker.onmessage = (e) => { const p = pending.get(e.data.id); if (!p) return; pending.delete(e.data.id); e.data.ok ? p.res(e.data) : p.rej(new Error(e.data.error)); };
+    worker.onerror = (e) => { for (const p of pending.values()) p.rej(new Error(e.message || "engine worker failed")); pending.clear(); };
+  }
+  const id = ++seq;
+  return new Promise((res, rej) => { pending.set(id, { res, rej }); worker.postMessage({ id, ...msg }, transfer); });
+}
 
 export const DEFAULT_SETTINGS = {
   apiKey: "",
@@ -40,13 +52,6 @@ export function loadImage(src) {
   return new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error("Could not decode image")); im.src = src; });
 }
 
-function canvasToJpegB64(canvas, quality = 0.82) {
-  return new Promise((res, rej) => canvas.toBlob(async (b) => {
-    if (!b) return rej(new Error("toBlob failed"));
-    res((await blobToDataUrl(b)).split(",")[1]);
-  }, "image/jpeg", quality));
-}
-
 /** Fetch an image, optionally through the configured CORS proxy. */
 export async function fetchImageBlob(url, settings) {
   const attempt = async (u) => {
@@ -66,51 +71,34 @@ export async function fetchImageBlob(url, settings) {
  * @param {HTMLImageElement} img  decoded page
  * @param {object} settings
  * @param {{terms:Array, recent:Array}} ctx  chapter context (mutated via return)
- * @returns {{items, bubbles, width, height, usage, ctx}}
+ * @returns {{items, placements, regions, work, letter, clean:ImageBitmap, width, height, usage, ctx}}
  */
 export async function translateImage(img, settings, ctx = { terms: [], recent: [] }) {
   if (!settings.apiKey) throw new Error("No API key set — open Settings (⚙) and paste your Claude API key.");
-  const W = img.naturalWidth, H = img.naturalHeight;
-  const slices = [], bubbles = [];
-  for (const s of sliceGeometry(W, H, settings)) {
-    const cw = Math.max(1, Math.round(s.w * s.scale)), ch = Math.max(1, Math.round(s.h * s.scale));
-    const c = document.createElement("canvas"); c.width = cw; c.height = ch;
-    const cx = c.getContext("2d", { willReadFrequently: true });
-    cx.fillStyle = "#fff"; cx.fillRect(0, 0, cw, ch);
-    cx.drawImage(img, s.x, s.y, s.w, s.h, 0, 0, cw, ch);
-    const cands = G.detectBubbles(cx.getImageData(0, 0, cw, ch));
-    const firstId = bubbles.length + 1;
-    bubbles.push(...candidatesToBubbles(cands, s, cw, ch, W, H, firstId));
-    stampMarks(cx, cands, cw, firstId);
-    slices.push({ b64: await canvasToJpegB64(c), mediaType: "image/jpeg", x: s.x, y: s.y, w: s.w, h: s.h, cw, ch, tagFrom: firstId, tagTo: firstId + cands.length - 1 });
-  }
-  const results = await Promise.all(slices.map((s) => callClaude(settings, s, ctx)));
-  const items = [], terms = [];
+  const bitmap = await createImageBitmap(img);
+  const prep = await rpc({ type: "prepare", bitmap, settings: { maxLongEdge: settings.maxLongEdge, stripWidth: settings.stripWidth, sliceHeight: settings.sliceHeight } }, [bitmap]);
+  let results;
+  try { results = await Promise.all(prep.slices.map((s) => callClaude(settings, s, ctx))); }
+  catch (e) { rpc({ type: "drop", jobId: prep.jobId }).catch(() => {}); throw e; }
+  const terms = [];
   const usage = { input_tokens: 0, output_tokens: 0 };
-  slices.forEach((s, i) => {
-    items.push(...normalizeItems(results[i].items, s, W, H));
-    terms.push(...results[i].terms);
-    if (results[i].usage) { usage.input_tokens += results[i].usage.input_tokens || 0; usage.output_tokens += results[i].usage.output_tokens || 0; }
-  });
-  return { items, bubbles, width: W, height: H, usage, ctx: mergeContext(ctx, terms, items.map((i) => i.text)) };
+  for (const r of results) { terms.push(...r.terms); if (r.usage) { usage.input_tokens += r.usage.input_tokens || 0; usage.output_tokens += r.usage.output_tokens || 0; } }
+  const fin = await rpc({ type: "finish", jobId: prep.jobId, results: results.map((r) => ({ items: r.items })) });
+  return { items: fin.items, placements: fin.placements, regions: fin.regions, work: fin.work, letter: fin.letter, clean: fin.clean, width: prep.width, height: prep.height, usage, ctx: mergeContext(ctx, terms, fin.items.map((i) => i.text)) };
 }
 
 /**
- * Render original + overlay into two canvases at a capped resolution.
+ * Render original + translated canvases at the engine's working resolution.
  * @returns {{original:HTMLCanvasElement, translated:HTMLCanvasElement, drawn:number}}
  */
-export function renderPage(img, result, settings, maxEdge = 2200) {
-  const scale = Math.min(1, maxEdge / Math.max(img.naturalWidth, img.naturalHeight));
-  const W = Math.max(1, Math.round(img.naturalWidth * scale)), H = Math.max(1, Math.round(img.naturalHeight * scale));
+export function renderPage(img, result, settings) {
+  const { W, H } = result.work;
   const original = document.createElement("canvas"); original.width = W; original.height = H;
-  const octx = original.getContext("2d", { willReadFrequently: true });
-  octx.drawImage(img, 0, 0, W, H);
-  const pixels = octx.getImageData(0, 0, W, H);
-  const overlay = document.createElement("canvas"); overlay.width = W; overlay.height = H;
-  const { drawn } = G.typeset(overlay.getContext("2d"), pixels, result, W, H, { fontFamily: settings.fontFamily, uppercase: settings.uppercase });
+  original.getContext("2d").drawImage(img, 0, 0, W, H);
   const translated = document.createElement("canvas"); translated.width = W; translated.height = H;
   const tctx = translated.getContext("2d");
-  tctx.drawImage(original, 0, 0); tctx.drawImage(overlay, 0, 0);
+  tctx.drawImage(result.clean, 0, 0);
+  const drawn = GyText.draw(tctx, result.placements, { fontFamily: settings.fontFamily, uppercase: settings.uppercase });
   return { original, translated, drawn };
 }
 

@@ -21,7 +21,8 @@ if (out("git status --porcelain")) { console.error("Working tree not clean — c
 if (out("git rev-parse --abbrev-ref HEAD") !== "main") { console.error("Switch to main first."); process.exit(1); }
 
 // 1. sync shared files (extension/ is canonical)
-for (const f of ["bubble.js", "typeset.js", "prompt.js"]) fs.copyFileSync(`extension/${f}`, `web/${f}`);
+for (const f of ["prompt.js", "text.js"]) fs.copyFileSync(`extension/${f}`, `web/${f}`);
+for (const d of ["engine", "vendor"]) { fs.rmSync(`web/${d}`, { recursive: true, force: true }); fs.cpSync(`extension/${d}`, `web/${d}`, { recursive: true }); }
 for (const f of fs.readdirSync("extension/icons")) if (/^icon\d+\.png$/.test(f)) fs.copyFileSync(`extension/icons/${f}`, `web/icons/${f}`);
 fs.mkdirSync("web/fonts", { recursive: true });
 for (const f of fs.readdirSync("extension/fonts")) fs.copyFileSync(`extension/fonts/${f}`, `web/fonts/${f}`);

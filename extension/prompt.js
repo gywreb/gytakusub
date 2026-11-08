@@ -91,36 +91,6 @@ export function normalizeItems(rawItems, s, width, height) {
   return items;
 }
 
-/** Stamp numbered marks on a slice canvas context for the given candidates. */
-export function stampMarks(ctx, cands, cw, firstId) {
-  const r = Math.max(9, Math.round(cw / 70));
-  ctx.font = `bold ${Math.round(r * 1.25)}px sans-serif`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  cands.forEach((c, i) => {
-    const cx = c.bbox.x + r + 1, cy = c.bbox.y + r + 1;
-    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.fillStyle = "#e11d48"; ctx.fill();
-    ctx.lineWidth = Math.max(1, r / 6); ctx.strokeStyle = "#fff"; ctx.stroke();
-    ctx.fillStyle = "#fff"; ctx.fillText(String(firstId + i), cx, cy + r * 0.05);
-  });
-}
-
-/** Convert detector candidates on a slice to full-image fraction records. */
-export function candidatesToBubbles(cands, s, cw, ch, width, height, firstId) {
-  const toOrigX = s.w / cw, toOrigY = s.h / ch;
-  return cands.map((c, i) => ({
-    id: firstId + i,
-    box: [(s.x + c.bbox.x * toOrigX) / width, (s.y + c.bbox.y * toOrigY) / height, (c.bbox.w * toOrigX) / width, (c.bbox.h * toOrigY) / height],
-    centroid: [(s.x + c.centroid.x * toOrigX) / width, (s.y + c.centroid.y * toOrigY) / height],
-    areaFrac: (c.area * toOrigX * toOrigY) / (width * height),
-    color: c.color, rows: c.rows, cols: c.cols,
-    blockW: (c.scale * toOrigX) / width, blockH: (c.scale * toOrigY) / height,
-    fillRatio: c.fillRatio,
-  }));
-}
-
-/** Slice geometry for a page: one slice, or several for tall strips. */
 export function sliceGeometry(W, H, settings) {
   const isStrip = H > 2.2 * W && H > settings.sliceHeight;
   const out = [];

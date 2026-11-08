@@ -3,17 +3,22 @@
   "private": true,
   "type": "commonjs",
   "scripts": {
-    "test": "node unit.test.mjs && node eraser-test.mjs && node extension-e2e.cjs fixtures/demo-page.png /tmp/gyt-e2e.png fixtures/demo-items.json && node web-e2e.mjs fixtures/demo-page.png /tmp/gyt-web-e2e.png",
-    "detect": "node detect.cjs",
-    "e2e:extension": "node extension-e2e.cjs",
-    "e2e:web": "node web-e2e.mjs",
+    "test": "node engine.test.mjs",
+    "test:browser": "node browser/run.mjs --out /tmp/gyt-browser/good && node browser/run.mjs --bad-boxes --out /tmp/gyt-browser/bad-boxes",
+    "e2e": "node engine-e2e.mjs fixtures/demo-page.png fixtures/demo-items.json /tmp/gyt-e2e.png",
+    "viz": "node engine-viz.mjs",
     "demo": "python3 make-demo-page.py fixtures",
-    "stress": "node typeset-stress.mjs typeset-stress.png",
     "assets": "node make-store-assets.mjs ../store/assets",
-    "test:browser": "node browser/run.mjs --out /tmp/gyt-browser/good && node browser/run.mjs --bad-boxes --out /tmp/gyt-browser/bad-boxes"
+    "vendor": "node ../scripts/vendor-opencv.mjs && node ../scripts/vendor-hyphen.mjs"
   },
   "devDependencies": {
     "canvas": "^3.1.0",
-    "playwright": "^1.65.0"
+    "playwright": "^1.65.0",
+    "opencv-bindings": "4.5.5",
+    "hyphen": "^1.14.1"
+  },
+  "dependencies": {
+    "hyphen": "^1.14.1",
+    "opencv-bindings": "^4.5.5"
   }
 }

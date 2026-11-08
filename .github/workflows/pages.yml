@@ -2,7 +2,7 @@ name: Deploy web app to GitHub Pages
 on:
   push:
     branches: [main]
-    paths: ["web/**", ".github/workflows/pages.yml"]
+    paths: ["web/**", "extension/engine/**", "extension/vendor/**", "extension/prompt.js", "extension/text.js", "extension/fonts/**", "extension/icons/**", ".github/workflows/pages.yml"]
   workflow_dispatch:
 permissions:
   contents: read
@@ -19,9 +19,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Check shared files are in sync
-        run: |
-          for f in bubble.js typeset.js prompt.js fonts/ComicNeue-Bold.ttf; do cmp "extension/$f" "web/$f" || { echo "::error::web/$f differs from extension/$f — run scripts/sync-shared.sh"; exit 1; }; done
+      # The engine, vendored libraries, prompt/text modules, fonts and icons are
+      # shared with the extension (extension/ is canonical) and copied in here
+      # rather than committed twice.
+      - run: ./scripts/sync-shared.sh
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

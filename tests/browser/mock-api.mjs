@@ -6,11 +6,10 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createCanvas, loadImage } from "canvas";
+import { cv } from "../cv-node.mjs";
+import { analyze } from "../../extension/engine/analyze.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const root = path.resolve(here, "../..");
-new Function(fs.readFileSync(path.join(root, "extension/bubble.js"), "utf8"))();
-const G = globalThis.GyT;
 
 const TEXTS = ["I never thought it would come to this.", "Wait!", "Are you sure about that?", "We leave at dawn. No excuses.",
   "That's impossible...", "Behind you!", "Fine. Have it your way.", "Nobody told me anything about a test.", "Hm.", "Run."];
@@ -36,15 +35,17 @@ export function startMock(port, pageImage, opts = {}) {
       const imgPart = content.find((c) => c.type === "image");
       const img = await loadImage(Buffer.from(imgPart.source.data, "base64"));
       const c = createCanvas(img.width, img.height); const ctx = c.getContext("2d"); ctx.drawImage(img, 0, 0);
-      const cands = G.detectBubbles(ctx.getImageData(0, 0, img.width, img.height));
+      // "read" the stamps the way the model would: the engine's own regions, in order
+      const an = analyze(cv, ctx.getImageData(0, 0, img.width, img.height));
       const m = prompt.match(/\((\d+)[–-](\d+)\)/); const tagFrom = m ? +m[1] : 1;
-      const items = cands.map((cd, i) => ({
+      const items = an.regions.map((r, i) => ({
         tag: tagFrom + i, kind: "bubble", size: "normal", text: TEXTS[i % TEXTS.length],
         // badBoxes: correct tag, but the box drifts like a model that is weak at pixel coordinates
         box: opts.badBoxes
-          ? [Math.round(cd.bbox.x + cd.bbox.w * 0.9), Math.round(cd.bbox.y + cd.bbox.h * 1.1), Math.round(cd.bbox.w * 1.3), Math.round(cd.bbox.h * 1.1)]
-          : [Math.round(cd.bbox.x + cd.bbox.w * 0.2), Math.round(cd.bbox.y + cd.bbox.h * 0.25), Math.round(cd.bbox.w * 0.6), Math.round(cd.bbox.h * 0.5)],
+          ? [Math.round(r.box.x + r.box.w * 0.9), Math.round(r.box.y + r.box.h * 1.1), Math.round(r.box.w * 1.3), Math.round(r.box.h * 1.1)]
+          : [Math.round(r.box.x + r.box.w * 0.2), Math.round(r.box.y + r.box.h * 0.25), Math.round(r.box.w * 0.6), Math.round(r.box.h * 0.5)],
       }));
+      an.dispose();
       calls.push({ w: img.width, h: img.height, n: items.length });
       res.writeHead(200, { "Content-Type": "application/json", ...cors });
       return res.end(JSON.stringify({ content: [{ type: "text", text: JSON.stringify({ items, terms: [] }) }], usage: { input_tokens: 1000, output_tokens: 200 } }));

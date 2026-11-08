@@ -8,9 +8,8 @@
   if (window.__gytLoaded) return;
   window.__gytLoaded = true;
 
-  const G = globalThis.GyT;
+  const GyText = globalThis.GyText;
   const MIN_W = 280, MIN_H = 280; // px, natural or rendered
-  const MAX_CANVAS_EDGE = 2500;
   const MAX_PARALLEL = 3;
 
   /** @type {Map<HTMLImageElement, {status:string, src:string, canvas?:HTMLCanvasElement, hidden:boolean, result?:any, error?:string, objectFit?:string}>} */
@@ -239,28 +238,36 @@
 
   async function render(img, entry) {
     await ensureFont();
-    const src = await loadImage(entry.result.imageDataUrl);
-    const scale = Math.min(1, MAX_CANVAS_EDGE / Math.max(src.naturalWidth, src.naturalHeight));
-    const W = Math.max(1, Math.round(src.naturalWidth * scale));
-    const H = Math.max(1, Math.round(src.naturalHeight * scale));
-
-    const work = document.createElement("canvas");
-    work.width = W; work.height = H;
-    const wctx = work.getContext("2d", { willReadFrequently: true });
-    wctx.drawImage(src, 0, 0, W, H);
-    const pixels = wctx.getImageData(0, 0, W, H);
-
+    const res = entry.result;
+    const src = await loadImage(res.cleanDataUrl); // the page with original lettering erased, at working resolution
+    const W = res.work.W, H = res.work.H;
     const canvas = entry.canvas || document.createElement("canvas");
     canvas.className = "overlay";
     canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext("2d");
-    ctx.clearRect(0, 0, W, H);
-    const { placements } = G.typeset(ctx, pixels, entry.result, W, H, { fontFamily: settings.fontFamily, uppercase: settings.uppercase, debug: !!settings.debugOverlay });
-    if (settings.debugOverlay) console.info("Gytakusub debug", { src: entry.src, W, H, natural: [src.naturalWidth, src.naturalHeight], items: entry.result.items, bubbles: entry.result.bubbles.map((b) => ({ id: b.id, box: b.box })), placements });
+    ctx.drawImage(src, 0, 0, W, H);
+    if (settings.debugOverlay) drawDebug(ctx, res);
+    GyText.draw(ctx, res.placements, { fontFamily: settings.fontFamily, uppercase: settings.uppercase });
+    if (settings.debugOverlay) console.info("Gytakusub debug", { src: entry.src, work: res.work, natural: [res.width, res.height], items: res.items, regions: res.regions, placements: res.placements, letter: res.letter });
 
     if (!entry.canvas) { entry.canvas = canvas; root.append(canvas); }
     entry.objectFit = getComputedStyle(img).objectFit;
     layout();
+  }
+
+  // Debug overlay: text regions the engine found (red = bubble, blue = free
+  // text, numbered as stamped for the model) and the final text areas (green).
+  function drawDebug(ctx, res) {
+    const W = res.work.W;
+    ctx.save();
+    ctx.lineWidth = Math.max(1, W / 600); ctx.font = `bold ${Math.max(10, W / 60)}px sans-serif`;
+    for (const r of res.regions) {
+      ctx.strokeStyle = r.kind === "bubble" ? "rgba(220,38,38,.9)" : "rgba(37,99,235,.9)";
+      ctx.strokeRect(r.box.x, r.box.y, r.box.w, r.box.h);
+      ctx.fillStyle = ctx.strokeStyle; ctx.fillText("#" + r.id, r.box.x + 3, r.box.y + W / 60);
+    }
+    for (const p of res.placements) { ctx.strokeStyle = "rgba(22,163,74,.9)"; ctx.strokeRect(p.rect.x, p.rect.y, p.rect.w, p.rect.h); }
+    ctx.restore();
   }
 
   // ---------- overlay positioning (event-driven, not a permanent rAF loop) ----------

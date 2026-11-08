@@ -7,3 +7,11 @@ tests/*.png
 /package-lock.json
 /node_modules/
 node_modules
+# shared files copied into the web app by scripts/sync-shared.sh (extension/ is canonical)
+web/engine/
+web/vendor/
+web/prompt.js
+web/text.js
+web/fonts/
+# real manga pages for local tuning only — never committed
+tests/fixtures/real/
