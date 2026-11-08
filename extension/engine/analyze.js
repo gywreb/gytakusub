@@ -19,6 +19,20 @@ function inkMedianHeight(gs) {
   const t = [...gs].sort((a, b) => a.h - b.h); let tot = 0; for (const g of t) tot += g.a;
   let acc = 0; for (const g of t) { acc += g.a; if (acc >= tot / 2) return g.h; } return t.length ? t[t.length - 1].h : 0;
 }
+/**
+ * Share of glyphs that line up with another glyph (same row or same column within
+ * a third of a letter). Lettering is aligned; fragments of art are scattered.
+ */
+function alignment(gs, letter) {
+  if (gs.length < 2) return 1;
+  const tol = Math.max(2, letter * 0.35); let n = 0;
+  for (let i = 0; i < gs.length; i++) {
+    const cx = gs[i].x + gs[i].w / 2, cy = gs[i].y + gs[i].h / 2; let ok = false;
+    for (let j = 0; j < gs.length && !ok; j++) { if (i === j) continue; const dx = Math.abs(gs[j].x + gs[j].w / 2 - cx), dy = Math.abs(gs[j].y + gs[j].h / 2 - cy); ok = dy < tol || dx < tol; }
+    if (ok) n++;
+  }
+  return n / gs.length;
+}
 const capHeight = (a) => { if (!a.length) return 0; const t = Float64Array.from(a).sort(); return t[Math.min(t.length - 1, Math.floor(t.length * 0.8))]; };
 
 /**
@@ -47,12 +61,25 @@ export function analyze(cv, img) {
   // Regions whose lettering is far from it are sound effects or art, not dialogue.
   const weighted = (bs) => { const v = []; for (const b of bs) for (let i = 0; i < Math.min(b.glyphCount, 40); i++) v.push(b.letter); return median(v); };
   const pageLetter = weighted(blocks.filter((b) => b.bubble)) || weighted(blocks) || Math.max(8, W / 60);
-  bubbles = bubbles.filter((b) => { const ok = b.letter >= 0.45 * pageLetter && b.letter <= 3 * pageLetter; if (!ok) for (const bl of b.blocks) bl.bubble = null; return ok; });
-  blocks = blocks.filter((b) => b.bubble || (b.letter >= 0.5 * pageLetter && b.letter <= 2.5 * pageLetter));
+  // Dialogue on one page spans about half to twice the typical size (whispers,
+  // shouts); what is further out is sound effects or art.
+  bubbles = bubbles.filter((b) => { const ok = b.letter >= 0.3 * pageLetter && b.letter <= 4 * pageLetter; if (!ok) { trace("region", b.box, "lettering size far from the page's dialogue", { letter: b.letter, pageLetter }); for (const bl of b.blocks) bl.bubble = null; } return ok; });
+  blocks = blocks.filter((b) => b.bubble || (b.letter >= 0.6 * pageLetter && b.letter <= 2.2 * pageLetter));
   const band = Math.max(1, Math.round(H / 24));
   const order = (a, b) => (Math.floor(a.box.y / band) - Math.floor(b.box.y / band)) || (a.box.x - b.box.x);
   bubbles.sort(order);
-  const freeBlocks = blocks.filter((b) => b.bubble === null && b.glyphCount >= (b.dark ? 4 : 3)).sort(order);
+  // Free text (no bubble around it) needs stronger evidence than lettering in a
+  // bubble: a dense line of several letters. Fragments of art along a speed line
+  // group into "lines" too, but sparsely.
+  const freeBlocks = blocks.filter((b) => {
+    if (b.bubble !== null || b.glyphCount < (b.dark ? 5 : 4) || b.components < 3) return false; // several separate marks, not one long fragment
+    if (b.letter < 0.8 * pageLetter) return false; // narration is not smaller than the dialogue
+    if (b.gbox.h > 1.8 * b.letter) return false; // one line of text is one row high; a cloud of fragments is not
+    const gs = b.glyphs.map((gi) => polarities[b.dark ? 1 : 0].glyphs[gi]);
+    const density = gs.reduce((s, g) => s + g.w, 0) / Math.max(1, b.gbox.w);
+    let inkTall = 0, inkTot = 0; for (const g of gs) { inkTot += g.a; if (g.w <= 1.4 * g.h) inkTall += g.a; } // letters are not wider than tall (W and M aside)
+    return density >= 0.45 && b.gbox.w >= 1.2 * b.gbox.h && inkTall / inkTot >= 0.6;
+  }).sort(order);
   const regions = [];
   let id = 1;
   for (const b of bubbles) { b.id = id; regions.push({ id: id++, kind: "bubble", ref: b, box: b.box, letter: b.letter, dark: b.dark }); }
@@ -91,12 +118,21 @@ function analyzePolarity(cv, src, gray, base, W, H, dark) {
     const x = S[i * 5], y = S[i * 5 + 1], w = S[i * 5 + 2], h = S[i * 5 + 3], a = S[i * 5 + 4];
     const thin = (w > 6 * h && h <= 3) || (h > 6 * w && w <= 3);
     const ok = h >= minH && h <= maxH && w <= W / 5 && !thin && a / (w * h) >= 0.08;
-    glyphs[i] = { x, y, w, h, a, ok };
+    // Letters touch at small sizes (one component per word on an 850 px page), so
+    // a component counts as about w / (0.75 h) letters — Latin letters are ~0.6 of
+    // their height wide, CJK characters ~1.0.
+    const letters = ok ? Math.max(1, Math.round(w / (0.75 * h))) : 0;
+    glyphs[i] = { x, y, w, h, a, ok, letters };
   }
 
   // --- text blocks: glyphs joined along lines/columns ---
+  // Close only the glyph-sized components: on a scan, letters sit a pixel or two
+  // from the bubble outline, and closing the raw ink would weld the line to the
+  // outline and the art behind it (one giant component, silently dropped).
+  const glyphMask = new cv.Mat.zeros(H, W, cv.CV_8UC1);
+  { const L = gl.data32S, M = glyphMask.data; for (let p = 0; p < W * H; p++) { const g = glyphs[L[p]]; if (g && g.ok) M[p] = 255; } }
   const kern = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(Math.max(3, Math.round(W / 90)), Math.max(3, Math.round(W / 200))));
-  const closed = new cv.Mat(); cv.morphologyEx(ink, closed, cv.MORPH_CLOSE, kern);
+  const closed = new cv.Mat(); cv.morphologyEx(glyphMask, closed, cv.MORPH_CLOSE, kern); glyphMask.delete();
   const bl = new cv.Mat(), bs = new cv.Mat(), bc = new cv.Mat();
   const bn = cv.connectedComponentsWithStats(closed, bl, bs, bc, 8, cv.CV_32S);
   const B = bs.data32S;
@@ -167,7 +203,8 @@ function analyzePolarity(cv, src, gray, base, W, H, dark) {
     // footprint of the lettering itself (the closed component can be inflated by art it touched)
     const gx0 = Math.min(...good.map((g) => glyphs[g].x)), gy0 = Math.min(...good.map((g) => glyphs[g].y));
     const gx1 = Math.max(...good.map((g) => glyphs[g].x + glyphs[g].w)), gy1 = Math.max(...good.map((g) => glyphs[g].y + glyphs[g].h));
-    blocks.push({ box: { x, y, w, h }, gbox: { x: gx0, y: gy0, w: gx1 - gx0, h: gy1 - gy0 }, letter, glyphCount: good.length, glyphs: good, inkArea, label: i, dark, bubble: null, region: null });
+    const letterCount = good.reduce((n, g) => n + glyphs[g].letters, 0);
+    blocks.push({ box: { x, y, w, h }, gbox: { x: gx0, y: gy0, w: gx1 - gx0, h: gy1 - gy0 }, letter, glyphCount: letterCount, components: good.length, glyphs: good, inkArea, label: i, dark, bubble: null, region: null });
   }
 
   // --- light regions → bubbles (must contain text, text must matter in them) ---
@@ -218,6 +255,35 @@ function analyzePolarity(cv, src, gray, base, W, H, dark) {
     const textArea = Math.min((ux1 - ux0) * (uy1 - uy0), 3 * sumArea);
     const glyphCount = inBlocks.reduce((s, b) => s + b.glyphCount, 0);
     if (glyphCount < 2) { reject("fewer than two glyphs", { glyphCount }); continue; }
+    const regionGlyphs = inBlocks.flatMap((b) => b.glyphs.map((gi) => glyphs[gi]));
+    const textInk = inBlocks.reduce((s, b) => s + b.inkArea, 0);
+    const aligned = alignment(regionGlyphs, capHeight(inBlocks.map((b) => b.letter)));
+    if (regionGlyphs.length >= 4 && aligned < (dark ? 0.8 : 0.6)) { reject("lettering not aligned in rows or columns", { aligned, glyphCount }); continue; }
+    if (dark && glyphCount < 4) { reject("too little light lettering for a dark bubble", { glyphCount }); continue; } // real dark bubbles are rare; white specks on black art are not
+    // Text lines hold several letters each (vertical text: blocks stacked in a
+    // column). Many "lines" of one or two marks are scattered detail.
+    if (inBlocks.length >= 3) {
+      const letterHere = capHeight(inBlocks.map((b) => b.letter)), tol = Math.max(2, letterHere * 0.3);
+      // rows: blocks sharing a baseline (a line of small text often splits into several blocks)
+      const rows = []; for (const b of [...inBlocks].sort((p, q) => p.gbox.y - q.gbox.y)) { const cy = b.gbox.y + b.gbox.h / 2; const r = rows.find((row) => Math.abs(row.cy - cy) < Math.max(tol, letterHere * 0.5)); if (r) { r.n += b.glyphCount; r.cy = (r.cy + cy) / 2; } else rows.push({ cy, n: b.glyphCount }); }
+      const perRow = glyphCount / rows.length;
+      let column = 0;
+      for (const a of inBlocks) { let n = 0; const ax = a.gbox.x + a.gbox.w / 2; for (const b of inBlocks) if (Math.abs(b.gbox.x + b.gbox.w / 2 - ax) < tol) n++; column = Math.max(column, n); }
+      if (rows.length >= 3 && perRow < 2.5 && column < 3) { reject("lines too sparse to be lettering", { perRow, rows: rows.length, column }); continue; }
+    }
+    // A few marks that are large relative to the shape (a face's features, a
+    // fold) are not lettering, which is small relative to the bubble holding it;
+    // and letters are dense within their own footprint.
+    const letterHere = capHeight(inBlocks.map((b) => b.letter));
+    if (glyphCount <= 3 && letterHere > 0.25 * Math.min(w, h)) { reject("marks too large for the shape", { letter: letterHere, letters: glyphCount }); continue; }
+    if (glyphCount < 8 && textInk / Math.max(1, textArea) < 0.06) { reject("marks too sparse in their footprint", { inkInFoot: textInk / Math.max(1, textArea), glyphCount }); continue; }
+    // Glyph heights cluster across the whole region in real lettering (one or two
+    // sizes); mechanical detail and foliage spread out.
+    if (regionGlyphs.length >= 4) {
+      const mid = inkMedianHeight(regionGlyphs); let near = 0, tot = 0;
+      for (const g of regionGlyphs) { tot += g.a; if (g.h >= 0.45 * mid && g.h <= 1.8 * mid) near += g.a; }
+      if (near / tot < 0.5) { reject("glyph heights too varied for lettering", { nearFrac: near / tot }); continue; }
+    }
     if (glyphCount < 4 && textArea / a < 0.1) { reject("a few specks in a big shape", { glyphCount, textFrac: textArea / a }); continue; } // eyes in a face, not a bubble
     // Little text in a big shape is a label on a background — unless the text sits
     // in the middle of the shape, which is how lettering sits in a bubble.
@@ -243,9 +309,19 @@ function analyzePolarity(cv, src, gray, base, W, H, dark) {
     if (bestK >= 0) { m.setTo(new cv.Scalar(0)); cv.drawContours(m, contours, bestK, new cv.Scalar(255), -1); fill = new Uint8Array(m.data); }
     contours.delete(); hier.delete(); m.delete(); roi.delete();
     const holes = Math.max(0, filled - a);
-    const textInk = inBlocks.reduce((s, b) => s + b.inkArea, 0);
     if (holes / Math.max(1, filled) > 0.3) { reject("too much drawn inside", { holeFrac: holes / filled }); continue; } // a background, not a bubble
-    if (holes > 0 && textInk / holes < 0.45) { reject("content inside is not lettering", { inkFrac: textInk / holes }); continue; }
+    // What is inside must be the lettering: count hole pixels that fall within the
+    // text blocks' footprints (a little grown, for anti-aliased fringes on scans).
+    let holesInText = 0;
+    if (holes > 0 && fill) {
+      const pad = Math.max(2, Math.round(capHeight(inBlocks.map((b) => b.letter)) * 0.35));
+      const ld = light.data;
+      for (const b of inBlocks) {
+        const bx0 = Math.max(x, b.gbox.x - pad), by0 = Math.max(y, b.gbox.y - pad), bx1 = Math.min(x + w, b.gbox.x + b.gbox.w + pad), by1 = Math.min(y + h, b.gbox.y + b.gbox.h + pad);
+        for (let yy = by0; yy < by1; yy++) for (let xx = bx0; xx < bx1; xx++) { if (fill[(yy - y) * w + (xx - x)] && !ld[yy * W + xx]) holesInText++; }
+      }
+    }
+    if (holes > 0 && holesInText / holes < 0.45) { reject("content inside is not lettering", { inText: holesInText / holes }); continue; }
     if (hullArea && a / hullArea < 0.45) { reject("not convex enough", { solidity: a / hullArea }); continue; } // sky between branches, gutters
     // bubble colour: mean of the region's own pixels
     let r = 0, g = 0, bb = 0, n = 0;

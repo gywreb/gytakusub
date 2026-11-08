@@ -26,3 +26,15 @@ same pages (regenerating needs Pillow and a Noto CJK font; `GYT_NO_CJK=1`
 produces a different, Latin-only set and is only for machines without the font).
 
 `fixtures/real/` is git-ignored: put your own pages there for local tuning.
+
+## Scoring on real pages (`npm run score -- report1.zip report2.zip …`)
+
+`score-reports.mjs` runs the detector on the original pages inside "Export
+debug report" zips and scores it with the model's own answer as the witness of
+where text is: *coverage* (items whose position falls in a detected region),
+*dialogue recognised as a bubble* (the metric that decides whether text is
+typeset in the bubble or squeezed into a line footprint), and *waste*
+(regions with no text). `--engine <dir>` scores another checkout's engine for
+a baseline; `--misses` names the rule that rejected the region around each
+missed item. Tune on some reports, validate on the rest: a change ships only
+if the hold-out numbers do not get worse.

@@ -10,7 +10,8 @@
     "demo": "python3 make-demo-page.py fixtures && python3 make-pages.py fixtures 12",
     "assets": "node make-store-assets.mjs ../store/assets",
     "vendor": "node ../scripts/vendor-opencv.mjs && node ../scripts/vendor-hyphen.mjs",
-    "replay": "node replay-report.mjs"
+    "replay": "node replay-report.mjs",
+    "score": "node score-reports.mjs"
   },
   "devDependencies": {
     "canvas": "^3.1.0",
