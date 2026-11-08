@@ -24,13 +24,15 @@ Repeat steps 1–3 on each device. Settings, glossary and (optionally) the API k
 | Translate automatically while scrolling | Popup → *Auto-translate while scrolling here* (per-site; implies enabled) |
 | Switch everything off | Popup → master switch (badge shows "off") |
 | Redo a page (e.g. after editing the glossary) | Hover → **↻ Redo** |
+| Peek at the original lettering | Rest the pointer on a translated bubble for a moment (Options → *Peek at the original* to turn off) |
+| Correct a line / teach the glossary | Double-click a translated bubble → edit → **Ctrl+Enter**; or fill "original term = translation" → *Add* |
 
 ## How it works
 
 1. The background worker fetches the image bytes itself (so cross-origin CDNs like MangaDex's work) and downsizes to ≤1600 px (tall webtoon strips are sliced into ~1800 px pieces).
-2. **Local bubble detection** (`bubble.js`, no ML model): closed, flat, light regions that contain ink and don't touch the page edge. Each candidate gets a numbered red mark stamped on the copy sent to Claude.
-3. Claude is asked, per text item, *which numbered bubble it is in* (set-of-mark prompting — far more reliable than asking a language model for coordinates), plus a pixel box used only for text outside any marked bubble. Names it finds and the last ~40 translated lines in the tab are fed back into later requests for continuity.
-4. The content script lays a **transparent canvas** over the image. Marked bubbles are re-filled exactly (full-resolution flood fill from the bubble's own centre) and the English is typeset inside, sized from the original lettering height and bounded to a page-wide base size. Bubbles cut by a panel border (which can't be detected as closed shapes) get a **text-zone erase**: light pixels inside the text box are repainted so the original lettering disappears without touching surrounding art. Text over artwork gets a translucent box sized around the text.
+2. **Local text and bubble detection** (`engine/analyze.js` on OpenCV.js, no ML model): glyph-sized ink components grouped into lines and kept when they look like one font; the flat light or dark shape around them is a bubble if lettering is all it contains. Each region gets a numbered red stamp on the copy sent to Claude. Also handles Japanese vertical text, dark bubbles, captions and loose narration.
+3. Claude is asked, per text item, *which numbered region it is in* (set-of-mark prompting — far more reliable than asking a language model for coordinates). The tag decides placement; the pixel box only orders speakers inside a joined bubble or places text the detector missed. Names it finds and the last ~40 translated lines in the tab are fed back into later requests for continuity.
+4. The background worker **inpaints the original lettering away** (`engine/erase.js`, Telea; outlines and art untouched) and computes where each line goes (`engine/layout.js`: the largest rectangle inside the bubble shape, joined bubbles split at the waist). The content script lays a transparent canvas over the image showing the cleaned page and typesets the translation into those rectangles (`text.js`), sized from the original lettering, hyphenating only when nothing else fits.
 5. Results are cached per image URL for the browser session, up to 3 pages translate in parallel, nearest to the viewport first.
 
 ## Cost
