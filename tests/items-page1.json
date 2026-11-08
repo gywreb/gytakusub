@@ -1,11 +1,95 @@
 [
-  {"tag": null, "box": [940, 50, 145, 140], "size": "large", "text": "Professor!"},
-  {"tag": 1, "box": [862, 205, 88, 70], "text": "Ah... ah..."},
-  {"tag": 6, "box": [255, 700, 110, 65], "text": "It's not a curse!"},
-  {"tag": null, "box": [235, 840, 65, 55], "text": "It's a crime!"},
-  {"tag": null, "box": [590, 695, 105, 175], "text": "No. Doctor Hellstein was alive! He was behind all of it!"},
-  {"tag": 5, "box": [790, 705, 70, 45], "text": "This is..."},
-  {"tag": 5, "box": [735, 805, 85, 35], "text": "A curse"},
-  {"tag": 4, "box": [985, 715, 110, 80], "size": "small", "text": "After the Labyrinth Building, the campus..."},
-  {"tag": 7, "box": [270, 1290, 125, 190], "size": "large", "text": "Shotaro..."}
+  {
+    "tag": null,
+    "box": [
+      940,
+      50,
+      145,
+      140
+    ],
+    "size": "large",
+    "text": "Teacher!"
+  },
+  {
+    "tag": 1,
+    "box": [
+      862,
+      205,
+      88,
+      70
+    ],
+    "text": "Ah... ah..."
+  },
+  {
+    "tag": 6,
+    "box": [
+      255,
+      700,
+      110,
+      65
+    ],
+    "text": "That's not what happened!"
+  },
+  {
+    "tag": null,
+    "box": [
+      235,
+      840,
+      65,
+      55
+    ],
+    "text": "It's a mistake!"
+  },
+  {
+    "tag": null,
+    "box": [
+      590,
+      695,
+      105,
+      175
+    ],
+    "text": "No. The visitor was still here. He arranged all of it!"
+  },
+  {
+    "tag": 5,
+    "box": [
+      790,
+      705,
+      70,
+      45
+    ],
+    "text": "This is..."
+  },
+  {
+    "tag": 5,
+    "box": [
+      735,
+      805,
+      85,
+      35
+    ],
+    "text": "a problem"
+  },
+  {
+    "tag": 4,
+    "box": [
+      985,
+      715,
+      110,
+      80
+    ],
+    "size": "small",
+    "text": "Past the old library, the courtyard..."
+  },
+  {
+    "tag": 7,
+    "box": [
+      270,
+      1290,
+      125,
+      190
+    ],
+    "size": "large",
+    "text": "Wait..."
+  }
 ]

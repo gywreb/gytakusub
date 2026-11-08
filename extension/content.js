@@ -1,9 +1,9 @@
-// Gytakusub – content script. Runs on every page.
-// Finds large images (manga pages), offers a hover button, asks the background
-// worker for a translation, then paints an overlay canvas: bubble interiors are
-// re-filled in their own colour and the translation is typeset inside them.
+// Gytakusub – content script. Injected only on sites the user enabled (or on
+// demand from the popup / hotkey). Finds large images (manga pages), offers a
+// hover button, asks the background worker for a translation, then paints an
+// overlay canvas via the shared typesetting engine.
 
-(function () {
+(() => {
   "use strict";
   if (window.__gytLoaded) return;
   window.__gytLoaded = true;
@@ -15,36 +15,52 @@
 
   /** @type {Map<HTMLImageElement, {status:string, src:string, canvas?:HTMLCanvasElement, hidden:boolean, result?:any, error?:string, objectFit?:string}>} */
   const entries = new Map();
-  let settings = { enabled: true, autoSites: [], uppercase: false, fontFamily: "", excludedSites: "" };
+  let settings = { enabled: true, autoSites: [], enabledSites: [], uppercase: false, fontFamily: "", excludedSites: "" };
   let allHidden = false;
   let hoverImg = null;
 
-  // ---------- DOM scaffolding ----------
+  // ---------- UI lives in a closed shadow root: page CSS/JS can't reach it ----------
 
-  const root = document.createElement("div");
-  root.id = "gyt-root";
-  const bar = document.createElement("div");
-  bar.id = "gyt-bar";
-  const btnTranslate = document.createElement("button");
-  const btnToggle = document.createElement("button");
-  const status = document.createElement("span");
-  status.className = "gyt-status";
+  const host = document.createElement("div");
+  host.id = "gyt-host";
+  host.style.cssText = "all:initial;position:fixed;left:0;top:0;width:0;height:0;z-index:2147483647;";
+  const shadow = host.attachShadow({ mode: "closed" });
+  const style = document.createElement("style");
+  style.textContent = `
+    :host { all: initial; }
+    .root { position: fixed; left: 0; top: 0; width: 0; height: 0; pointer-events: none; }
+    canvas.overlay { position: fixed; pointer-events: none; }
+    .bar { position: fixed; display: flex; gap: 4px; padding: 4px; border-radius: 8px; background: rgba(17,24,39,.85);
+      backdrop-filter: blur(4px); box-shadow: 0 2px 8px rgba(0,0,0,.35); font: 12px/1 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+      color: #fff; opacity: 0; transition: opacity .12s; pointer-events: none; }
+    .bar.visible { opacity: 1; pointer-events: auto; }
+    .bar button { all: unset; cursor: pointer; padding: 6px 9px; border-radius: 6px; background: rgba(255,255,255,.08); color: #fff;
+      font: 12px/1 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; white-space: nowrap; }
+    .bar button:hover, .bar button:focus-visible { background: rgba(255,255,255,.2); outline: 2px solid #93c5fd; outline-offset: 1px; }
+    .bar button[disabled] { opacity: .5; cursor: default; }
+    .bar .status { padding: 6px 4px; opacity: .8; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); padding: 8px 14px; border-radius: 8px;
+      background: rgba(17,24,39,.92); color: #fff; font: 13px/1.3 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+      box-shadow: 0 2px 10px rgba(0,0,0,.4); pointer-events: none; max-width: 80vw; }
+  `;
+  const root = document.createElement("div"); root.className = "root";
+  const bar = document.createElement("div"); bar.className = "bar"; bar.setAttribute("role", "toolbar"); bar.setAttribute("aria-label", "Gytakusub");
+  const btnTranslate = document.createElement("button"); btnTranslate.setAttribute("aria-label", "Translate this image");
+  const btnToggle = document.createElement("button"); btnToggle.setAttribute("aria-label", "Show or hide translation");
+  const status = document.createElement("span"); status.className = "status";
   bar.append(btnTranslate, btnToggle, status);
+  const toastEl = document.createElement("div"); toastEl.className = "toast"; toastEl.setAttribute("role", "status"); toastEl.setAttribute("aria-live", "polite"); toastEl.hidden = true;
+  shadow.append(style, root, bar, toastEl);
 
-  function mount() {
-    if (!document.documentElement) return;
-    document.documentElement.append(root, bar);
-  }
+  const mount = () => { if (document.documentElement && !host.isConnected) document.documentElement.append(host); };
   if (document.body) mount(); else document.addEventListener("DOMContentLoaded", mount, { once: true });
 
   let toastTimer = null;
   function toast(msg, ms = 3500) {
-    let t = document.getElementById("gyt-toast");
-    if (!t) { t = document.createElement("div"); t.id = "gyt-toast"; document.documentElement.append(t); }
-    t.textContent = msg;
-    t.style.display = "block";
+    toastEl.textContent = msg;
+    toastEl.hidden = false;
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => (t.style.display = "none"), ms);
+    toastTimer = setTimeout(() => (toastEl.hidden = true), ms);
   }
 
   // ---------- settings ----------
@@ -55,16 +71,14 @@
       if (s && !s.error) settings = s;
     } catch { /* background not ready yet */ }
     applyAutoMode();
-    if (!settings.enabled) { bar.classList.remove("gyt-visible"); hoverImg = null; }
+    if (!settings.enabled) { bar.classList.remove("visible"); hoverImg = null; }
   }
   chrome.storage.onChanged.addListener(() => loadSettings());
 
-  const host = location.hostname;
-  function siteExcluded() {
-    return settings.excludedSites.split(/[\s,]+/).filter(Boolean).some((p) => host === p || host.endsWith("." + p));
-  }
-  function active() { return settings.enabled && !siteExcluded(); }
-  function autoOn() { return active() && (settings.autoSites || []).includes(host); }
+  const hostname = location.hostname;
+  const siteExcluded = () => settings.excludedSites.split(/[\s,]+/).filter(Boolean).some((p) => hostname === p || hostname.endsWith("." + p));
+  const active = () => settings.enabled && !siteExcluded();
+  const autoOn = () => active() && (settings.autoSites || []).includes(hostname);
 
   // ---------- image discovery ----------
 
@@ -72,7 +86,6 @@
 
   function isEligible(img) {
     if (!(img instanceof HTMLImageElement)) return false;
-    if (img.closest("#gyt-root, #gyt-bar")) return false;
     const r = img.getBoundingClientRect();
     const bigNatural = img.naturalWidth >= MIN_W && img.naturalHeight >= MIN_H;
     const bigRendered = r.width >= MIN_W && r.height >= MIN_H;
@@ -81,8 +94,7 @@
 
   function viewportDistance(img) {
     const r = img.getBoundingClientRect();
-    const cy = r.top + r.height / 2, vc = window.innerHeight / 2;
-    return Math.abs(cy - vc);
+    return Math.abs(r.top + r.height / 2 - window.innerHeight / 2);
   }
 
   function visibleImages(marginFactor = 0.5) {
@@ -104,7 +116,7 @@
   function showBar(img) {
     hoverImg = img;
     refreshBar();
-    bar.classList.add("gyt-visible");
+    bar.classList.add("visible");
     positionBar();
     clearTimeout(hideTimer);
   }
@@ -116,7 +128,7 @@
   }
   function scheduleHide() {
     clearTimeout(hideTimer);
-    hideTimer = setTimeout(() => { bar.classList.remove("gyt-visible"); hoverImg = null; }, 350);
+    hideTimer = setTimeout(() => { bar.classList.remove("visible"); hoverImg = null; }, 350);
   }
   function refreshBar() {
     const e = hoverImg ? entries.get(hoverImg) : null;
@@ -130,16 +142,18 @@
   }
 
   document.addEventListener("mouseover", (ev) => {
+    if (!ev.isTrusted) return;
     const t = ev.target;
-    if (t === bar || bar.contains(t)) { clearTimeout(hideTimer); return; }
+    if (t === host) { clearTimeout(hideTimer); return; }
     if (active() && isEligible(t)) showBar(t);
     else if (hoverImg) scheduleHide();
   }, true);
   bar.addEventListener("mouseleave", scheduleHide);
 
-  btnTranslate.addEventListener("click", () => { if (hoverImg) enqueue(hoverImg, entries.get(hoverImg)?.status === "done"); });
-  btnToggle.addEventListener("click", () => {
-    if (!hoverImg) return;
+  // Only real user clicks may spend tokens (a page script can't synthesize isTrusted).
+  btnTranslate.addEventListener("click", (ev) => { if (ev.isTrusted && hoverImg) enqueue(hoverImg, entries.get(hoverImg)?.status === "done"); });
+  btnToggle.addEventListener("click", (ev) => {
+    if (!ev.isTrusted || !hoverImg) return;
     const e = entries.get(hoverImg);
     if (e) { e.hidden = !e.hidden; refreshBar(); layout(); }
   });
@@ -171,22 +185,19 @@
 
   // ---------- translation ----------
 
-  function blobToDataUrl(blob) {
-    return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(blob); });
-  }
+  const blobToDataUrl = (blob) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(blob); });
+  const loadImage = (dataUrl) => new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error("Could not decode image")); im.src = dataUrl; });
 
   async function translateImage(img, force = false) {
     const entry = entries.get(img) || { status: "idle", hidden: false };
     entry.status = "working"; entry.error = undefined; entry.src = srcOf(img);
     entries.set(img, entry);
     refreshBar();
-
     try {
       const src = entry.src;
       const msg = { type: "TRANSLATE", force };
       if (/^(blob|data):/i.test(src)) {
-        // Only the page can read its own blob: URLs; hand the bytes over.
-        const blob = await (await fetch(src)).blob();
+        const blob = await (await fetch(src)).blob(); // only the page can read its own blob: URLs
         msg.dataUrl = await blobToDataUrl(blob);
       } else {
         msg.url = src;
@@ -198,7 +209,7 @@
       entry.result = res;
       await render(img, entry);
       entry.status = "done";
-      ensureLoop();
+      watchLayout();
     } catch (e) {
       entry.status = "error";
       entry.error = e.message || String(e);
@@ -208,26 +219,20 @@
     refreshBar();
   }
 
-  function loadImage(dataUrl) {
-    return new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error("Could not decode image")); im.src = dataUrl; });
-  }
-
   async function render(img, entry) {
     const src = await loadImage(entry.result.imageDataUrl);
     const scale = Math.min(1, MAX_CANVAS_EDGE / Math.max(src.naturalWidth, src.naturalHeight));
     const W = Math.max(1, Math.round(src.naturalWidth * scale));
     const H = Math.max(1, Math.round(src.naturalHeight * scale));
 
-    // Work canvas: pixel access for bubble refinement and lettering-size estimates.
     const work = document.createElement("canvas");
     work.width = W; work.height = H;
     const wctx = work.getContext("2d", { willReadFrequently: true });
     wctx.drawImage(src, 0, 0, W, H);
     const pixels = wctx.getImageData(0, 0, W, H);
 
-    // Overlay canvas: transparent, only bubbles get painted.
     const canvas = entry.canvas || document.createElement("canvas");
-    canvas.className = "gyt-overlay";
+    canvas.className = "overlay";
     canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext("2d");
     ctx.clearRect(0, 0, W, H);
@@ -238,9 +243,8 @@
     layout();
   }
 
-  // ---------- overlay positioning ----------
+  // ---------- overlay positioning (event-driven, not a permanent rAF loop) ----------
 
-  // Where the image's pixels actually are inside its box (object-fit aware).
   function contentRect(img, objectFit) {
     const r = img.getBoundingClientRect();
     if ((objectFit === "contain" || objectFit === "scale-down") && img.naturalWidth && img.naturalHeight) {
@@ -251,12 +255,10 @@
     return r;
   }
 
-  let loopRunning = false;
   function layout() {
     for (const [img, e] of entries) {
       if (!e.canvas) continue;
-      // The reader swapped this <img> to another page: drop the stale overlay.
-      if (img.isConnected && srcOf(img) !== e.src) {
+      if (img.isConnected && srcOf(img) !== e.src) { // reader swapped this <img> to another page
         e.canvas.remove();
         entries.delete(img);
         if (io) { io.unobserve(img); io.observe(img); }
@@ -271,13 +273,27 @@
       e.canvas.style.width = r.width + "px";
       e.canvas.style.height = r.height + "px";
     }
-    if (hoverImg && bar.classList.contains("gyt-visible")) positionBar();
+    if (hoverImg && bar.classList.contains("visible")) positionBar();
   }
-  function ensureLoop() {
-    if (loopRunning) return;
-    loopRunning = true;
-    const tick = () => { layout(); requestAnimationFrame(tick); };
+
+  let rafPending = false, activeUntil = 0, watching = false, idleTimer = null;
+  function scheduleLayout() {
+    activeUntil = performance.now() + 400; // keep following for a moment after the last event (smooth scrolling)
+    if (rafPending) return;
+    rafPending = true;
+    const tick = (now) => {
+      layout();
+      if (now < activeUntil) requestAnimationFrame(tick); else rafPending = false;
+    };
     requestAnimationFrame(tick);
+  }
+  function watchLayout() {
+    if (watching) return;
+    watching = true;
+    window.addEventListener("scroll", scheduleLayout, { capture: true, passive: true });
+    window.addEventListener("resize", scheduleLayout, { passive: true });
+    idleTimer = setInterval(layout, 500); // catches layout changes that fire no event (lazy loads, SPA reflows)
+    scheduleLayout();
   }
 
   // ---------- bulk / auto ----------
@@ -290,8 +306,7 @@
     for (const img of imgs) enqueue(img);
   }
 
-  let io = null;
-  let mo = null;
+  let io = null, mo = null;
   function applyAutoMode() {
     const on = autoOn();
     if (on && !io) {
@@ -304,7 +319,7 @@
       }, { rootMargin: "200% 0px" });
       const observeAll = () => { for (const img of document.images) if (isEligible(img)) io.observe(img); };
       observeAll();
-      mo = new MutationObserver(() => observeAll());
+      mo = new MutationObserver(observeAll);
       mo.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ["src", "srcset"] });
       document.addEventListener("load", onImgLoad, true);
     } else if (!on && io) {
@@ -319,12 +334,13 @@
 
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     switch (msg?.type) {
+      case "PING": sendResponse({ ok: true }); break;
       case "TRANSLATE_VISIBLE": translateVisible(); sendResponse({ ok: true }); break;
       case "TOGGLE_OVERLAYS": allHidden = !allHidden; layout(); refreshBar(); sendResponse({ hidden: allHidden }); break;
       case "GET_STATE": {
         let done = 0, working = 0;
         for (const e of entries.values()) { if (e.status === "done") done++; if (e.status === "working" || e.status === "queued") working++; }
-        sendResponse({ done, working, hidden: allHidden, host, autoOn: autoOn(), excluded: siteExcluded() });
+        sendResponse({ done, working, hidden: allHidden, host: hostname, autoOn: autoOn(), excluded: siteExcluded() });
         break;
       }
       default: return false;

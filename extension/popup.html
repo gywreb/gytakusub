@@ -45,7 +45,7 @@
   <div id="nokey" class="warn" style="display:none">No API key yet — <a href="#" id="openOptions2">add one in options</a>.</div>
 
   <div class="row">
-    <button id="translate" class="primary">Translate visible (Alt+T)</button>
+    <button id="translate" class="primary">Translate visible images (Alt+T)</button>
   </div>
   <div class="row">
     <button id="toggle">Hide / show (Alt+Shift+T)</button>
@@ -57,7 +57,8 @@
     <option value="claude-opus-5-5">Claude Opus 5.5 — best, most expensive</option>
   </select>
 
-  <label class="toggle"><span>Auto-translate on <b id="host">this site</b></span><input type="checkbox" id="auto" /></label>
+  <label class="toggle"><span>Enable on <b id="host">this site</b> <span class="muted">(hover button, shortcuts)</span></span><input type="checkbox" id="site" /></label>
+  <label class="toggle"><span>Auto-translate while scrolling here</span><input type="checkbox" id="auto" /></label>
   <label class="toggle"><span>Chapter context (names + recent lines)</span><input type="checkbox" id="useContext" /></label>
 
   <div class="muted" id="state" style="margin-top:8px"></div>

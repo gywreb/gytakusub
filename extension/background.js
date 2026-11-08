@@ -16,7 +16,8 @@ export const DEFAULT_SETTINGS = {
   targetLang: "English",
   glossary: "",
   customPrompt: "",
-  autoSites: [], // hostnames where auto-translate-on-scroll is on
+  enabledSites: [], // hostnames where the content script is injected (hover button + hotkeys)
+  autoSites: [], // hostnames where auto-translate-on-scroll is on (implies enabled)
   useContext: true, // feed recent dialogue from this tab into each request
   includeSource: false, // ask the model to transcribe the original too (slower)
   uppercase: false,
@@ -43,9 +44,53 @@ async function updateBadge() {
   await chrome.action.setBadgeText({ text: s.enabled ? "" : "off" });
   await chrome.action.setBadgeBackgroundColor({ color: "#6b7280" });
 }
-chrome.runtime.onInstalled.addListener(updateBadge);
-chrome.runtime.onStartup.addListener(updateBadge);
-chrome.storage.onChanged.addListener((changes) => { if (changes.enabled) updateBadge(); });
+// ---------- content script registration ----------
+// The content script is not declared statically: it is registered only for
+// sites the user enabled, and injected on demand elsewhere (popup / hotkey).
+
+const CS_ID = "gytakusub-main";
+const CS_FILES = ["bubble.js", "typeset.js", "content.js"];
+
+function hostPatterns(hosts) {
+  const out = [];
+  for (const h of hosts) {
+    const host = String(h).trim().toLowerCase().replace(/^\*\./, "");
+    if (!/^[a-z0-9.-]+$/.test(host)) continue;
+    out.push(`*://${host}/*`, `*://*.${host}/*`);
+  }
+  return [...new Set(out)];
+}
+
+async function syncRegistration() {
+  const s = await getSettings();
+  const hosts = s.enabled ? [...new Set([...(s.enabledSites || []), ...(s.autoSites || [])])] : [];
+  const matches = hostPatterns(hosts);
+  const existing = await chrome.scripting.getRegisteredContentScripts({ ids: [CS_ID] }).catch(() => []);
+  if (!matches.length) {
+    if (existing.length) await chrome.scripting.unregisterContentScripts({ ids: [CS_ID] }).catch(() => {});
+    return;
+  }
+  const spec = { id: CS_ID, js: CS_FILES, matches, runAt: "document_idle", persistAcrossSessions: true };
+  if (existing.length) await chrome.scripting.updateContentScripts([spec]);
+  else await chrome.scripting.registerContentScripts([spec]);
+}
+
+/** Make sure the content script is present in a tab; inject it if not. */
+async function ensureContentScript(tabId) {
+  try {
+    const r = await chrome.tabs.sendMessage(tabId, { type: "PING" });
+    if (r?.ok) return true;
+  } catch { /* not injected */ }
+  await chrome.scripting.executeScript({ target: { tabId }, files: CS_FILES });
+  return true;
+}
+
+chrome.runtime.onInstalled.addListener(() => { updateBadge(); syncRegistration(); });
+chrome.runtime.onStartup.addListener(() => { updateBadge(); syncRegistration(); });
+chrome.storage.onChanged.addListener((changes) => {
+  if (changes.enabled) updateBadge();
+  if (changes.enabled || changes.enabledSites || changes.autoSites) syncRegistration();
+});
 
 // ---------- small utils ----------
 
@@ -124,25 +169,48 @@ async function handleTranslate(msg, sender) {
   const tabId = sender.tab?.id ?? -1;
   const cacheKey = "cache:" + (await sha1(`${PROMPT_VERSION}|${settings.model}|${settings.targetLang}|${settings.includeSource}|${settings.useContext}|${msg.url || msg.dataUrl?.slice(0, 512) + msg.dataUrl?.length}`));
   const cached = (await chrome.storage.session.get(cacheKey))[cacheKey];
-  if (cached && !msg.force) return { ...cached, fromCache: true };
 
-  // 1. bytes
-  let blob;
-  if (msg.dataUrl) {
-    blob = dataUrlToBlob(msg.dataUrl);
-  } else {
-    const res = await fetch(msg.url, { credentials: "omit" });
-    if (!res.ok) throw new Error(`Could not fetch image (${res.status})`);
-    blob = await res.blob();
+  // 1. bytes (only http(s) URLs or inline data from our own content script)
+  const MAX_BYTES = 25 * 1024 * 1024;
+  const fetchBytes = async () => {
+    let blob;
+    if (msg.dataUrl) {
+      if (!/^data:image\//i.test(msg.dataUrl)) throw new Error("Unsupported image data");
+      blob = dataUrlToBlob(msg.dataUrl);
+    } else {
+      let u;
+      try { u = new URL(msg.url); } catch { throw new Error("Invalid image URL"); }
+      if (!/^https?:$/.test(u.protocol)) throw new Error("Only http(s) images are supported");
+      const res = await fetch(u.href, { credentials: "omit" });
+      if (!res.ok) throw new Error(`Could not fetch image (${res.status})`);
+      blob = await res.blob();
+    }
+    if (blob.size > MAX_BYTES) throw new Error("Image is too large (over 25 MB)");
+    if (!blob.type.startsWith("image/")) blob = new Blob([await blob.arrayBuffer()], { type: "image/jpeg" });
+    return blob;
+  };
+
+  // Cache holds the translation only (not the image bytes, which would exhaust
+  // storage.session after a few pages); bytes are re-fetched on a hit.
+  if (cached && !msg.force) {
+    const blob = await fetchBytes();
+    return { ...cached, imageDataUrl: msg.dataUrl || (await blobToDataUrl(blob)), fromCache: true };
   }
-  if (!blob.type.startsWith("image/")) blob = new Blob([await blob.arrayBuffer()], { type: "image/jpeg" });
+  const blob = await fetchBytes();
 
   // 2. prepare (downscale, detect bubbles, stamp marks)
   const { slices, bubbles, width, height } = await prepareSlices(blob, settings);
 
   // 3. translate each slice (slices of one strip run in parallel)
   const ctx = await getTabCtx(tabId);
-  const results = await Promise.all(slices.map((s) => callClaude(settings, s, ctx)));
+  const withRetry = async (slice) => {
+    try { return await callClaude(settings, slice, ctx); }
+    catch (e) {
+      if (/Claude API (429|529|503)/.test(e.message)) { await new Promise((r) => setTimeout(r, 2500)); return callClaude(settings, slice, ctx); }
+      throw e;
+    }
+  };
+  const results = await Promise.all(slices.map(withRetry));
 
   const items = [];
   const usage = { input_tokens: 0, output_tokens: 0 };
@@ -157,10 +225,10 @@ async function handleTranslate(msg, sender) {
 
   // 4. the content script needs the pixels for painting; hand back the original bytes
   const originalDataUrl = msg.dataUrl || (await blobToDataUrl(blob));
-  const result = { items, bubbles, width, height, usage, imageDataUrl: originalDataUrl };
-  try { await chrome.storage.session.set({ [cacheKey]: result }); }
+  const cacheable = { items, bubbles, width, height, usage };
+  try { await chrome.storage.session.set({ [cacheKey]: cacheable }); }
   catch (e) { console.warn("Gytakusub: cache write failed", e); }
-  return result;
+  return { ...cacheable, imageDataUrl: originalDataUrl };
 }
 
 async function testKey() {
@@ -188,9 +256,18 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     case "TEST_KEY": reply(testKey()); return true;
     case "CLEAR_CACHE": reply(chrome.storage.session.clear().then(() => ({ ok: true }))); return true;
     case "RELAY_TO_TAB":
-      reply(chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
+      reply(chrome.tabs.query({ active: true, currentWindow: true }).then(async ([tab]) => {
         if (!tab?.id) throw new Error("No active tab");
+        if (!/^https?:/.test(tab.url || "")) throw new Error("Not a web page");
+        if (msg.inject) await ensureContentScript(tab.id);
         return chrome.tabs.sendMessage(tab.id, msg.payload);
+      }));
+      return true;
+    case "ACTIVE_TAB_INFO":
+      reply(chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
+        let host = null;
+        try { host = /^https?:/.test(tab?.url || "") ? new URL(tab.url).hostname : null; } catch { /* ignore */ }
+        return { host };
       }));
       return true;
     default: return false;
@@ -198,9 +275,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 });
 
 chrome.commands.onCommand.addListener(async (command, tab) => {
-  if (!tab?.id) return;
+  if (!tab?.id || !/^https?:/.test(tab.url || "")) return;
   const map = { "translate-visible": "TRANSLATE_VISIBLE", "toggle-overlays": "TOGGLE_OVERLAYS" };
-  if (map[command]) chrome.tabs.sendMessage(tab.id, { type: map[command] }).catch(() => {});
+  if (!map[command]) return;
+  try {
+    if (command === "translate-visible") await ensureContentScript(tab.id);
+    await chrome.tabs.sendMessage(tab.id, { type: map[command] });
+  } catch (e) { console.warn("Gytakusub command failed", e); }
 });
 
 chrome.tabs.onRemoved.addListener((tabId) => {

@@ -74,9 +74,13 @@
   <label class="check"><input type="checkbox" id="includeSource" /> Also transcribe the original text (slower, slightly more careful reading; useful for debugging)</label>
   <label class="check"><input type="checkbox" id="uppercase" /> UPPERCASE lettering (comic style)</label>
 
+  <label for="enabledSites">Enabled sites (hover button and keyboard shortcuts)</label>
+  <textarea id="enabledSites" placeholder="mangadex.org"></textarea>
+  <div class="hint">One hostname per line. Gytakusub runs only on these sites; everywhere else it stays dormant until you use the toolbar button or Alt+T. Easiest: open the site and flip the switch in the popup.</div>
+
   <label for="autoSites">Auto-translate while scrolling on these sites</label>
   <textarea id="autoSites" placeholder="mangadex.org"></textarea>
-  <div class="hint">One hostname per line. Easiest: open the site and flip the switch in the toolbar popup. Nothing is ever sent from other sites unless you click Translate.</div>
+  <div class="hint">Subset of the enabled sites. Each page that scrolls into view is sent to Claude automatically — only turn this on where you want to spend tokens.</div>
 
   <h2>Appearance & sites</h2>
   <label for="fontFamily">Font family</label>

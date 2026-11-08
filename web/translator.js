@@ -17,6 +17,7 @@ export const DEFAULT_SETTINGS = {
   fontFamily: "",
   rtlSpreads: true,
   imageProxy: "", // optional: https://your-worker.workers.dev/?url=
+  chapterMode: false, // advanced: show the "Chapter link" tab
   maxLongEdge: 1600,
   stripWidth: 1000,
   sliceHeight: 1800,
@@ -120,19 +121,4 @@ export async function testKey(settings) {
   });
   if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(`${res.status}: ${j?.error?.message || res.statusText}`); }
   return true;
-}
-
-// ---------- MangaDex ----------
-
-export function parseMangaDexChapter(input) {
-  const m = String(input).match(/chapter\/([0-9a-f-]{36})/i) || String(input).match(/^([0-9a-f-]{36})$/i);
-  return m ? m[1] : null;
-}
-
-export async function mangaDexPages(chapterId, dataSaver = false) {
-  const r = await fetch(`https://api.mangadex.org/at-home/server/${chapterId}?forcePort443=true`);
-  if (!r.ok) throw new Error(`MangaDex API ${r.status}`);
-  const j = await r.json();
-  const files = dataSaver ? j.chapter.dataSaver : j.chapter.data;
-  return files.map((f) => `${j.baseUrl}/${dataSaver ? "data-saver" : "data"}/${j.chapter.hash}/${f}`);
 }

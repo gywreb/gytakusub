@@ -1,0 +1,52 @@
+# Release checklist — Gytakusub (Chrome Web Store)
+
+Everything below is a one-time account step or a copy-paste from `store/LISTING.md`. Budget: US$5 one-time developer fee; nothing else.
+
+## 0. Before you start (5 min)
+- [ ] Load `extension/` unpacked in Brave one more time, open Options → Test key, and translate one page end to end. (I can't run a browser here; this is the one check only you can do.)
+- [ ] `git pull` and confirm `dist/gytakusub-extension-1.0.0.zip` matches the commit you tested (CI builds it on tags; the one in the release is identical to `extension/` minus `icon512.png`).
+
+## 1. Developer account (10 min, $5)
+- [ ] Go to https://chrome.google.com/webstore/devconsole and sign in with the Google account you want to own the listing (a dedicated account is fine).
+- [ ] Pay the one-time US$5 registration fee and accept the developer agreement.
+- [ ] Account tab → fill **publisher display name** (e.g. "gywreb") and a **contact email**, then **verify the email** (required before publishing).
+- [ ] Optional: verify the GitHub Pages domain under *Account → Verified websites* if you want "by gywreb.github.io" on the listing. Not required.
+
+## 2. Create the item (2 min)
+- [ ] Dashboard → **New item** → upload `dist/gytakusub-extension-1.0.0.zip`.
+- [ ] If the upload reports a manifest problem, stop and paste the message to me.
+
+## 3. Store listing tab (10 min)
+- [ ] Paste **Name**, **Summary**, **Description** from `LISTING.md`.
+- [ ] Category: Productivity. Language: English.
+- [ ] Upload icon `extension/icons/icon128.png`.
+- [ ] Upload the three screenshots from `store/assets/` (1280×800) and the small promo tile (440×280).
+- [ ] Homepage URL: `https://github.com/gywreb/gytakusub`. Support URL: `https://github.com/gywreb/gytakusub/issues`.
+
+## 4. Privacy practices tab (10 min) — this is where most rejections happen
+- [ ] Paste the **single purpose** text.
+- [ ] Paste each **permission justification** (storage, activeTab, scripting, host permission).
+- [ ] Remote code: **No**.
+- [ ] Data usage: tick **Authentication information** and **Website content** only; tick all three certifications.
+- [ ] Privacy policy URL: `https://gywreb.github.io/gytakusub/privacy.html` (confirm the page loads first — Pages must be enabled, see repo README).
+
+## 5. Distribution tab (1 min)
+- [ ] Visibility **Unlisted**. Free. All regions.
+
+## 6. Submit (1 min, then wait)
+- [ ] **Submit for review**. Leave "publish automatically after review" ON.
+- [ ] Typical review for a new item with broad host permissions: a few days; up to ~2 weeks is not unusual. You'll get an email either way.
+
+## 7. If it is rejected
+Paste the rejection email to me verbatim. The two likely reasons and what we'd do:
+- *"Broad host permissions not justified"* → we switch to `optional_host_permissions` and request access per site when the user enables it (I kept the code structure ready for this; it costs one extra permission prompt per site).
+- *"Description doesn't match functionality / misleading"* → adjust the wording they quote; no code change.
+
+## 8. After approval
+- [ ] Install from the store link in Brave on the Windows machine and the MacBook; remove the unpacked copy.
+- [ ] Try Orion on the iPhone with the store link (free; beta extension support) and tell me what breaks, if anything.
+- [ ] Enable auto-translate only on the sites you actually read, via the popup.
+- [ ] After a week with no issues: Distribution → **Public**, if you want it discoverable.
+
+## Updating later
+Bump `version` in `extension/manifest.json`, run the tests, push a tag `v1.0.1` — CI attaches the zip to a GitHub Release; upload that zip in the dashboard → *Package → Upload new package* → Submit. Listing text only needs changing when behaviour changes.

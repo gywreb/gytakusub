@@ -13,6 +13,7 @@ async function load() {
   for (const f of FIELDS) $(f).value = s[f] ?? "";
   for (const c of CHECKS) $(c).checked = !!s[c];
   $("autoSites").value = (s.autoSites || []).join("\n");
+  $("enabledSites").value = (s.enabledSites || []).join("\n");
   $("apiKey").value = s.apiKey || "";
 }
 
@@ -20,7 +21,9 @@ async function save() {
   const sync = {};
   for (const f of FIELDS) sync[f] = $(f).value;
   for (const c of CHECKS) sync[c] = $(c).checked;
-  sync.autoSites = $("autoSites").value.split(/[\s,]+/).map((h) => h.trim().toLowerCase()).filter(Boolean);
+  const hosts = (v) => v.split(/[\s,]+/).map((h) => h.trim().toLowerCase()).filter(Boolean);
+  sync.autoSites = hosts($("autoSites").value);
+  sync.enabledSites = [...new Set([...hosts($("enabledSites").value), ...sync.autoSites])];
   const key = $("apiKey").value.trim();
 
   // Key storage: local by default; optionally in browser sync so other devices get it.

@@ -3,7 +3,7 @@
 // candidates), paints bubble fills and translated text onto a transparent
 // overlay context. Depends on bubble.js (globalThis.GyT). Exposed as GyT.typeset.
 
-(function (root) {
+((root) => {
   "use strict";
   const G = root.GyT;
   const DEFAULT_FONT = '"Comic Neue", "Comic Sans MS", "Arial Rounded MT Bold", "Trebuchet MS", sans-serif';
@@ -38,9 +38,13 @@
     ctx.arcTo(x, y, x + w, y, r);
     ctx.closePath();
   }
+  // Text-safe rectangle inside a region. Rectangular boxes (fill ≈ 1) get a
+  // small inset; round bubbles get the inscribed rectangle of their ellipse
+  // (sides ≈ 1/√2 of the bounding box) so lines never cross the outline.
   function innerRect(bbox, fillRatio) {
-    const ix = fillRatio > 0.92 ? 0.06 : 0.13, iy = fillRatio > 0.92 ? 0.06 : 0.10;
-    return { x: bbox.x + bbox.w * ix, y: bbox.y + bbox.h * iy, w: bbox.w * (1 - 2 * ix), h: bbox.h * (1 - 2 * iy) };
+    const k = fillRatio > 0.92 ? 0.88 : fillRatio > 0.8 ? 0.78 : 0.71;
+    const ix = (1 - k) / 2, iy = (1 - k) / 2;
+    return { x: bbox.x + bbox.w * ix, y: bbox.y + bbox.h * iy, w: bbox.w * k, h: bbox.h * k };
   }
   function makeCanvas(w, h) {
     const c = document.createElement("canvas");

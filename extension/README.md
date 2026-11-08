@@ -20,7 +20,8 @@ Repeat steps 1–3 on each device. Settings, glossary and (optionally) the API k
 | Translate one page | Hover the image → **Translate** |
 | Translate everything on screen | `Alt+T`, or popup → *Translate visible* |
 | Hide / show translations | `Alt+Shift+T`, or hover → **Hide** |
-| Translate automatically while scrolling | Popup → *Auto-translate on \<this site\>* (per-site opt-in; never runs elsewhere) |
+| Make a site "yours" (hover button + shortcuts) | Popup → *Enable on \<this site\>*. Elsewhere the extension stays dormant until you use the toolbar button or `Alt+T`. |
+| Translate automatically while scrolling | Popup → *Auto-translate while scrolling here* (per-site; implies enabled) |
 | Switch everything off | Popup → master switch (badge shows "off") |
 | Redo a page (e.g. after editing the glossary) | Hover → **↻ Redo** |
 
@@ -38,6 +39,7 @@ Roughly 1,500–2,000 input tokens per page plus a few hundred output tokens. Ha
 
 ## Known limitations (v0.1)
 
+- The content script is injected only on enabled sites or on demand, so the first "Translate visible" on a new site takes a moment longer.
 - Only `<img>` elements are handled. Readers that draw pages into a `<canvas>` or CSS `background-image` are not yet supported.
 - Sites that require a `Referer` header to serve images may return 403; the error shows in the hover bar.
 - Overlays are positioned over the image's on-screen rectangle; if the image sits inside a scrolling sub-panel the overlay can spill past the panel edge.

@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Gytakusub — Privacy Policy</title>
+<link rel="icon" href="icons/icon48.png" />
+<style>
+  :root { color-scheme: light dark; }
+  body { max-width: 720px; margin: 40px auto; padding: 0 20px; font: 16px/1.6 -apple-system, system-ui, "Segoe UI", Roboto, sans-serif; color: #111; background: #fff; }
+  @media (prefers-color-scheme: dark) { body { color: #e5e7eb; background: #16181d; } a { color: #60a5fa; } }
+  h1 { font-size: 26px; } h2 { font-size: 19px; margin-top: 28px; }
+  code { background: rgba(127,127,127,.15); padding: 1px 5px; border-radius: 4px; }
+  .muted { opacity: .7; font-size: 14px; }
+</style>
+</head>
+<body>
+<h1>Gytakusub — Privacy Policy</h1>
+<p class="muted">Effective 8 November 2026. Applies to the Gytakusub browser extension and the Gytakusub web app (gywreb.github.io/gytakusub).</p>
+
+<h2>Summary</h2>
+<p>Gytakusub has no server and no account system. The developer never receives your data. The only data that leaves your device is sent, by your browser, directly to Anthropic's Claude API using <strong>your own API key</strong>, in order to translate the image you asked to translate.</p>
+
+<h2>What is processed, and where</h2>
+<ul>
+  <li><strong>Page images.</strong> When you translate an image (by hovering and clicking, pressing a shortcut, enabling auto-translate on a site you chose, or pasting a screenshot into the web app), a downscaled copy of that image is sent to <code>api.anthropic.com</code> so the model can read and translate the text. Anthropic's handling of API inputs is governed by <a href="https://www.anthropic.com/legal/commercial-terms">Anthropic's commercial terms</a> and privacy policy. The developer of Gytakusub has no access to these requests.</li>
+  <li><strong>Your API key.</strong> Stored in your browser's extension storage (device-local by default; optionally in your browser's sync storage if you turn that on) or, in the web app, in the browser's localStorage. It is sent only to <code>api.anthropic.com</code> as the authentication header.</li>
+  <li><strong>Settings, glossary, and chapter context.</strong> Your model choice, target language, glossary, list of enabled sites, and the names and recent translated lines used for consistency are stored locally in the browser (and in browser sync storage for settings, if your browser syncs). Chapter context is per tab and discarded when the tab closes.</li>
+  <li><strong>Translation cache.</strong> Translations are cached in browser session storage so re-opening a page does not cost tokens; the cache is cleared when the browser closes.</li>
+</ul>
+
+<h2>What is not collected</h2>
+<ul>
+  <li>No analytics, telemetry, crash reporting, or advertising identifiers.</li>
+  <li>No browsing history. The extension runs only on sites you enable, or on a page where you explicitly invoke it from the toolbar or a shortcut.</li>
+  <li>No images, translations, or keys are ever sent to the developer or to any party other than Anthropic.</li>
+</ul>
+
+<h2>Optional image proxy (web app only)</h2>
+<p>If you deploy and configure your own Cloudflare Worker from <code>worker.js</code>, image bytes for chapter pages pass through <em>your</em> worker. The developer does not operate any proxy.</p>
+
+<h2>Permissions (extension)</h2>
+<ul>
+  <li><code>storage</code> — save your settings and key locally.</li>
+  <li><code>activeTab</code>, <code>scripting</code> — inject the translator into the current tab when you ask, and register it on sites you enable.</li>
+  <li>Host permission for all sites — required to fetch the page images you are viewing from whichever image server the site uses, so they can be read and translated. Gytakusub does not read or modify page content other than the images you translate.</li>
+</ul>
+
+<h2>Your control</h2>
+<p>Remove the API key or any setting from the extension's Options page or the web app's Settings; uninstalling the extension or clearing site data for the web app deletes everything stored locally. There is nothing to delete on the developer's side because nothing is held there.</p>
+
+<h2>Changes and contact</h2>
+<p>Changes to this policy are published in the <a href="https://github.com/gywreb/gytakusub">project repository</a>. Questions: open an issue on the repository.</p>
+</body>
+</html>

@@ -38,7 +38,7 @@ const ITEMS_FILE = process.argv[4]; // JSON: [{tag, box:[x,y,w,h] in px of the 1
 
   // --- fake DOM ---
   const canvases = [];
-  const el = () => ({ style: {}, classList: { add() {}, remove() {}, contains() { return false; } }, append() {}, remove() {}, addEventListener() {}, textContent: "", id: "", className: "", disabled: false, offsetWidth: 100, contains() { return false; } });
+  const el = () => ({ style: {}, classList: { add() {}, remove() {}, contains() { return false; }, toggle() {} }, append() {}, remove() {}, addEventListener() {}, setAttribute() {}, attachShadow() { return el(); }, textContent: "", id: "", className: "", disabled: false, hidden: false, offsetWidth: 100, isConnected: false, contains() { return false; } });
   class HTMLImageElement {}
   const img = Object.assign(new HTMLImageElement(), {
     naturalWidth: W, naturalHeight: H, currentSrc: "https://example.test/page.png", src: "https://example.test/page.png", isConnected: true,
@@ -49,6 +49,8 @@ const ITEMS_FILE = process.argv[4]; // JSON: [{tag, box:[x,y,w,h] in px of the 1
   globalThis.location = { hostname: "example.test" };
   globalThis.Image = Image;
   globalThis.requestAnimationFrame = () => 0;
+  globalThis.addEventListener = () => {};
+  globalThis.performance = globalThis.performance || { now: () => Date.now() };
   globalThis.getComputedStyle = () => ({ objectFit: "fill" });
   globalThis.IntersectionObserver = class { observe() {} unobserve() {} disconnect() {} };
   globalThis.MutationObserver = class { observe() {} disconnect() {} };
@@ -78,4 +80,5 @@ const ITEMS_FILE = process.argv[4]; // JSON: [{tag, box:[x,y,w,h] in px of the 1
   o.drawImage(src, 0, 0); o.drawImage(overlay, 0, 0, W, H);
   fs.writeFileSync(OUT, outC.toBuffer("image/png"));
   console.log("wrote", OUT, "candidates:", bubbles.length);
+  process.exit(0); // content.js keeps a layout interval alive
 })().catch((e) => { console.error(e); process.exit(1); });

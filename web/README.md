@@ -14,7 +14,7 @@ The key is stored only in that browser (localStorage). Repeat on the MacBook or 
 
 **Screenshots (any app):** take a screenshot → tap its preview → **Share → Copy** → open Gytakusub → **Paste image**. Or **Choose photos** and pick the screenshot. Tap a page to flip between translated and original; **Save** shares/saves the translated image.
 
-**MangaDex chapter:** paste a `mangadex.org/chapter/…` link → **Load**. Pages translate as you scroll. On a wide screen (tablet, foldable inner display, laptop) pages show as right-to-left two-page spreads; switch it off in Settings.
+**Chapter link (advanced, off by default):** Settings → Advanced → show "Chapter link" mode. It takes a chapter link from a reader with an adapter in `sources.js` and translates pages as you scroll. On a wide screen (tablet, foldable inner display, laptop) pages show as right-to-left two-page spreads; switch it off in Settings.
 
 ## Hosting
 
@@ -22,13 +22,14 @@ Any static host works. This repo deploys `web/` to GitHub Pages from `main` via 
 
 ## Image proxy (only if needed)
 
-Chapter mode fetches page images from the manga site's CDN and needs to read their pixels. If a CDN refuses cross-origin reads you'll see a "blocks cross-origin reads" error; deploy `worker.js` as a free Cloudflare Worker and enter `https://<name>.<you>.workers.dev/?url=` under **Settings → Image proxy**. Screenshot mode never needs this.
+Chapter mode fetches page images from the reader's CDN and needs to read their pixels. If a CDN refuses cross-origin reads you'll see a "blocks cross-origin reads" error; deploy `worker.js` as a free Cloudflare Worker (it relays image bytes from an allow-list, sends no spoofed headers) and enter `https://<name>.<you>.workers.dev/?url=` under **Settings → Image proxy**. Screenshot mode never needs this.
 
 ## Files
 
 ```
 index.html / style.css / app.js   UI
 translator.js                      pipeline: slice → detect → stamp → Claude → typeset
+sources.js                         reader adapters for chapter-link mode
 bubble.js, typeset.js, prompt.js   shared engine (copied from ../extension — run scripts/sync-shared.sh)
 sw.js, manifest.webmanifest        PWA shell
 worker.js                          optional Cloudflare image proxy

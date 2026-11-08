@@ -1,9 +1,18 @@
 // Gytakusub Web – UI.
-import { DEFAULT_SETTINGS, loadSettings, saveSettings, loadImage, blobToDataUrl, fetchImageBlob, translateImage, renderPage, testKey, parseMangaDexChapter, mangaDexPages } from "./translator.js";
+import { loadSettings, saveSettings, loadImage, blobToDataUrl, fetchImageBlob, translateImage, renderPage, testKey } from "./translator.js";
+import { chapterPages } from "./sources.js";
 import { MODELS } from "./prompt.js";
 
 const $ = (id) => document.getElementById(id);
+
 let settings = loadSettings();
+
+// "Chapter link" mode is an advanced, opt-in feature (Settings → Advanced).
+function applyChapterMode() {
+  const tab = document.querySelector('.tab[data-mode="chapter"]');
+  tab.classList.toggle("hidden", !settings.chapterMode);
+  if (!settings.chapterMode && tab.classList.contains("active")) setMode("shots");
+}
 let ctx = { terms: [], recent: [] }; // chapter context for this session
 const MAX_PARALLEL = 2;
 const pages = []; // { el, img?, url?, status, result? }
@@ -109,6 +118,7 @@ async function savePage(page) {
   if (!c) return toast("Not translated yet");
   const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", 0.92));
   const file = new File([blob], `gytakusub-${Date.now()}.jpg`, { type: "image/jpeg" });
+  toast("Saved for your personal reading. Please don't redistribute translated pages.", 3500);
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
     try { await navigator.share({ files: [file], title: "Gytakusub" }); return; } catch { /* cancelled */ return; }
   }
@@ -163,11 +173,9 @@ drop.addEventListener("drop", (e) => addFiles(e.dataTransfer.files));
 let io = null;
 $("chapterForm").onsubmit = async (e) => {
   e.preventDefault();
-  const id = parseMangaDexChapter($("chapterUrl").value.trim());
-  if (!id) return toast("That doesn't look like a MangaDex chapter link.");
   $("chapterInfo").textContent = "Loading chapter…";
   try {
-    const urls = await mangaDexPages(id);
+    const urls = await chapterPages($("chapterUrl").value);
     clearPages();
     ctx = { terms: [], recent: [] };
     $("chapterInfo").textContent = `${urls.length} pages. Scroll — pages translate as they come into view.`;
@@ -203,12 +211,12 @@ function fillSettings() {
   $("sApiKey").value = settings.apiKey; $("sModel").value = settings.model; $("sTargetLang").value = settings.targetLang;
   $("sGlossary").value = settings.glossary; $("sCustomPrompt").value = settings.customPrompt;
   $("sUseContext").checked = settings.useContext; $("sUppercase").checked = settings.uppercase; $("sRtl").checked = settings.rtlSpreads;
-  $("sProxy").value = settings.imageProxy; $("sMsg").textContent = "";
+  $("sProxy").value = settings.imageProxy; $("sChapter").checked = !!settings.chapterMode; $("sMsg").textContent = "";
 }
 function readSettings() {
   return { ...settings, apiKey: $("sApiKey").value.trim(), model: $("sModel").value, targetLang: $("sTargetLang").value.trim() || "English",
     glossary: $("sGlossary").value, customPrompt: $("sCustomPrompt").value, useContext: $("sUseContext").checked,
-    uppercase: $("sUppercase").checked, rtlSpreads: $("sRtl").checked, imageProxy: $("sProxy").value.trim() };
+    uppercase: $("sUppercase").checked, rtlSpreads: $("sRtl").checked, imageProxy: $("sProxy").value.trim(), chapterMode: $("sChapter").checked };
 }
 $("btnSettings").onclick = () => { fillSettings(); dlg.showModal(); };
 $("sShow").onclick = () => { const i = $("sApiKey"); i.type = i.type === "password" ? "text" : "password"; $("sShow").textContent = i.type === "password" ? "Show" : "Hide"; };
@@ -217,10 +225,11 @@ $("sTest").onclick = async () => {
   try { await testKey(s); $("sMsg").className = "hint ok"; $("sMsg").textContent = `Key works (${s.model}).`; }
   catch (e) { $("sMsg").className = "hint err"; $("sMsg").textContent = "Failed: " + e.message; }
 };
-dlg.addEventListener("close", () => { if (dlg.returnValue === "save") { settings = readSettings(); saveSettings(settings); updateToolbar(); toast("Saved"); } });
+dlg.addEventListener("close", () => { if (dlg.returnValue === "save") { settings = readSettings(); saveSettings(settings); updateToolbar(); applyChapterMode(); toast("Saved"); } });
 
 // ---------- boot ----------
 
+applyChapterMode();
 if (!settings.apiKey) setTimeout(() => { fillSettings(); dlg.showModal(); }, 400);
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 updateToolbar();

@@ -2,7 +2,7 @@
 // No DOM access except an optional CanvasRenderingContext2D passed in, so this
 // file can be unit-tested in Node. Exposed as globalThis.GyT.
 
-(function (root) {
+((root) => {
   "use strict";
 
   const lum = (r, g, b) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
