@@ -8,6 +8,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
       - run: for f in extension/*.js web/*.js; do node --check "$f"; done
+      - run: pip install --quiet pillow && cd tests && npm run demo # synthetic test page (fixtures/*.png are git-ignored)
       - run: cd tests && npm install --no-audit --no-fund && npm test
       # Real-browser test: the actual extension in headless Chrome against a mock API.
       - run: cd tests && npx playwright install --with-deps chrome

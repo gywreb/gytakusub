@@ -95,6 +95,7 @@ items.append({"box": [850, 1350, 210, 30], "text": "And if he doesn't come back?
 items.append({"box": [870, 1470, 110, 30], "text": "He will.", "size": "normal"})
 
 out = sys.argv[1] if len(sys.argv) > 1 else "fixtures"
+import os; os.makedirs(out, exist_ok=True)
 img.save(f"{out}/demo-page.png")
 json.dump([{"tag": None, "kind": it.get("kind", "bubble"), **it} for it in items], open(f"{out}/demo-items.json", "w"), indent=2)
 print("demo page written", W, H, len(items), "items")
