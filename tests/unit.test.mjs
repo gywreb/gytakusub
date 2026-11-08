@@ -81,10 +81,13 @@ console.log("ALL TESTS PASSED");
   assert.equal(f.broken, false, "should not split a word when a comparable size fits it whole");
   assert.deepEqual(f.lines, ["SHOTARO..."]);
   // very narrow + tall: hyphenated break beats a tiny single line
-  const h = G.fitText("SHOTARO", { x: 0, y: 0, w: 40, h: 120 }, setFont, measure, { maxSize: 40, minSize: 8 });
+  const h = G.fitText("SUPERTRIGGER", { x: 0, y: 0, w: 40, h: 120 }, setFont, measure, { maxSize: 40, minSize: 8 });
   assert.equal(h.broken, true);
   assert.ok(h.lines[0].endsWith("-"), "hyphen on letter break: " + h.lines[0]);
   assert.ok(h.size > 8);
+  // short words (names) are never hyphenated: they shrink instead
+  const n = G.fitText("Nikaido", { x: 0, y: 0, w: 40, h: 120 }, setFont, measure, { maxSize: 40, minSize: 8 });
+  assert.equal(n.broken, false); assert.deepEqual(n.lines, ["Nikaido"]);
   // impossible even at minSize -> splits, flagged
   const g = G.fitText("SUPERCALIFRAGILISTIC", { x: 0, y: 0, w: 30, h: 60 }, setFont, measure, { maxSize: 40, minSize: 8 });
   assert.equal(g.broken, true);

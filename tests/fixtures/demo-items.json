@@ -63,12 +63,24 @@
     "tag": null,
     "kind": "bubble",
     "box": [
-      847,
-      1365,
-      166,
+      850,
+      1350,
+      210,
       30
     ],
-    "text": "...I'm sorry.",
-    "size": "small"
+    "text": "And if he doesn't come back?",
+    "size": "normal"
+  },
+  {
+    "tag": null,
+    "kind": "bubble",
+    "box": [
+      870,
+      1470,
+      110,
+      30
+    ],
+    "text": "He will.",
+    "size": "normal"
   }
 ]

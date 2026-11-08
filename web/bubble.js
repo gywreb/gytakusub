@@ -355,13 +355,19 @@
     return wrapInfo(measure, text, maxW).lines;
   }
 
-  function wrapInfo(measure, text, maxW) {
+  function wrapInfo(measure, text, maxW, opts = {}) {
     const words = text.split(/\s+/).filter(Boolean);
     const lines = [];
     let cur = "";
     let broken = false;
+    const minBreakLen = opts.minBreakLen ?? 8;
     for (const w of words) {
       if (measure(w) > maxW) {
+        if ([...w].length < minBreakLen && !opts.force) {
+          // Short word that doesn't fit: report as not fitting rather than splitting it.
+          if (cur) { lines.push(cur); cur = ""; }
+          lines.push(w); broken = true; continue;
+        }
         // break the long word by characters
         broken = true;
         if (cur) { lines.push(cur); cur = ""; }
@@ -411,10 +417,11 @@
         if (!brokenFit) brokenFit = fit;
       }
     }
-    if (wholeFit && (!brokenFit || wholeFit.size >= brokenFit.size * (opts.hyphenRatio ?? 0.7))) return wholeFit;
+    if (wholeFit && (!brokenFit || wholeFit.size >= brokenFit.size * (opts.hyphenRatio ?? 0.6))) return wholeFit;
     if (brokenFit) return brokenFit;
+    // Nothing fits even at minSize: force character breaks so the text at least stays inside.
     setFont(minSize);
-    const { lines, broken } = wrapInfo(measure, text, rect.w);
+    const { lines, broken } = wrapInfo(measure, text, rect.w, { force: true, minBreakLen: 1 });
     return { size: minSize, lines, lineHeight: minSize * lh, broken };
   }
 

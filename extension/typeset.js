@@ -46,6 +46,57 @@
     const ix = (1 - k) / 2, iy = (1 - k) / 2;
     return { x: bbox.x + bbox.w * ix, y: bbox.y + bbox.h * iy, w: bbox.w * k, h: bbox.h * k };
   }
+  /**
+   * Largest axis-aligned rectangle (approx.) inside a region, sampled from its
+   * `inside(x,y)` predicate within `bbox` and optionally a row window.
+   * Rows are scanned for their longest inside run; the rectangle is the best
+   * window of consecutive rows × the intersection of their runs.
+   */
+  function inscribedRect(inside, bbox, y0 = bbox.y, y1 = bbox.y + bbox.h) {
+    const step = Math.max(1, Math.round(Math.min(bbox.w, bbox.h) / 60));
+    const rows = [];
+    for (let y = Math.ceil(y0); y < y1; y += step) {
+      let best = null, runStart = null;
+      for (let x = bbox.x; x <= bbox.x + bbox.w; x += step) {
+        const inn = x < bbox.x + bbox.w && inside(x, y);
+        if (inn && runStart === null) runStart = x;
+        if (!inn && runStart !== null) { if (!best || x - runStart > best.w) best = { x: runStart, w: x - runStart }; runStart = null; }
+      }
+      if (runStart !== null) { const end = bbox.x + bbox.w; if (!best || end - runStart > best.w) best = { x: runStart, w: end - runStart }; }
+      rows.push(best ? { y, x0: best.x, x1: best.x + best.w } : null);
+    }
+    let bestArea = 0, bestRect = null;
+    for (let i = 0; i < rows.length; i++) {
+      if (!rows[i]) continue;
+      let x0 = rows[i].x0, x1 = rows[i].x1;
+      for (let j = i; j < rows.length; j++) {
+        if (!rows[j]) break;
+        x0 = Math.max(x0, rows[j].x0); x1 = Math.min(x1, rows[j].x1);
+        if (x1 <= x0) break;
+        const h = rows[j].y - rows[i].y + step, area = (x1 - x0) * h;
+        if (area > bestArea) { bestArea = area; bestRect = { x: x0, y: rows[i].y, w: x1 - x0, h }; }
+      }
+    }
+    if (!bestRect) return null;
+    // small inset so letters don't kiss the outline
+    const k = 0.92;
+    return { x: bestRect.x + bestRect.w * (1 - k) / 2, y: bestRect.y + bestRect.h * (1 - k) / 2, w: bestRect.w * k, h: bestRect.h * k };
+  }
+
+  /** Row (y) with the narrowest inside span between ya and yb — the "waist" between two lobes. */
+  function waistRow(inside, bbox, ya, yb) {
+    const lo = Math.min(ya, yb), hi = Math.max(ya, yb);
+    if (hi - lo < 6) return (lo + hi) / 2;
+    const step = Math.max(1, Math.round((hi - lo) / 40));
+    let best = (lo + hi) / 2, bestW = Infinity;
+    for (let y = lo; y <= hi; y += step) {
+      let w = 0;
+      for (let x = bbox.x; x < bbox.x + bbox.w; x += step) if (inside(x, y)) w++;
+      if (w < bestW) { bestW = w; best = y; }
+    }
+    return best;
+  }
+
   function makeCanvas(w, h) {
     const c = document.createElement("canvas");
     c.width = w; c.height = h;
@@ -184,27 +235,40 @@
       const mul = SIZE_MUL[it.size] || 1;
       if (key) {
         const g = regions.get(key);
-        const { bbox, fillRatio, color } = g.region;
-        const inner = innerRect(bbox, fillRatio);
+        const { bbox, fillRatio, color, inside } = g.region;
         let rect;
         if (g.items.length === 1) {
-          // The detected bubble is authoritative; the model's box is not used
-          // to grow the text area (its coordinates are approximate).
-          rect = inner;
+          // The detected bubble is authoritative: text goes in the largest
+          // rectangle inside its actual shape (the model's box is approximate).
+          rect = inscribedRect(inside, bbox) || innerRect(bbox, fillRatio);
         } else {
-          // Joined bubble: split the interior between its speakers in reading
-          // order (vertical bands), nudged toward each one's own box when given.
-          const idx = g.items.findIndex((j) => j.it === it), n = g.items.length;
-          rect = { x: inner.x, y: inner.y + (inner.h / n) * idx, w: inner.w, h: inner.h / n };
-          if (box) {
-            const bx = clampRect({ x: box.x - box.w * 0.15, y: box.y - box.h * 0.15, w: box.w * 1.3, h: box.h * 1.3 }, inner);
-            if (bx.w * bx.h > rect.w * rect.h * 0.5) rect = bx;
+          // Joined bubble: cut the region at the waists between consecutive
+          // speakers (ordered top-to-bottom by their boxes, else evenly), then
+          // inscribe each lobe.
+          if (!g.cuts) {
+            const n = g.items.length;
+            const centres = g.items.map((j, i) => j.box ? j.box.y + j.box.h / 2 : bbox.y + bbox.h * (i + 0.5) / n);
+            const order = centres.map((c, i) => [c, i]).sort((a, b) => a[0] - b[0]);
+            const edges = [bbox.y];
+            for (let k = 0; k < n - 1; k++) edges.push(waistRow(inside, bbox, order[k][0], order[k + 1][0]));
+            edges.push(bbox.y + bbox.h);
+            g.cuts = new Map(order.map(([, i], k) => [i, [edges[k], edges[k + 1]]]));
           }
+          const idx = g.items.findIndex((j) => j.it === it);
+          const [ya, yb] = g.cuts.get(idx);
+          rect = inscribedRect(inside, bbox, ya, yb) || { x: bbox.x + bbox.w * 0.15, y: ya + (yb - ya) * 0.1, w: bbox.w * 0.7, h: (yb - ya) * 0.8 };
         }
         placements.push({ text, rect, color: G.isDark(color) ? "#fff" : "#000", target: sizeFor(g.letter, mul), minSize: Math.max(7, Math.round(base * 0.4)) });
       } else if (box) {
         const pad = Math.max(4, Math.min(box.w, box.h) * 0.16);
-        const zone = clampRect({ x: box.x - pad, y: box.y - pad, w: box.w + 2 * pad, h: box.h + 2 * pad }, page);
+        let zone = clampRect({ x: box.x - pad, y: box.y - pad, w: box.w + 2 * pad, h: box.h + 2 * pad }, page);
+        // A wrong, oversized model box must not wipe artwork: cap the zone to
+        // ~2.5× the area this text needs at page size, centred on the box.
+        const need = text.length * pageLetter * 0.55 * pageLetter * 1.15 * 2.5;
+        if (zone.w * zone.h > need) {
+          const k = Math.sqrt(need / (zone.w * zone.h));
+          zone = clampRect({ x: zone.x + zone.w * (1 - k) / 2, y: zone.y + zone.h * (1 - k) / 2, w: zone.w * k, h: zone.h * k }, page);
+        }
         const erased = G.eraseTextZone(ctx, pixels, zone, { radius: Math.max(3, Math.round(base * 0.12)) });
         if (erased) {
           const letter = G.estimateLetterSize(pixels, zone, null);

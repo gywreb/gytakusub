@@ -83,7 +83,16 @@ f = ImageFont.truetype(FONT, 24)
 d.text((90, 1270), "Tres horas después...", font=f, fill="black")
 items.append({"box": [90, 1270, 300, 30], "text": "Three hours later...", "size": "small", "kind": "narration"})
 character(600, 1480, 85)
-items.append({"box": bubble(930, 1380, 180, 80, "...lo siento.", 26, tail=(760, 1440)), "text": "...I'm sorry.", "size": "small"})
+# joined bubble: two overlapping ellipses sharing one outline (two speakers)
+d.ellipse([760, 1300, 1120, 1450], fill="white", outline="black", width=5)
+d.ellipse([820, 1420, 1140, 1560], fill="white", outline="black", width=5)
+d.ellipse([826, 1426, 1134, 1554], fill="white")  # erase the inner outline where they overlap
+d.ellipse([766, 1306, 1114, 1444], fill="white")
+f2 = ImageFont.truetype(FONT, 26)
+d.text((850, 1350), "¿Y si no vuelve?", font=f2, fill="black")
+d.text((870, 1470), "Volverá.", font=f2, fill="black")
+items.append({"box": [850, 1350, 210, 30], "text": "And if he doesn't come back?", "size": "normal"})
+items.append({"box": [870, 1470, 110, 30], "text": "He will.", "size": "normal"})
 
 out = sys.argv[1] if len(sys.argv) > 1 else "fixtures"
 img.save(f"{out}/demo-page.png")
