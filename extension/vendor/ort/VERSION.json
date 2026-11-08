@@ -1,0 +1,8 @@
+{
+  "package": "onnxruntime-web",
+  "version": "1.31.1",
+  "files": [
+    "ort.wasm.bundle.min.mjs",
+    "ort-wasm-simd-threaded.wasm"
+  ]
+}

@@ -9,7 +9,9 @@ globalThis.__dirname ??= here;
 globalThis.require ??= createRequire(import.meta.url);
 import { ImageData } from "canvas";
 globalThis.ImageData ??= ImageData; // engine/erase.js constructs ImageData like a browser would
-const { getCV, getDetector } = await import("../extension/engine/cv.js");
+const { getCV, getDetector, getSegmenter } = await import("../extension/engine/cv.js");
+const { analyze } = await import("../extension/engine/analyze.js");
+const { segment } = await import("../extension/engine/segment.js");
 export const cv = await getCV({ wasmBinary: fs.readFileSync(path.join(here, "../extension/vendor/opencv_js.wasm")) });
 // Emscripten's Node branch installs process-wide handlers that turn any unhandled
 // rejection into a wasm abort (exit code 7, source dump) — masking the real error.
@@ -18,3 +20,24 @@ process.removeAllListeners("uncaughtException");
 
 // The learned text detector, from the vendored model file (fetch() cannot read files in Node).
 export const detector = await getDetector({ modelBytes: new Uint8Array(fs.readFileSync(path.join(here, "../extension/vendor/ppocr-det.onnx"))) });
+
+// The learned bubble segmenter, when a model is available: extension/vendor/segment.onnx
+// (+ segment.json) as shipped, or the file named by GYT_SEGMENT (a model under
+// evaluation, with GYT_SEGMENT_CONFIG for its description). null otherwise.
+const segPath = process.env.GYT_SEGMENT || path.join(here, "../extension/vendor/segment.onnx");
+export const segmenter = fs.existsSync(segPath)
+  ? await getSegmenter({
+    modelBytes: new Uint8Array(fs.readFileSync(segPath)),
+    config: (() => { const c = process.env.GYT_SEGMENT_CONFIG || segPath.replace(/\.onnx$/, ".json"); return fs.existsSync(c) ? JSON.parse(fs.readFileSync(c, "utf8")) : {}; })(),
+    wasmBinary: fs.readFileSync(path.join(here, "../extension/vendor/ort/ort-wasm-simd-threaded.wasm")).buffer,
+  })
+  : null;
+if (segmenter) console.error(`[cv-node] bubble segmenter: ${path.basename(segPath)} (input ${segmenter.inputSize}, classes ${segmenter.classes.join("/")})`);
+
+/** Full analysis as the extension runs it: segmentation (if a model is loaded) + text detection + geometry. */
+export async function analyzePage(img, opts = {}) {
+  const seg = segmenter ? await segment(segmenter, img) : null;
+  const an = analyze(cv, img, { detector, instances: seg ? seg.instances : null, bubbleClasses: segmenter?.bubbleClasses, ...opts });
+  an.segmentMs = seg ? seg.ms : 0;
+  return an;
+}

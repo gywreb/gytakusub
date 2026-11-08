@@ -2,8 +2,9 @@
 // text regions for the model) and finish (place the translations, erase the
 // original lettering, hand back a cleaned page plus text placements).
 // Used by the extension's service worker and by the web app's Web Worker.
-import { getCV, getDetector } from "./cv.js";
+import { getCV, getDetector, getSegmenter } from "./cv.js";
 import { analyze } from "./analyze.js";
+import { segment } from "./segment.js";
 import { layout } from "./layout.js";
 import { erase } from "./erase.js";
 import { sliceGeometry, normalizeItems } from "../prompt.js";
@@ -15,7 +16,7 @@ import { sliceGeometry, normalizeItems } from "../prompt.js";
  */
 export async function preparePage(bitmap, settings) {
   const cv = await getCV();
-  const detector = await getDetector();
+  const [detector, segmenter] = await Promise.all([getDetector(), getSegmenter()]);
   const W = bitmap.width, H = bitmap.height;
   const geometry = sliceGeometry(W, H, settings);
   const scale = geometry[0].scale; // one scale for the whole page
@@ -29,7 +30,11 @@ export async function preparePage(bitmap, settings) {
     ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, cw, ch);
     ctx.drawImage(bitmap, s.x, s.y, s.w, s.h, 0, 0, cw, ch);
     const imageData = ctx.getImageData(0, 0, cw, ch);
-    const analysis = analyze(cv, imageData, { detector });
+    // bubbles from the segmentation model when there is one; the analysis then
+    // only has to read the text inside them
+    const seg = segmenter ? await segment(segmenter, imageData) : null;
+    const analysis = analyze(cv, imageData, { detector, instances: seg ? seg.instances : null, bubbleClasses: segmenter?.bubbleClasses });
+    analysis.segmentMs = seg ? seg.ms : 0;
     const tagFrom = nextId;
     for (const r of analysis.regions) r.id = nextId++; // page-wide numbering
     const tagTo = nextId - 1;
@@ -74,7 +79,9 @@ export async function finishPage(job, results, opts = {}) {
     an.dispose();
   });
   const letter = job.slices.length ? job.slices[0].analysis.letter : 0;
-  const engine = job.slices.length && job.slices[0].analysis.learned ? "learned" : "heuristic";
+  const first = job.slices[0]?.analysis;
+  const engine = !first ? "heuristic" : first.segmented ? "segmented" : first.learned ? "learned" : "heuristic";
+  const segmentMs = job.slices.reduce((n, s) => n + (s.analysis.segmentMs || 0), 0);
   // Patches: just the areas the eraser changed, cut from the cleaned page. The
   // extension ships these (a few KB each) instead of the whole page; the content
   // script draws them over the image it already shows.
@@ -83,7 +90,7 @@ export async function finishPage(job, results, opts = {}) {
     c.getContext("2d").drawImage(canvas, r.x, r.y, r.w, r.h, 0, 0, r.w, r.h);
     return { x: r.x, y: r.y, w: r.w, h: r.h, canvas: c };
   });
-  return { items, placements, regions, work, letter, canvas, patches, engine };
+  return { items, placements, regions, work, letter, canvas, patches, engine, segmentMs };
 }
 
 /** Red numbered stamps at the top-left of each text region. */

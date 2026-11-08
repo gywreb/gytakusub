@@ -14,7 +14,7 @@ import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { createCanvas, loadImage, registerFont } from "canvas";
-import { cv, detector } from "./cv-node.mjs";
+import { cv, detector, analyzePage } from "./cv-node.mjs";
 import { analyze } from "../extension/engine/analyze.js";
 import { layout } from "../extension/engine/layout.js";
 
@@ -74,7 +74,7 @@ for (const zipPath of zips) {
     const { W, H } = rep.work;
     const c = createCanvas(W, H), ctx = c.getContext("2d"); ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, W, H); ctx.drawImage(img, 0, 0, W, H);
     const t0 = Date.now();
-    const an = analyze(cv, ctx.getImageData(0, 0, W, H), { detector });
+    const an = await analyzePage(ctx.getImageData(0, 0, W, H));
     tot.ms += Date.now() - t0;
     // re-match the report's tags to the regions found now (as replay-report.mjs does)
     const items = rep.items.map((it, index) => ({ tag: rematch(an, rep, it), box: it.box, text: it.text, size: it.size, kind: it.kind, index }));

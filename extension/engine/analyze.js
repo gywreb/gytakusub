@@ -18,7 +18,10 @@ const trace = (...a) => { if (globalThis.GYT_TRACE) globalThis.GYT_TRACE(...a); 
 /**
  * @param {typeof import("../vendor/opencv.js")} cv
  * @param {ImageData} img
- * @param {{detector?: object}} [opts] detector from detect.js loadDetector; without it the heuristic analyser runs
+ * @param {{detector?: object, instances?: import("./segment.js").Instance[]|null, bubbleClasses?: Set<number>}} [opts]
+ *   detector: from detect.js loadDetector; without it the heuristic analyser runs.
+ *   instances: from segment.js — the bubbles as a learned segmentation model sees them;
+ *   with them, bubbles are the model's masks and the light-region rules are not used.
  * @returns {import("./analyze-heuristic.js").Analysis}
  */
 export function analyze(cv, img, opts = {}) {
@@ -151,6 +154,48 @@ export function analyze(cv, img, opts = {}) {
   for (const p of paragraphs) if (p.lineLetters) p.letter = median(p.lineLetters);
   const pageLetter = median(paragraphs.flatMap((p) => Array(Math.min(40, p.glyphCount)).fill(p.letter))) || Math.max(8, W / 60);
 
+  const band = Math.max(1, Math.round(H / 24));
+  const order = (a, b) => (Math.floor(a.box.y / band) - Math.floor(b.box.y / band)) || (a.box.x - b.box.x);
+  // Loose text must look like letters inside: no single ink component spanning the
+  // line (a border, a speed line), and the components letter-sized rather than
+  // specks (screentone dots the detector read as a dotted line).
+  const looksLettered = (p) => {
+    const P = pol[p.dark ? 1 : 0], { x, y, w, h } = p.gbox;
+    const roi = P.ink.roi(new cv.Rect(x, y, w, h)), lab = new cv.Mat(), st = new cv.Mat(), ce = new cv.Mat();
+    const n = cv.connectedComponentsWithStats(roi, lab, st, ce, 8, cv.CV_32S);
+    const S = st.data32S; let longest = 0; const sizes = [];
+    for (let i = 1; i < n; i++) { longest = Math.max(longest, w >= h ? S[i * 5 + 2] / w : S[i * 5 + 3] / h); sizes.push(Math.max(S[i * 5 + 2], S[i * 5 + 3])); }
+    roi.delete(); lab.delete(); st.delete(); ce.delete();
+    return n > 1 && longest <= 0.8 && median(sizes) >= 0.35 * p.letter;
+  };
+  // loose text is dialogue-sized (narration is never a third of the dialogue size: that is tone or detail)
+  const isFree = (p) => !p.bubble && p.score >= 0.6 && p.letter >= 0.6 * pageLetter && p.letter <= 2.5 * pageLetter && looksLettered(p);
+  const finish = (kept) => {
+    kept.sort(order);
+    const free = paragraphs.filter(isFree).sort(order);
+    const regions = []; let id = 1;
+    for (const b of kept) { b.id = id; regions.push({ id: id++, kind: "bubble", ref: b, box: b.box, letter: b.letter, dark: b.dark }); }
+    for (const p of free) { p.region = id; regions.push({ id: id++, kind: "block", ref: p, box: p.gbox, letter: p.letter, dark: p.dark }); }
+    for (const p of paragraphs) if (p.bubble) p.region = p.bubble.id;
+    src.delete(); gray.delete(); base.delete();
+    return {
+      W, H, letter: pageLetter, regions, bubbles: kept, blocks: paragraphs, lines, learned: true, segmented: !!opts.instances,
+      insideOf(regionId) {
+        const r = regions.find((q) => q.id === regionId);
+        if (!r || r.kind !== "bubble") return null;
+        const { fill, box, labels, labelId } = r.ref;
+        if (fill) return (px, py) => { const lx = (px | 0) - box.x, ly = (py | 0) - box.y; return lx >= 0 && ly >= 0 && lx < box.w && ly < box.h && fill[ly * box.w + lx] !== 0; };
+        const data = labels.data32S;
+        return (px, py) => px >= 0 && py >= 0 && px < W && py < H && data[(py | 0) * W + (px | 0)] === labelId;
+      },
+      // erase.js needs the ink masks and the light-region labels per polarity
+      polarities: pol.map((P) => ({ dark: P.dark, inkMask: P.ink, regionLabels: P.labels, dispose() { P.ink.delete(); P.light.delete(); P.labels.delete(); P.stats.delete(); } })),
+      dispose() { for (const P of pol) { P.ink.delete(); P.light.delete(); P.labels.delete(); P.stats.delete(); } },
+    };
+  };
+
+  if (opts.instances) return finish(bubblesFromInstances(opts.instances, opts.bubbleClasses, paragraphs, pageLetter, G, W, H));
+
   // ---- which light region holds each paragraph (majority of its non-ink pixels) ----
   const ownerOf = (p) => {
     const P = pol[p.dark ? 1 : 0], L = P.labels.data32S, I = P.ink.data, { x, y, w, h } = p.gbox;
@@ -223,45 +268,39 @@ export function analyze(cv, img, opts = {}) {
   const kept = bubbles.filter((A) => { const nests = bubbles.some((B) => B !== A && encloses(A, B)); if (nests) trace("region", A.box, "encloses another bubble: a background"); return !nests; });
   for (const b of kept) { for (const p of b.blocks) p.bubble = b; if (!b.dark) widenInterior(cv, pol[0], b, W, H); }
 
-  // ---- regions in reading order: bubbles, then loose paragraphs ----
-  const band = Math.max(1, Math.round(H / 24));
-  const order = (a, b) => (Math.floor(a.box.y / band) - Math.floor(b.box.y / band)) || (a.box.x - b.box.x);
-  kept.sort(order);
-  // Loose text must look like letters inside: no single ink component spanning the
-  // line (a border, a speed line), and the components letter-sized rather than
-  // specks (screentone dots the detector read as a dotted line).
-  const looksLettered = (p) => {
-    const P = pol[p.dark ? 1 : 0], { x, y, w, h } = p.gbox;
-    const roi = P.ink.roi(new cv.Rect(x, y, w, h)), lab = new cv.Mat(), st = new cv.Mat(), ce = new cv.Mat();
-    const n = cv.connectedComponentsWithStats(roi, lab, st, ce, 8, cv.CV_32S);
-    const S = st.data32S; let longest = 0; const sizes = [];
-    for (let i = 1; i < n; i++) { longest = Math.max(longest, w >= h ? S[i * 5 + 2] / w : S[i * 5 + 3] / h); sizes.push(Math.max(S[i * 5 + 2], S[i * 5 + 3])); }
-    roi.delete(); lab.delete(); st.delete(); ce.delete();
-    return n > 1 && longest <= 0.8 && median(sizes) >= 0.35 * p.letter;
-  };
-  // loose text is dialogue-sized (narration is never a third of the dialogue size: that is tone or detail)
-  const free = paragraphs.filter((p) => !p.bubble && p.score >= 0.6 && p.letter >= 0.6 * pageLetter && p.letter <= 2.5 * pageLetter && looksLettered(p)).sort(order);
-  const regions = []; let id = 1;
-  for (const b of kept) { b.id = id; regions.push({ id: id++, kind: "bubble", ref: b, box: b.box, letter: b.letter, dark: b.dark }); }
-  for (const p of free) { p.region = id; regions.push({ id: id++, kind: "block", ref: p, box: p.gbox, letter: p.letter, dark: p.dark }); }
-  for (const p of paragraphs) if (p.bubble) p.region = p.bubble.id;
-
-  src.delete(); gray.delete(); base.delete();
   for (const b of kept) if (b.widened) trace("bubble", b.box, "interior widened", { from: b.lightBox, area: b.area, interior: b.interiorArea });
-  return {
-    W, H, letter: pageLetter, regions, bubbles: kept, blocks: paragraphs, lines, learned: true,
-    insideOf(regionId) {
-      const r = regions.find((q) => q.id === regionId);
-      if (!r || r.kind !== "bubble") return null;
-      const { fill, box, labels, labelId } = r.ref;
-      if (fill) return (px, py) => { const lx = (px | 0) - box.x, ly = (py | 0) - box.y; return lx >= 0 && ly >= 0 && lx < box.w && ly < box.h && fill[ly * box.w + lx] !== 0; };
-      const data = labels.data32S;
-      return (px, py) => px >= 0 && py >= 0 && px < W && py < H && data[(py | 0) * W + (px | 0)] === labelId;
-    },
-    // erase.js needs the ink masks and the light-region labels per polarity
-    polarities: pol.map((P) => ({ dark: P.dark, inkMask: P.ink, regionLabels: P.labels, dispose() { P.ink.delete(); P.light.delete(); P.labels.delete(); P.stats.delete(); } })),
-    dispose() { for (const P of pol) { P.ink.delete(); P.light.delete(); P.labels.delete(); P.stats.delete(); } },
-  };
+  return finish(kept);
+}
+
+/**
+ * Bubbles as a segmentation model returned them: each instance's mask is the
+ * interior, the lettering inside is whatever detected paragraphs have their
+ * centre in the mask, and the bubble is dark when its surface is. Instances
+ * are filtered for the bubble classes, a plausible size and a mask that is
+ * mostly solid (a few stray pixels are not a bubble).
+ */
+function bubblesFromInstances(instances, bubbleClasses, paragraphs, pageLetter, G, W, H) {
+  const bubbles = [];
+  for (const inst of instances) {
+    if (bubbleClasses && !bubbleClasses.has(inst.cls)) continue;
+    if (!inst.mask) continue;
+    const { x, y, w, h } = inst.box;
+    let area = 0, lum = 0; const m = inst.mask;
+    for (let i = 0; i < m.length; i++) if (m[i]) { area++; lum += G[(y + ((i / w) | 0)) * W + x + (i % w)]; }
+    const frac = area / (W * H);
+    if (frac < 0.0004 || frac > 0.3 || area < 0.3 * w * h) { trace("region", inst.box, "segment rejected", { frac, fill: area / (w * h) }); continue; }
+    const inside = (px, py) => { const lx = px - x, ly = py - y; return lx >= 0 && ly >= 0 && lx < w && ly < h && m[ly * w + lx] !== 0; };
+    const blocks = paragraphs.filter((p) => !p.bubble && inside((p.gbox.x + p.gbox.w / 2) | 0, (p.gbox.y + p.gbox.h / 2) | 0));
+    // surface luminance without the lettering: dark bubble when the mask is mostly dark
+    let inkArea = 0; for (const p of blocks) inkArea += p.inkArea || 0;
+    const dark = lum / Math.max(1, area) < 110;
+    const letter = blocks.length ? median(blocks.map((b) => b.letter)) : pageLetter;
+    const bubble = { id: 0, box: { x, y, w, h }, area, color: dark ? [0, 0, 0] : [255, 255, 255], dark, letter, blocks, labelId: 0, labels: null, fill: m, score: inst.score, segmented: true };
+    for (const p of blocks) p.bubble = bubble;
+    bubbles.push(bubble);
+    trace("bubble", bubble.box, "segment accepted", { score: inst.score, blocks: blocks.length, dark, letter, inkArea });
+  }
+  return bubbles;
 }
 
 /**

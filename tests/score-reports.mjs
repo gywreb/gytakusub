@@ -14,7 +14,7 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 import { createCanvas, loadImage } from "canvas";
-import { cv, detector } from "./cv-node.mjs";
+import { cv, detector, analyzePage } from "./cv-node.mjs";
 
 const args = process.argv.slice(2);
 let engineDir = path.resolve("../extension/engine");
@@ -45,7 +45,7 @@ for (const zip of args) {
     const c = createCanvas(W, H), ctx = c.getContext("2d"); ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, W, H); ctx.drawImage(img, 0, 0, W, H);
     const t0 = Date.now();
     rejections = [];
-    const an = analyze(cv, ctx.getImageData(0, 0, W, H), { detector });
+    const an = await analyzePage(ctx.getImageData(0, 0, W, H));
     const ms = Date.now() - t0;
     // where the model saw text: the stamped region it named (as the report recorded
     // it) when it gave one, else the centre of its own box

@@ -3,13 +3,13 @@
   "private": true,
   "type": "commonjs",
   "scripts": {
-    "test": "node engine.test.mjs",
-    "test:browser": "node browser/run.mjs --out /tmp/gyt-browser/good && node browser/run.mjs --bad-boxes --out /tmp/gyt-browser/bad-boxes && node browser/web.mjs --out /tmp/gyt-browser/web",
+    "test": "node engine.test.mjs && node segment.test.mjs",
+    "test:browser": "node browser/run.mjs --out /tmp/gyt-browser/good && node browser/run.mjs --bad-boxes --out /tmp/gyt-browser/bad-boxes && node browser/run.mjs --segmenter /tmp/gyt-fake-seg.onnx --out /tmp/gyt-browser/segmented && node browser/web.mjs --out /tmp/gyt-browser/web",
     "e2e": "node engine-e2e.mjs fixtures/demo-page.png fixtures/demo-items.json /tmp/gyt-e2e.png",
     "viz": "node engine-viz.mjs",
     "demo": "python3 make-demo-page.py fixtures && python3 make-pages.py fixtures 12",
     "assets": "node make-store-assets.mjs ../store/assets",
-    "vendor": "node ../scripts/vendor-opencv.mjs && node ../scripts/vendor-hyphen.mjs && node ../scripts/vendor-detector.mjs",
+    "vendor": "node ../scripts/vendor-opencv.mjs && node ../scripts/vendor-hyphen.mjs && node ../scripts/vendor-detector.mjs && node ../scripts/vendor-ort.mjs",
     "replay": "node replay-report.mjs",
     "score": "node score-reports.mjs",
     "score:layout": "node layout-score.mjs"
@@ -19,7 +19,8 @@
     "hyphen": "^1.14.1",
     "opencv-bindings": "4.5.5",
     "playwright": "^1.65.0",
-    "@gutenye/ocr-models": "1.4.2"
+    "@gutenye/ocr-models": "1.4.2",
+    "onnxruntime-web": "1.31.1"
   },
   "dependencies": {
     "@gutenye/ocr-models": "^1.4.2",

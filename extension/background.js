@@ -221,6 +221,7 @@ async function handleTranslate(msg, sender) {
   }
   lap("encode");
   timing.patchBytes = patches.reduce((s, p) => s + p.dataUrl.length, 0);
+  if (page.segmentMs) timing.segment = page.segmentMs; // part of "analyze": the bubble model's share
   return {
     items: page.items, placements: page.placements, regions: page.regions, letter: page.letter, engine: page.engine,
     work: page.work, width: job.width, height: job.height, usage, timing,

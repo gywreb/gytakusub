@@ -22,6 +22,13 @@ const ext = fs.mkdtempSync(path.join(os.tmpdir(), "gyt-ext-"));
 fs.cpSync(extSrc, ext, { recursive: true });
 const pj = path.join(ext, "prompt.js");
 fs.writeFileSync(pj, fs.readFileSync(pj, "utf8").replace(/export const API_URL = "[^"]+"/, `export const API_URL = "http://127.0.0.1:${PORT}/v1/messages"`));
+// --segmenter <model.onnx>: ship a bubble segmentation model with the test copy, so
+// the service worker runs ONNX Runtime (CSP, wasm fetch, no dynamic import) for real.
+const segModel = arg("--segmenter", null);
+if (segModel) {
+  fs.copyFileSync(path.resolve(segModel), path.join(ext, "vendor", "segment.onnx"));
+  fs.writeFileSync(path.join(ext, "vendor", "segment.json"), JSON.stringify({ classes: ["bubble"] }));
+}
 
 const { srv, calls } = await startMock(PORT, pageImage, { badBoxes: process.argv.includes("--bad-boxes"), truth: pageImage.replace(/-page\.png$/, "-truth.json") });
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), "gyt-prof-"));
@@ -143,6 +150,8 @@ for (const [i, d] of debugLogs.entries()) {
   }
 }
 if (!debugLogs.length) { failures++; console.log("FAIL: no render happened"); }
+if (segModel && debugLogs.some((d) => d.engine !== "segmented")) { failures++; console.log(`FAIL: a segmentation model was shipped but the engine ran as ${debugLogs.map((d) => d.engine).join(",")}`); }
+if (debugLogs.length) console.log(`engine: ${debugLogs[0].engine}, timing: ${JSON.stringify(debugLogs[0].timing)}`);
 if (!reportOk) { failures++; console.log("FAIL: diagnostic report incomplete: " + JSON.stringify(rep).slice(0, 200)); }
 if (!zipOk) { failures++; console.log("FAIL: export zip missing files or corrupt: " + JSON.stringify(exp).slice(0, 200)); }
 if (peekChanged === false) { failures++; console.log("FAIL: hovering a bubble did not reveal the original"); }

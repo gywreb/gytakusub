@@ -12,7 +12,7 @@ registerFont("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", { family: "
 registerFont("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", { family: "DemoSans", weight: "normal" });
 
 // Render the synthetic page through the real engine (same code the extension runs).
-import { cv, detector } from "./cv-node.mjs";
+import { cv, detector, analyzePage } from "./cv-node.mjs";
 import { analyze } from "../extension/engine/analyze.js";
 import { layout } from "../extension/engine/layout.js";
 import { erase } from "../extension/engine/erase.js";
@@ -25,7 +25,7 @@ const scale = 1600 / Math.max(page.width, page.height);
 const W = Math.round(page.width * scale), H = Math.round(page.height * scale);
 const original = createCanvas(W, H); original.getContext("2d").drawImage(page, 0, 0, W, H);
 const pixels = original.getContext("2d").getImageData(0, 0, W, H);
-const an = analyze(cv, pixels, { detector });
+const an = await analyzePage(pixels);
 const iou = (a, b) => { const ix = Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)), iy = Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y)); const i = ix * iy; return i / (a.w * a.h + b.w * b.h - i); };
 const regionFor = (t) => an.regions.find((r) => iou(r.box, { x: t.box[0] * scale, y: t.box[1] * scale, w: t.box[2] * scale, h: t.box[3] * scale }) >= 0.6);
 const items = demoItems.map((it, i) => ({ tag: regionFor(truth.find((t) => t.items.includes(i)))?.id ?? null, box: null, text: it.text, size: it.size, kind: it.kind }));

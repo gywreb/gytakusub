@@ -2,6 +2,8 @@
 // (extension service worker, the web app's Web Worker, or Node in tests).
 import loadOpenCV from "../vendor/opencv.js";
 import { loadDetector } from "./detect.js"; // static: MV3 service workers do not support dynamic import()
+import { getOrt } from "./ort.js";
+import { loadSegmenter } from "./segment.js";
 
 let ready = null;
 
@@ -44,4 +46,34 @@ export function getDetector(overrides = {}) {
     })();
   }
   return detectorReady;
+}
+
+let segmenterReady = null;
+/**
+ * Resolves to the learned bubble segmenter (engine/segment.js) — the model file
+ * vendor/segment.onnx and its description vendor/segment.json next to this module
+ * — loaded once by ONNX Runtime. Resolves to null when there is no model (the
+ * analysis then decides bubbles from pixel statistics) or when it fails to load.
+ * @param {object} [overrides] tests pass `modelBytes`, `config`, `wasmBinary`
+ */
+export function getSegmenter(overrides = {}) {
+  if (!segmenterReady) {
+    segmenterReady = (async () => {
+      try {
+        let bytes = overrides.modelBytes, config = overrides.config;
+        if (!bytes) {
+          const res = await fetch(new URL("../vendor/segment.onnx", import.meta.url));
+          if (!res.ok) return null;
+          bytes = new Uint8Array(await res.arrayBuffer());
+        }
+        if (!config) {
+          const res = await fetch(new URL("../vendor/segment.json", import.meta.url)).catch(() => null);
+          config = res && res.ok ? await res.json() : {};
+        }
+        const ort = getOrt(overrides.wasmBinary ? { wasmBinary: overrides.wasmBinary } : {});
+        return await loadSegmenter(ort, bytes, config);
+      } catch (e) { console.warn("Gytakusub: bubble segmenter unavailable, deciding bubbles from pixels", e); return null; }
+    })();
+  }
+  return segmenterReady;
 }

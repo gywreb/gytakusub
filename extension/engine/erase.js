@@ -46,19 +46,43 @@ export function erase(cv, img, analysis, regionIds) {
     roi.delete(); lab.delete(); st.delete(); ce.delete();
   };
 
+  // A bubble the segmentation model found but the text detector left empty: the
+  // lettering is whatever letter-sized ink lies wholly inside the mask.
+  const paintInsideMask = (pol, b, letter) => {
+    const { x, y, w, h } = b.box, m = b.fill;
+    const roi = pol.inkMask.roi(new cv.Rect(x, y, w, h)), lab = new cv.Mat(), st = new cv.Mat(), ce = new cv.Mat();
+    const n = cv.connectedComponentsWithStats(roi, lab, st, ce, 8, cv.CV_32S);
+    const S = st.data32S, Lb = lab.data32S, keep = new Uint8Array(n);
+    for (let i = 1; i < n; i++) {
+      const cx = S[i * 5], cy = S[i * 5 + 1], cw = S[i * 5 + 2], ch = S[i * 5 + 3];
+      if (ch > 3 * letter || cw > 0.9 * w) continue;
+      // all four corners of the component's box on the mask: it does not touch the outline
+      if (m[cy * w + cx] && m[cy * w + Math.min(w - 1, cx + cw)] && m[Math.min(h - 1, cy + ch) * w + cx] && m[Math.min(h - 1, cy + ch) * w + Math.min(w - 1, cx + cw)]) keep[i] = 1;
+    }
+    let any = false;
+    for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) { const l = Lb[yy * w + xx]; if (l && keep[l]) { md[(y + yy) * W + x + xx] = 255; any = true; } }
+    roi.delete(); lab.delete(); st.delete(); ce.delete();
+    return any;
+  };
+
   for (const r of analysis.regions) {
     if (!regionIds.has(r.id)) continue;
     const pol = analysis.polarities[r.dark ? 1 : 0];
     if (analysis.learned) {
       const letter = Math.max(4, r.letter);
       const blocks = r.kind === "bubble" ? r.ref.blocks : [r.ref];
-      for (const b of blocks) paintTextBox(pol, b, b.letter || letter);
-      const pad = Math.round(letter * 0.8);
-      const tx0 = Math.min(...blocks.map((b) => b.gbox.x)) - pad, ty0 = Math.min(...blocks.map((b) => b.gbox.y)) - pad;
-      const tx1 = Math.max(...blocks.map((b) => b.gbox.x + b.gbox.w)) + pad, ty1 = Math.max(...blocks.map((b) => b.gbox.y + b.gbox.h)) + pad;
-      const roi = { x: Math.max(0, Math.round(tx0)), y: Math.max(0, Math.round(ty0)) };
-      roi.w = Math.max(1, Math.min(W, Math.round(tx1)) - roi.x); roi.h = Math.max(1, Math.min(H, Math.round(ty1)) - roi.y);
-      if (r.kind === "bubble") rois.push({ ...roi, radius: 3, confine: r.ref.labelId, labels: pol.regionLabels.data32S, dark: r.dark });
+      let roi;
+      if (blocks.length) {
+        for (const b of blocks) paintTextBox(pol, b, b.letter || letter);
+        const pad = Math.round(letter * 0.8);
+        const tx0 = Math.min(...blocks.map((b) => b.gbox.x)) - pad, ty0 = Math.min(...blocks.map((b) => b.gbox.y)) - pad;
+        const tx1 = Math.max(...blocks.map((b) => b.gbox.x + b.gbox.w)) + pad, ty1 = Math.max(...blocks.map((b) => b.gbox.y + b.gbox.h)) + pad;
+        roi = { x: Math.max(0, Math.round(tx0)), y: Math.max(0, Math.round(ty0)) };
+        roi.w = Math.max(1, Math.min(W, Math.round(tx1)) - roi.x); roi.h = Math.max(1, Math.min(H, Math.round(ty1)) - roi.y);
+      } else if (r.kind === "bubble" && r.ref.fill && paintInsideMask(pol, r.ref, letter)) {
+        roi = { ...r.box };
+      } else continue;
+      if (r.kind === "bubble") rois.push({ ...roi, radius: 3, inside: analysis.insideOf(r.id), dark: r.dark });
       else rois.push({ ...roi, radius: Math.max(3, Math.round(letter * 0.3)) });
       continue;
     }
@@ -86,7 +110,7 @@ export function erase(cv, img, analysis, regionIds) {
       const tx0 = Math.max(x, Math.min(...b.blocks.map((bl) => bl.gbox.x)) - 2 * letter), ty0 = Math.max(y, Math.min(...b.blocks.map((bl) => bl.gbox.y)) - 2 * letter);
       const tx1 = Math.min(x + w, Math.max(...b.blocks.map((bl) => bl.gbox.x + bl.gbox.w)) + 2 * letter), ty1 = Math.min(y + h, Math.max(...b.blocks.map((bl) => bl.gbox.y + bl.gbox.h)) + 2 * letter);
       for (const gi of seen) paintGlyph(glyphLabels, gi, pol.glyphs[gi]);
-      rois.push({ x: Math.round(tx0), y: Math.round(ty0), w: Math.max(1, Math.round(tx1 - tx0)), h: Math.max(1, Math.round(ty1 - ty0)), radius: 3, confine: b.labelId, labels: regionLabels, dark: r.dark });
+      rois.push({ x: Math.round(tx0), y: Math.round(ty0), w: Math.max(1, Math.round(tx1 - tx0)), h: Math.max(1, Math.round(ty1 - ty0)), radius: 3, inside: analysis.insideOf(r.id), dark: r.dark });
     } else {
       const bl = r.ref, { x, y, w, h } = bl.box;
       for (const gi of bl.glyphs) paintGlyph(glyphLabels, gi, pol.glyphs[gi]);
@@ -97,7 +121,7 @@ export function erase(cv, img, analysis, regionIds) {
 
   if (rois.length) {
     // Grow the mask over the anti-aliased fringe of each stroke; inside bubbles
-    // never past the bubble surface (so outlines stay crisp).
+    // never past the bubble's interior (so outlines stay crisp).
     const grow = Math.max(2, Math.round(analysis.letter * 0.15));
     const k = cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(2 * grow + 1, 2 * grow + 1));
     const grown = new cv.Mat(); cv.dilate(mask, grown, k); k.delete();
@@ -106,7 +130,7 @@ export function erase(cv, img, analysis, regionIds) {
       for (let yy = r.y; yy < r.y + r.h; yy++) for (let xx = r.x; xx < r.x + r.w; xx++) {
         const p = yy * W + xx;
         if (!gd[p] || md[p]) continue;
-        if (r.confine && r.labels[p] !== r.confine) {
+        if (r.inside && !r.inside(xx, yy)) {
           // Not bubble surface: admit the anti-aliased fringe of a stroke, never
           // the outline itself (solid ink of the bubble's own colour polarity).
           const lum = (px[p * 4] + px[p * 4 + 1] + px[p * 4 + 2]) / 3;

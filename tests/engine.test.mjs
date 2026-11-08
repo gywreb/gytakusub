@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { createCanvas, loadImage, registerFont } from "canvas";
-import { cv, detector } from "./cv-node.mjs";
+import { cv, detector, analyzePage } from "./cv-node.mjs";
 import { analyze } from "../extension/engine/analyze.js";
 import { layout } from "../extension/engine/layout.js";
 import { erase } from "../extension/engine/erase.js";
@@ -81,7 +81,7 @@ for (const [name, png, truthPath, itemsPath] of pages) {
   const sc = (b) => ({ x: b[0] * scale, y: b[1] * scale, w: b[2] * scale, h: b[3] * scale });
   const T = (t, fn) => test(`[${name}] ${t}`, fn);
 
-  const an = analyze(cv, pixels, { detector });
+  const an = await analyzePage(pixels);
   const matched = new Map(); // truth index → region
   T("every ground-truth region is detected with the right kind (IoU ≥ 0.6)", () => {
     truth.forEach((t, i) => {
@@ -101,11 +101,10 @@ for (const [name, png, truthPath, itemsPath] of pages) {
   T("letter sizes are plausible for 22–34 px fonts (scaled)", () => {
     for (const r of an.regions) assert.ok(r.letter >= 11 && r.letter <= 34, `letter ${r.letter} for ${JSON.stringify(r.box)}`);
   });
-  if (name === "demo") T("analysis is deterministic", () => {
-    const again = analyze(cv, pixels, { detector });
+  if (name === "demo") { const again = await analyzePage(pixels); T("analysis is deterministic", () => {
     assert.deepEqual(again.regions.map((r) => [r.id, r.kind, r.box, r.letter]), an.regions.map((r) => [r.id, r.kind, r.box, r.letter]));
     again.dispose();
-  });
+  }); }
 
   // items tagged like a model reading the stamps
   const items = rawItems.map((it, i) => {
