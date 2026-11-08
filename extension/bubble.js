@@ -449,7 +449,16 @@
     const L = opts.letter || Math.max(10, W / 42); // page lettering size in px
     const r = opts.radius ?? Math.max(2, Math.round(L * 0.12));
     const inkThr = opts.inkThreshold ?? 110, lightThr = opts.lightThreshold ?? 150;
-    const grow = opts.search ?? 0.5;
+    // Search window grows if the lettering chain reaches its edge (max 3 tries).
+    for (let grow = opts.search ?? 0.5, tries = 0; tries < 3; grow += 0.5, tries++) {
+      const res = eraseAttempt(ctx, img, core, { L, r, inkThr, lightThr, grow, W, H, data, last: tries === 2 });
+      if (res === "regrow") continue;
+      return res;
+    }
+    return null;
+  }
+
+  function eraseAttempt(ctx, img, core, { L, r, inkThr, lightThr, grow, W, H, data, last }) {
     const x0 = Math.max(0, Math.floor(core.x - core.w * grow)), y0 = Math.max(0, Math.floor(core.y - core.h * grow));
     const x1 = Math.min(W, Math.ceil(core.x + core.w * (1 + grow))), y1 = Math.min(H, Math.ceil(core.y + core.h * (1 + grow)));
     const zw = x1 - x0, zh = y1 - y0;
@@ -496,7 +505,10 @@
       }
       inkArea += n;
       const h = by1 - by0 + 1, w = bx1 - bx0 + 1;
-      if (h <= maxH && w <= maxW && n >= 2) comps.push({ pix, bx0, bx1, by0, by1, used: false });
+      // A component touching the window edge continues outside it (a clipped
+      // stroke can look glyph-sized) — never treat it as a glyph.
+      const clipped = (bx0 === 0 && x0 > 0) || (by0 === 0 && y0 > 0) || (bx1 === zw - 1 && x1 < W) || (by1 === zh - 1 && y1 < H);
+      if (h <= maxH && w <= maxW && n >= 2 && !clipped) comps.push({ pix, bx0, bx1, by0, by1, used: false });
     }
     // Seed: glyphs overlapping the core box (in zone coordinates); then chain.
     let ex0 = core.x - x0, ey0 = core.y - y0, ex1 = core.x + core.w - x0, ey1 = core.y + core.h - y0;
@@ -514,6 +526,9 @@
       }
     }
     if (!any || (erasedArea < 0.3 * inkArea && erasedArea < L * L)) return null; // mostly artwork here
+    // Lettering reached the window edge: there may be more outside — widen and retry.
+    const edge = near;
+    if (!last && ((ex0 < edge && x0 > 0) || (ey0 < edge && y0 > 0) || (ex1 > zw - edge && x1 < W) || (ey1 > zh - edge && y1 < H))) return "regrow";
 
     // Paint: dilate the kept glyph pixels by r, but never over non-glyph ink.
     const out = ctx.createImageData(zw, zh);
