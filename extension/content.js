@@ -14,7 +14,7 @@
 
   /** @type {Map<HTMLImageElement, {status:string, src:string, canvas?:HTMLCanvasElement, hidden:boolean, result?:any, error?:string, objectFit?:string}>} */
   const entries = new Map();
-  let settings = { enabled: true, autoSites: [], enabledSites: [], uppercase: false, fontFamily: "", excludedSites: "" };
+  let settings = { enabled: true, autoSites: [], enabledSites: [], uppercase: false, fontFamily: "", excludedSites: "", peekOnHover: true };
   let allHidden = false;
   let hoverImg = null;
 
@@ -38,6 +38,19 @@
     .bar button:hover, .bar button:focus-visible { background: rgba(255,255,255,.2); outline: 2px solid #93c5fd; outline-offset: 1px; }
     .bar button[disabled] { opacity: .5; cursor: default; }
     .bar .status { padding: 6px 4px; opacity: .8; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .editor { position: fixed; z-index: 1; width: 300px; max-width: calc(100vw - 16px); padding: 10px; border-radius: 10px; background: rgba(17,24,39,.96);
+      color: #fff; box-shadow: 0 6px 24px rgba(0,0,0,.45); font: 13px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; pointer-events: auto; }
+    .editor textarea, .editor input { all: unset; display: block; box-sizing: border-box; width: 100%; padding: 6px 8px; border-radius: 6px; background: rgba(255,255,255,.1);
+      color: #fff; font: 13px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; white-space: pre-wrap; }
+    .editor textarea { min-height: 64px; resize: vertical; }
+    .editor textarea:focus, .editor input:focus { outline: 2px solid #93c5fd; }
+    .editor .row { display: flex; gap: 6px; align-items: center; margin-top: 8px; }
+    .editor .row.gloss input { flex: 1; min-width: 0; }
+    .editor .label { opacity: .75; font-size: 12px; margin-top: 10px; }
+    .editor button { all: unset; cursor: pointer; padding: 6px 10px; border-radius: 6px; background: rgba(255,255,255,.1); color: #fff; font: 12px/1 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; white-space: nowrap; }
+    .editor button.primary { background: #2563eb; }
+    .editor button:hover, .editor button:focus-visible { outline: 2px solid #93c5fd; outline-offset: 1px; }
+    .editor .hint { opacity: .6; font-size: 11px; margin-left: auto; }
     .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); padding: 8px 14px; border-radius: 8px;
       background: rgba(17,24,39,.92); color: #fff; font: 13px/1.3 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
       box-shadow: 0 2px 10px rgba(0,0,0,.4); pointer-events: none; max-width: 80vw; }
@@ -239,21 +252,145 @@
   async function render(img, entry) {
     await ensureFont();
     const res = entry.result;
-    const src = await loadImage(res.cleanDataUrl); // the page with original lettering erased, at working resolution
-    const W = res.work.W, H = res.work.H;
+    entry.cleanImg = await loadImage(res.cleanDataUrl); // the page with original lettering erased, at working resolution
     const canvas = entry.canvas || document.createElement("canvas");
     canvas.className = "overlay";
-    canvas.width = W; canvas.height = H;
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(src, 0, 0, W, H);
-    if (settings.debugOverlay) drawDebug(ctx, res);
-    GyText.draw(ctx, res.placements, { fontFamily: settings.fontFamily, uppercase: settings.uppercase });
-    if (settings.debugOverlay) console.info("Gytakusub debug", { src: entry.src, work: res.work, natural: [res.width, res.height], items: res.items, regions: res.regions, placements: res.placements, letter: res.letter });
-
+    canvas.width = res.work.W; canvas.height = res.work.H;
+    entry.img = img; entry.peek = -1;
     if (!entry.canvas) { entry.canvas = canvas; root.append(canvas); }
+    drawOverlay(entry);
+    if (settings.debugOverlay) console.info("Gytakusub debug", { src: entry.src, work: res.work, natural: [res.width, res.height], items: res.items, regions: res.regions, placements: res.placements, letter: res.letter });
     entry.objectFit = getComputedStyle(img).objectFit;
     layout();
   }
+
+  /** Clean page + translations; while peeking, one bubble shows the original pixels instead. */
+  function drawOverlay(entry) {
+    const { result: res, canvas, cleanImg, img } = entry;
+    const W = res.work.W, H = res.work.H;
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, W, H);
+    ctx.drawImage(cleanImg, 0, 0, W, H);
+    if (settings.debugOverlay) drawDebug(ctx, res);
+    const peek = res.placements[entry.peek];
+    GyText.draw(ctx, peek ? res.placements.filter((p) => p !== peek) : res.placements, { fontFamily: settings.fontFamily, uppercase: settings.uppercase });
+    if (peek && img?.naturalWidth) {
+      // the original lettering, from the page's own <img>, mapped work → natural pixels
+      const sx = img.naturalWidth / W, sy = img.naturalHeight / H, r = peekRect(peek, res);
+      try { ctx.drawImage(img, r.x * sx, r.y * sy, r.w * sx, r.h * sy, r.x, r.y, r.w, r.h); } catch { /* image not decodable here; keep the translation */ }
+    }
+  }
+  // The area a peek reveals: the bubble when the line sits in one, else the text's footprint.
+  function peekRect(p, res) {
+    const region = p.tag != null ? res.regions.find((r) => r.id === p.tag) : null;
+    const r = region && region.kind === "bubble" ? region.box : p.rect;
+    return { x: Math.max(0, r.x - 2), y: Math.max(0, r.y - 2), w: r.w + 4, h: r.h + 4 };
+  }
+
+  // ---------- pointer → bubble: peek on hover, edit on double-click ----------
+
+  // Overlays never take pointer events (the reader keeps working underneath), so
+  // bubbles are hit-tested from the pointer position instead.
+  function hitTest(clientX, clientY) {
+    for (const [img, e] of entries) {
+      if (e.status !== "done" || !e.canvas || e.canvas.style.display === "none" || !e.result) continue;
+      const r = contentRect(img, e.objectFit);
+      if (clientX < r.left || clientY < r.top || clientX > r.left + r.width || clientY > r.top + r.height) continue;
+      const wx = (clientX - r.left) / r.width * e.result.work.W, wy = (clientY - r.top) / r.height * e.result.work.H;
+      const pad = Math.max(4, e.result.letter * 0.5);
+      const idx = e.result.placements.findIndex((p) => wx >= p.rect.x - pad && wy >= p.rect.y - pad && wx <= p.rect.x + p.rect.w + pad && wy <= p.rect.y + p.rect.h + pad);
+      return { entry: e, img, idx, rect: r };
+    }
+    return null;
+  }
+
+  let peekTimer = null, lastHit = null;
+  function setPeek(entry, idx) {
+    if (entry.peek === idx) return;
+    entry.peek = idx;
+    drawOverlay(entry);
+  }
+  document.addEventListener("mousemove", (ev) => {
+    if (!ev.isTrusted || !settings.peekOnHover || editor.open) return;
+    const hit = hitTest(ev.clientX, ev.clientY);
+    const same = hit && lastHit && hit.entry === lastHit.entry && hit.idx === lastHit.idx;
+    if (same) return;
+    clearTimeout(peekTimer);
+    if (lastHit?.entry && lastHit.entry !== hit?.entry) setPeek(lastHit.entry, -1);
+    lastHit = hit;
+    if (!hit || hit.idx < 0) { if (hit) setPeek(hit.entry, -1); return; }
+    peekTimer = setTimeout(() => setPeek(hit.entry, hit.idx), 280); // a dwell, so passing over bubbles doesn't flicker
+  }, { capture: true, passive: true });
+  document.addEventListener("mouseout", (ev) => { if (ev.relatedTarget) return; clearTimeout(peekTimer); if (lastHit?.entry) setPeek(lastHit.entry, -1); lastHit = null; }, true); // pointer left the window
+
+  // Editor: double-click a translated line to correct it (and optionally teach the glossary).
+  const editor = { el: null, open: false, entry: null, idx: -1 };
+  function buildEditor() {
+    const el = document.createElement("div"); el.className = "editor"; el.setAttribute("role", "dialog"); el.setAttribute("aria-label", "Edit translation"); el.hidden = true;
+    el.innerHTML = `<textarea aria-label="Translated line" spellcheck="true"></textarea>
+      <div class="row"><button class="primary" data-act="save">Save</button><button data-act="cancel">Cancel</button><span class="hint">Ctrl+Enter · Esc</span></div>
+      <div class="label">Teach the glossary (applies to later pages)</div>
+      <div class="row gloss"><input data-f="from" placeholder="original term" aria-label="Original term" /><span>=</span><input data-f="to" placeholder="translation" aria-label="Translation" /><button data-act="gloss">Add</button></div>`;
+    // the reader must not see these keys (its hotkeys), and the page must not see the text
+    for (const t of ["keydown", "keyup", "keypress", "mousedown", "mouseup", "click", "dblclick", "wheel"]) el.addEventListener(t, (ev) => ev.stopPropagation());
+    el.addEventListener("keydown", (ev) => {
+      if (ev.key === "Escape") closeEditor();
+      else if (ev.key === "Enter" && (ev.ctrlKey || ev.metaKey)) saveEdit();
+    });
+    el.addEventListener("click", (ev) => {
+      if (!ev.isTrusted) return;
+      const act = ev.target?.dataset?.act;
+      if (act === "save") saveEdit(); else if (act === "cancel") closeEditor(); else if (act === "gloss") addGlossary();
+    });
+    shadow.append(el);
+    return el;
+  }
+  function openEditor(hit, clientX, clientY) {
+    editor.el ||= buildEditor();
+    const p = hit.entry.result.placements[hit.idx];
+    const item = p.item != null ? hit.entry.result.items[p.item] : null;
+    editor.entry = hit.entry; editor.idx = hit.idx; editor.open = true;
+    const ta = editor.el.querySelector("textarea"); ta.value = p.text;
+    editor.el.querySelector('[data-f="from"]').value = item?.source || "";
+    editor.el.querySelector('[data-f="to"]').value = "";
+    editor.el.hidden = false;
+    const w = 300, h = editor.el.offsetHeight || 190;
+    editor.el.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, clientX + 12)) + "px";
+    editor.el.style.top = Math.max(8, Math.min(window.innerHeight - h - 8, clientY + 12)) + "px";
+    clearTimeout(peekTimer); setPeek(hit.entry, -1);
+    ta.focus(); ta.select();
+  }
+  function closeEditor() { if (!editor.el) return; editor.el.hidden = true; editor.open = false; editor.entry = null; }
+  async function saveEdit() {
+    const e = editor.entry, p = e?.result.placements[editor.idx];
+    if (!p) return closeEditor();
+    const text = editor.el.querySelector("textarea").value.trim();
+    if (text && text !== p.text) {
+      p.text = text;
+      if (p.item != null && e.result.items[p.item]) e.result.items[p.item].text = text;
+      drawOverlay(e);
+      if (p.item != null && e.result.cacheKey) chrome.runtime.sendMessage({ type: "EDIT_ITEM", cacheKey: e.result.cacheKey, item: p.item, text }).catch(() => {});
+    }
+    closeEditor();
+  }
+  async function addGlossary() {
+    const from = editor.el.querySelector('[data-f="from"]').value.trim(), to = editor.el.querySelector('[data-f="to"]').value.trim();
+    if (!from || !to) { toast("Fill both the original term and its translation"); return; }
+    try {
+      const r = await chrome.runtime.sendMessage({ type: "ADD_GLOSSARY", from, to });
+      if (r?.error) throw new Error(r.error);
+      toast(r.replaced ? `Glossary updated: ${from} = ${to}` : `Added to glossary: ${from} = ${to}`);
+      editor.el.querySelector('[data-f="to"]').value = "";
+    } catch (err) { toast("Gytakusub: " + (err.message || err), 5000); }
+  }
+  document.addEventListener("dblclick", (ev) => {
+    if (!ev.isTrusted || !active()) return;
+    const hit = hitTest(ev.clientX, ev.clientY);
+    if (!hit || hit.idx < 0) return;
+    ev.preventDefault(); ev.stopPropagation();
+    openEditor(hit, ev.clientX, ev.clientY);
+  }, true);
+  document.addEventListener("mousedown", (ev) => { if (editor.open && ev.isTrusted && ev.composedPath()[0] !== host) closeEditor(); }, true);
 
   // Debug overlay: text regions the engine found (red = bubble, blue = free
   // text, numbered as stamped for the model) and the final text areas (green).

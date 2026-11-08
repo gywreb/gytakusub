@@ -24,6 +24,7 @@ export const DEFAULT_SETTINGS = {
   syncApiKey: false,
   excludedSites: "",
   debugOverlay: false, // draw detection boxes and log results (for diagnosing placement)
+  peekOnHover: true, // hovering a translated bubble shows the original lettering
   // Image prep
   maxLongEdge: 1600, // px sent to Claude for a normal page
   stripWidth: 1000, // px width for tall webtoon strips
@@ -195,6 +196,15 @@ async function handleTranslate(msg, sender) {
   }
 
   const page = await finishPage(job, results);
+  // The user's own corrections to this page's lines live beside the cached answer
+  // (a Redo asks the model again and drops them).
+  const editsKey = "edits:" + cacheKey;
+  if (msg.force) await chrome.storage.session.remove(editsKey).catch(() => {});
+  const edits = msg.force ? {} : (await chrome.storage.session.get(editsKey))[editsKey] || {};
+  for (const [i, text] of Object.entries(edits)) {
+    if (page.items[i]) page.items[i].text = text;
+    for (const p of page.placements) if (p.item === +i) p.text = text;
+  }
   if (tabId >= 0 && newTerms.length) await updateTabCtx(tabId, newTerms, page.items.map((i) => i.text));
   else if (tabId >= 0 && !cached) await updateTabCtx(tabId, [], page.items.map((i) => i.text));
   const big = page.work.W * page.work.H > 2.6e6;
@@ -202,8 +212,31 @@ async function handleTranslate(msg, sender) {
   return {
     items: page.items, placements: page.placements, regions: page.regions, letter: page.letter,
     work: page.work, width: job.width, height: job.height, usage,
-    cleanDataUrl: await blobToDataUrl(cleanBlob), fromCache: !!(cached && !msg.force),
+    cleanDataUrl: await blobToDataUrl(cleanBlob), fromCache: !!(cached && !msg.force), cacheKey,
   };
+}
+
+/** Remember a corrected line for a page (applied on every re-render until a Redo). */
+async function editItem({ cacheKey, item, text }) {
+  if (typeof cacheKey !== "string" || !/^cache:[0-9a-f]{40}$/.test(cacheKey)) throw new Error("Bad cache key");
+  if (!Number.isInteger(item) || item < 0) throw new Error("Bad item");
+  const key = "edits:" + cacheKey;
+  const edits = (await chrome.storage.session.get(key))[key] || {};
+  edits[item] = String(text ?? "").slice(0, 2000);
+  await chrome.storage.session.set({ [key]: edits });
+  return { ok: true };
+}
+
+/** Append "from = to" to the glossary unless an equivalent line exists. */
+async function addGlossary({ from, to }) {
+  from = String(from ?? "").trim().slice(0, 200); to = String(to ?? "").trim().slice(0, 200);
+  if (!from || !to) throw new Error("Both the original and the translation are needed");
+  const s = await getSettings();
+  const lines = s.glossary.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const dup = lines.some((l) => l.split("=")[0].trim().toLowerCase() === from.toLowerCase());
+  const glossary = (dup ? lines.map((l) => (l.split("=")[0].trim().toLowerCase() === from.toLowerCase() ? `${from} = ${to}` : l)) : [...lines, `${from} = ${to}`]).join("\n");
+  await chrome.storage.sync.set({ glossary });
+  return { ok: true, replaced: dup };
 }
 
 async function testKey() {
@@ -230,6 +263,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     case "GET_SETTINGS": reply(getSettings()); return true;
     case "TEST_KEY": reply(testKey()); return true;
     case "CLEAR_CACHE": reply(chrome.storage.session.clear().then(() => ({ ok: true }))); return true;
+    case "EDIT_ITEM": reply(editItem(msg)); return true;
+    case "ADD_GLOSSARY": reply(addGlossary(msg)); return true;
     case "RELAY_TO_TAB":
       reply(chrome.tabs.query({ active: true, currentWindow: true }).then(async ([tab]) => {
         if (!tab?.id) throw new Error("No active tab");

@@ -59,6 +59,35 @@ await page.reload(); await page.waitForLoadState("load"); await page.waitForTime
 await translate(false); await waitLogs(3);
 await page.screenshot({ path: path.join(out, "3-cached.png") });
 
+// ---- peek + edit (first scenario only) ----
+let peekChanged = null, editOk = null, persisted = null;
+if (!process.argv.includes("--bad-boxes")) {
+  const d = debugLogs[2]; // state after the reload: placements in work px
+  const img = await page.$eval("#p1", (el) => { const r = el.getBoundingClientRect(); return { left: r.left, top: r.top, width: r.width, height: r.height }; });
+  const toClient = (x, y) => ({ x: img.left + x / d.work.W * img.width, y: img.top + y / d.work.H * img.height });
+  const target = d.placements.find((p) => p.tag != null && p.item != null);
+  const c = toClient(target.rect.x + target.rect.w / 2, target.rect.y + target.rect.h / 2);
+  const region = (() => { const a = toClient(target.rect.x, target.rect.y), b = toClient(target.rect.x + target.rect.w, target.rect.y + target.rect.h); return { x: Math.floor(a.x), y: Math.floor(a.y), width: Math.ceil(b.x - a.x), height: Math.ceil(b.y - a.y) }; })();
+  const before = await page.screenshot({ clip: region });
+  await page.mouse.move(c.x - 40, c.y - 40); await page.waitForTimeout(50);
+  await page.mouse.move(c.x, c.y); await page.waitForTimeout(600); // dwell → peek
+  const peeking = await page.screenshot({ clip: region });
+  await page.screenshot({ path: path.join(out, "4-peek.png") });
+  peekChanged = !before.equals(peeking);
+  await page.mouse.dblclick(c.x, c.y); await page.waitForTimeout(200);
+  await page.keyboard.press("Control+a"); await page.keyboard.type("EDITED LINE");
+  await page.screenshot({ path: path.join(out, "5-editor.png") });
+  await page.keyboard.press("Control+Enter"); await page.waitForTimeout(300);
+  await page.mouse.move(5, 5); await page.waitForTimeout(400);
+  const after = await page.screenshot({ clip: region });
+  editOk = !after.equals(before);
+  // the edit survives a reload (cache hit re-applies it)
+  await page.reload(); await page.waitForLoadState("load"); await page.waitForTimeout(500);
+  await translate(false); await waitLogs(4);
+  persisted = debugLogs[3].placements.find((p) => p.item === target.item)?.text === "EDITED LINE";
+  await page.screenshot({ path: path.join(out, "6-after-edit-reload.png") });
+}
+
 // pixel diff between renders
 async function diff(a, b, name) {
   const [A, B] = await Promise.all([loadImage(a), loadImage(b)]);
@@ -96,6 +125,10 @@ for (const [i, d] of debugLogs.entries()) {
   }
 }
 if (!debugLogs.length) { failures++; console.log("FAIL: no render happened"); }
+if (peekChanged === false) { failures++; console.log("FAIL: hovering a bubble did not reveal the original"); }
+if (editOk === false) { failures++; console.log("FAIL: editing a line did not change the overlay"); }
+if (persisted === false) { failures++; console.log("FAIL: the edited line did not survive a reload"); }
+if (peekChanged !== null) console.log(`peek: ${peekChanged} edit: ${editOk} persisted: ${persisted}`);
 console.log(failures ? `BROWSER TEST FAILED (${failures})` : "BROWSER TEST PASSED");
 process.exitCode = failures ? 1 : 0;
 for (const [i, d] of debugLogs.entries()) console.log(`render ${i + 1}: work=${d.work.W}x${d.work.H} natural=${d.natural} items=${d.items.length} regions=${d.regions.length} placed=${d.placements.length} tags=${d.items.map((it) => it.tag).join(",")}`);

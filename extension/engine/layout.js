@@ -37,7 +37,7 @@ export function layout(an, items) {
       const inside = an.insideOf(id), bbox = r.box;
       if (members.length === 1) {
         const rect = inscribedRect(inside, bbox) || inset(bbox, 0.78);
-        placements.push({ text: members[0].it.text, size: members[0].it.size, rect, letter, color, halo: false, tag: id });
+        placements.push({ text: members[0].it.text, size: members[0].it.size, rect, letter, color, halo: false, tag: id, item: members[0].it.index ?? null });
       } else {
         // Joined bubble: order speakers top-to-bottom (by their boxes, else
         // evenly), cut at the waists between them, inscribe each lobe.
@@ -50,7 +50,7 @@ export function layout(an, items) {
         order.forEach(([, i], k) => {
           const ya = edges[k], yb = edges[k + 1];
           const rect = inscribedRect(inside, bbox, ya, yb) || { x: bbox.x + bbox.w * 0.15, y: ya + (yb - ya) * 0.1, w: bbox.w * 0.7, h: (yb - ya) * 0.8 };
-          placements.push({ text: members[i].it.text, size: members[i].it.size, rect, letter, color, halo: false, tag: id });
+          placements.push({ text: members[i].it.text, size: members[i].it.size, rect, letter, color, halo: false, tag: id, item: members[i].it.index ?? null });
         });
       }
     } else {
@@ -59,11 +59,11 @@ export function layout(an, items) {
       const b = r.box, pad = letter * 0.5;
       const rect = clampRect({ x: b.x - pad, y: b.y - pad, w: b.w + 2 * pad, h: b.h + 2 * pad }, W, H);
       const text = members.map((m) => m.it.text).join(" ");
-      placements.push({ text, size: members[0].it.size, rect, letter, color: r.dark ? "#fff" : "#000", halo: true, tag: id });
+      placements.push({ text, size: members[0].it.size, rect, letter, color: r.dark ? "#fff" : "#000", halo: true, tag: id, item: members.length === 1 ? members[0].it.index ?? null : null });
     }
   }
   for (const { it, px } of loose) {
-    placements.push({ text: it.text, size: it.size, rect: clampRect(px, W, H), letter: an.letter, color: "#000", halo: true, tag: null });
+    placements.push({ text: it.text, size: it.size, rect: clampRect(px, W, H), letter: an.letter, color: "#000", halo: true, tag: null, item: it.index ?? null });
   }
 
   separate(placements);
@@ -161,4 +161,5 @@ function separate(placements) {
  * @property {string} color text colour
  * @property {boolean} halo draw with an outline (text sits on artwork)
  * @property {number|null} tag region id, if placed by region
+ * @property {number|null} item index into the page's items (null when several items were merged)
  */
