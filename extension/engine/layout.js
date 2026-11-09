@@ -26,7 +26,8 @@ export function layout(an, items) {
   for (const it of items) {
     if (!it.text) continue;
     const px = it.box ? { x: it.box[0] * W, y: it.box[1] * H, w: it.box[2] * W, h: it.box[3] * H } : null;
-    let region = it.tag != null ? byId.get(it.tag) : null;
+    const stamped = it.tag != null ? byId.get(it.tag) : null;
+    let region = stamped;
     if (region && px) {
       const cx = px.x + px.w / 2, cy = px.y + px.h / 2;
       if (!inBox(region.box, cx, cy)) {
@@ -46,6 +47,10 @@ export function layout(an, items) {
     // A shape too narrow for the line (one letter per row) is not where it goes.
     if (region && region.kind === "bubble" && px && region.box.w < 3 * region.letter && it.text.length > 4) region = null;
     if (!region && px) region = nearestRegion(an, px);
+    // A distrusted tag is overruled only by a box that points at some other region;
+    // a box pointing nowhere (drifted off the shape, clipped at the page edge) is
+    // weaker evidence than the stamp, so the stamp stands.
+    if (!region && stamped && !(stamped.kind === "bubble" && stamped.box.w < 3 * stamped.letter && it.text.length > 4)) region = stamped;
     if (region) (groups.get(region.id) || groups.set(region.id, []).get(region.id)).push({ it, px });
     else if (px) loose.push({ it, px });
   }
