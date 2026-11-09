@@ -16,7 +16,8 @@ for f in extension/*.js web/*.js; do node --check "$f"; done
 ( cd tests && [ -d node_modules ] || npm install --no-audit --no-fund >/dev/null; npm test )
 
 git add -A
-git commit -m "Release v$v"
+# nothing to commit when the version was already bumped in a pull request
+[ -z "$(git status --porcelain)" ] || git commit -m "Release v$v"
 git tag "v$v"
 git push origin main "v$v"
 echo "Pushed v$v — watch https://github.com/gywreb/gytakusub/actions"
