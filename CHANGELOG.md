@@ -4,6 +4,15 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
 
 ## [Unreleased]
 
+## [2.2.1] — 2026-11-10
+
+### Project
+- **Pull request rules**, checked in seconds by a new workflow (`pr-checks.yml`) and written down in `CONTRIBUTING.md` with a pull request template:
+  - **Every pull request carries a version.** It raises `extension/manifest.json` and adds its dated section here (`scripts/check-version.mjs`).
+  - **A pull request that changes UI has screenshots in its description** (`scripts/check-screenshots.mjs`, which lists the files that count). The check runs again when the description is edited.
+  - The checks use the base branch's copy of the scripts, so a pull request can't change the rules it is checked against.
+- `scripts/release.mjs` no longer bumps the version. It checks and tests, then tags the version main is at.
+
 ## [2.2.0] — 2026-11-09 (extension on GitHub Releases, not yet submitted to the Chrome Web Store, which still has 2.0.0; there is no extension 2.1.0. Web app live on GitHub Pages)
 
 ### Web app
@@ -25,13 +34,6 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
   - **Options:** sections for Claude API, Translation, Sites, Lettering & speed and Troubleshooting, listed at the side on wide windows. Every toggle is a switch with a short description. *Save* is pinned at the bottom with its message beside it, and the page shows *Unsaved changes*, saves on Ctrl/Cmd+S and asks before you leave unsaved edits. Settings changed in the popup appear here when nothing is unsaved.
   - *Clear cache* asks first, because it also drops your edited lines.
 - Fixed: the debug-overlay option's label broke into columns on the Options page, and the popup's *Options* button was disabled while Gytakusub was off.
-
-### Project
-- **Pull request rules**, checked in seconds by a new workflow (`pr-checks.yml`) and written down in `CONTRIBUTING.md` with a pull request template:
-  - **Every pull request carries a version.** It raises `extension/manifest.json` and adds its dated section here (`scripts/check-version.mjs`).
-  - **A pull request that changes UI has screenshots in its description** (`scripts/check-screenshots.mjs`, which lists the files that count). The check runs again when the description is edited.
-  - The checks use the base branch's copy of the scripts, so a pull request can't change the rules it is checked against.
-- `scripts/release.mjs` no longer bumps the version. It checks and tests, then tags the version main is at.
 
 ## [2.1.0] — 2026-11-09 (web app and chapter fetcher, live on GitHub Pages; the browser extension is unchanged and stays 2.0.0, so there is no store package or GitHub Release for 2.1.0)
 
