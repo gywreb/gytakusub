@@ -1,106 +1,181 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Gytakusub options</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Gytakusub settings</title>
+<link rel="stylesheet" href="ui.css" />
 <style>
-  :root {
-    color-scheme: light dark;
-    --bg: #ffffff; --fg: #111827; --muted: #6b7280; --border: #d1d5db; --field: #ffffff;
-    --btn: #f9fafb; --btn-hover: #f3f4f6; --primary: #111827; --primary-fg: #fff; --primary-hover: #1f2937; --link: #2563eb;
-    --ok-bg: #ecfdf5; --ok-fg: #065f46; --ok-border: #a7f3d0;
-    --err-bg: #fef2f2; --err-fg: #991b1b; --err-border: #fecaca;
+  .layout { max-width: 980px; margin: 0 auto; padding: var(--s5) var(--s4) 0; display: grid; gap: var(--s5); }
+  .opt-head { display: flex; align-items: center; gap: var(--s3); }
+  .opt-head h1 { margin: 0; font-size: var(--t-h1); line-height: 1.2; }
+  .toc { display: none; }
+  main { display: grid; gap: var(--s4); min-width: 0; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r3); padding: var(--s4) var(--s5); scroll-margin-top: var(--s4); }
+  .card > h2 { margin: 0 0 var(--s1); font-size: var(--t-h2); }
+  .card > .lede { color: var(--muted); font-size: var(--t-caption); margin-bottom: var(--s2); }
+  .card .field { padding: var(--s3) 0; }
+  .card .field + .field, .card .field + .option, .card .option + .field { border-top: 1px solid var(--border); }
+  .option .btn { flex: none; }
+  .savebar { position: sticky; bottom: 0; z-index: 1; margin-top: var(--s5); border-top: 1px solid var(--border); background: var(--surface); }
+  .savebar-inner { max-width: 980px; margin: 0 auto; padding: var(--s3) var(--s4); display: flex; align-items: center; justify-content: flex-end; gap: var(--s3); }
+  #msg { flex: 1; min-width: 0; font-size: var(--t-caption); color: var(--muted); }
+  #msg.ok { color: var(--ok); }
+  #msg.err { color: var(--danger); }
+  #msg.dirty { color: var(--fg); font-weight: 600; }
+  #save { min-width: 112px; }
+  .about { color: var(--muted); font-size: var(--t-caption); padding-bottom: var(--s2); }
+  @media (min-width: 900px) {
+    .layout { grid-template-columns: 200px minmax(0, 1fr); column-gap: var(--s6); }
+    .opt-head { grid-column: 1 / -1; }
+    .toc { display: grid; gap: 2px; align-content: start; position: sticky; top: var(--s5); }
+    .toc a { padding: 6px var(--s3); border-radius: var(--r1); color: var(--muted); text-decoration: none; font-weight: 600; }
+    .toc a:hover { background: var(--surface-2); color: var(--fg); }
+    .savebar-inner { padding-left: calc(var(--s4) + 200px + var(--s6)); }
   }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #1f2124; --fg: #e5e7eb; --muted: #9ca3af; --border: #3f4449; --field: #2a2d31;
-      --btn: #2a2d31; --btn-hover: #34383d; --primary: #e5e7eb; --primary-fg: #111827; --primary-hover: #ffffff; --link: #60a5fa;
-      --ok-bg: #0f2e22; --ok-fg: #6ee7b7; --ok-border: #1f5a40;
-      --err-bg: #3a1515; --err-fg: #fca5a5; --err-border: #6b2525;
-    }
+  @media (max-width: 520px) {
+    .layout { padding-top: var(--s4); }
+    .card { padding: var(--s3) var(--s4); }
+    .input-row { flex-wrap: wrap; }
+    .input-row input { flex-basis: 100%; }
+    .input-row .btn { flex: 1; }
   }
-  body { max-width: 640px; margin: 32px auto; padding: 0 16px; font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--fg); background: var(--bg); }
-  h1 { font-size: 20px; display: flex; align-items: center; gap: 10px; }
-  h2 { font-size: 15px; margin: 28px 0 8px; }
-  label { display: block; font-weight: 600; margin: 14px 0 4px; }
-  input[type=text], input[type=password], textarea, select { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--field); color: var(--fg); font: inherit; }
-  textarea { min-height: 90px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; }
-  .hint { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
-  .row { display: flex; gap: 8px; align-items: center; }
-  .row input[type=text], .row input[type=password] { flex: 1; }
-  button { padding: 8px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--btn); color: var(--fg); cursor: pointer; font: inherit; }
-  button:hover { background: var(--btn-hover); }
-  button.primary { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); }
-  button.primary:hover { background: var(--primary-hover); }
-  .check { display: flex; align-items: center; gap: 8px; font-weight: 500; margin: 10px 0; }
-  input[type=checkbox] { accent-color: var(--link); }
-  #msg { margin-top: 16px; padding: 10px 12px; border-radius: 8px; display: none; }
-  #msg.ok { display: block; background: var(--ok-bg); color: var(--ok-fg); border: 1px solid var(--ok-border); }
-  #msg.err { display: block; background: var(--err-bg); color: var(--err-fg); border: 1px solid var(--err-border); }
 </style>
 </head>
 <body>
-  <h1><img src="icons/icon48.png" width="28" height="28" alt="" /> Gytakusub options</h1>
+  <div class="layout">
+    <header class="opt-head">
+      <img src="icons/icon48.png" width="36" height="36" alt="" />
+      <div><h1>Gytakusub settings</h1><p class="hint">Changes apply after you save.</p></div>
+    </header>
 
-  <h2>Claude API</h2>
-  <label for="apiKey">API key</label>
-  <div class="row">
-    <input id="apiKey" type="password" placeholder="sk-ant-api03-…" autocomplete="off" />
-    <button id="showKey" type="button">Show</button>
-    <button id="testKey" type="button">Test</button>
+    <nav class="toc" aria-label="Sections">
+      <a href="#sec-api">Claude API</a>
+      <a href="#sec-translation">Translation</a>
+      <a href="#sec-sites">Sites</a>
+      <a href="#sec-look">Lettering &amp; speed</a>
+      <a href="#sec-debug">Troubleshooting</a>
+      <a href="#sec-about">About</a>
+    </nav>
+
+    <main>
+      <section class="card" id="sec-api" aria-labelledby="h-api">
+        <h2 id="h-api">Claude API</h2>
+        <p class="lede">Gytakusub sends pages to Claude with your own key.</p>
+        <div class="field">
+          <label class="field-label" for="apiKey">API key</label>
+          <div class="input-row">
+            <input id="apiKey" type="password" placeholder="sk-ant-api03-…" autocomplete="off" spellcheck="false" aria-describedby="apiKeyHint" />
+            <button id="showKey" class="btn" type="button" aria-controls="apiKey">Show</button>
+            <button id="testKey" class="btn" type="button">Save &amp; test</button>
+          </div>
+          <p class="hint" id="apiKeyHint">Create one at <a href="https://platform.claude.com/" target="_blank" rel="noopener">platform.claude.com</a> → Settings → API keys. Usage is billed to that Console account, separately from a Claude subscription (Max, Ultra and Team plans include monthly API credits).</p>
+        </div>
+        <label class="option">
+          <span class="option-text"><span class="option-title">Sync the key to my other browsers</span><span class="option-desc">Keeps it in browser sync instead of only on this device</span></span>
+          <input type="checkbox" id="syncApiKey" class="switch" />
+        </label>
+        <div class="field">
+          <label class="field-label" for="model">Model</label>
+          <select id="model">
+            <option value="claude-haiku-5-5">Claude Haiku 5.5 — fastest, cheapest</option>
+            <option value="claude-sonnet-5-5">Claude Sonnet 5.5 — better on dense / stylised pages</option>
+            <option value="claude-opus-5-5">Claude Opus 5.5 — best quality, most expensive</option>
+          </select>
+        </div>
+      </section>
+
+      <section class="card" id="sec-translation" aria-labelledby="h-translation">
+        <h2 id="h-translation">Translation</h2>
+        <div class="field">
+          <label class="field-label" for="targetLang">Target language</label>
+          <input id="targetLang" type="text" placeholder="English" />
+        </div>
+        <div class="field">
+          <label class="field-label" for="glossary">Glossary</label>
+          <textarea id="glossary" placeholder="One per line, e.g.&#10;Gojo Satoru = Satoru Gojo&#10;呪術 = jujutsu" aria-describedby="glossaryHint" spellcheck="false"></textarea>
+          <p class="hint" id="glossaryHint">Names and terms the model must use exactly. Names it discovers on its own are remembered per tab automatically.</p>
+        </div>
+        <div class="field">
+          <label class="field-label" for="customPrompt">Extra instructions</label>
+          <textarea id="customPrompt" placeholder="e.g. Keep the tone casual. Translate SFX as English onomatopoeia."></textarea>
+        </div>
+        <label class="option">
+          <span class="option-text"><span class="option-title">Chapter context</span><span class="option-desc">Sends names and the last ~40 translated lines of this tab with each page: better continuity, about 400 extra input tokens</span></span>
+          <input type="checkbox" id="useContext" class="switch" />
+        </label>
+        <label class="option">
+          <span class="option-text"><span class="option-title">Also transcribe the original text</span><span class="option-desc">Slower, slightly more careful reading; useful for debugging</span></span>
+          <input type="checkbox" id="includeSource" class="switch" />
+        </label>
+        <label class="option">
+          <span class="option-text"><span class="option-title">UPPERCASE lettering</span><span class="option-desc">Comic-book style</span></span>
+          <input type="checkbox" id="uppercase" class="switch" />
+        </label>
+      </section>
+
+      <section class="card" id="sec-sites" aria-labelledby="h-sites">
+        <h2 id="h-sites">Sites</h2>
+        <p class="lede">One hostname per line. The easiest way to add a site: open it and use the switches in the toolbar popup.</p>
+        <div class="field">
+          <label class="field-label" for="enabledSites">Enabled sites</label>
+          <textarea id="enabledSites" placeholder="mangadex.org" aria-describedby="enabledSitesHint" spellcheck="false"></textarea>
+          <p class="hint" id="enabledSitesHint">The hover button and keyboard shortcuts work only here. Everywhere else Gytakusub stays dormant until you use the toolbar button or the shortcut.</p>
+        </div>
+        <div class="field">
+          <label class="field-label" for="autoSites">Auto-translate while scrolling</label>
+          <textarea id="autoSites" placeholder="mangadex.org" aria-describedby="autoSitesHint" spellcheck="false"></textarea>
+          <p class="hint" id="autoSitesHint">Each page that scrolls into view is sent to Claude automatically, so only add sites where you want to spend tokens. These count as enabled too.</p>
+        </div>
+        <div class="field">
+          <label class="field-label" for="excludedSites">Disabled sites</label>
+          <textarea id="excludedSites" placeholder="mail.google.com&#10;youtube.com" aria-describedby="excludedSitesHint" spellcheck="false"></textarea>
+          <p class="hint" id="excludedSitesHint">Gytakusub stays off on these sites and their subdomains.</p>
+        </div>
+      </section>
+
+      <section class="card" id="sec-look" aria-labelledby="h-look">
+        <h2 id="h-look">Lettering &amp; speed</h2>
+        <div class="field">
+          <label class="field-label" for="fontFamily">Font family</label>
+          <input id="fontFamily" type="text" placeholder='"Comic Neue", "Comic Sans MS", sans-serif' aria-describedby="fontHint" spellcheck="false" />
+          <p class="hint" id="fontHint">Leave empty for the bundled lettering font (Comic Neue Bold), or name any font installed on this device, e.g. <code>"Bangers"</code>.</p>
+        </div>
+        <label class="option">
+          <span class="option-text"><span class="option-title">Use the graphics card (WebGPU)</span><span class="option-desc">Finds text and bubbles much faster. Turn off only if pages come out wrong or the browser misbehaves.</span></span>
+          <input type="checkbox" id="useGpu" class="switch" />
+        </label>
+        <label class="option">
+          <span class="option-text"><span class="option-title">Peek at the original while hovering</span><span class="option-desc">Hovering a translated bubble shows the original lettering. To fix a line, double-click its bubble.</span></span>
+          <input type="checkbox" id="peekOnHover" class="switch" />
+        </label>
+      </section>
+
+      <section class="card" id="sec-debug" aria-labelledby="h-debug">
+        <h2 id="h-debug">Troubleshooting</h2>
+        <label class="option">
+          <span class="option-text"><span class="option-title">Debug overlay</span><span class="option-desc">Draws the detected regions and text areas on translated pages, and adds a Report button to the hover bar that downloads that page's original, debug render and JSON. "Export debug report" in the popup does every translated page on the tab.</span></span>
+          <input type="checkbox" id="debugOverlay" class="switch" />
+        </label>
+        <div class="option">
+          <span class="option-text"><span class="option-title">Translation cache</span><span class="option-desc">Translated pages, the names found per tab and your edited lines are kept until the browser closes. Clear them to translate pages afresh.</span></span>
+          <button id="clearCache" class="btn" type="button">Clear cache</button>
+        </div>
+      </section>
+
+      <section class="card" id="sec-about" aria-labelledby="h-about">
+        <h2 id="h-about">About</h2>
+        <p class="about">Gytakusub is free software under the <a href="LICENSE" target="_blank">GNU AGPL v3</a> · <a href="https://github.com/gywreb/gytakusub" target="_blank" rel="noopener">source code</a> · <a href="THIRD_PARTY.md" target="_blank">third-party components</a></p>
+      </section>
+    </main>
   </div>
-  <div class="hint">Create one at platform.claude.com → Settings → API keys. Usage is billed to that Console account, separately from a Claude subscription (Max, Ultra and Team plans include monthly API credits).</div>
-  <label class="check"><input type="checkbox" id="syncApiKey" /> Sync the key to my other browsers (stored in browser sync instead of this device only)</label>
 
-  <label for="model">Model</label>
-  <select id="model">
-    <option value="claude-haiku-5-5">Claude Haiku 5.5 — fastest, cheapest</option>
-    <option value="claude-sonnet-5-5">Claude Sonnet 5.5 — better on dense / stylised pages</option>
-    <option value="claude-opus-5-5">Claude Opus 5.5 — best quality, most expensive</option>
-  </select>
-
-  <h2>Translation</h2>
-  <label for="targetLang">Target language</label>
-  <input id="targetLang" type="text" placeholder="English" />
-
-  <label for="glossary">Glossary</label>
-  <textarea id="glossary" placeholder="One per line, e.g.&#10;Gojo Satoru = Satoru Gojo&#10;呪術 = jujutsu"></textarea>
-  <div class="hint">Names and terms the model must use exactly. Names it discovers on its own are remembered per tab automatically.</div>
-
-  <label for="customPrompt">Extra instructions</label>
-  <textarea id="customPrompt" placeholder="e.g. Keep the tone casual. Translate SFX as English onomatopoeia."></textarea>
-
-  <label class="check"><input type="checkbox" id="useContext" /> Chapter context — send names and the last ~40 translated lines of this tab with each page (better continuity, ~400 extra input tokens)</label>
-  <label class="check"><input type="checkbox" id="includeSource" /> Also transcribe the original text (slower, slightly more careful reading; useful for debugging)</label>
-  <label class="check"><input type="checkbox" id="uppercase" /> UPPERCASE lettering (comic style)</label>
-
-  <label for="enabledSites">Enabled sites (hover button and keyboard shortcuts)</label>
-  <textarea id="enabledSites" placeholder="mangadex.org"></textarea>
-  <div class="hint">One hostname per line. Gytakusub runs only on these sites; everywhere else it stays dormant until you use the toolbar button or Alt+T. Easiest: open the site and flip the switch in the popup.</div>
-
-  <label for="autoSites">Auto-translate while scrolling on these sites</label>
-  <textarea id="autoSites" placeholder="mangadex.org"></textarea>
-  <div class="hint">Subset of the enabled sites. Each page that scrolls into view is sent to Claude automatically — only turn this on where you want to spend tokens.</div>
-
-  <h2>Appearance & sites</h2>
-  <label for="fontFamily">Font family</label>
-  <input id="fontFamily" type="text" placeholder='"Comic Neue", "Comic Sans MS", sans-serif' />
-  <div class="hint">Leave empty for the bundled lettering font (Comic Neue Bold). Or name any font installed on this device, e.g. <code>"Bangers"</code>.</div>
-
-  <label class="check"><input type="checkbox" id="useGpu" /> Use the graphics card (WebGPU) to find text and bubbles — much faster; turn off only if pages come out wrong or the browser misbehaves</label>
-  <label class="check"><input type="checkbox" id="peekOnHover" /> Peek at the original lettering while hovering a translated bubble (double-click a bubble to edit its line)</label>
-  <label class="check"><input type="checkbox" id="debugOverlay" /> Debug overlay — draw detected regions and text areas on translated pages, and add a <b>Report</b> button to the hover bar that downloads a diagnostic report for that page (original, debug render, JSON); the popup's <i>Export debug report</i> does every translated page on the tab</label>
-
-  <label for="excludedSites">Disabled on these sites</label>
-  <textarea id="excludedSites" placeholder="mail.google.com&#10;youtube.com"></textarea>
-
-  <div class="row" style="margin-top:20px">
-    <button id="save" class="primary" type="button">Save</button>
-    <button id="clearCache" type="button">Clear translation cache</button>
+  <div class="savebar">
+    <div class="savebar-inner">
+      <p id="msg" role="status" aria-live="polite"></p>
+      <button id="save" class="primary" type="button">Save</button>
+    </div>
   </div>
-  <div id="msg"></div>
-
-  <p class="hint" style="margin-top:28px">Gytakusub is free software under the <a href="LICENSE" target="_blank">GNU AGPL v3</a> — <a href="https://github.com/gywreb/gytakusub" target="_blank" rel="noopener">source code</a> · <a href="THIRD_PARTY.md" target="_blank">third-party components</a></p>
 
   <script type="module" src="options.js"></script>
 </body>

@@ -11,7 +11,7 @@ From the Chrome Web Store listing, or unpacked:
 2. Open `brave://extensions` (or `chrome://extensions`), turn on **Developer mode**.
 3. **Load unpacked** → pick the `gytakusub` folder.
 
-Then click the extension icon → **Options** → paste your API key (platform.claude.com → Settings → API keys) → **Test** → **Save**, and reload any manga tab that was already open.
+Then click the extension icon → **All settings** → paste your API key (platform.claude.com → Settings → API keys) → **Save & test**, and reload any manga tab that was already open.
 
 Settings, glossary and (optionally) the API key sync through your browser's sync. The first translation after the browser starts takes a few seconds longer: the WebAssembly modules compile and the two models load once.
 
@@ -21,13 +21,13 @@ Settings, glossary and (optionally) the API key sync through your browser's sync
 |---|---|
 | Translate one page | Hover the image → **Translate** |
 | Translate everything on screen | `Alt+T`, or popup → *Translate visible images* |
-| Hide / show translations | `Alt+Shift+T`, or hover → **Hide** |
-| Make a site "yours" (hover button + shortcuts) | Popup → *Enable on \<this site\>*. Elsewhere the extension stays dormant until you use the toolbar button or `Alt+T`. |
-| Translate automatically while scrolling | Popup → *Auto-translate while scrolling here* (per site; implies enabled) |
-| Switch everything off | Popup → master switch (badge shows "off") |
+| Hide / show translations | `Alt+Shift+T`, the eye button in the popup, or hover → **Hide** |
+| Make a site "yours" (hover button + shortcuts) | Popup → *On \<this site\>* → *Enable here*. Elsewhere the extension stays dormant until you use the toolbar button or `Alt+T`. |
+| Translate automatically while scrolling | Popup → *On \<this site\>* → *Auto-translate while scrolling* (per site; implies enabled) |
+| Switch everything off | Popup → the switch in its header (badge shows "off") |
 | Redo a page (e.g. after editing the glossary) | Hover → **↻ Redo** |
 | Correct a line / teach the glossary | Double-click a translated bubble → edit → **Ctrl+Enter**; or fill "original term = translation" → *Add* |
-| Peek at the original lettering | Options → *Peek at the original* (off by default), then rest the pointer on a translated bubble |
+| Peek at the original lettering | Options → *Peek at the original while hovering* (off by default), then rest the pointer on a translated bubble |
 | Report a bad page | Options → *Debug overlay*, then popup → **Export debug report** (one `.zip` for every translated page on the tab) |
 
 ## How it works
@@ -74,7 +74,8 @@ engine/           page engine (runs in the worker):
 vendor/           OpenCV.js, ONNX Runtime Web, the two models, hyphenation patterns (licences beside them)
 fonts/            Comic Neue Bold (SIL OFL)
 popup.*           quick actions, model, site toggles, debug report
-options.*         API key, model, glossary, prompt, appearance, sites, GPU, debug
+options.*         API key, model, glossary, prompt, sites, lettering, GPU, debug
+ui.css            shared look of the popup and Options (same tokens as the web app)
 LICENSE           GNU AGPL v3; THIRD_PARTY.md lists the bundled components
 ```
 

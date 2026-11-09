@@ -20,12 +20,12 @@ let currentHost = null;
 
 async function init() {
   const [s, [active]] = await Promise.all([getSettings(), chrome.tabs.query({ active: true, currentWindow: true })]);
-  $("nokey").style.display = s.apiKey ? "none" : "block";
+  $("nokey").hidden = !!s.apiKey;
   $("enabled").checked = !!s.enabled;
-  document.body.classList.toggle("off", !s.enabled);
+  showEnabled(!!s.enabled);
   $("model").value = s.model;
   $("useContext").checked = !!s.useContext;
-  $("exportReport").style.display = s.debugOverlay ? "" : "none";
+  $("exportReport").hidden = !s.debugOverlay;
 
   tab = active && /^https?:/.test(active.url || "") ? active : null;
   try { currentHost = tab ? new URL(tab.url).hostname : null; } catch { currentHost = null; }
@@ -49,8 +49,23 @@ async function init() {
   } else {
     $("state").textContent = $("site").checked
       ? "Reload the tab to activate Gytakusub here."
-      : "Not active on this page yet. \"Translate visible\" works anyway; enable the site for the hover button.";
+      : "Not active on this page yet. Translate still works.";
   }
+}
+
+/** The master switch: while it is off, the popup shows only that (plus the key notice and the footer). */
+function showEnabled(on) {
+  document.body.classList.toggle("off", !on);
+  $("enabledText").textContent = on ? "On" : "Off";
+}
+
+/** The real shortcuts: people can change or remove them at chrome://extensions/shortcuts. */
+async function showShortcuts() {
+  const commands = await chrome.commands.getAll().catch(() => []);
+  const key = (name) => commands.find((c) => c.name === name)?.shortcut || "";
+  $("kbdTranslate").textContent = key("translate-visible");
+  $("kbdTranslate").hidden = !key("translate-visible");
+  $("toggle").title = "Hide / show translations" + (key("toggle-overlays") ? ` (${key("toggle-overlays")})` : "");
 }
 
 async function setSiteLists(host, { enabled, auto }) {
@@ -61,7 +76,7 @@ async function setSiteLists(host, { enabled, auto }) {
 
 $("enabled").onchange = async (e) => {
   await chrome.storage.sync.set({ enabled: e.target.checked });
-  document.body.classList.toggle("off", !e.target.checked);
+  showEnabled(e.target.checked);
 };
 $("translate").onclick = async () => { const r = await relay({ type: "TRANSLATE_VISIBLE" }, true); if (r?.error) $("state").textContent = r.error; else window.close(); };
 $("toggle").onclick = async () => { await relay({ type: "TOGGLE_OVERLAYS" }); init(); };
@@ -93,4 +108,5 @@ $("auto").onchange = async (e) => {
 $("openOptions").onclick = () => chrome.runtime.openOptionsPage();
 $("openOptions2").onclick = (e) => { e.preventDefault(); chrome.runtime.openOptionsPage(); };
 
+showShortcuts();
 init().finally(() => document.body.classList.add("ready"));

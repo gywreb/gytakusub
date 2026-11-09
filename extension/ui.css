@@ -1,0 +1,74 @@
+/* Gytakusub extension pages (popup, Options): the same tokens and components as the web app,
+   so the two look like one product. Light and dark follow the system. */
+:root {
+  color-scheme: light dark;
+  --bg: #f4f5f7; --surface: #ffffff; --surface-2: #eef0f3; --fg: #15171c; --muted: #5f6672; --border: #d6d9df;
+  --primary: #15171c; --primary-fg: #ffffff; --accent: #1d63d8; --ok: #15803d; --danger: #c62828; --focus: #1d63d8;
+  --warn-fg: #8a5300; --warn-bg: #fff7e6; --warn-border: #f3d18a;
+  --switch-off: #b8bdc6; --switch-on: #16a34a;
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px;
+  --r1: 8px; --r2: 12px; --r3: 16px;
+  --t-caption: 12.5px; --t-body: 14px; --t-h3: 13px; --t-h2: 16px; --t-h1: 20px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #121418; --surface: #1b1e24; --surface-2: #23272f; --fg: #eceef1; --muted: #a3a9b4; --border: #313641;
+    --primary: #eceef1; --primary-fg: #111318; --accent: #7cb3ff; --ok: #4ade80; --danger: #f87171; --focus: #7cb3ff;
+    --warn-fg: #f5c870; --warn-bg: #2d2412; --warn-border: #5c4718;
+    --switch-off: #4b515c;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--fg); }
+body { font: var(--t-body)/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif; }
+p { margin: 0; }
+a { color: var(--accent); }
+code, kbd { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .9em; }
+kbd { padding: 1px 6px; border-radius: 6px; border: 1px solid var(--border); border-bottom-width: 2px; background: var(--surface); color: var(--muted); font-size: 11px; white-space: nowrap; }
+.muted { color: var(--muted); }
+.hint { color: var(--muted); font-size: var(--t-caption); }
+.hidden, [hidden] { display: none !important; }
+:focus { outline: none; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: var(--r1); }
+
+/* buttons */
+.btn, button.primary { display: inline-flex; align-items: center; justify-content: center; gap: var(--s2); min-height: 36px; padding: 0 var(--s4); border-radius: var(--r1); border: 1px solid var(--border); background: var(--surface); color: var(--fg); font: inherit; font-weight: 600; cursor: pointer; text-decoration: none; transition: background-color .15s ease, border-color .15s ease, opacity .15s ease; }
+.btn:hover { background: var(--surface-2); }
+button.primary { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); }
+button.primary:hover { opacity: .9; }
+button:disabled { opacity: .45; cursor: default; }
+.btn.block, button.primary.block { width: 100%; justify-content: space-between; min-height: 40px; }
+.btn.block kbd, button.primary.block kbd { background: transparent; color: inherit; opacity: .7; border-color: currentColor; }
+.btn.small { min-height: 30px; padding: 0 var(--s3); font-size: var(--t-caption); }
+
+/* fields */
+.field { display: grid; gap: var(--s1); }
+.field > span:first-child, .field-label { font-weight: 600; font-size: 13px; }
+input[type=text], input[type=password], textarea, select { width: 100%; min-height: 36px; padding: 7px 10px; border-radius: var(--r1); border: 1px solid var(--border); background: var(--bg); color: var(--fg); font: inherit; }
+textarea { min-height: 84px; resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
+select { padding-right: 28px; text-overflow: ellipsis; }
+input:focus-visible, textarea:focus-visible, select:focus-visible { outline-offset: 0; border-color: var(--focus); }
+::placeholder { color: var(--muted); opacity: .8; }
+.input-row { display: flex; gap: var(--s2); }
+.input-row input { flex: 1; min-width: 0; }
+
+/* switch: a real checkbox, restyled; keyboard and screen readers see a checkbox */
+.switch { appearance: none; -webkit-appearance: none; flex: none; position: relative; width: 36px; height: 22px; margin: 0; border-radius: 11px; background: var(--switch-off); cursor: pointer; transition: background-color .15s ease; }
+.switch::before { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, .3); transition: transform .15s ease; }
+.switch:checked { background: var(--switch-on); }
+.switch:checked::before { transform: translateX(14px); }
+.switch:disabled { opacity: .45; cursor: default; }
+.switch:focus-visible { outline-offset: 2px; border-radius: 11px; }
+
+/* a row: title + description on the left, control on the right; the whole row is the label */
+.option { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); padding: var(--s3) 0; cursor: pointer; }
+.option + .option { border-top: 1px solid var(--border); }
+div.option { cursor: default; }
+.option-text { display: grid; gap: 2px; min-width: 0; }
+.option-title { font-weight: 600; }
+.option-desc { color: var(--muted); font-size: var(--t-caption); }
+
+.notice { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); padding: var(--s2) var(--s3); border-radius: var(--r1); border: 1px solid var(--warn-border); background: var(--warn-bg); color: var(--warn-fg); font-size: var(--t-caption); }
+
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; } }
