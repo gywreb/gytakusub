@@ -3,11 +3,14 @@
 // browser forbids it — so chapter links go through the fetcher, which opens the
 // page, lists its images and relays them. Setup happens in the Chapter link tab.
 
-// The fetcher code this app was built with (copied in by scripts/sync-shared.mjs):
-// its version is the oldest fetcher this app accepts, and the setup guide offers its source.
+// The fetcher code this app was built with (copied in by scripts/sync-shared.mjs).
 import { VERSION } from "./fetcher-worker.js";
 
-export const FETCHER_VERSION = VERSION;
+export const FETCHER_VERSION = VERSION; // the newest fetcher: what "Sync fork" brings
+// The oldest fetcher the app works with. Raise it only when chapters can't work otherwise:
+// every user then has to update theirs. Newer features check their own version (USAGE_VERSION).
+export const MIN_FETCHER_VERSION = "2.1.0";
+export const USAGE_VERSION = "2.4.0"; // /usage: today's count from Cloudflare
 export const MIN_KEY = 24;
 
 /** The fetcher's base address from whatever the user pasted (trailing slash, a path, no scheme). */
@@ -50,7 +53,7 @@ async function signature(base, key) {
 export async function isConnected(s) {
   const base = fetcherBase(s.fetcherUrl);
   if (!base || !s.fetcherKey || !s.fetcherCheck) return false;
-  return s.fetcherCheck.sig === (await signature(base, s.fetcherKey)) && atLeast(s.fetcherCheck.version, FETCHER_VERSION);
+  return s.fetcherCheck.sig === (await signature(base, s.fetcherKey)) && atLeast(s.fetcherCheck.version, MIN_FETCHER_VERSION);
 }
 
 // What each error code from the fetcher means for the reader, and what to do instead.
@@ -87,6 +90,22 @@ export function usageToday(base) {
     if (u.day === utcDay() && u.base === base) return { requests: u.requests || 0, chapters: u.chapters || 0 };
   } catch { /* storage unavailable */ }
   return { requests: 0, chapters: 0 };
+}
+
+/**
+ * Today's count for the whole Cloudflare account, read by the fetcher from Cloudflare's analytics
+ * (/usage): {requests, errors, limit, day, asOf, workers[], version}. The same number on every device.
+ * Throws FetcherError "usage-old" (fetcher older than USAGE_VERSION), "usage-setup" (no token on the
+ * Worker yet; err.version is the fetcher's), "usage-upstream" (Cloudflare refused), or a connection error.
+ */
+export async function loadCloudUsage(s) {
+  const base = fetcherBase(s.fetcherUrl);
+  try {
+    return await (await call("/usage", {}, base, s.fetcherKey, true)).json();
+  } catch (e) {
+    if (e.code === "not-found") throw new FetcherError("usage-old", `Update your fetcher to ${USAGE_VERSION} or newer for Cloudflare's count.`);
+    throw e;
+  }
 }
 
 /** Calls fn() whenever the count changes. */
@@ -129,7 +148,9 @@ async function call(path, params, base, key, inUse = false) {
   if (!body.error && /\b1102\b/.test(text)) throw new FetcherError("cpu", "This page needed more work than Cloudflare's free plan allows per request (10 ms). Try again; if it keeps failing, use screenshot mode for this chapter.");
   if (!body.error) throw new FetcherError(code, `${base} answered HTTP ${res.status}, not like a Gytakusub fetcher. Check the address.`);
   const extra = body.message && !["unauthorized", "setup"].includes(code) ? ` (${body.message})` : "";
-  throw new FetcherError(code, ADVICE[code] ? ADVICE[code] + extra : body.message || `The fetcher answered HTTP ${res.status}.`);
+  const err = new FetcherError(code, ADVICE[code] ? ADVICE[code] + extra : body.message || `The fetcher answered HTTP ${res.status}.`);
+  if (body.version) err.version = body.version;
+  throw err;
 }
 
 /**
@@ -142,7 +163,7 @@ export async function connectFetcher(url, key) {
   if ((key || "").length < MIN_KEY) throw new FetcherError("short-key", `The access key must be at least ${MIN_KEY} characters (generate one in step 1).`);
   const j = await (await call("/ping", {}, base, key)).json();
   if (!j.ok || !j.version) throw new FetcherError("not-fetcher", `${base} answered, but not like a Gytakusub fetcher.`);
-  if (!atLeast(j.version, FETCHER_VERSION)) throw new FetcherError("outdated", `Your fetcher is version ${j.version}; this app needs ${FETCHER_VERSION} or newer. On GitHub, open your gytakusub copy → Sync fork → Update branch; wait a minute, then Connect again.`);
+  if (!atLeast(j.version, MIN_FETCHER_VERSION)) throw new FetcherError("outdated", `Your fetcher is version ${j.version}; this app needs ${MIN_FETCHER_VERSION} or newer. On GitHub, open your gytakusub copy → Sync fork → Update branch; wait a minute, then Connect again.`);
   return { fetcherUrl: base, fetcherKey: key, fetcherCheck: { sig: await signature(base, key), version: j.version, at: Date.now() } };
 }
 

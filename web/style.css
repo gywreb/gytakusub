@@ -207,6 +207,19 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline-offs
 .meter.warn .meter-fill { background: var(--danger); }
 .usage-facts { margin: 0; padding-left: 1.2em; display: grid; gap: var(--s2); color: var(--muted); }
 .usage-facts b { color: var(--fg); }
+/* section head with a source label on the right (Cloudflare · 12:03 / This device) */
+.sec-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s3); flex-wrap: wrap; margin-bottom: var(--s3); }
+.sec-head h3 { margin: 0; }
+.source-badge { font-size: var(--t-caption); color: var(--muted); font-variant-numeric: tabular-nums; }
+.source-badge.live::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: var(--ok); vertical-align: 1px; }
+/* an optional task inside a section: framed so it reads as one unit */
+.callout { margin-top: var(--s4); padding: var(--s4); border: 1px solid var(--border); border-radius: var(--r2); background: var(--bg); }
+.callout h4 { margin: 0 0 var(--s2); font-size: var(--t-body); }
+.callout > p { margin-bottom: var(--s3); }
+.callout .sub { margin-bottom: var(--s4); }
+.callout > :last-child { margin-bottom: 0; }
+#liveError { margin-top: var(--s3); }
+kbd { display: inline-block; min-width: 1.6em; padding: 0 5px; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 5px; background: var(--surface); font: 600 12px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; text-align: center; }
 .usage-state { align-self: center; padding: 2px var(--s2); border-radius: 999px; font-size: var(--t-caption); font-weight: 600; color: var(--danger); border: 1px solid currentColor; }
 .wizard .progress { font-size: var(--t-caption); font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin: var(--s4) 0 var(--s2); }
 

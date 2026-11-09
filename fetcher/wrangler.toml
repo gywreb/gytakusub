@@ -7,6 +7,14 @@ main = "worker.js"
 compatibility_date = "2026-11-01"
 workers_dev = true
 
+# Keep variables set in the dashboard when Workers Builds redeploys (after "Sync fork").
+keep_vars = true
+
+# Optional secrets (Worker → Settings → Variables and Secrets → Add → type Secret):
+#   CF_API_TOKEN   a Cloudflare API token with only Account · Account Analytics · Read
+#   CF_ACCOUNT_ID  your Cloudflare account ID
+# With both, /usage reports today's requests from Cloudflare's analytics, and the app shows that count.
+
 # Optional: only answer the app at these origins (the access key is required either way).
 # [vars]
 # ALLOWED_ORIGINS = "https://gywreb.github.io"

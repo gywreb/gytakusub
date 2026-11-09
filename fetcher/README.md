@@ -20,7 +20,13 @@ The app tells you when that's the case. For those sites use screenshot mode, or 
 Cost: nothing. The fetcher runs on Cloudflare's Workers Free plan, and no card is needed:
 - **Allowance:** 100,000 requests a day for your whole Cloudflare account, counted from midnight UTC. One chapter takes about one request per page, plus one.
 - **Past the allowance:** Cloudflare stops answering until the reset (its error 1027). Nothing is charged.
-- **Watching it:** the app shows how much this device used today, on the chip under the chapter form and in **Your fetcher**. The exact count for the account is in the Cloudflare dashboard: Workers & Pages → your Worker → Metrics.
+- **Watching it:** the chip under the chapter form and **Your fetcher** show today's count. By default that's an estimate of what this device sent. It misses your other devices and the browser's permission checks (preflights), which Cloudflare counts too.
+- **Live count (optional, about 3 minutes):** add two Secrets to the Worker, and it reads today's exact count from Cloudflare's analytics (`/usage`). Every browser and the installed app then show the same number, refreshed every minute while the Chapter link tab is open.
+  1. Create a token: Account API tokens → Create Token → Custom token. Give it only **Account · Account Analytics · Read**. Cloudflare shows the token once.
+  2. Copy your account ID: press Ctrl/Cmd+K in the dashboard → *Copy account ID*.
+  3. On the Worker: Settings → Variables and Secrets → add Secret `CF_API_TOKEN` (the token) and Secret `CF_ACCOUNT_ID` (the ID) → Deploy.
+
+  The token can read your account's analytics and nothing else. It stays on the Worker and is never sent to the app. Use the type **Secret** for both: plain variables set in the dashboard can be replaced when the Worker redeploys. `wrangler.toml` has `keep_vars = true` as a second guard.
 
 ## Set it up
 
