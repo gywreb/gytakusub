@@ -91,13 +91,17 @@ dropped before stamping).
 
 | `layout-score.mjs` | rules only | + segmenter |
 |---|---|---|
-| lines placed by halo (no bubble found) | 190 | **102** |
-| rendered size under 0.7× the original | 9.6% | **8.7%** |
-| 10th-percentile rendered size | 0.71 | **0.74** |
-| translations over un-erased lettering | 70 | **57** |
-| rectangle over its own lettering | 96.1% | 94.6% |
-| rectangles narrower than 3 letters | 136 | 153 |
-| shared bubbles: every line over its own | 89.3% | 83.3% (317 vs 458 shared placements: the model separates joined bubbles) |
+| lines placed by halo or loose (no bubble found) | 190 | **119** |
+| rendered size under 0.7× the original | 9.6% | **8.8%** |
+| 10th-percentile rendered size | 0.71 | **0.73** |
+| translations over un-erased lettering | 70 | **52** |
+| rectangle over its own lettering | 96.1% | 96.0% |
+| rectangles narrower than 3 letters | 136 | 147 |
+| shared bubbles: every line over its own | 89.3% | 82.6% (322 vs 458 shared placements: the model separates joined bubbles) |
+| analysis per page (Node; text detector on ORT in both) | 0.67 s | 2.53 s |
+
+(Final code, including the rule that a distrusted stamp stands unless the
+model's box points at another region.)
 
 The two small regressions come from mask edges: at 512 px input a prototype
 cell is ~9 page pixels at 850 px width, so masks are blobby and sometimes

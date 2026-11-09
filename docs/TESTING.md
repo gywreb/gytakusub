@@ -77,6 +77,20 @@ Click a run → *Artifacts* → `browser-renders` to see the screenshots those t
 4. Chrome Web Store: https://chrome.google.com/webstore/devconsole → the Gytakusub item → **Package** → *Upload new package* → the zip from the release → **Submit for review**. Store listing text for "What's new" is in `store/LISTING.md`. (Once the CWS secrets are configured in the repo, step 4 happens automatically on the tag.)
 5. GitHub Pages redeploys the web app from `main` on its own (Actions → *Deploy web app*).
 
+## G. Testing the 1.1.1 branch (learned bubbles)
+
+```powershell
+git fetch origin
+git checkout feature/learned-layout
+git pull
+```
+`brave://extensions` → Gytakusub → **↻ reload**. The first page after a reload takes a few extra seconds (two models are loaded once).
+
+1. Read the same chapters as before with auto-translate on.
+2. What should look different: bubbles shaded with tone or gradients get full-size text; text no longer lands on a bright sky between bubbles; fewer lines with an outline "halo" instead of sitting in a bubble.
+3. Options → Debug overlay → popup → **Export debug report** on each chapter. Every page in the report says `"engine": "segmented"`; `timing.detect` and `timing.segment` show where the time goes.
+4. To go back to 1.1: `git checkout release/1.1` and reload.
+
 ## F. If a problem shows up after merging
 
 Tell me which page/site. The fix goes into a branch with a failing test first, then the fix, then the same steps as above. If the problem is serious, `main` can be reverted from the PR page (*Revert*) and the previous zip re-uploaded to the store.
