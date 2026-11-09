@@ -77,6 +77,24 @@ jobs:
         if: always()
         with: { name: extension-renders, path: /tmp/gyt-browser/**/*.png, if-no-files-found: ignore }
 
+  # The store package, built exactly as the Release workflow builds it, on the same runner image (~30 s).
+  package:
+    needs: changes
+    if: needs.changes.outputs.extension == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: "${{ inputs.ref }}" }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      # ZIP set on purpose: zip reads it as options, which broke the 2.2.0 release; the script must ignore it
+      - env: { ZIP: "dist/not-the-archive.zip" }
+        run: |
+          v=$(node -p "require('./extension/manifest.json').version")
+          rm -rf dist
+          ./scripts/build-zip.sh
+          [ "$(ls dist)" = "gytakusub-extension-$v.zip" ] || { echo "::error::dist/ holds $(ls dist), expected gytakusub-extension-$v.zip"; exit 1; }
+
   # The fetcher and the web app in a browser (~4 min).
   web:
     needs: changes
@@ -102,15 +120,16 @@ jobs:
 
   # The required check: every suite that ran passed.
   test:
-    needs: [changes, extension, web]
+    needs: [changes, extension, package, web]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:
       - env:
           CHANGES: ${{ needs.changes.result }}
           EXTENSION: ${{ needs.extension.result }}
+          PACKAGE: ${{ needs.package.result }}
           WEB: ${{ needs.web.result }}
         run: |
-          echo "changes: $CHANGES, extension suite: $EXTENSION, web suite: $WEB"
+          echo "changes: $CHANGES, extension suite: $EXTENSION, package: $PACKAGE, web suite: $WEB"
           [ "$CHANGES" = success ] || { echo "::error::could not work out which suites to run"; exit 1; }
-          for r in "$EXTENSION" "$WEB"; do case "$r" in success|skipped) ;; *) echo "::error::a test suite did not pass ($r)"; exit 1;; esac; done
+          for r in "$EXTENSION" "$PACKAGE" "$WEB"; do case "$r" in success|skipped) ;; *) echo "::error::a test suite did not pass ($r)"; exit 1;; esac; done
