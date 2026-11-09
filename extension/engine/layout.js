@@ -96,7 +96,17 @@ export function layout(an, items) {
       // Free text block: the translation takes the block's own footprint, with
       // a little room, and is drawn with a halo since it sits on artwork.
       const b = r.box, pad = letter * 0.5;
-      const rect = clampRect({ x: b.x - pad, y: b.y - pad, w: b.w + 2 * pad, h: b.h + 2 * pad }, W, H);
+      let rect = clampRect({ x: b.x - pad, y: b.y - pad, w: b.w + 2 * pad, h: b.h + 2 * pad }, W, H);
+      // Lettering set in a column or two: the translation runs in rows and needs
+      // a width the column does not have. Widen it about its centre (to 0.6 of its
+      // height) as far as the other regions and the page allow.
+      if (r.ref.vertical && rect.h > 1.7 * rect.w) {
+        const others = an.regions.filter((q) => q.id !== id).map((q) => q.box);
+        for (const f of [1, 0.75, 0.5, 0.25]) {
+          const w = rect.w + (0.6 * rect.h - rect.w) * f, cand = clampRect({ x: rect.x + rect.w / 2 - w / 2, y: rect.y, w, h: rect.h }, W, H);
+          if (!others.some((o) => overlap(o, cand) > 0.05 * Math.min(area(o), area(cand)))) { rect = cand; break; }
+        }
+      }
       const text = members.map((m) => m.it.text).join(" ");
       placements.push({ text, size: members[0].it.size, rect, letter, color: r.dark ? "#fff" : "#000", halo: true, tag: id, item: members.length === 1 ? members[0].it.index ?? null : null });
     }

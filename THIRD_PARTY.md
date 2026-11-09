@@ -7,7 +7,7 @@ following, each under its own licence; the licence texts ship next to the files.
 |---|---|---|---|
 | OpenCV.js 4.5.5 | `vendor/opencv.js`, `vendor/opencv_js.wasm` | Apache-2.0 | `vendor/LICENSE-OpenCV.txt` |
 | ONNX Runtime Web 1.31.1 (Microsoft) | `vendor/ort/` | MIT | `vendor/ort/LICENSE-onnxruntime.txt` |
-| PaddleOCR PP-OCRv4 text detector | `vendor/ppocr-det.onnx` | Apache-2.0 | `vendor/LICENSE-PaddleOCR.txt` |
+| PaddleOCR PP-OCRv6 (small) text detector | `vendor/ppocr-det.onnx` | Apache-2.0 | `vendor/LICENSE-PaddleOCR.txt` |
 | Speech-bubble segmentation model (kitsumed, Ultralytics YOLOv8m-seg), int8 | `vendor/segment.onnx` | GPL-3.0 (model card) / Ultralytics AGPL-3.0 | `vendor/LICENSE-segment.txt` |
 | English hyphenation patterns (hyphen) | `vendor/hyphen-en.js` | ISC | `vendor/LICENSE-hyphen.txt` |
 | Comic Neue Bold | `fonts/ComicNeue-Bold.ttf` | SIL OFL 1.1 | `fonts/LICENSE-ComicNeue.txt` |

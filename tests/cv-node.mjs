@@ -12,7 +12,7 @@ globalThis.ImageData ??= ImageData; // engine/erase.js constructs ImageData like
 const { getCV, getDetector, getSegmenter } = await import("../extension/engine/cv.js");
 const { analyze } = await import("../extension/engine/analyze.js");
 const { segment } = await import("../extension/engine/segment.js");
-const { detectText, detectInEmptyBubbles } = await import("../extension/engine/detect.js");
+const { detectText, detectInEmptyBubbles, detectInDarkShapes } = await import("../extension/engine/detect.js");
 export const cv = await getCV({ wasmBinary: fs.readFileSync(path.join(here, "../extension/vendor/opencv_js.wasm")) });
 // Emscripten's Node branch installs process-wide handlers that turn any unhandled
 // rejection into a wasm abort (exit code 7, source dump) — masking the real error.
@@ -22,10 +22,13 @@ process.removeAllListeners("uncaughtException");
 // The learned text detector, from the vendored model file (fetch() cannot read files in Node).
 // GYT_DETECTOR=dnn runs the text detector on OpenCV's dnn instead of ONNX Runtime (the fallback path).
 const ortWasm = fs.readFileSync(path.join(here, "../extension/vendor/ort/ort-wasm-simd-threaded.asyncify.wasm")).buffer;
-const detBytes = new Uint8Array(fs.readFileSync(path.join(here, "../extension/vendor/ppocr-det.onnx")));
+// GYT_DETECTOR_MODEL: another text-detector file to evaluate (same DB output), GYT_DETECTOR_POST its
+// post-processing as JSON ({"thresh":..,"boxThresh":..,"unclip":..}).
+const detBytes = new Uint8Array(fs.readFileSync(process.env.GYT_DETECTOR_MODEL || path.join(here, "../extension/vendor/ppocr-det.onnx")));
+const detPost = process.env.GYT_DETECTOR_POST ? JSON.parse(process.env.GYT_DETECTOR_POST) : undefined;
 export const detector = process.env.GYT_DETECTOR === "dnn"
-  ? await (await import("../extension/engine/detect.js")).loadDetector(cv, detBytes)
-  : await getDetector({ modelBytes: detBytes, wasmBinary: ortWasm });
+  ? await (await import("../extension/engine/detect.js")).loadDetector(cv, detBytes, { post: detPost })
+  : await getDetector({ modelBytes: detBytes, wasmBinary: ortWasm, post: detPost });
 console.error(`[cv-node] text detector on ${detector.kind}`);
 
 // The learned bubble segmenter, when a model is available: extension/vendor/segment.onnx
@@ -46,6 +49,7 @@ export async function analyzePage(img, opts = {}) {
   const det = detector;
   const t0 = Date.now();
   let lines = det ? await detectText(cv, det, img) : null;
+  if (lines) lines = await detectInDarkShapes(cv, det, img, lines);
   const seg = segmenter ? await segment(segmenter, img) : null;
   if (lines && seg) lines = await detectInEmptyBubbles(cv, det, img, lines, seg.instances, segmenter.bubbleClasses);
   const detectMs = Date.now() - t0 - (seg ? seg.ms : 0);

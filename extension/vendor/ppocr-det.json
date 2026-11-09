@@ -1,6 +1,15 @@
 {
-  "source": "@gutenye/ocr-models@1.4.2",
-  "model": "ch_PP-OCRv4_det_infer.onnx (PaddleOCR, Apache-2.0)",
-  "rewrite": "HardSigmoid → Mul/Add/Clip",
-  "bytes": 4746747
+  "source": "PaddlePaddle/PP-OCRv6_small_det_onnx@28fe5895c24fd108c19eb3e8479f4ab385fbfc62",
+  "license": "Apache-2.0",
+  "model": "PP-OCRv6 text detection (PaddleOCR)",
+  "rewrite": "HardSigmoid → Mul/Add/Clip, Erf → tanh form, ReduceMean(H,W) → GlobalAveragePool, MaxPool SAME_UPPER → explicit pads (for OpenCV 4.5 dnn)",
+  "sourceSha256": "d73e0058b7a8086bbd57f3d10b8bcd4ff95363f67e06e2762b5e814fe9c9410e",
+  "bytes": 9885219,
+  "sha256": "21535381cd39a1f053436e5dfb062dbf4e49366e1c0cbec354104acf3bcbd3d5",
+  "post": {
+    "maxSide": 960,
+    "thresh": 0.3,
+    "boxThresh": 0.5,
+    "unclip": 1.6
+  }
 }

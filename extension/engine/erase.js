@@ -40,7 +40,10 @@ export function erase(cv, img, analysis, regionIds) {
     for (let i = 1; i < n; i++) {
       const cx = S[i * 5], cy = S[i * 5 + 1], cw = S[i * 5 + 2], ch = S[i * 5 + 3];
       const touches = cx <= 0 || cy <= 0 || cx + cw >= w || cy + ch >= h;
-      if (!touches && ch <= 2.5 * letter) keep[i] = 1;
+      // size across the line only: along it a mark may be long (a wave dash, a
+      // long vowel mark in a column) and still be lettering — a stroke of art or
+      // an outline crossing the window touches its edge instead
+      if (!touches && (b.vertical ? cw : ch) <= 2.5 * letter) keep[i] = 1;
     }
     for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) { const l = Lb[yy * w + xx]; if (l && keep[l]) md[(y0 + yy) * W + x0 + xx] = 255; }
     roi.delete(); lab.delete(); st.delete(); ce.delete();

@@ -1,6 +1,6 @@
 # ADR 0002 — Learned text detection replaces hand-written text rules
 
-Status: accepted (1.1.0). Date: 2026-11-08. Supersedes the "bubble policy" row of ADR 0001 in part.
+Status: accepted (2.0.0); the model is replaced by PP-OCRv6 in ADR 0005. Date: 2026-11-08. Supersedes the "bubble policy" row of ADR 0001 in part.
 
 ## Context
 

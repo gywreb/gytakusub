@@ -142,7 +142,7 @@ export function mergeParagraphs(lines) {
     merged = false;
     outer: for (let i = 0; i < out.length; i++) for (let j = i + 1; j < out.length; j++) {
       const a = out[i], b = out[j];
-      if (a.dark !== b.dark) continue;
+      if (a.dark !== b.dark || a.group !== b.group) continue; // group: the bubble each line lies in, when known
       const L = Math.max(a.letter, b.letter);
       if (Math.min(a.letter, b.letter) < 0.5 * L) continue;
       const A = a.gbox, B = b.gbox;

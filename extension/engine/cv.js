@@ -47,19 +47,26 @@ export function getDetector(overrides = {}) {
   if (ortBroken()) return getFallbackDetector();
   if (!detectorReady) {
     detectorReady = (async () => {
-      let cv, bytes;
+      let cv, bytes, post;
       try {
         cv = await getCV();
         bytes = overrides.modelBytes || new Uint8Array(await (await fetch(new URL("../vendor/ppocr-det.onnx", import.meta.url))).arrayBuffer());
+        post = overrides.post || await detectorPost();
       } catch (e) { console.warn("Gytakusub: text detector unavailable, using heuristics", e); return null; }
       // ONNX Runtime first (about four times faster than OpenCV's dnn on wasm); dnn if it will not start
-      try { return await loadDetector(cv, bytes, { ort: getOrt(overrides.wasmBinary ? { wasmBinary: overrides.wasmBinary } : {}), gpu: overrides.gpu ?? prefs.gpu, wasmBinary: overrides.wasmBinary }); }
+      try { return await loadDetector(cv, bytes, { ort: getOrt(overrides.wasmBinary ? { wasmBinary: overrides.wasmBinary } : {}), gpu: overrides.gpu ?? prefs.gpu, wasmBinary: overrides.wasmBinary, post }); }
       catch (e) { console.warn("Gytakusub: ONNX Runtime unavailable for the text detector, using OpenCV dnn", e); }
-      try { return await loadDetector(cv, bytes); }
+      try { return await loadDetector(cv, bytes, { post }); }
       catch (e) { console.warn("Gytakusub: text detector unavailable, using heuristics", e); return null; }
     })();
   }
   return detectorReady;
+}
+
+/** The detector's post-processing as vendor/ppocr-det.json records it (undefined: the engine's defaults). */
+async function detectorPost() {
+  const res = await fetch(new URL("../vendor/ppocr-det.json", import.meta.url)).catch(() => null);
+  return res && res.ok ? (await res.json().catch(() => ({}))).post : undefined;
 }
 
 let fallbackReady = null;
@@ -69,7 +76,7 @@ export function getFallbackDetector() {
     try {
       const cv = await getCV();
       const bytes = new Uint8Array(await (await fetch(new URL("../vendor/ppocr-det.onnx", import.meta.url))).arrayBuffer());
-      return await loadDetector(cv, bytes);
+      return await loadDetector(cv, bytes, { post: await detectorPost() });
     } catch (e) { console.warn("Gytakusub: text detector unavailable, using heuristics", e); return null; }
   })();
   return fallbackReady;

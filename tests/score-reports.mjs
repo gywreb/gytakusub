@@ -86,6 +86,13 @@ for (const zip of args) {
       if (showMisses) console.log(`   MISS ${label}/${pg.id} ${JSON.stringify(sp.text).slice(0, 40)} ← ${why} ${around.length ? JSON.stringify(around[0].extra, (k, v) => (typeof v === "number" ? +v.toFixed(2) : v)).slice(0, 120) : ""}`);
     }
     const wasted = an.regions.filter((r) => !used.has(r.id)), waste = wasted.length;
+    // GYT_REGLOG=<file>: one JSON line per region (what it is, whether an item used it, the
+    // measurements the analysis accepted it on) — to set thresholds from data
+    if (process.env.GYT_REGLOG) for (const r of an.regions) {
+      const acc = rejections.find((j) => j.kind === "bubble" && j.why === "accepted" && j.box.x === (r.ref.lightBox || r.box).x && j.box.y === (r.ref.lightBox || r.box).y);
+      const bl = r.kind === "bubble" ? r.ref.blocks : [r.ref];
+      fs.appendFileSync(process.env.GYT_REGLOG, JSON.stringify({ page: label + "/" + pg.id, kind: r.kind === "bubble" ? (r.ref.segmented ? "seg" : "rule") : "block", used: used.has(r.id), letterRel: r.letter / an.letter, frac: (r.box.w * r.box.h) / (W * H), vertical: bl.some((b) => b.vertical), score: Math.min(...bl.map((b) => b.score)), ...(acc ? acc.extra : {}) }) + "\n");
+    }
     // what the unused regions are: a segmented bubble with lettering inside (the model
     // answered nothing for it in this run — often because it was never stamped then),
     // a segmented bubble with no lettering (the segmenter's false positive, or text the

@@ -14,7 +14,8 @@ new Function(fs.readFileSync("../extension/vendor/hyphen-en.js", "utf8"))();
 new Function(fs.readFileSync("../extension/text.js", "utf8"))();
 const GyText = globalThis.GyText;
 let passed = 0;
-const test = (name, fn) => { fn(); passed++; console.log("ok -", name); };
+const failures = [];
+const test = (name, fn) => { try { fn(); passed++; console.log("ok -", name); } catch (e) { if (!process.env.GYT_ALL) throw e; failures.push(name); console.log("FAIL -", name, String(e.message).slice(0, 300)); } };
 
 // ---------- text.js ----------
 {
@@ -170,4 +171,53 @@ for (const [name, png, truthPath, itemsPath] of pages) {
   });
   an.dispose();
 }
+
+// ---------- vertical Japanese with ruby (fixtures/ruby-00, make-ruby-page.py) ----------
+// Columns of 30 px glyphs with their readings in 14 px kana beside them, one bubble
+// at the right edge of a 1096 px page (where the detector's 32-px input grid makes
+// the horizontal and vertical scales differ most).
+{
+  const img = await loadImage("fixtures/ruby-00.png");
+  const truth = JSON.parse(fs.readFileSync("fixtures/ruby-00.truth.json", "utf8"));
+  const W = img.width, H = img.height;
+  const c = createCanvas(W, H), ctx = c.getContext("2d"); ctx.drawImage(img, 0, 0);
+  const pixels = ctx.getImageData(0, 0, W, H);
+  const T = (t, fn) => test(`[ruby] ${t}`, fn);
+  const box = (b) => ({ x: b[0], y: b[1], w: b[2], h: b[3] });
+  const an = await analyzePage(pixels);
+  const regionOf = (t) => an.regions.find((r) => r.kind === "bubble" && contains(r.box, box(t.lettering), 0));
+  T("detector boxes sit on the columns they found (per-axis scale back to the page)", () => {
+    for (const t of truth) for (const col of t.columns) {
+      const cx = col[0] + col[2] / 2, cy = col[1] + col[3] / 2;
+      const line = an.lines.find((l) => cx >= l.x && cx <= l.x + l.w && cy >= l.y && cy <= l.y + l.h);
+      assert.ok(line, `no detected line over the column at ${JSON.stringify(col)}`);
+      assert.ok(Math.abs(line.x + line.w / 2 - cx) <= 0.25 * t.glyph, `line ${JSON.stringify(line)} off the column centre ${cx}`);
+    }
+  });
+  T("each bubble is found, with the glyph size as its letter — not the ruby's", () => {
+    for (const t of truth) {
+      const r = regionOf(t);
+      assert.ok(r, `bubble ${JSON.stringify(t.box)} not found among ${JSON.stringify(an.regions.map((q) => [q.kind, q.box]))}`);
+      assert.ok(r.letter >= 0.75 * t.glyph && r.letter <= 1.3 * t.glyph, `letter ${r.letter} for ${t.glyph} px glyphs`);
+    }
+  });
+  T("ruby joins its column: no paragraph of ruby size is left on its own", () => {
+    for (const t of truth) for (const b of regionOf(t).ref.blocks) assert.ok(b.letter >= 0.6 * t.glyph || b.glyphCount <= 2, `block ${JSON.stringify(b.gbox)} letter ${b.letter}`);
+  });
+  const items = truth.map((t) => ({ tag: regionOf(t).id, box: null, text: "Are you really all right?", size: "normal", kind: "bubble" }));
+  const { placements, regionIds } = layout(an, items);
+  T("erase removes the columns and their ruby", () => {
+    const clean = erase(cv, pixels, an, regionIds).image;
+    for (const t of truth) {
+      const L = box(t.lettering); let before = 0, after = 0;
+      for (let y = L.y; y < L.y + L.h; y++) for (let x = L.x; x < L.x + L.w; x++) { const p = (y * W + x) * 4; if (pixels.data[p] < 110) before++; if (clean.data[p] < 110) after++; }
+      assert.ok(before > 500 && after < 0.03 * before, `lettering ${JSON.stringify(L)}: ${after} of ${before} dark pixels left`);
+    }
+  });
+  T("the translation is set at a readable size, from the glyphs", () => {
+    for (const p of placements) assert.ok(p.letter >= 0.75 * truth[0].glyph, `placement letter ${p.letter}`);
+  });
+  an.dispose();
+}
+if (failures.length) { console.log(`ENGINE TESTS FAILED: ${failures.length}`); process.exit(1); }
 console.log(`ENGINE TESTS PASSED (${passed})`);

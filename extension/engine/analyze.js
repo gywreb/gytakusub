@@ -14,6 +14,10 @@ const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const odd = (n) => (n % 2 ? n : n + 1);
 const median = (a) => { if (!a.length) return 0; const t = Float64Array.from(a).sort(); return t[t.length >> 1]; };
 const trace = (...a) => { if (globalThis.GYT_TRACE) globalThis.GYT_TRACE(...a); };
+// The letter size of a group of paragraphs: that of most of its lettering, each
+// paragraph weighing as many glyphs as it holds (up to 40) — a speck the detector
+// returned beside the text, or a row of emphasis dots, is one glyph, not a vote.
+const letterOf = (ps) => median(ps.flatMap((p) => Array(Math.max(1, Math.min(40, p.glyphCount | 0))).fill(p.letter)));
 
 /**
  * @param {typeof import("../vendor/opencv.js")} cv
@@ -29,7 +33,7 @@ const trace = (...a) => { if (globalThis.GYT_TRACE) globalThis.GYT_TRACE(...a); 
 export function analyze(cv, img, opts = {}) {
   if (!opts.lines && !opts.detector) return analyzeHeuristic(cv, img);
   const W = img.width, H = img.height;
-  const lines = opts.lines || detectTextSync(cv, opts.detector, img, { maxSide: opts.maxSide ?? 960 });
+  const lines = opts.lines || detectTextSync(cv, opts.detector, img, opts.maxSide ? { maxSide: opts.maxSide } : {});
   const src = cv.matFromImageData(img);
   const gray = new cv.Mat(); cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
   const base = new cv.Mat(); cv.medianBlur(gray, base, odd(clamp(Math.round(W / 320), 3, 7)));
@@ -50,13 +54,21 @@ export function analyze(cv, img, opts = {}) {
   });
 
   // ---- text lines → blocks (polarity by the lettering colour inside the box) ----
+  // Ruby (furigana) — the small kana beside a column of Japanese that give its
+  // reading — comes back from the detector as a column of its own, about half as
+  // wide. It is not the lettering size: counted as a line it would set the size
+  // estimate (and the typical column width below) to half the real one.
+  const rubyLine = lines.map((r) => r.h >= 0.8 * r.w && lines.some((b) => rubyBeside(r, b, b.w)));
   // The detector sometimes returns two tight lines as one box: split boxes much
   // taller (or, for columns, wider) than the page's typical line into equal lines.
-  const typicalH = median(lines.filter((l) => !l.vertical).map((l) => l.h)), typicalW = median(lines.filter((l) => l.vertical).map((l) => l.w));
+  const typicalH = median(lines.filter((l) => !l.vertical).map((l) => l.h)), typicalW = median(lines.filter((l, i) => l.vertical && !rubyLine[i]).map((l) => l.w));
   const split = [];
-  for (const ln of lines) {
-    const t = ln.vertical ? typicalW : typicalH, size = ln.vertical ? ln.w : ln.h;
-    const n = t && size > 1.7 * t ? Math.max(1, Math.round(size / t)) : 1;
+  for (const [i, ln] of lines.entries()) {
+    if (rubyLine[i]) { split.push(ln); continue; }
+    // (two lines in one box still make a long box: a squarish one is a single big
+    // mark — a sound effect, or a shape the detector read as a glyph)
+    const t = ln.vertical ? typicalW : typicalH, size = ln.vertical ? ln.w : ln.h, along = ln.vertical ? ln.h : ln.w;
+    const n = t && size > 1.7 * t && along >= 2 * size ? Math.max(1, Math.round(size / t)) : 1;
     if (n === 1) { split.push(ln); continue; }
     for (let i = 0; i < n; i++) split.push(ln.vertical ? { ...ln, x: Math.round(ln.x + (ln.w * i) / n), w: Math.round(ln.w / n) } : { ...ln, y: Math.round(ln.y + (ln.h * i) / n), h: Math.round(ln.h / n) });
   }
@@ -126,11 +138,10 @@ export function analyze(cv, img, opts = {}) {
       g = 0; while (g < tail && y0 > 0 && rowOk(y0 - 1, x0, x1) && !rowBlocked(y0 - 1, x0, x1)) { y0--; g++; }
       g = 0; while (g < tail && y1 < H && rowOk(y1, x0, x1) && !rowBlocked(y1, x0, x1)) { y1++; g++; }
     }
-    // Cap height from the ink profile: the dense band of rows (columns, for vertical
-    // text) holding ≥30% of the peak row's ink is the letter bodies; accents,
-    // descenders and an opening ¿ hang outside it. The band is the x-height for
-    // lowercase lines and the full height for capitals or CJK; 1.15× splits the
-    // difference (within ~15% either way).
+    // Cap height from the ink profile: the dense band of rows holding ≥30% of the
+    // peak row's ink is the letter bodies; accents, descenders and an opening ¿
+    // hang outside it. The band is the x-height for lowercase lines and the full
+    // height for capitals; 1.15× splits the difference (within ~15% either way).
     let letter;
     if (!ln.vertical) {
       const prof = new Int32Array(y1 - y0); let peak = 0;
@@ -138,23 +149,62 @@ export function analyze(cv, img, opts = {}) {
       let best = 0, run = 0; for (const v of prof) { run = v >= 0.3 * peak ? run + 1 : 0; if (run > best) best = run; }
       letter = Math.max(4, best * 1.15);
     } else {
-      const prof = new Int32Array(x1 - x0); let peak = 0;
-      for (let x = x0; x < x1; x++) { let n = 0; for (let y = y0; y < y1; y++) if (I[y * W + x]) n++; prof[x - x0] = n; if (n > peak) peak = n; }
-      let best = 0, run = 0; for (const v of prof) { run = v >= 0.3 * peak ? run + 1 : 0; if (run > best) best = run; }
-      letter = Math.max(4, best * 1.1);
+      // A column of CJK: the glyphs' width, from the ink profile across the column.
+      // Not the band near the peak as for rows of Latin: one stroke down the middle
+      // (a long vowel mark, a run of dots) dwarfs the rest of the profile. The
+      // glyphs span the run of columns with any real share of ink — counting only
+      // the marks wholly inside the detector's box, since hatching, tone or a
+      // neighbouring column's strokes run across its edges and would widen the run.
+      const bx0 = clamp(ln.x, 0, W - 1), by0 = clamp(ln.y, 0, H - 1), bw = clamp(ln.x + ln.w, bx0 + 1, W) - bx0, bh = clamp(ln.y + ln.h, by0 + 1, H) - by0;
+      const roi = P.ink.roi(new cv.Rect(bx0, by0, bw, bh)), lab = new cv.Mat(), st = new cv.Mat(), ce = new cv.Mat();
+      const nc = cv.connectedComponentsWithStats(roi, lab, st, ce, 8, cv.CV_32S), S = st.data32S, Lc = lab.data32S;
+      const inner = new Uint8Array(nc);
+      for (let i = 1; i < nc; i++) inner[i] = S[i * 5] > 0 && S[i * 5 + 1] > 0 && S[i * 5] + S[i * 5 + 2] < bw && S[i * 5 + 1] + S[i * 5 + 3] < bh ? 1 : 0;
+      const prof = new Int32Array(bw); let peak = 0;
+      for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) if (inner[Lc[y * bw + x]]) prof[x]++;
+      for (const v of prof) if (v > peak) peak = v;
+      roi.delete(); lab.delete(); st.delete(); ce.delete();
+      let best = 0, run = 0; for (const v of prof) { run = peak && v >= 0.12 * peak ? run + 1 : 0; if (run > best) best = run; }
+      letter = Math.max(4, best || x1 - x0);
     }
+    if (x1 - x0 < 3 || y1 - y0 < 3) continue; // snapped down to nothing: no lettering there
     // ink pixels in the box = the lettering; a glyph count estimate for tag sanity and scoring
     let inkArea = 0;
     for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) if (I[y * W + x]) inkArea++;
-    const letters = Math.max(1, Math.round((ln.vertical ? (y1 - y0) : (x1 - x0)) / (0.6 * letter)));
+    // glyphs along the line: CJK fill a square, Latin letters are ~0.6 of their height
+    // wide. A column of dots and marks ("……！！") measures a tiny letter from its dots;
+    // its glyphs are still the page's column pitch apart (half a detector box is about
+    // a glyph), not one per dot — or it would outvote the text in every size estimate.
+    const letters = Math.max(1, Math.round(ln.vertical ? (y1 - y0) / Math.max(letter, 0.5 * typicalW) : (x1 - x0) / (0.6 * letter)));
     const box = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
     blocks.push({ box, gbox: { ...box }, letter, lineLetters: [letter], glyphCount: letters, components: letters, glyphs: [], inkArea, dark, vertical: ln.vertical, score: ln.score, bubble: null, region: null, lines: 1, lineWidth: box.w });
+  }
+  // Lines in different bubbles are different speakers: with the segmentation model's
+  // masks, a line joins a paragraph only within its own bubble (or outside all of them)
+  // — never a line of dialogue with a sound effect drawn just past the outline.
+  if (opts.instances) for (const b of blocks) b.group = instanceAt(opts.instances, opts.bubbleClasses, (b.gbox.x + b.gbox.w / 2) | 0, (b.gbox.y + b.gbox.h / 2) | 0);
+  // Ruby joins the column it annotates: erased (and stamped) with it, but its
+  // size takes no part in the column's letter.
+  for (let i = blocks.length - 1; i >= 0; i--) {
+    const r = blocks[i];
+    let base = null, best = Infinity;
+    for (const b of blocks) {
+      // ruby is half the size of its kanji, set in a column (or one or two kana) — a
+      // line of small horizontal text beside big lettering is a line of its own
+      if (b === r || b.dark !== r.dark || b.group !== r.group || r.letter > 0.7 * b.letter || r.letter < 0.3 * b.letter || r.gbox.h < 0.8 * r.gbox.w || !rubyBeside(r.gbox, { ...b.gbox, vertical: b.vertical }, b.letter, Infinity)) continue;
+      const d = Math.abs(r.gbox.x + r.gbox.w / 2 - (b.gbox.x + b.gbox.w / 2));
+      if (d < best) { best = d; base = b; }
+    }
+    if (!base) continue;
+    const u = (A, B) => { const x = Math.min(A.x, B.x), y = Math.min(A.y, B.y); return { x, y, w: Math.max(A.x + A.w, B.x + B.w) - x, h: Math.max(A.y + A.h, B.y + B.h) - y }; };
+    base.box = u(base.box, r.box); base.gbox = u(base.gbox, r.gbox); base.inkArea += r.inkArea; base.ruby = (base.ruby || 0) + 1;
+    blocks.splice(i, 1);
   }
 
   // ---- paragraphs ----
   const paragraphs = mergeParagraphs(blocks);
   for (const p of paragraphs) if (p.lineLetters) p.letter = median(p.lineLetters);
-  const pageLetter = median(paragraphs.flatMap((p) => Array(Math.min(40, p.glyphCount)).fill(p.letter))) || Math.max(8, W / 60);
+  const pageLetter = letterOf(paragraphs) || Math.max(8, W / 60);
 
   const band = Math.max(1, Math.round(H / 24));
   const order = (a, b) => (Math.floor(a.box.y / band) - Math.floor(b.box.y / band)) || (a.box.x - b.box.x);
@@ -165,13 +215,61 @@ export function analyze(cv, img, opts = {}) {
     const P = pol[p.dark ? 1 : 0], { x, y, w, h } = p.gbox;
     const roi = P.ink.roi(new cv.Rect(x, y, w, h)), lab = new cv.Mat(), st = new cv.Mat(), ce = new cv.Mat();
     const n = cv.connectedComponentsWithStats(roi, lab, st, ce, 8, cv.CV_32S);
-    const S = st.data32S; let longest = 0; const sizes = [];
-    for (let i = 1; i < n; i++) { longest = Math.max(longest, w >= h ? S[i * 5 + 2] / w : S[i * 5 + 3] / h); sizes.push(Math.max(S[i * 5 + 2], S[i * 5 + 3])); }
+    const S = st.data32S; let longest = 0, ink = 0, letterInk = 0; const sizes = [];
+    for (let i = 1; i < n; i++) {
+      const size = Math.max(S[i * 5 + 2], S[i * 5 + 3]), a = S[i * 5 + 4];
+      longest = Math.max(longest, w >= h ? S[i * 5 + 2] / w : S[i * 5 + 3] / h); sizes.push(size);
+      ink += a; if (size >= 0.35 * p.letter) letterInk += a;
+    }
     roi.delete(); lab.delete(); st.delete(); ce.delete();
-    return n > 1 && longest <= 0.8 && median(sizes) >= 0.35 * p.letter;
+    // letter-sized marks: most components are, or (text over hatching or tone, whose
+    // specks outnumber the glyphs) most of the ink is in them
+    const ok = n > 1 && longest <= 0.8 && (median(sizes) >= 0.35 * p.letter || letterInk >= 0.6 * ink) && !solidMarks(p);
+    if (!ok) trace("block", p.gbox, "not lettered", { components: n - 1, longest, medianSize: median(sizes), letterInk: letterInk / Math.max(1, ink), letter: p.letter });
+    return ok;
   };
+  // Lettering is drawn in strokes, thin for the letter's size. A "line" whose
+  // glyph-sized marks are mostly solid to their middle — two eyes in a round face
+  // (which a detector reads as "ö"), a shadow — is not lettering.
+  const marksOf = (p) => {
+    if (p.marks) return p.marks;
+    // marks wholly inside the box (a margin around it shows which run on past it:
+    // an outline, a stroke of art — not glyphs of this line)
+    const P = pol[p.dark ? 1 : 0], m = 3;
+    const x = Math.max(0, p.gbox.x - m), y = Math.max(0, p.gbox.y - m), w = Math.min(W, p.gbox.x + p.gbox.w + m) - x, h = Math.min(H, p.gbox.y + p.gbox.h + m) - y;
+    const roi = P.ink.roi(new cv.Rect(x, y, w, h)), lab = new cv.Mat(), st = new cv.Mat(), ce = new cv.Mat(), dist = new cv.Mat();
+    const n = cv.connectedComponentsWithStats(roi, lab, st, ce, 8, cv.CV_32S);
+    cv.distanceTransform(roi, dist, cv.DIST_L2, 3); // half the stroke width at each ink pixel
+    const S = st.data32S, Lb = lab.data32S, D = dist.data32F, core = new Float32Array(n);
+    for (let i = 0; i < w * h; i++) { const l = Lb[i]; if (l && D[i] > core[l]) core[l] = D[i]; }
+    let glyphs = 0, glyphInk = 0, solidInk = 0;
+    for (let i = 1; i < n; i++) {
+      const cx = S[i * 5], cy = S[i * 5 + 1], cw = S[i * 5 + 2], ch = S[i * 5 + 3], size = Math.max(cw, ch), a = S[i * 5 + 4];
+      if ((cx <= 0 && x > 0) || (cy <= 0 && y > 0) || (cx + cw >= w && x + w < W) || (cy + ch >= h && y + h < H)) continue;
+      if (size < 0.35 * p.letter || size > 2 * p.letter) continue; // specks; outlines and art
+      glyphs++; glyphInk += a;
+      // solid to its middle, and fat: a blob over half a letter across (the page's
+      // letter, too — a line of dots measures its own "letter" from the dots), not a
+      // bar (the stem of a bold "!", a long vowel mark)
+      const lo = Math.min(cw, ch);
+      if (2 * core[i] >= 0.6 * lo && lo >= 0.6 * Math.max(p.letter, pageLetter) && size <= 2 * lo) solidInk += a;
+    }
+    roi.delete(); lab.delete(); st.delete(); ce.delete(); dist.delete();
+    return (p.marks = { glyphs, solid: glyphInk > 0 && solidInk >= 0.5 * glyphInk });
+  };
+  // Lettering is drawn in strokes, thin for the letter's size: a "line" whose
+  // glyph-sized marks are mostly solid blobs (eyes, a shadow) is not lettering.
+  const solidMarks = (p) => {
+    const solid = marksOf(p).solid;
+    if (solid && !p.solidTraced) { p.solidTraced = true; trace("block", p.gbox, "solid marks, not strokes", { letter: p.letter }); }
+    return solid;
+  };
+  // A "line" filling a closed shape edge to edge (see the bubble tests) with no more
+  // than two marks inside is that shape read as a glyph — a round face with two eyes
+  // reads as "ö" — not lettering. A caption or a sign filled by its text has many marks.
+  const shapeAsGlyph = (p) => { if (marksOf(p).glyphs <= 2) p.shape = true; return p.shape; };
   // loose text is dialogue-sized (narration is never a third of the dialogue size: that is tone or detail)
-  const isFree = (p) => !p.bubble && p.score >= 0.6 && p.letter >= 0.6 * pageLetter && p.letter <= 2.5 * pageLetter && looksLettered(p);
+  const isFree = (p) => !p.bubble && !p.shape && p.score >= 0.6 && p.letter >= 0.6 * pageLetter && p.letter <= 2.5 * pageLetter && looksLettered(p);
   const finish = (kept) => {
     kept.sort(order);
     const free = paragraphs.filter(isFree).sort(order);
@@ -199,7 +297,7 @@ export function analyze(cv, img, opts = {}) {
   // Bubbles the segmentation model found come first and claim their lettering.
   // Lettering it left outside any mask still goes through the light-region
   // rules below (the model misses some shapes — heavily toned bubbles, say).
-  const segBubbles = opts.instances ? bubblesFromInstances(opts.instances, opts.bubbleClasses, paragraphs, pageLetter, G, W, H) : [];
+  const segBubbles = opts.instances ? bubblesFromInstances(opts.instances, opts.bubbleClasses, paragraphs, pageLetter, G, W, H, solidMarks, shapeAsGlyph) : [];
 
   // ---- which light region holds each paragraph (majority of its non-ink pixels) ----
   const ownerOf = (p) => {
@@ -211,7 +309,7 @@ export function analyze(cv, img, opts = {}) {
     return n >= 0.3 * samples ? best : 0;
   };
   const byLight = new Map(); // `${polarity}:${label}` → paragraphs
-  for (const p of paragraphs) { if (p.bubble) continue; const o = ownerOf(p); if (o) { const k = `${p.dark ? 1 : 0}:${o}`; (byLight.get(k) || byLight.set(k, []).get(k)).push(p); } }
+  for (const p of paragraphs) { if (p.bubble || p.shape || solidMarks(p)) continue; const o = ownerOf(p); if (o) { const k = `${p.dark ? 1 : 0}:${o}`; (byLight.get(k) || byLight.set(k, []).get(k)).push(p); } }
 
   // ---- bubble candidates: shape and content tests on the light region ----
   const bubbles = [];
@@ -224,6 +322,9 @@ export function analyze(cv, img, opts = {}) {
     const reject = (why, extra) => trace("region", rbox, why, { frac, blocks: inBlocks.length, ...extra });
     if (frac < 0.0006 || frac > 0.2) { reject("area out of range"); continue; }
     if (w > 0.8 * W || h > 0.6 * H || w * h > 0.3 * W * H) { reject("too large for a bubble"); continue; }
+    // lettering has room around it inside a bubble (see bubblesFromInstances)
+    // (a "line" filling the shape edge to edge with a mark or two in it: a face read as "ö")
+    if (inBlocks.every((b) => b.gbox.w >= 0.85 * w && b.gbox.h >= 0.85 * h && shapeAsGlyph(b))) { reject("the shape itself read as text"); continue; }
     if (a / (w * h) < 0.3) { reject("too ragged", { fill: a / (w * h) }); continue; }
     // the bubble's full footprint (lettering holes filled); its holes must be the lettering
     const m = new cv.Mat(h, w, cv.CV_8UC1), md = m.data;
@@ -254,12 +355,15 @@ export function analyze(cv, img, opts = {}) {
       if (holesInText / holes < 0.45) { reject("content inside is not lettering", { inText: holesInText / holes }); continue; }
     }
     // the lettering is small relative to the shape that holds it
-    const letter = median(inBlocks.map((b) => b.letter));
+    const letter = letterOf(inBlocks);
     if (letter > 0.55 * Math.min(w, h)) { reject("marks too large for the shape", { letter }); continue; }
+    // dialogue is not drawn at several times the page's dialogue size: that is a sound
+    // effect over the panel's background (the bound loose text has, below)
+    if (letter > 2.5 * pageLetter) { reject("lettering too large for dialogue", { letter, pageLetter }); continue; }
     let r = 0, g = 0, bb = 0, n = 0;
     for (let yy = y; yy < y + h; yy += 3) for (let xx = x; xx < x + w; xx += 3) { const p = yy * W + xx; if (L[p] !== li) continue; r += srcData[p * 4]; g += srcData[p * 4 + 1]; bb += srcData[p * 4 + 2]; n++; }
     const color = n ? [Math.round(r / n), Math.round(g / n), Math.round(bb / n)] : (pi ? [0, 0, 0] : [255, 255, 255]);
-    const bubble = { id: 0, box: rbox, area: a, color, dark: !!pi, letter, blocks: inBlocks, labelId: li, labels: P.labels, fill };
+    const bubble = { id: 0, box: rbox, area: a, color, dark: !!pi, letter: bubbleLetter(inBlocks, pageLetter), blocks: inBlocks, labelId: li, labels: P.labels, fill };
     trace("bubble", rbox, "accepted", { frac, blocks: inBlocks.length, fill: a / (w * h), holeFrac: holes / Math.max(1, filled), solidity: hullArea ? a / hullArea : 1, inText: holes > 0 ? holesInText / holes : 1, letter });
     bubbles.push(bubble);
   }
@@ -279,13 +383,55 @@ export function analyze(cv, img, opts = {}) {
 }
 
 /**
+ * A bubble's letter size: its lettering's. A bubble holding only marks — "……",
+ * "!?" — measures its "letter" from the dots, a fraction of any letter; its
+ * translation ("...") is set at the page's size instead.
+ */
+function bubbleLetter(blocks, pageLetter) {
+  const letter = blocks.length ? letterOf(blocks) : pageLetter;
+  return letter < 0.4 * pageLetter ? pageLetter : letter;
+}
+
+/** Index of the smallest bubble instance whose mask holds the point, -1 for none. */
+function instanceAt(instances, bubbleClasses, px, py) {
+  let best = -1, area = Infinity;
+  instances.forEach((inst, i) => {
+    if ((bubbleClasses && !bubbleClasses.has(inst.cls)) || !inst.mask) return;
+    const { x, y, w, h } = inst.box, lx = px - x, ly = py - y;
+    if (lx < 0 || ly < 0 || lx >= w || ly >= h || !inst.mask[ly * w + lx] || w * h >= area) return;
+    best = i; area = w * h;
+  });
+  return best;
+}
+
+/**
+ * Whether box `r` sits beside column `b` the way ruby does: much thinner than
+ * the column's letters, against one of its sides (not over its middle) and
+ * within its length. Only columns: horizontal lines are left alone (a small
+ * line above a large one in a Latin-script bubble is a line of its own).
+ * @param {{x:number,y:number,w:number,h:number}} r
+ * @param {{x:number,y:number,w:number,h:number,vertical:boolean}} b
+ * @param {number} size the column's letter size (a detector box's width)
+ * @param {number} [thin] how much thinner than `size` ruby's box is at most (for
+ *   detector boxes; a snapped box may have grown across the gap it sits in, so for
+ *   those the caller compares letter sizes instead and passes Infinity)
+ */
+function rubyBeside(r, b, size, thin = 0.65) {
+  if (!b.vertical || r === b || !(size > 0) || r.w > thin * size) return false;
+  if (Math.max(r.x, b.x) - Math.min(r.x + r.w, b.x + b.w) > 0.8 * size) return false;
+  const cx = r.x + r.w / 2;
+  if (cx > b.x + 0.25 * b.w && cx < b.x + 0.75 * b.w) return false;
+  return r.y >= b.y - 0.5 * size && r.y + r.h <= b.y + b.h + 0.5 * size;
+}
+
+/**
  * Bubbles as a segmentation model returned them: each instance's mask is the
  * interior, the lettering inside is whatever detected paragraphs have their
  * centre in the mask, and the bubble is dark when its surface is. Instances
  * are filtered for the bubble classes, a plausible size, a mask that is
  * mostly solid (a few stray pixels are not a bubble) and lettering inside.
  */
-function bubblesFromInstances(instances, bubbleClasses, paragraphs, pageLetter, G, W, H) {
+function bubblesFromInstances(instances, bubbleClasses, paragraphs, pageLetter, G, W, H, solidMarks, shapeAsGlyph) {
   const bubbles = [];
   for (const inst of instances) {
     if (bubbleClasses && !bubbleClasses.has(inst.cls)) continue;
@@ -296,7 +442,14 @@ function bubblesFromInstances(instances, bubbleClasses, paragraphs, pageLetter, 
     const frac = area / (W * H);
     if (frac < 0.0004 || frac > 0.3 || area < 0.3 * w * h) { trace("region", inst.box, "segment rejected", { frac, fill: area / (w * h) }); continue; }
     const inside = (px, py) => { const lx = px - x, ly = py - y; return lx >= 0 && ly >= 0 && lx < w && ly < h && m[ly * w + lx] !== 0; };
-    const blocks = paragraphs.filter((p) => !p.bubble && inside((p.gbox.x + p.gbox.w / 2) | 0, (p.gbox.y + p.gbox.h / 2) | 0));
+    // A "text box" spanning the shape edge to edge with a mark or two inside is the
+    // shape itself read as a glyph (a round face with two eyes reads as "ö"), not
+    // lettering in it. (A caption filled by its text has many marks.)
+    const blocks = paragraphs.filter((p) => {
+      if (p.bubble || !inside((p.gbox.x + p.gbox.w / 2) | 0, (p.gbox.y + p.gbox.h / 2) | 0)) return false;
+      if (p.gbox.w >= 0.85 * w && p.gbox.h >= 0.85 * h && shapeAsGlyph(p)) return false;
+      return !solidMarks(p);
+    });
     // No lettering inside: a round face, a cloud, an empty balloon. Not a region —
     // a stamp there would invite the model to invent text, and the eraser must
     // never touch a shape that holds no letters.
@@ -304,7 +457,7 @@ function bubblesFromInstances(instances, bubbleClasses, paragraphs, pageLetter, 
     // surface luminance without the lettering: dark bubble when the mask is mostly dark
     let inkArea = 0; for (const p of blocks) inkArea += p.inkArea || 0;
     const dark = lum / Math.max(1, area) < 110;
-    const letter = blocks.length ? median(blocks.map((b) => b.letter)) : pageLetter;
+    const letter = bubbleLetter(blocks, pageLetter);
     const bubble = { id: 0, box: { x, y, w, h }, area, color: dark ? [0, 0, 0] : [255, 255, 255], dark, letter, blocks, labelId: 0, labels: null, fill: m, score: inst.score, segmented: true };
     for (const p of blocks) p.bubble = bubble;
     bubbles.push(bubble);
