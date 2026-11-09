@@ -1,7 +1,7 @@
 # ADR 0004 — Bubbles from a learned segmentation model
 
-Status: **accepted for 2.0.0** (2026-11-09),
-pending the user's live test and the licensing decision below. Supersedes the
+Status: **accepted (2.0.0)**, 2026-11-09. The owner tested it on real chapters and accepted it for 2.0; the
+licensing decision below was made (AGPL-3.0). Supersedes the
 bubble half of ADR 0002 (the light-region tests become the fallback); ADR
 0003's layout invariants stay.
 
@@ -18,10 +18,10 @@ the field uses. Open-source manga translators (Koharu, manga-image-translator)
 do not decide bubbles from pixel statistics; they run an instance-segmentation
 model that returns balloon polygons.
 
-## Decision (proposed)
+## Decision
 
 Run a YOLO instance-segmentation model for speech bubbles with **ONNX Runtime
-Web** (MIT, vendored: 77 KB ESM bundle + 14.8 MB single-threaded SIMD wasm) in
+Web** (MIT, vendored: at first a 77 KB ESM bundle + 14.8 MB single-threaded SIMD wasm; since the GPU work below, the WebGPU build: 122 KB + 29 MB) in
 the service worker and the web app's worker, and use its masks as the bubble
 interiors. The text detector, paragraph merging, layout (ADR 0003), erase and
 inpainting are unchanged; the analysis only stops guessing the bubble shape.

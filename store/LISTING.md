@@ -19,7 +19,7 @@ Translate manga and comic pages in place, right on the page, using your own Clau
 Gytakusub re-letters comic and manga pages in your browser. Hover a page and click Translate, press Alt+T to translate everything on screen, or turn on auto-translate for a site you read regularly. Speech bubbles are detected on your device, the original lettering is replaced inside the bubble, and the translation is typeset to fit — artwork stays untouched.
 
 HOW IT WORKS
-• Text and bubbles are found locally (a small open-source text detector and OpenCV, both running in your browser); no page content is read except the images you translate.
+• Text and speech bubbles are found locally by open-source models (PaddleOCR's text detector and a speech-bubble segmentation model) and OpenCV, all running in your browser — on the graphics card when available. No page content is read except the images you translate.
 • The image is sent directly from your browser to Anthropic's Claude API using YOUR API key. Gytakusub has no server and never sees your data.
 • Names and recent dialogue are carried from page to page so translations stay consistent through a chapter.
 • Japanese (including vertical text), Korean, Chinese, Spanish, Italian and most other languages → English or any target language you set.
@@ -32,7 +32,7 @@ YOU STAY IN CONTROL
 • Double-click a translated bubble to correct a line or add a term to the glossary; an option lets you peek at the original by hovering.
 
 REQUIREMENTS
-You need a Claude API key from platform.claude.com (pay-per-use; Claude Max and Team subscriptions include monthly API credit). The key is stored only in your browser.
+You need a Claude API key from platform.claude.com (pay-per-use; Claude Max, Ultra and Team plans include monthly API credits). The key is stored only in your browser.
 
 PRIVACY
 No analytics, no telemetry, no account. Images go to api.anthropic.com only, with your key. Full policy: https://gywreb.github.io/gytakusub/privacy.html
@@ -69,7 +69,7 @@ Translates the text inside comic and manga page images that the user is viewing,
 | `activeTab` | Lets the user invoke the translator on the current tab from the toolbar button or keyboard shortcut without the extension running on every page. |
 | `scripting` | Injects the translator only into the current tab on user request, and registers it for the specific sites the user has enabled in the popup/options. |
 | Host permission `<all_urls>` | Comic pages are served from many image CDNs that differ from the page's own domain and block cross-origin reads. The background worker needs host access to fetch the image the user asked to translate so its pixels can be analysed. The extension does not read or modify any other page content and does not run on sites the user has not enabled or explicitly invoked it on. |
-| Remote code | Not used. All code and models are packaged, including the OpenCV WebAssembly module and the text-detection model file (loaded from the extension package; the CSP allows `wasm-unsafe-eval`, not `unsafe-eval`). The only network calls are to api.anthropic.com (user's key) and to fetch the image being translated. |
+| Remote code | Not used. All code and models are packaged in the extension: OpenCV and ONNX Runtime (WebAssembly), the text-detection model and the speech-bubble model (ONNX files), all loaded from the extension package. The CSP allows `wasm-unsafe-eval`, not `unsafe-eval`. The only network calls are to api.anthropic.com (user's key) and to fetch the image being translated. |
 
 **Data usage disclosures** — tick these, and only these:
 - [x] **Authentication information** — the user's Claude API key, stored locally, transmitted only to api.anthropic.com.
@@ -94,5 +94,5 @@ https://gywreb.github.io/gytakusub/privacy.html
 
 ## Notes for the reviewer (optional field)
 ```
-Bring-your-own-key tool. To test: open Options, paste any Claude API key (the reviewer may use their own; a test key can be created free at platform.claude.com), open any web page with a comic/manga image, hover it and click "Translate". Without a key the extension shows a clear error and makes no network requests at all. Host permission is needed only to fetch the image the user selected; the content script is registered only for sites the user enables.
+Bring-your-own-key tool. To test: open Options, paste any Claude API key (the reviewer may use their own; keys are created at platform.claude.com, and requests are billed to that account), open any web page with a comic/manga image, hover it and click "Translate". Without a key the extension shows a clear error and makes no network requests at all. Host permission is needed only to fetch the image the user selected; the content script is registered only for sites the user enables.
 ```

@@ -135,3 +135,7 @@ are research-only and excluded). Running it needs ONNX Runtime Web (OpenCV
 4.5's dnn cannot run YOLO segmentation heads) and a first-run model download
 with caching rather than a 40 MB store package. Planned for 1.2, measured the
 same way before any switch.
+
+*Later (2.0.0):* done as ADR 0004, with a different model (kitsumed's
+YOLOv8m-seg speech-bubble model, int8) bundled in the package rather than
+downloaded on first run, so no code or model is fetched at run time.

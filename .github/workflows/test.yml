@@ -1,10 +1,20 @@
 name: Tests
-on: [push, pull_request]
+on:
+  push:
+    branches: ["**"] # tags are tested by the Release workflow, which calls this one
+  pull_request:
+  workflow_call:
+    inputs:
+      ref:
+        description: "Commit, branch or tag to test (default: the caller's)"
+        type: string
+        default: ""
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with: { ref: "${{ inputs.ref }}" }
       - uses: actions/setup-node@v4
         with:
           node-version: 22

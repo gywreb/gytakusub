@@ -2,7 +2,7 @@
 
 All notable changes to Gytakusub are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
-## [2.0.0] — unreleased
+## [2.0.0] — 2026-11-09
 
 A new page engine built on open-source models that run in the browser, and a new licence. 1.0 found bubbles, erased lettering and fitted text with hand-written heuristics that were tuned one reported page at a time; each fix risked the last one. 2.0 finds text and bubbles with learned models (on the graphics card when there is one), does the geometry with [OpenCV](https://opencv.org/) (WebAssembly, bundled), and ships only what passes a test corpus and a measurement on real pages. Nothing leaves the browser except the call to Claude with your own key. Decisions and measurements: `docs/adr/0001`–`0005`. (Developed as 1.1.0 and 1.1.1; never released under those numbers.)
 
@@ -18,7 +18,7 @@ A new page engine built on open-source models that run in the browser, and a new
 - **Bundled lettering font** (Comic Neue Bold, SIL Open Font License) so pages look the same on every machine; Options → "Font family" still overrides it.
 - **Hyphenation** at syllable boundaries using Franklin Liang's algorithm (the `hyphen` package, vendored), tried only when an un-hyphenated layout does not fit.
 - **Debug overlay** (Options) drawing detected regions and text areas, plus **Export debug report** in the popup: one `.zip` with the original image, the debug render and the JSON for every translated page on the tab (the hover bar's **Report** does one page). `tests/replay-report.mjs` replays such a zip through the engine offline.
-- **Real-browser tests.** The actual extension and the web app run in headless Chromium against a mock Claude API on every push; detection, layout and erase are asserted against ground truth on thirteen synthetic pages (Spanish, Italian, Japanese).
+- **Real-browser tests.** The actual extension and the web app run in headless Chromium against a mock Claude API on every push; detection, layout and erase are asserted against ground truth on fourteen synthetic pages (Spanish, Italian, Japanese, including vertical Japanese with furigana); the GPU path runs on a software GPU. A release is built only after this whole suite passes on the tagged commit.
 
 ### Changed
 - **Licence: GNU AGPL v3** (1.0.x was MIT). The bubble model is GPL-3.0 per its card and AGPL-3.0 under Ultralytics' terms; publishing the whole extension under the AGPL keeps the store build compliant. The licence text and `THIRD_PARTY.md` ship inside the package, and Options links to the source.
@@ -31,7 +31,6 @@ A new page engine built on open-source models that run in the browser, and a new
 - The service worker now returns a cleaned page plus text placements; the content script only draws text. Content scripts no longer carry the engine (a few KB instead of hundreds).
 - Text fitting tries every size without hyphens first and hyphenates only when nothing else fits, instead of hyphenating eagerly at line ends.
 - Minimum Chrome version stays 116; the extension's CSP now allows `wasm-unsafe-eval` (WebAssembly; no remote code, no `eval`).
-- Hover to peek is off by default (Options → "Peek at the original").
 - **The model answers in a fixed JSON schema** (the API's structured output, `output_config.format`): its reply is constrained to valid JSON of the expected shape, so a page can no longer fail on malformed JSON (one did on the owner's One Piece chapter: "Expected ',' or ']' … at position 1998"). An answer that cannot be used now says why — refused, cut off at the token limit, empty — with the API's stop reason, instead of "Empty model response". If the API rejects structured output, the extension falls back to the plain request for the session.
 - The popup and the Options page read and write the settings themselves instead of asking the service worker, and Options' Save stays off until the settings are loaded.
 
@@ -45,12 +44,12 @@ A new page engine built on open-source models that run in the browser, and a new
 - A panel's light background with loose lettering on it is no longer taken for a speech bubble the size of the panel (with the bubble model running, the rule-based fallback now stops at 8% of the page): the lettering becomes loose text, placed where it is.
 
 ### Validated on real pages
-The detector was reworked against the first real exports (850 px JPEG pages with 8 px Latin capitals; Japanese pages): line grouping from glyph components only, width-aware letter counts, evidence rules for lettering (alignment, letters per row, height clustering, density). Scored with the model's own answer as witness (`tests/score-reports.mjs`), tuned on one export and validated on two untouched ones: dialogue recognised as a bubble rose from 49% to 83% (hold-outs 64→88%, 49→84%) with coverage and false regions unchanged. The eraser now ships only the inpainted patches (≈10% of the bytes of a full page), and every result carries per-stage timings.
+The rule-based detector (now the fallback) was first reworked against the real exports (850 px JPEG pages with 8 px Latin capitals; Japanese pages): line grouping from glyph components only, width-aware letter counts, evidence rules for lettering (alignment, letters per row, height clustering, density). Scored with the model's own answer as witness (`tests/score-reports.mjs`), tuned on one export and validated on two untouched ones: dialogue recognised as a bubble rose from 49% to 83% (hold-outs 64→88%, 49→84%) with coverage and false regions unchanged. The eraser now ships only the inpainted patches (≈10% of the bytes of a full page), and every result carries per-stage timings.
 
 The learned bubble model, on 270 pages of the owner's exports at the time (`docs/adr/0004`): dialogue recognised as a bubble 92.4% → 98.0%. The PP-OCRv6 detector and the vertical-text work on top of it (`docs/adr/0005`): on 242 Spanish/English pages coverage 95.6% → 97.0% and dialogue as a bubble 98.1% → 98.4%, with words broken letter by letter 40 → 10; on 28 Japanese raw pages dialogue as a bubble 94.3% → 98.4%, lettering left after erasing 35% → 22%, translations under 12 px 13% → 2%.
 
 ### Known limitations
-- Package size: about +110 MB unpacked over 1.0 (runtime 29 MB, bubble model 43 MB CPU + 28 MB GPU variant, text detector 9.9 MB, OpenCV 6 MB).
+- Package size: about 117 MB unpacked, a 78 MB download (runtime 29 MB, bubble model 43 MB CPU + 28 MB GPU variant, text detector 9.9 MB, OpenCV 6 MB). The web app downloads one bubble-model variant, about 75–90 MB on first use.
 - On the CPU (no WebGPU) a page takes about 3 s to analyse before the model call; pages translated while scrolling fast queue behind each other.
 - The text detector reports sound effects and signs that the model then leaves untranslated: more numbered stamps per page (≈1.2 unused regions per page on Latin-script pages, 2.2 on Japanese raws), which costs prompt tokens.
 - Telea inpainting smooths screentone and hatching behind narration set on the art (a visible smudge where the letters were). Bubbles are unaffected.

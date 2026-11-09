@@ -3,8 +3,8 @@
 Everything below is a one-time account step or a copy-paste from `store/LISTING.md`. Budget: US$5 one-time developer fee; nothing else.
 
 ## 0. Before you start (5 min)
-- [ ] Load `extension/` unpacked in Brave one more time, open Options → Test key, and translate one page end to end. (I can't run a browser here; this is the one check only you can do.)
-- [ ] `git pull` and confirm `dist/gytakusub-extension-2.0.0.zip` matches the commit you tested (CI builds it on tags; the one in the release is identical to `extension/` minus `icon512.png`).
+- [ ] Load `extension/` unpacked in Brave one more time, open Options → Test key, and translate one page end to end. (CI runs the real extension in headless Chromium, but against a mock API; a real key on a real site is the one check only you can do.)
+- [ ] `git pull` and take the zip from the GitHub Release of the tag you tested (`gytakusub-extension-X.Y.Z.zip`; CI builds it only after the full test suite passes on that tag, and it is `extension/` minus `icon512.png`).
 
 ## 1. Developer account (10 min, $5)
 - [ ] Go to https://chrome.google.com/webstore/devconsole and sign in with the Google account you want to own the listing (a dedicated account is fine).
@@ -26,7 +26,7 @@ Everything below is a one-time account step or a copy-paste from `store/LISTING.
 ## 4. Privacy practices tab (10 min) — this is where most rejections happen
 - [ ] Paste the **single purpose** text.
 - [ ] Paste each **permission justification** (storage, activeTab, scripting, host permission).
-- [ ] Remote code: **No**.
+- [ ] Remote code: **No** (paste the remote-code row from `LISTING.md` if the form asks why WebAssembly and the ONNX models are present).
 - [ ] Data usage: tick **Authentication information** and **Website content** only; tick all three certifications.
 - [ ] Privacy policy URL: `https://gywreb.github.io/gytakusub/privacy.html` (confirm the page loads first — Pages must be enabled, see repo README).
 
@@ -48,12 +48,19 @@ Paste the rejection email to me verbatim. The two likely reasons and what we'd d
 - [ ] Enable auto-translate only on the sites you actually read, via the popup.
 - [ ] After a week with no issues: Distribution → **Public**, if you want it discoverable.
 
+## Uploading a new version by hand (item already exists)
+1. If a version is still in review: the item → ⋮ → **Cancel review** (it returns to draft).
+2. **Package** → *Upload new package* → the zip from the GitHub Release.
+3. Store listing: replace the **Description** (and paste the *What's new* text) from `LISTING.md` if behaviour changed.
+4. Privacy practices: re-check the answers against `LISTING.md`.
+5. **Save draft** → **Submit for review**.
+
 ## Updating later
-Run `node scripts/release.mjs 1.0.1` from the repo folder (any OS). CI tests, zips, creates the GitHub Release and — once the secrets below exist — uploads to the store and submits for review. Listing text only needs changing when behaviour changes.
+Run `node scripts/release.mjs 2.0.1` from the repo folder (any OS). CI tests, zips, creates the GitHub Release and — once the secrets below exist — uploads to the store and submits for review. Listing text only needs changing when behaviour changes.
 
 ## Automating updates (one-time, ~15 min) — after the first version is approved
 
-Later versions are then one command from the repo folder — Windows PowerShell, macOS or Linux: `node scripts/release.mjs 1.0.1` (`./scripts/release.sh` is the same thing for Unix shells) → CI tests, zips, creates the GitHub Release, uploads to the store and submits for review. Listing text and screenshots stay as they are.
+Later versions are then one command from the repo folder — Windows PowerShell, macOS or Linux: `node scripts/release.mjs 2.0.1` (`./scripts/release.sh` is the same thing for Unix shells) → CI tests, zips, creates the GitHub Release, uploads to the store and submits for review. Listing text and screenshots stay as they are.
 
 1. **Google Cloud project**: https://console.cloud.google.com → New project (e.g. `gytakusub-ci`).
 2. **Enable the API**: APIs & Services → Library → search **Chrome Web Store API** → Enable.

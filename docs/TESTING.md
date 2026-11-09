@@ -57,10 +57,13 @@ then open `http://localhost:8080` in Brave, ⚙ → paste the API key → *Save*
 ## D. Verify the automated checks (1 min)
 
 Open https://github.com/gywreb/gytakusub/actions?query=branch%3Arelease%2F2.0 — the latest **Tests** run must be green. It covers:
-- syntax of every script, and that the vendored OpenCV/hyphen files match what the vendoring scripts produce;
-- 105 engine assertions on fourteen synthetic pages (detection against ground truth, placement inside bubbles, lettering erased, outlines kept; one page of vertical Japanese with furigana);
-- the real extension in headless Chromium against a mock Claude API: first render = Redo = cached render, every tagged line inside its bubble, the drifted-box scenario, peek, edit, persistence;
+- syntax of every script, and that the vendored files match what the vendoring scripts produce (OpenCV, ONNX Runtime and hyphen from the pinned npm packages; the text detector from PaddlePaddle's pinned Hugging Face revision);
+- 108 engine assertions on fourteen synthetic pages (detection against ground truth, placement inside bubbles, lettering erased, outlines kept; one page of vertical Japanese with furigana);
+- the bubble model's output parsing, the fallback when the runtime traps, both models on WebGPU (a software GPU) giving the same lines and bubbles as the CPU, and three pages at once on the GPU;
+- the real extension in headless Chromium against a mock Claude API: first render = Redo = cached render, every tagged line inside its bubble, the drifted-box scenario, a stand-in bubble model, the GPU path, peek, edit, persistence, and the popup and Options showing the stored settings while the worker is busy;
 - the web app in headless Chromium.
+
+The **Release** workflow (on a `v*` tag) runs this same Tests workflow on the tagged commit before it builds anything.
 
 Click a run → *Artifacts* → `browser-renders` to see the screenshots those tests produced.
 
@@ -75,8 +78,8 @@ Click a run → *Artifacts* → `browser-renders` to see the screenshots those t
    git tag v2.0.0
    git push origin v2.0.0
    ```
-   Actions → **Release** builds `gytakusub-extension-2.0.0.zip` and attaches it to https://github.com/gywreb/gytakusub/releases.
-4. Chrome Web Store: https://chrome.google.com/webstore/devconsole → the Gytakusub item → **Package** → *Upload new package* → the zip from the release → **Submit for review**. Store listing text for "What's new" is in `store/LISTING.md`. (Once the CWS secrets are configured in the repo, step 4 happens automatically on the tag.)
+   Actions → **Release** runs the tests on the tag, builds `gytakusub-extension-2.0.0.zip` and attaches it to https://github.com/gywreb/gytakusub/releases. If that run fails for a reason outside the code (it happened once: the workflow lacked a test dependency), fix the workflow on `main`, then rebuild the same tag from Actions → **Release** → *Run workflow* (tag `v2.0.0`).
+4. Chrome Web Store: https://chrome.google.com/webstore/devconsole → the Gytakusub item → **Package** → *Upload new package* → the zip from the release → **Submit for review**. If an earlier version is still in review, cancel that review first (⋮ → *Cancel review*); the item goes back to draft and takes the new package. Store listing text for "What's new" is in `store/LISTING.md`. (Once the CWS secrets are configured in the repo, step 4 happens automatically on the tag.)
 5. GitHub Pages redeploys the web app from `main` on its own (Actions → *Deploy web app*).
 
 ## F. If a problem shows up after merging

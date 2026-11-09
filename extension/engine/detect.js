@@ -1,13 +1,15 @@
-// Learned text detection: PaddleOCR PP-OCRv4 detector (DBNet, Apache-2.0),
-// from the bundled ONNX file. Finds every text line on a page — Latin or CJK,
+// Learned text detection: PaddleOCR PP-OCRv6 (small) detector (DBNet,
+// Apache-2.0), from the bundled ONNX file. Finds every text line on a page — Latin or CJK,
 // light or dark, any size — and nothing else, which is the step hand-written
 // rules kept getting wrong on real scans.
 //
 // Two backends run the same model: ONNX Runtime (engine/ort.js; ~4× faster
 // on wasm, the default) and OpenCV's dnn module (the fallback when the runtime
-// is unavailable). vendor/ppocr-det.onnx is the official model with its
-// HardSigmoid nodes rewritten as Mul/Add/Clip, which OpenCV 4.5 lacks and
-// ONNX Runtime does not mind; see scripts/vendor-detector.mjs.
+// is unavailable). vendor/ppocr-det.onnx is the official model with the ops
+// OpenCV 4.5 cannot run rewritten (HardSigmoid → Mul/Add/Clip, Erf → the tanh
+// form of GELU, ReduceMean over H,W → GlobalAveragePool, SAME-padded MaxPool →
+// explicit pads); ONNX Runtime runs the result unchanged. See
+// scripts/vendor-detector.mjs.
 
 import { createSession, run } from "./ort.js";
 
