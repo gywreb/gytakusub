@@ -43,6 +43,8 @@ const context = await chromium.launchPersistentContext(profile, {
   viewport: { width: 1200, height: 900 },
 });
 let sw = context.serviceWorkers()[0] || (await context.waitForEvent("serviceworker"));
+// the worker's own warnings (a GPU session that fails to start, a model that will not load)
+context.on("console", (m) => { if (m.type() === "warning" && /Gytakusub/.test(m.text())) console.log("  [worker]", m.text().slice(0, 300)); });
 await sw.evaluate(async () => {
   await chrome.storage.sync.set({ enabled: true, enabledSites: ["127.0.0.1"], debugOverlay: true, peekOnHover: true, useContext: false, includeSource: false });
   await chrome.storage.local.set({ apiKey: "sk-ant-test" });
@@ -58,7 +60,9 @@ await page.waitForTimeout(500);
 
 const tabId = await sw.evaluate(async () => (await chrome.tabs.query({ url: "http://127.0.0.1:*/*" }))[0]?.id);
 const translate = (force) => sw.evaluate(async ({ tabId, force }) => chrome.tabs.sendMessage(tabId, { type: "TRANSLATE_VISIBLE", force }), { tabId, force });
-const waitLogs = async (n) => { for (let i = 0; i < 100 && debugLogs.length < n; i++) await page.waitForTimeout(100); if (debugLogs.length < n) throw new Error(`timeout waiting for render ${n}`); await page.waitForTimeout(400); };
+// a software GPU is slow (the bubble model takes ~10 s on lavapipe): give the --gpu run time
+const waitTicks = process.argv.includes("--gpu") ? 3000 : 100;
+const waitLogs = async (n) => { for (let i = 0; i < waitTicks && debugLogs.length < n; i++) await page.waitForTimeout(100); if (debugLogs.length < n) throw new Error(`timeout waiting for render ${n}`); await page.waitForTimeout(400); };
 
 const r = await translate(false); if (!r?.ok) throw new Error("content script did not answer: " + JSON.stringify(r));
 await waitLogs(1);
