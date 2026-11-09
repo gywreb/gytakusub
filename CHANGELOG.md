@@ -16,8 +16,12 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
   - **Install guide:** in-app, per platform (iPhone/iPad steps, the install button where the browser offers one, a QR code on computers). On a phone that hasn't installed the app, it comes before the key prompt.
   - **Accessibility:** visible keyboard focus, the tablist pattern with arrow keys, toasts and progress announced to screen readers, key fields without autocorrect, a theme colour for light and dark, and reduced motion respected.
 
-### Planned for the next extension release
-- The same audit and overhaul for the extension's popup and Options page.
+### Extension (next release)
+- **Popup and Options page redesigned** with the same look as the web app (`extension/ui.css`), checked in dark and light and in narrow windows:
+  - **Popup:** the master switch says On/Off; when off, the popup shows a short note instead of greyed-out buttons. *Translate visible images* shows your actual shortcut (it can be changed at `chrome://extensions/shortcuts`), and hide/show is an eye button. The site switches sit under *On \<site\>*, and the model and chapter context under *Translation*. The missing-key notice has an *Add key* button.
+  - **Options:** sections for Claude API, Translation, Sites, Lettering & speed and Troubleshooting, listed at the side on wide windows. Every toggle is a switch with a short description. *Save* is pinned at the bottom with its message beside it, and the page shows *Unsaved changes*, saves on Ctrl/Cmd+S and asks before you leave unsaved edits. Settings changed in the popup appear here when nothing is unsaved.
+  - *Clear cache* asks first, because it also drops your edited lines.
+- Fixed: the debug-overlay option's label broke into columns on the Options page, and the popup's *Options* button was disabled while Gytakusub was off.
 
 ## [2.1.0] — 2026-11-09 (web app and chapter fetcher, live on GitHub Pages; the browser extension is unchanged and stays 2.0.0, so there is no store package or GitHub Release for 2.1.0)
 
