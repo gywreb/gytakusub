@@ -78,10 +78,18 @@ handles tone reliably, which is why the rules stay as fallback).
 
 | `score-reports.mjs` (model answers as witness) | rules only | + segmenter |
 |---|---|---|
-| dialogue recognised as a bubble | 92.4% (by text 95.0%) | **98.8% (99.4%)** |
-| lines covered by a region | 93.5% | **95.4%** |
-| regions without an answer, per page | 0.61 | 0.99* |
-| analysis per page (Node, wasm) | 0.61 s | 2.51 s |
+| dialogue recognised as a bubble | 92.4% (by text 95.0%) | **98.0% (99.4%)** |
+| lines covered by a region | 93.5% | **94.8%** |
+| regions without an answer, per page | 0.61 | 0.90* |
+| analysis per page (Node, wasm) | 0.61 s | 2.60 s |
+
+Final code: model bubbles without lettering are dropped, and before that each
+one gets a second text-detection pass on its crop at up to 2× resolution
+(`detectInEmptyBubbles`: the page-wide pass runs at 960 px, where small
+lettering in a bubble can fall under the threshold). Without the second pass
+dropping empty bubbles cost 1.7 points by count (98.8 → 97.1%); with it, 98.0%.
+The GPU variant of the model scores the same as the CPU variant (both 94.0% /
+97.1% / 99.4% before the second pass).
 
 \* Of 89 such regions on 90 pages: 40 segmented bubbles *with* lettering that
 the recorded run had no answer for (the model never saw a stamp there in that
@@ -91,9 +99,9 @@ dropped before stamping).
 
 | `layout-score.mjs` | rules only | + segmenter |
 |---|---|---|
-| lines placed by halo or loose (no bubble found) | 190 | **119** |
-| rendered size under 0.7× the original | 9.6% | **8.8%** |
-| 10th-percentile rendered size | 0.71 | **0.73** |
+| lines placed by halo or loose (no bubble found) | 190 | **106** |
+| rendered size under 0.7× the original | 9.6% | **8.7%** |
+| 10th-percentile rendered size | 0.71 | **0.74** |
 | translations over un-erased lettering | 70 | **52** |
 | rectangle over its own lettering | 96.1% | 96.0% |
 | rectangles narrower than 3 letters | 136 | 147 |

@@ -109,7 +109,7 @@ const reportOk = rep && !rep.error && Array.isArray(rep.placements) && Array.isA
 fs.writeFileSync(path.join(out, "report.json"), JSON.stringify(rep, null, 1));
 // one-click export: a .zip with original + debug render + json per page
 const [download, exp] = await Promise.all([
-  page.waitForEvent("download", { timeout: 30000 }),
+  page.waitForEvent("download", { timeout: process.argv.includes("--gpu") ? 180000 : 30000 }),
   sw.evaluate(async ({ tabId }) => chrome.tabs.sendMessage(tabId, { type: "EXPORT_REPORT" }), { tabId }),
 ]);
 const zipPath = path.join(out, "report.zip"); await download.saveAs(zipPath);

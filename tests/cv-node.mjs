@@ -12,7 +12,7 @@ globalThis.ImageData ??= ImageData; // engine/erase.js constructs ImageData like
 const { getCV, getDetector, getSegmenter } = await import("../extension/engine/cv.js");
 const { analyze } = await import("../extension/engine/analyze.js");
 const { segment } = await import("../extension/engine/segment.js");
-const { detectText } = await import("../extension/engine/detect.js");
+const { detectText, detectInEmptyBubbles } = await import("../extension/engine/detect.js");
 export const cv = await getCV({ wasmBinary: fs.readFileSync(path.join(here, "../extension/vendor/opencv_js.wasm")) });
 // Emscripten's Node branch installs process-wide handlers that turn any unhandled
 // rejection into a wasm abort (exit code 7, source dump) — masking the real error.
@@ -45,9 +45,10 @@ if (segmenter) console.error(`[cv-node] bubble segmenter: ${path.basename(segPat
 export async function analyzePage(img, opts = {}) {
   const det = detector;
   const t0 = Date.now();
-  const lines = det ? await detectText(cv, det, img) : null;
-  const detectMs = Date.now() - t0;
+  let lines = det ? await detectText(cv, det, img) : null;
   const seg = segmenter ? await segment(segmenter, img) : null;
+  if (lines && seg) lines = await detectInEmptyBubbles(cv, det, img, lines, seg.instances, segmenter.bubbleClasses);
+  const detectMs = Date.now() - t0 - (seg ? seg.ms : 0);
   const an = analyze(cv, img, { detector: det, lines, instances: seg ? seg.instances : null, bubbleClasses: segmenter?.bubbleClasses, ...opts });
   an.segmentMs = seg ? seg.ms : 0; an.detectMs = detectMs;
   return an;

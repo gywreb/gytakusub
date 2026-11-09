@@ -55,6 +55,36 @@ export async function detectText(cv, det, img, opts = {}) {
   return decodeOutput(cv, prob, inp, opts);
 }
 
+/**
+ * A second look inside bubbles the segmentation model found but the page-wide
+ * pass left without text: each such bubble is cropped and detected again at up
+ * to twice the resolution. The page-wide pass works on the page shrunk to 960 px,
+ * where a small or thin line inside a bubble can fall under the detector's
+ * threshold; a bubble is strong evidence that lettering is there, and the crop
+ * gives the detector the pixels to see it. Returns the page lines plus any found.
+ * @param {Line[]} lines from detectText on the whole page
+ * @param {import("./segment.js").Instance[]} instances
+ * @param {Set<number>} [bubbleClasses]
+ */
+export async function detectInEmptyBubbles(cv, det, img, lines, instances, bubbleClasses) {
+  const out = lines.slice();
+  for (const inst of instances) {
+    if (bubbleClasses && !bubbleClasses.has(inst.cls)) continue;
+    const { x, y, w, h } = inst.box;
+    if (w < 12 || h < 12 || !inst.mask) continue;
+    const inMask = (px, py) => { const lx = Math.round(px) - x, ly = Math.round(py) - y; return lx >= 0 && ly >= 0 && lx < w && ly < h && inst.mask[ly * w + lx] !== 0; };
+    if (out.some((l) => inMask(l.x + l.w / 2, l.y + l.h / 2))) continue;
+    const crop = new ImageData(new Uint8ClampedArray(w * h * 4), w, h), cd = crop.data, sd = img.data, W = img.width;
+    for (let yy = 0; yy < h; yy++) cd.set(sd.subarray(((y + yy) * W + x) * 4, ((y + yy) * W + x + w) * 4), yy * w * 4);
+    const found = await detectText(cv, det, crop, { maxSide: 960, maxScale: 2 });
+    for (const l of found) {
+      const g = { ...l, x: l.x + x, y: l.y + y };
+      if (inMask(g.x + g.w / 2, g.y + g.h / 2)) out.push(g);
+    }
+  }
+  return out;
+}
+
 /** detectText for the OpenCV backend only, without a promise (analyze() is synchronous). */
 export function detectTextSync(cv, det, img, opts = {}) {
   if (det.kind === "ort") throw new Error("detectTextSync: the ONNX Runtime detector is asynchronous; pass `lines` to analyze()");
@@ -67,7 +97,7 @@ export function detectTextSync(cv, det, img, opts = {}) {
 function prepareInput(cv, img, opts) {
   const maxSide = opts.maxSide ?? 960;
   const W = img.width, H = img.height;
-  const scale = Math.min(1, maxSide / Math.max(W, H));
+  const scale = Math.min(opts.maxScale ?? 1, maxSide / Math.max(W, H));
   const w = Math.max(32, Math.round((W * scale) / 32) * 32), h = Math.max(32, Math.round((H * scale) / 32) * 32);
   const src = cv.matFromImageData(img);
   const rgb = new cv.Mat(); cv.cvtColor(src, rgb, cv.COLOR_RGBA2RGB);

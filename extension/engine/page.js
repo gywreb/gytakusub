@@ -5,7 +5,7 @@
 import { getCV, getDetector, getSegmenter, setEnginePrefs } from "./cv.js";
 import { analyze } from "./analyze.js";
 import { segment } from "./segment.js";
-import { detectText } from "./detect.js";
+import { detectText, detectInEmptyBubbles } from "./detect.js";
 import { layout } from "./layout.js";
 import { erase } from "./erase.js";
 import { sliceGeometry, normalizeItems } from "../prompt.js";
@@ -35,9 +35,10 @@ export async function preparePage(bitmap, settings) {
     // bubbles from the segmentation model when there is one; the analysis then
     // only has to read the text inside them
     const t0 = Date.now();
-    const lines = detector ? await detectText(cv, detector, imageData) : null;
-    const detectMs = Date.now() - t0;
+    let lines = detector ? await detectText(cv, detector, imageData) : null;
+    let detectMs = Date.now() - t0;
     const seg = segmenter ? await segment(segmenter, imageData) : null;
+    if (lines && seg) { const t1 = Date.now(); lines = await detectInEmptyBubbles(cv, detector, imageData, lines, seg.instances, segmenter.bubbleClasses); detectMs += Date.now() - t1; }
     const analysis = analyze(cv, imageData, { detector, lines, instances: seg ? seg.instances : null, bubbleClasses: segmenter?.bubbleClasses });
     analysis.segmentMs = seg ? seg.ms : 0; analysis.detectMs = detectMs;
     analysis.backend = `detect:${detector ? detector.ep : "none"} segment:${segmenter ? segmenter.ep : "none"}`;
