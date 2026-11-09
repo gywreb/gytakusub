@@ -1,0 +1,26 @@
+[
+ {
+  "tag": null,
+  "box": [
+   190,
+   639,
+   102,
+   25
+  ],
+  "text": "It can't be!",
+  "size": "small",
+  "kind": "narration"
+ },
+ {
+  "tag": null,
+  "box": [
+   726,
+   816,
+   174,
+   78
+  ],
+  "text": "Calm down, it isn't over yet.",
+  "size": "normal",
+  "kind": "bubble"
+ }
+]

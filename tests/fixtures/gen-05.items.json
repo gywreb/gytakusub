@@ -1,0 +1,38 @@
+[
+ {
+  "tag": null,
+  "box": [
+   518,
+   162,
+   40,
+   227
+  ],
+  "text": "It can't be!",
+  "size": "normal",
+  "kind": "bubble"
+ },
+ {
+  "tag": null,
+  "box": [
+   159,
+   732,
+   46,
+   184
+  ],
+  "text": "Calm down, it isn't over yet.",
+  "size": "normal",
+  "kind": "bubble"
+ },
+ {
+  "tag": null,
+  "box": [
+   661,
+   1273,
+   46,
+   110
+  ],
+  "text": "Since when did you know?",
+  "size": "normal",
+  "kind": "bubble"
+ }
+]

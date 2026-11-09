@@ -1,6 +1,13 @@
+// Reads and writes storage directly, never through the service worker (which may
+// be busy analysing a page for seconds; see settings.js) — and Save stays off
+// until the stored settings are on screen, so it can never write the form's
+// empty defaults over them.
+import { getSettings } from "./settings.js";
+import { apiHeaders, API_URL } from "./prompt.js";
+
 const $ = (id) => document.getElementById(id);
 const FIELDS = ["model", "targetLang", "glossary", "customPrompt", "fontFamily", "excludedSites"];
-const CHECKS = ["useContext", "includeSource", "uppercase", "syncApiKey"];
+const CHECKS = ["useContext", "includeSource", "uppercase", "syncApiKey", "debugOverlay", "peekOnHover", "useGpu"];
 
 function show(kind, text) {
   const m = $("msg");
@@ -8,16 +15,21 @@ function show(kind, text) {
   m.textContent = text;
 }
 
+let loaded = false;
+
 async function load() {
-  const s = await chrome.runtime.sendMessage({ type: "GET_SETTINGS" });
+  const s = await getSettings();
   for (const f of FIELDS) $(f).value = s[f] ?? "";
   for (const c of CHECKS) $(c).checked = !!s[c];
   $("autoSites").value = (s.autoSites || []).join("\n");
   $("enabledSites").value = (s.enabledSites || []).join("\n");
   $("apiKey").value = s.apiKey || "";
+  loaded = true;
+  for (const id of ["save", "testKey"]) $(id).disabled = false;
 }
 
 async function save() {
+  if (!loaded) throw new Error("Settings are still loading.");
   const sync = {};
   for (const f of FIELDS) sync[f] = $(f).value;
   for (const c of CHECKS) sync[c] = $(c).checked;
@@ -47,13 +59,18 @@ $("showKey").onclick = () => {
 $("testKey").onclick = async () => {
   await save();
   show("ok", "Testing…");
-  const r = await chrome.runtime.sendMessage({ type: "TEST_KEY" });
-  if (r?.ok) show("ok", `Key works. Model ${r.model} responded.`);
-  else show("err", "Key test failed: " + (r?.error || "unknown error"));
+  try {
+    const s = await getSettings();
+    if (!s.apiKey) throw new Error("No API key saved yet.");
+    const res = await fetch(API_URL, { method: "POST", headers: apiHeaders(s.apiKey), body: JSON.stringify({ model: s.model, max_tokens: 8, messages: [{ role: "user", content: "Reply with OK" }] }) });
+    if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(`${res.status}: ${j?.error?.message || res.statusText}`); }
+    show("ok", `Key works. Model ${s.model} responded.`);
+  } catch (e) { show("err", "Key test failed: " + e.message); }
 };
 $("clearCache").onclick = async () => {
-  await chrome.runtime.sendMessage({ type: "CLEAR_CACHE" });
+  await chrome.storage.session.clear();
   show("ok", "Cache cleared.");
 };
 
-load();
+for (const id of ["save", "testKey"]) $(id).disabled = true;
+load().catch((e) => show("err", "Could not read the settings: " + e.message));

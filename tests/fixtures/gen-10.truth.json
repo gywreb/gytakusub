@@ -1,0 +1,92 @@
+[
+ {
+  "box": [
+   186,
+   158,
+   310,
+   199
+  ],
+  "kind": "bubble",
+  "shape": "ellipse",
+  "items": [
+   0
+  ],
+  "lang": "it",
+  "dark": false
+ },
+ {
+  "box": [
+   723,
+   94,
+   344,
+   148
+  ],
+  "kind": "bubble",
+  "shape": "ellipse",
+  "items": [
+   1
+  ],
+  "lang": "it",
+  "dark": false
+ },
+ {
+  "box": [
+   76,
+   1004,
+   391,
+   209
+  ],
+  "kind": "bubble",
+  "shape": "rect",
+  "items": [
+   2
+  ],
+  "lang": "it",
+  "dark": false
+ },
+ {
+  "box": [
+   111,
+   1260,
+   417,
+   144
+  ],
+  "kind": "bubble",
+  "shape": "ellipse",
+  "items": [
+   3
+  ],
+  "lang": "it",
+  "dark": false
+ },
+ {
+  "box": [
+   706,
+   955,
+   222,
+   186
+  ],
+  "kind": "bubble",
+  "shape": "rect",
+  "items": [
+   4
+  ],
+  "lang": "it",
+  "dark": false
+ },
+ {
+  "box": [
+   642,
+   1160,
+   248,
+   190
+  ],
+  "kind": "bubble",
+  "shape": "rect",
+  "items": [
+   5
+  ],
+  "lang": "it",
+  "dark": false
+ }
+]

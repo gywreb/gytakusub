@@ -1,0 +1,32 @@
+[
+ {
+  "box": [
+   70,
+   623,
+   341,
+   57
+  ],
+  "kind": "bubble",
+  "shape": "rect",
+  "items": [
+   0
+  ],
+  "lang": "es",
+  "dark": false
+ },
+ {
+  "box": [
+   655,
+   741,
+   317,
+   229
+  ],
+  "kind": "bubble",
+  "shape": "jagged",
+  "items": [
+   1
+  ],
+  "lang": "es",
+  "dark": false
+ }
+]

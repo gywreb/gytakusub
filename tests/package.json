@@ -3,15 +3,27 @@
   "private": true,
   "type": "commonjs",
   "scripts": {
-    "test": "node unit.test.mjs && node eraser-test.mjs",
-    "detect": "node detect.cjs",
-    "e2e:extension": "node extension-e2e.cjs",
-    "e2e:web": "node web-e2e.mjs",
-    "demo": "python3 make-demo-page.py fixtures",
-    "stress": "node typeset-stress.mjs typeset-stress.png",
-    "assets": "node make-store-assets.mjs ../store/assets"
+    "test": "node engine.test.mjs && node segment.test.mjs && node ort-trap.test.mjs && node gpu.test.mjs && node concurrency.test.mjs",
+    "test:browser": "node browser/run.mjs --out /tmp/gyt-browser/good && node browser/run.mjs --bad-boxes --out /tmp/gyt-browser/bad-boxes && node browser/run.mjs --segmenter /tmp/gyt-fake-seg.onnx --out /tmp/gyt-browser/segmented && node browser/run.mjs --gpu --require-gpu --out /tmp/gyt-browser/gpu && node browser/web.mjs --out /tmp/gyt-browser/web",
+    "e2e": "node engine-e2e.mjs fixtures/demo-page.png fixtures/demo-items.json /tmp/gyt-e2e.png",
+    "viz": "node engine-viz.mjs",
+    "demo": "python3 make-demo-page.py fixtures && python3 make-pages.py fixtures 12",
+    "assets": "node make-store-assets.mjs ../store/assets",
+    "vendor": "node ../scripts/vendor-opencv.mjs && node ../scripts/vendor-hyphen.mjs && node ../scripts/vendor-ort.mjs",
+    "replay": "node replay-report.mjs",
+    "score": "node score-reports.mjs",
+    "score:layout": "node layout-score.mjs"
   },
   "devDependencies": {
-    "canvas": "^3.1.0"
+    "canvas": "^3.1.0",
+    "hyphen": "^1.14.1",
+    "onnxruntime-web": "1.31.1",
+    "opencv-bindings": "4.5.5",
+    "playwright": "^1.65.0",
+    "webgpu": "0.6.2"
+  },
+  "dependencies": {
+    "hyphen": "^1.14.1",
+    "opencv-bindings": "^4.5.5"
   }
 }

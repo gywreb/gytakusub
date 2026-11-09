@@ -4,7 +4,7 @@ Everything below is a one-time account step or a copy-paste from `store/LISTING.
 
 ## 0. Before you start (5 min)
 - [ ] Load `extension/` unpacked in Brave one more time, open Options → Test key, and translate one page end to end. (I can't run a browser here; this is the one check only you can do.)
-- [ ] `git pull` and confirm `dist/gytakusub-extension-1.0.0.zip` matches the commit you tested (CI builds it on tags; the one in the release is identical to `extension/` minus `icon512.png`).
+- [ ] `git pull` and confirm `dist/gytakusub-extension-2.0.0.zip` matches the commit you tested (CI builds it on tags; the one in the release is identical to `extension/` minus `icon512.png`).
 
 ## 1. Developer account (10 min, $5)
 - [ ] Go to https://chrome.google.com/webstore/devconsole and sign in with the Google account you want to own the listing (a dedicated account is fine).
@@ -13,7 +13,7 @@ Everything below is a one-time account step or a copy-paste from `store/LISTING.
 - [ ] Optional: verify the GitHub Pages domain under *Account → Verified websites* if you want "by gywreb.github.io" on the listing. Not required.
 
 ## 2. Create the item (2 min)
-- [ ] Dashboard → **New item** → upload `dist/gytakusub-extension-1.0.0.zip`.
+- [ ] Dashboard → **New item** → upload `dist/gytakusub-extension-2.0.0.zip`.
 - [ ] If the upload reports a manifest problem, stop and paste the message to me.
 
 ## 3. Store listing tab (10 min)

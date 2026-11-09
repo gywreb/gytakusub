@@ -37,6 +37,8 @@
   h1 .switch input:checked + span { background: #16a34a; }
   h1 .switch input:checked + span::before { transform: translateX(16px); }
   body.off .row, body.off select, body.off label.toggle { opacity: 0.45; pointer-events: none; }
+  /* until the settings are read (a few ms): never show the HTML defaults as if they were the user's */
+  body:not(.ready) h1 .switch, body:not(.ready) select, body:not(.ready) label.toggle { visibility: hidden; }
   #host { font-weight: 600; }
 </style>
 </head>
@@ -64,7 +66,8 @@
   <div class="muted" id="state" style="margin-top:8px"></div>
   <div class="row" style="margin-top:10px">
     <button id="openOptions">Options</button>
+    <button id="exportReport" style="display:none" title="One .zip with every translated page on this tab: original image, debug render and JSON">Export debug report</button>
   </div>
-  <script src="popup.js"></script>
+  <script type="module" src="popup.js"></script>
 </body>
 </html>

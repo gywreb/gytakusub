@@ -1,3 +1,4 @@
+@font-face { font-family: "Gytakusub Comic"; src: url("fonts/ComicNeue-Bold.ttf") format("truetype"); font-weight: 700; font-style: normal; font-display: swap; }
 :root {
   color-scheme: dark light;
   --bg: #16181d; --panel: #1f2228; --fg: #e5e7eb; --muted: #9ca3af; --border: #343841;

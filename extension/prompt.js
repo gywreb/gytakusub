@@ -17,8 +17,8 @@ export function buildPrompt(settings, ctx, slice) {
     : "";
   const hasTags = slice.tagTo >= slice.tagFrom;
   const tagLine = hasTags
-    ? `Some speech bubbles are stamped with a small red circle containing a number (${slice.tagFrom}–${slice.tagTo}), placed at the bubble's top-left corner. Ignore the stamps when reading the text.`
-    : `No bubbles are stamped on this image.`;
+    ? `Text regions (speech bubbles, captions, and some loose lettering) are stamped with a small red circle containing a number (${slice.tagFrom}–${slice.tagTo}), placed at the region's top-left corner. Ignore the stamps when reading the text. A stamp may occasionally sit on artwork that is not text: return nothing for it — never invent text for a stamp.`
+    : `No regions are stamped on this image.`;
   return `You are translating one page (or one slice of a long strip) of a manga, manhwa or comic into ${settings.targetLang}.
 
 The image is exactly ${slice.cw} pixels wide and ${slice.ch} pixels tall. The origin (0,0) is the top-left corner; x grows to the right (max ${slice.cw}), y grows downward (max ${slice.ch}).
@@ -27,7 +27,7 @@ ${tagLine}
 Find EVERY piece of dialogue and written text in the image: speech bubbles, thought bubbles, narration boxes, and signs. Do NOT include sound effects / onomatopoeia drawn as part of the artwork.
 
 For each item return:
-- "tag": the number of the stamped bubble the text is inside, or null if the text is not inside a stamped bubble. One tag per item; if one stamped bubble contains two separate pieces of text, return two items with the same tag.
+- "tag": the number of the stamped region the text is inside, or null if the text is not inside a stamped region. One tag per item; if one stamped bubble contains two separate pieces of text, return two items with the same tag.
 - "box": [x, y, w, h] in PIXELS of this image: x,y = top-left corner of the text, w = width, h = height. Measure x against the ${slice.cw}px width and y against the ${slice.ch}px height independently. The box must tightly enclose the TEXT itself, not the whole bubble. Required for every item, most important for items with tag null.
 - "kind": one of "bubble", "narration", "sign".
 - "size": the lettering size relative to normal dialogue on this page: "small" (whispers, asides, tiny notes), "normal", or "large" (shouting, big bold lettering).
@@ -91,36 +91,6 @@ export function normalizeItems(rawItems, s, width, height) {
   return items;
 }
 
-/** Stamp numbered marks on a slice canvas context for the given candidates. */
-export function stampMarks(ctx, cands, cw, firstId) {
-  const r = Math.max(9, Math.round(cw / 70));
-  ctx.font = `bold ${Math.round(r * 1.25)}px sans-serif`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  cands.forEach((c, i) => {
-    const cx = c.bbox.x + r + 1, cy = c.bbox.y + r + 1;
-    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.fillStyle = "#e11d48"; ctx.fill();
-    ctx.lineWidth = Math.max(1, r / 6); ctx.strokeStyle = "#fff"; ctx.stroke();
-    ctx.fillStyle = "#fff"; ctx.fillText(String(firstId + i), cx, cy + r * 0.05);
-  });
-}
-
-/** Convert detector candidates on a slice to full-image fraction records. */
-export function candidatesToBubbles(cands, s, cw, ch, width, height, firstId) {
-  const toOrigX = s.w / cw, toOrigY = s.h / ch;
-  return cands.map((c, i) => ({
-    id: firstId + i,
-    box: [(s.x + c.bbox.x * toOrigX) / width, (s.y + c.bbox.y * toOrigY) / height, (c.bbox.w * toOrigX) / width, (c.bbox.h * toOrigY) / height],
-    centroid: [(s.x + c.centroid.x * toOrigX) / width, (s.y + c.centroid.y * toOrigY) / height],
-    areaFrac: (c.area * toOrigX * toOrigY) / (width * height),
-    color: c.color, rows: c.rows, cols: c.cols,
-    blockW: (c.scale * toOrigX) / width, blockH: (c.scale * toOrigY) / height,
-    fillRatio: c.fillRatio,
-  }));
-}
-
-/** Slice geometry for a page: one slice, or several for tall strips. */
 export function sliceGeometry(W, H, settings) {
   const isStrip = H > 2.2 * W && H > settings.sliceHeight;
   const out = [];
@@ -145,11 +115,39 @@ export function apiHeaders(apiKey) {
   };
 }
 
+/**
+ * The answer's JSON Schema, sent as structured output (output_config.format):
+ * the API then constrains the model's sampling to it, so the reply is always
+ * valid JSON of this shape — a translation that quotes someone ("…") can no
+ * longer break the parse. Every property is required and objects are closed,
+ * as structured outputs require.
+ */
+export function answerSchema(includeSource) {
+  const item = {
+    type: "object", additionalProperties: false,
+    properties: {
+      tag: { type: ["integer", "null"] },
+      box: { type: "array", items: { type: "number" } },
+      kind: { type: "string", enum: ["bubble", "narration", "sign"] },
+      size: { type: "string", enum: ["small", "normal", "large"] },
+      ...(includeSource ? { source: { type: "string" } } : {}),
+      text: { type: "string" },
+    },
+    required: ["tag", "box", "kind", "size", ...(includeSource ? ["source"] : []), "text"],
+  };
+  const term = { type: "object", additionalProperties: false, properties: { source: { type: "string" }, translation: { type: "string" } }, required: ["source", "translation"] };
+  return { type: "object", additionalProperties: false, properties: { items: { type: "array", items: item }, terms: { type: "array", items: term } }, required: ["items", "terms"] };
+}
+
+// Set when the API rejects structured output (an older model or API version):
+// later calls in this worker send the plain request, whose JSON is parsed leniently.
+let structuredRejected = false;
+
 /** One Claude call for one prepared slice. Returns {items(raw), terms, usage}. */
 export async function callClaude(settings, slice, ctx, fetchFn = fetch) {
   const body = {
     model: settings.model,
-    max_tokens: 4096,
+    max_tokens: 8192, // billed per token used; a dense page with transcriptions needs ~3k
     messages: [{
       role: "user",
       content: [
@@ -158,16 +156,32 @@ export async function callClaude(settings, slice, ctx, fetchFn = fetch) {
       ],
     }],
   };
+  const structured = !structuredRejected;
+  if (structured) body.output_config = { format: { type: "json_schema", schema: answerSchema(!!settings.includeSource) } };
   const res = await fetchFn(API_URL, { method: "POST", headers: apiHeaders(settings.apiKey), body: JSON.stringify(body) });
   if (!res.ok) {
     let detail = "";
     try { const j = await res.json(); detail = j?.error?.message || JSON.stringify(j); }
     catch { detail = await res.text(); }
+    if (structured && res.status === 400 && /output_config|json_schema|schema|structured/i.test(detail)) {
+      console.warn("Gytakusub: structured output not accepted, using a plain request:", detail);
+      structuredRejected = true;
+      return callClaude(settings, slice, ctx, fetchFn);
+    }
     throw new Error(`Claude API ${res.status}: ${detail}`);
   }
   const data = await res.json();
   const text = (data.content || []).filter((c) => c.type === "text").map((c) => c.text).join("\n");
-  const parsed = extractJson(text);
+  // Say why there is nothing to read, rather than failing on the parse.
+  if (data.stop_reason === "refusal") throw new Error("Claude declined to translate this page (refusal)");
+  if (data.stop_reason === "max_tokens") throw new Error(`Claude's answer was cut off (max_tokens, ${data.usage?.output_tokens ?? "?"} tokens)`);
+  if (!text.trim()) throw new Error(`Empty model response (stop_reason: ${data.stop_reason ?? "none"})`);
+  let parsed;
+  try { parsed = extractJson(text); }
+  catch (e) {
+    console.warn("Gytakusub: unreadable model answer:", text.slice(0, 4000));
+    throw new Error(`Unreadable model answer (${e.message}; stop_reason: ${data.stop_reason ?? "none"})`);
+  }
   return {
     items: Array.isArray(parsed.items) ? parsed.items : [],
     terms: Array.isArray(parsed.terms) ? parsed.terms : [],

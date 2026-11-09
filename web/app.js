@@ -96,7 +96,10 @@ async function processPage(page) {
       page.el.append(page.img);
     }
     setStatus(page, "translating…");
-    const result = await translateImage(page.img, settings, settings.useContext ? ctx : { terms: [], recent: [] });
+    const [result] = await Promise.all([
+      translateImage(page.img, settings, settings.useContext ? ctx : { terms: [], recent: [] }),
+      document.fonts?.load('700 20px "Gytakusub Comic"').catch(() => null), // bundled lettering font
+    ]);
     if (settings.useContext) ctx = result.ctx;
     const { original, translated, drawn } = renderPage(page.img, result, settings);
     original.className = "original"; translated.className = "translated";

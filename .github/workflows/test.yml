@@ -6,6 +6,30 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: 22 }
-      - run: for f in extension/*.js web/*.js; do node --check "$f"; done
-      - run: cd tests && npm install --no-audit --no-fund && npm test
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: tests/package-lock.json
+      - run: for f in extension/*.js extension/engine/*.js web/*.js; do node --check "$f"; done
+      # cairo/pango…: node-canvas ships prebuilt binaries; when that download fails it builds
+      # from source, which needs these (~1 min). mesa-vulkan-drivers: a software GPU
+      # (lavapipe) for Dawn, so gpu.test.mjs runs the WebGPU path for real.
+      - run: sudo apt-get update -q >/dev/null && sudo apt-get install -y --no-install-recommends libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev mesa-vulkan-drivers >/dev/null
+      - run: cd tests && npm ci --no-audit --no-fund
+      - run: pip install --quiet onnx numpy pillow # detector vendoring rewrites ONNX ops; the stand-in segmentation model is built from a fixture
+      # Vendored libraries must match what the vendoring scripts produce from the pinned packages.
+      - run: cd tests && npm run vendor && git diff --exit-code -- ../extension/vendor || { echo "::error::extension/vendor differs from scripts/vendor-*.mjs output"; exit 1; }
+      # ...and the text detector, from PaddlePaddle's pinned Hugging Face revision.
+      - run: |
+          curl -sSfL -o /tmp/ppocr-det.onnx https://huggingface.co/PaddlePaddle/PP-OCRv6_small_det_onnx/resolve/28fe5895c24fd108c19eb3e8479f4ab385fbfc62/inference.onnx
+          node scripts/vendor-detector.mjs /tmp/ppocr-det.onnx --source "PaddlePaddle/PP-OCRv6_small_det_onnx@28fe5895c24fd108c19eb3e8479f4ab385fbfc62"
+          git diff --exit-code -- extension/vendor || { echo "::error::extension/vendor/ppocr-det.* differs from scripts/vendor-detector.mjs output"; exit 1; }
+      - run: cd tests && npm test
+        env:
+          GYT_REQUIRE_GPU: "1"
+      # Real-browser tests: the actual extension and the web app in headless Chromium against a mock API.
+      - run: cd tests && npx playwright install --with-deps chromium
+      - run: cd tests && npm run test:browser
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: browser-renders, path: /tmp/gyt-browser/**/*.png, if-no-files-found: ignore }

@@ -1,0 +1,47 @@
+[
+ {
+  "box": [
+   440,
+   106,
+   196,
+   339
+  ],
+  "kind": "bubble",
+  "shape": "jagged",
+  "items": [
+   0
+  ],
+  "lang": "ja",
+  "dark": false
+ },
+ {
+  "box": [
+   102,
+   640,
+   160,
+   366
+  ],
+  "kind": "bubble",
+  "shape": "ellipse",
+  "items": [
+   1
+  ],
+  "lang": "ja",
+  "dark": false
+ },
+ {
+  "box": [
+   575,
+   1168,
+   219,
+   321
+  ],
+  "kind": "bubble",
+  "shape": "ellipse",
+  "items": [
+   2
+  ],
+  "lang": "ja",
+  "dark": false
+ }
+]

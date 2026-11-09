@@ -61,6 +61,18 @@
   },
   {
     "tag": null,
+    "kind": "narration",
+    "box": [
+      620,
+      1250,
+      410,
+      30
+    ],
+    "text": "Meanwhile, in the city...",
+    "size": "small"
+  },
+  {
+    "tag": null,
     "kind": "bubble",
     "box": [
       850,

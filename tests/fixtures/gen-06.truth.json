@@ -1,0 +1,62 @@
+[
+ {
+  "box": [
+   357,
+   136,
+   265,
+   237
+  ],
+  "kind": "bubble",
+  "shape": "ellipse",
+  "items": [
+   0
+  ],
+  "lang": "ja",
+  "dark": false
+ },
+ {
+  "box": [
+   662,
+   159,
+   449,
+   217
+  ],
+  "kind": "bubble",
+  "shape": "jagged",
+  "items": [
+   1
+  ],
+  "lang": "ja",
+  "dark": false
+ },
+ {
+  "box": [
+   188,
+   1199,
+   192,
+   357
+  ],
+  "kind": "bubble",
+  "shape": "ellipse",
+  "items": [
+   2
+  ],
+  "lang": "ja",
+  "dark": false
+ },
+ {
+  "box": [
+   881,
+   1237,
+   184,
+   405
+  ],
+  "kind": "bubble",
+  "shape": "ellipse",
+  "items": [
+   3
+  ],
+  "lang": "ja",
+  "dark": false
+ }
+]

@@ -1,43 +1,18 @@
 // Gytakusub – background service worker.
-// Responsibilities: fetch image bytes (bypassing page CORS), downscale/slice,
-// detect speech-bubble candidates locally and stamp numbered marks on them
-// (set-of-mark prompting), call the Claude Messages API with vision, cache
-// results, keep per-tab glossary context, and relay keyboard commands.
+// Responsibilities: fetch image bytes (bypassing page CORS), run the page
+// engine (OpenCV analysis, numbered stamps for set-of-mark prompting, erase +
+// layout after the model answers), call the Claude Messages API with vision,
+// cache translations, keep per-tab glossary context, relay keyboard commands.
 
-import "./bubble.js"; // defines globalThis.GyT
-import { callClaude, normalizeItems, stampMarks, candidatesToBubbles, sliceGeometry, mergeContext, apiHeaders, API_URL } from "./prompt.js";
-const G = globalThis.GyT;
+import { callClaude, mergeContext } from "./prompt.js";
+import { preparePage, finishPage } from "./engine/page.js";
+import { DEFAULT_SETTINGS, getSettings, CS_FILES, ensureContentScript } from "./settings.js";
 
-const PROMPT_VERSION = 4; // bump when the prompt/coordinate format changes so old cache entries are ignored
+const PROMPT_VERSION = 6; // bump when the prompt/coordinate format changes so old cache entries are ignored
 
-export const DEFAULT_SETTINGS = {
-  enabled: true, // master switch
-  model: "claude-haiku-5-5",
-  targetLang: "English",
-  glossary: "",
-  customPrompt: "",
-  enabledSites: [], // hostnames where the content script is injected (hover button + hotkeys)
-  autoSites: [], // hostnames where auto-translate-on-scroll is on (implies enabled)
-  useContext: true, // feed recent dialogue from this tab into each request
-  includeSource: false, // ask the model to transcribe the original too (slower)
-  uppercase: false,
-  fontFamily: "",
-  syncApiKey: false,
-  excludedSites: "",
-  // Image prep
-  maxLongEdge: 1600, // px sent to Claude for a normal page
-  stripWidth: 1000, // px width for tall webtoon strips
-  sliceHeight: 1800, // px per slice for tall strips
-};
+export { DEFAULT_SETTINGS }; // defined in settings.js, shared with the popup and options pages
 
 // ---------- settings ----------
-
-async function getSettings() {
-  const synced = await chrome.storage.sync.get(DEFAULT_SETTINGS);
-  const local = await chrome.storage.local.get({ apiKey: "" });
-  const syncedKey = (await chrome.storage.sync.get({ apiKey: "" })).apiKey;
-  return { ...DEFAULT_SETTINGS, ...synced, apiKey: local.apiKey || syncedKey || "" };
-}
 
 async function updateBadge() {
   const s = await getSettings();
@@ -49,7 +24,6 @@ async function updateBadge() {
 // sites the user enabled, and injected on demand elsewhere (popup / hotkey).
 
 const CS_ID = "gytakusub-main";
-const CS_FILES = ["bubble.js", "typeset.js", "content.js"];
 
 function hostPatterns(hosts) {
   const out = [];
@@ -76,15 +50,6 @@ async function syncRegistration() {
 }
 
 /** Make sure the content script is present in a tab; inject it if not. */
-async function ensureContentScript(tabId) {
-  try {
-    const r = await chrome.tabs.sendMessage(tabId, { type: "PING" });
-    if (r?.ok) return true;
-  } catch { /* not injected */ }
-  await chrome.scripting.executeScript({ target: { tabId }, files: CS_FILES });
-  return true;
-}
-
 chrome.runtime.onInstalled.addListener(() => { updateBadge(); syncRegistration(); });
 chrome.runtime.onStartup.addListener(() => { updateBadge(); syncRegistration(); });
 chrome.storage.onChanged.addListener((changes) => {
@@ -121,29 +86,9 @@ async function sha1(str) {
 
 // Returns slices with the image bytes Claude will see (bubbles stamped with
 // numbered marks) plus the detected bubble candidates in full-image fractions.
-async function prepareSlices(blob, settings) {
+async function decode(blob) {
   const bitmap = await createImageBitmap(blob);
-  const W = bitmap.width, H = bitmap.height;
-  const slices = [];
-  const bubbles = [];
-  for (const s of sliceGeometry(W, H, settings)) {
-    const cw = Math.max(1, Math.round(s.w * s.scale));
-    const ch = Math.max(1, Math.round(s.h * s.scale));
-    const canvas = new OffscreenCanvas(cw, ch);
-    const ctx = canvas.getContext("2d", { willReadFrequently: true });
-    ctx.fillStyle = "#fff";
-    ctx.fillRect(0, 0, cw, ch);
-    ctx.drawImage(bitmap, s.x, s.y, s.w, s.h, 0, 0, cw, ch);
-    const cands = G.detectBubbles(ctx.getImageData(0, 0, cw, ch));
-    const firstId = bubbles.length + 1;
-    bubbles.push(...candidatesToBubbles(cands, s, cw, ch, W, H, firstId));
-    stampMarks(ctx, cands, cw, firstId);
-    const jpeg = await canvas.convertToBlob({ type: "image/jpeg", quality: 0.82 });
-    const dataUrl = await blobToDataUrl(jpeg);
-    slices.push({ b64: dataUrl.split(",")[1], mediaType: "image/jpeg", x: s.x, y: s.y, w: s.w, h: s.h, cw, ch, tagFrom: firstId, tagTo: firstId + cands.length - 1 });
-  }
-  bitmap.close();
-  return { slices, bubbles, width: W, height: H };
+  try { return await preparePage(bitmap, await getSettings()); } finally { bitmap.close(); }
 }
 
 // ---------- per-tab chapter context (names + recent dialogue) ----------
@@ -159,6 +104,27 @@ async function updateTabCtx(tabId, newTerms, newLines) {
   await chrome.storage.session.set({ [key]: mergeContext(await getTabCtx(tabId), newTerms, newLines) });
 }
 
+// ---------- image bytes (only http(s) URLs or inline data from our own content script) ----------
+
+const MAX_BYTES = 25 * 1024 * 1024;
+async function fetchImageBlob({ url, dataUrl }) {
+  let blob;
+  if (dataUrl) {
+    if (!/^data:image\//i.test(dataUrl)) throw new Error("Unsupported image data");
+    blob = dataUrlToBlob(dataUrl);
+  } else {
+    let u;
+    try { u = new URL(url); } catch { throw new Error("Invalid image URL"); }
+    if (!/^https?:$/.test(u.protocol)) throw new Error("Only http(s) images are supported");
+    const res = await fetch(u.href, { credentials: "omit" });
+    if (!res.ok) throw new Error(`Could not fetch image (${res.status})`);
+    blob = await res.blob();
+  }
+  if (blob.size > MAX_BYTES) throw new Error("Image is too large (over 25 MB)");
+  if (!blob.type.startsWith("image/")) blob = new Blob([await blob.arrayBuffer()], { type: "image/jpeg" });
+  return blob;
+}
+
 // ---------- main handler ----------
 
 async function handleTranslate(msg, sender) {
@@ -169,81 +135,87 @@ async function handleTranslate(msg, sender) {
   const tabId = sender.tab?.id ?? -1;
   const cacheKey = "cache:" + (await sha1(`${PROMPT_VERSION}|${settings.model}|${settings.targetLang}|${settings.includeSource}|${settings.useContext}|${msg.url || msg.dataUrl?.slice(0, 512) + msg.dataUrl?.length}`));
   const cached = (await chrome.storage.session.get(cacheKey))[cacheKey];
+  const timing = {}; let t = performance.now();
+  const lap = (k) => { const n = performance.now(); timing[k] = Math.round(n - t); t = n; };
 
-  // 1. bytes (only http(s) URLs or inline data from our own content script)
-  const MAX_BYTES = 25 * 1024 * 1024;
-  const fetchBytes = async () => {
-    let blob;
-    if (msg.dataUrl) {
-      if (!/^data:image\//i.test(msg.dataUrl)) throw new Error("Unsupported image data");
-      blob = dataUrlToBlob(msg.dataUrl);
-    } else {
-      let u;
-      try { u = new URL(msg.url); } catch { throw new Error("Invalid image URL"); }
-      if (!/^https?:$/.test(u.protocol)) throw new Error("Only http(s) images are supported");
-      const res = await fetch(u.href, { credentials: "omit" });
-      if (!res.ok) throw new Error(`Could not fetch image (${res.status})`);
-      blob = await res.blob();
-    }
-    if (blob.size > MAX_BYTES) throw new Error("Image is too large (over 25 MB)");
-    if (!blob.type.startsWith("image/")) blob = new Blob([await blob.arrayBuffer()], { type: "image/jpeg" });
-    return blob;
-  };
-
-  // Cache holds the translation only (not the image bytes, which would exhaust
-  // storage.session after a few pages); bytes are re-fetched on a hit.
+  // Cache holds the model's answer only (not image bytes, which would exhaust
+  // storage.session after a few pages); the page is re-analysed on a hit.
+  const blob = await fetchImageBlob(msg); lap("fetch");
+  const job = await decode(blob); lap("analyze");
+  let results, usage, newTerms = [];
   if (cached && !msg.force) {
-    const blob = await fetchBytes();
-    return { ...cached, imageDataUrl: msg.dataUrl || (await blobToDataUrl(blob)), fromCache: true };
+    results = cached.results; usage = cached.usage;
+  } else {
+    const ctx = await getTabCtx(tabId);
+    const withRetry = async (slice) => {
+      try { return await callClaude(settings, slice, ctx); }
+      catch (e) {
+        if (/Claude API (429|529|503)/.test(e.message)) { await new Promise((r) => setTimeout(r, 2500)); return callClaude(settings, slice, ctx); }
+        throw e;
+      }
+    };
+    const raw = await Promise.all(job.slices.map(withRetry));
+    results = raw.map((r) => ({ items: r.items }));
+    usage = { input_tokens: 0, output_tokens: 0 };
+    for (const r of raw) { newTerms.push(...r.terms); if (r.usage) { usage.input_tokens += r.usage.input_tokens || 0; usage.output_tokens += r.usage.output_tokens || 0; } }
+    try { await chrome.storage.session.set({ [cacheKey]: { results, usage } }); }
+    catch (e) { console.warn("Gytakusub: cache write failed", e); }
   }
-  const blob = await fetchBytes();
+  lap("model");
 
-  // 2. prepare (downscale, detect bubbles, stamp marks)
-  const { slices, bubbles, width, height } = await prepareSlices(blob, settings);
-
-  // 3. translate each slice (slices of one strip run in parallel)
-  const ctx = await getTabCtx(tabId);
-  const withRetry = async (slice) => {
-    try { return await callClaude(settings, slice, ctx); }
-    catch (e) {
-      if (/Claude API (429|529|503)/.test(e.message)) { await new Promise((r) => setTimeout(r, 2500)); return callClaude(settings, slice, ctx); }
-      throw e;
-    }
+  const page = await finishPage(job, results); lap("layout");
+  // The user's own corrections to this page's lines live beside the cached answer
+  // (a Redo asks the model again and drops them).
+  const editsKey = "edits:" + cacheKey;
+  if (msg.force) await chrome.storage.session.remove(editsKey).catch(() => {});
+  const edits = msg.force ? {} : (await chrome.storage.session.get(editsKey))[editsKey] || {};
+  for (const [i, text] of Object.entries(edits)) {
+    if (page.items[i]) page.items[i].text = text;
+    for (const p of page.placements) if (p.item === +i) p.text = text;
+  }
+  if (tabId >= 0 && newTerms.length) await updateTabCtx(tabId, newTerms, page.items.map((i) => i.text));
+  else if (tabId >= 0 && !cached) await updateTabCtx(tabId, [], page.items.map((i) => i.text));
+  // Only the erased areas travel to the page (patches); the whole cleaned page
+  // is encoded only when asked for (diagnostic export).
+  const patches = await Promise.all(page.patches.map(async (p) => ({ x: p.x, y: p.y, w: p.w, h: p.h, dataUrl: await blobToDataUrl(await p.canvas.convertToBlob({ type: "image/png" })) })));
+  let cleanDataUrl = null;
+  if (msg.wantClean) {
+    const big = page.work.W * page.work.H > 2.6e6;
+    cleanDataUrl = await blobToDataUrl(await page.canvas.convertToBlob(big ? { type: "image/jpeg", quality: 0.92 } : { type: "image/png" }));
+  }
+  lap("encode");
+  timing.patchBytes = patches.reduce((s, p) => s + p.dataUrl.length, 0);
+  if (page.detectMs) timing.detect = page.detectMs; // parts of "analyze": the text detector's and the bubble model's shares
+  if (page.segmentMs) timing.segment = page.segmentMs;
+  if (page.backend) timing.backend = page.backend; // where the models ran: webgpu / wasm / opencv
+  return {
+    items: page.items, placements: page.placements, regions: page.regions, letter: page.letter, engine: page.engine,
+    work: page.work, width: job.width, height: job.height, usage, timing,
+    patches, cleanDataUrl, fromCache: !!(cached && !msg.force), cacheKey,
   };
-  const results = await Promise.all(slices.map(withRetry));
-
-  const items = [];
-  const usage = { input_tokens: 0, output_tokens: 0 };
-  const newTerms = [];
-  slices.forEach((s, idx) => {
-    const r = results[idx];
-    items.push(...normalizeItems(r.items, s, width, height));
-    newTerms.push(...r.terms);
-    if (r.usage) { usage.input_tokens += r.usage.input_tokens || 0; usage.output_tokens += r.usage.output_tokens || 0; }
-  });
-  if (tabId >= 0) await updateTabCtx(tabId, newTerms, items.map((i) => i.text));
-
-  // 4. the content script needs the pixels for painting; hand back the original bytes
-  const originalDataUrl = msg.dataUrl || (await blobToDataUrl(blob));
-  const cacheable = { items, bubbles, width, height, usage };
-  try { await chrome.storage.session.set({ [cacheKey]: cacheable }); }
-  catch (e) { console.warn("Gytakusub: cache write failed", e); }
-  return { ...cacheable, imageDataUrl: originalDataUrl };
 }
 
-async function testKey() {
-  const settings = await getSettings();
-  if (!settings.apiKey) throw new Error("No API key saved yet.");
-  const res = await fetch(API_URL, {
-    method: "POST",
-    headers: apiHeaders(settings.apiKey),
-    body: JSON.stringify({ model: settings.model, max_tokens: 8, messages: [{ role: "user", content: "Reply with OK" }] }),
-  });
-  if (!res.ok) {
-    const j = await res.json().catch(() => ({}));
-    throw new Error(`${res.status}: ${j?.error?.message || res.statusText}`);
-  }
-  return { ok: true, model: settings.model };
+/** Remember a corrected line for a page (applied on every re-render until a Redo). */
+async function editItem({ cacheKey, item, text }) {
+  if (typeof cacheKey !== "string" || !/^cache:[0-9a-f]{40}$/.test(cacheKey)) throw new Error("Bad cache key");
+  if (!Number.isInteger(item) || item < 0) throw new Error("Bad item");
+  const key = "edits:" + cacheKey;
+  const edits = (await chrome.storage.session.get(key))[key] || {};
+  edits[item] = String(text ?? "").slice(0, 2000);
+  await chrome.storage.session.set({ [key]: edits });
+  return { ok: true };
+}
+
+/** Append "from = to" to the glossary unless an equivalent line exists. */
+async function addGlossary({ from, to }) {
+  from = String(from ?? "").trim().slice(0, 200); to = String(to ?? "").trim().slice(0, 200);
+  if (!from || !to) throw new Error("Both the original and the translation are needed");
+  const s = await getSettings();
+  const lines = s.glossary.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const dup = lines.some((l) => l.split("=")[0].trim().toLowerCase() === from.toLowerCase());
+  const glossary = (dup ? lines.map((l) => (l.split("=")[0].trim().toLowerCase() === from.toLowerCase() ? `${from} = ${to}` : l)) : [...lines, `${from} = ${to}`]).join("\n");
+  await chrome.storage.sync.set({ glossary });
+  return { ok: true, replaced: dup };
 }
 
 // ---------- messaging ----------
@@ -253,23 +225,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   switch (msg?.type) {
     case "TRANSLATE": reply(handleTranslate(msg, sender)); return true;
     case "GET_SETTINGS": reply(getSettings()); return true;
-    case "TEST_KEY": reply(testKey()); return true;
-    case "CLEAR_CACHE": reply(chrome.storage.session.clear().then(() => ({ ok: true }))); return true;
-    case "RELAY_TO_TAB":
-      reply(chrome.tabs.query({ active: true, currentWindow: true }).then(async ([tab]) => {
-        if (!tab?.id) throw new Error("No active tab");
-        if (!/^https?:/.test(tab.url || "")) throw new Error("Not a web page");
-        if (msg.inject) await ensureContentScript(tab.id);
-        return chrome.tabs.sendMessage(tab.id, msg.payload);
-      }));
-      return true;
-    case "ACTIVE_TAB_INFO":
-      reply(chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
-        let host = null;
-        try { host = /^https?:/.test(tab?.url || "") ? new URL(tab.url).hostname : null; } catch { /* ignore */ }
-        return { host };
-      }));
-      return true;
+    case "EDIT_ITEM": reply(editItem(msg)); return true;
+    case "FETCH_IMAGE": reply(fetchImageBlob(msg).then(async (b) => ({ dataUrl: await blobToDataUrl(b), type: b.type }))); return true; // diagnostic export needs the original bytes
+    case "ADD_GLOSSARY": reply(addGlossary(msg)); return true;
     default: return false;
   }
 });

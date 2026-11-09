@@ -1,0 +1,62 @@
+[
+ {
+  "tag": null,
+  "box": [
+   266,
+   154,
+   214,
+   104
+  ],
+  "text": "It can't be!",
+  "size": "normal",
+  "kind": "bubble"
+ },
+ {
+  "tag": null,
+  "box": [
+   834,
+   176,
+   186,
+   78
+  ],
+  "text": "Calm down, it isn't over yet.",
+  "size": "normal",
+  "kind": "bubble"
+ },
+ {
+  "tag": null,
+  "box": [
+   231,
+   1016,
+   203,
+   25
+  ],
+  "text": "Since when did you know?",
+  "size": "normal",
+  "kind": "bubble"
+ },
+ {
+  "tag": null,
+  "box": [
+   156,
+   1267,
+   118,
+   69
+  ],
+  "text": "From the very beginning.",
+  "size": "normal",
+  "kind": "bubble"
+ },
+ {
+  "tag": null,
+  "box": [
+   760,
+   997,
+   200,
+   39
+  ],
+  "text": "Three hours later...",
+  "size": "normal",
+  "kind": "bubble"
+ }
+]

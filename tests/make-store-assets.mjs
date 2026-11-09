@@ -7,43 +7,34 @@ import path from "node:path";
 
 const OUT = process.argv[2] || "../store/assets";
 fs.mkdirSync(OUT, { recursive: true });
+registerFont("../extension/fonts/ComicNeue-Bold.ttf", { family: "Gytakusub Comic", weight: "bold" });
 registerFont("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", { family: "DemoSans", weight: "bold" });
 registerFont("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", { family: "DemoSans", weight: "normal" });
 
-new Function(fs.readFileSync("../web/bubble.js", "utf8"))();
-new Function(fs.readFileSync("../web/typeset.js", "utf8"))();
-globalThis.Image = Image;
-globalThis.document = { createElement(tag) { const c = createCanvas(1, 1); c.toBlob = (cb, type, q) => cb(new Blob([c.toBuffer("image/jpeg", { quality: q })], { type })); return c; } };
-globalThis.FileReader = class { readAsDataURL(blob) { blob.arrayBuffer().then((ab) => { this.result = `data:${blob.type};base64,` + Buffer.from(ab).toString("base64"); this.onload(); }); } };
-globalThis.localStorage = { getItem() { return null; }, setItem() {} };
-
-const demoItems = JSON.parse(fs.readFileSync("fixtures/demo-items.json", "utf8"));
-let lastSlice = null;
-globalThis.fetch = async (url, init) => {
-  const body = JSON.parse(init.body);
-  const prompt = body.messages[0].content[1].text;
-  const [, cw, ch] = prompt.match(/exactly (\d+) pixels wide and (\d+) pixels tall/).map(Number);
-  // Mock "model": scale boxes to the slice and assign the tag whose candidate contains the box centre.
-  const items = demoItems.map((it) => {
-    const sx = cw / 1200, sy = ch / 1700;
-    const box = [it.box[0] * sx, it.box[1] * sy, it.box[2] * sx, it.box[3] * sy];
-    const cx = box[0] + box[2] / 2, cy = box[1] + box[3] / 2;
-    const cand = lastSlice.cands.find((c) => cx >= c.bbox.x && cx <= c.bbox.x + c.bbox.w && cy >= c.bbox.y && cy <= c.bbox.y + c.bbox.h);
-    return { tag: cand ? cand.id : null, box, kind: it.kind, size: it.size, text: it.text };
-  });
-  return { ok: true, json: async () => ({ content: [{ type: "text", text: JSON.stringify({ items, terms: [] }) }], usage: { input_tokens: 1400, output_tokens: 220 } }) };
-};
-// Capture candidates as the translator detects them (same detector, same slice size).
-const G = globalThis.GyT;
-const origDetect = G.detectBubbles;
-G.detectBubbles = (px) => { const c = origDetect(px); lastSlice = { cands: c.map((x, i) => ({ ...x, id: i + 1 })) }; return c; };
-
-const T = await import("../web/translator.js");
+// Render the synthetic page through the real engine (same code the extension runs).
+import { cv, detector, analyzePage } from "./cv-node.mjs";
+import { analyze } from "../extension/engine/analyze.js";
+import { layout } from "../extension/engine/layout.js";
+import { erase } from "../extension/engine/erase.js";
+new Function(fs.readFileSync("../extension/vendor/hyphen-en.js", "utf8"))();
+new Function(fs.readFileSync("../extension/text.js", "utf8"))();
 const page = await loadImage("fixtures/demo-page.png");
-const settings = { ...T.DEFAULT_SETTINGS, apiKey: "sk-demo", fontFamily: '"DemoSans"' };
-const result = await T.translateImage(page, settings);
-const { original, translated, drawn } = T.renderPage(page, result, settings, 1700);
-console.log("items", result.items.length, "drawn", drawn, "tagged", result.items.filter((i) => i.tag != null).length);
+const truth = JSON.parse(fs.readFileSync("fixtures/demo-truth.json", "utf8"));
+const demoItems = JSON.parse(fs.readFileSync("fixtures/demo-items.json", "utf8"));
+const scale = 1600 / Math.max(page.width, page.height);
+const W = Math.round(page.width * scale), H = Math.round(page.height * scale);
+const original = createCanvas(W, H); original.getContext("2d").drawImage(page, 0, 0, W, H);
+const pixels = original.getContext("2d").getImageData(0, 0, W, H);
+const an = await analyzePage(pixels);
+const iou = (a, b) => { const ix = Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)), iy = Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y)); const i = ix * iy; return i / (a.w * a.h + b.w * b.h - i); };
+const regionFor = (t) => an.regions.find((r) => iou(r.box, { x: t.box[0] * scale, y: t.box[1] * scale, w: t.box[2] * scale, h: t.box[3] * scale }) >= 0.6);
+const items = demoItems.map((it, i) => ({ tag: regionFor(truth.find((t) => t.items.includes(i)))?.id ?? null, box: null, text: it.text, size: it.size, kind: it.kind }));
+const { placements, regionIds } = layout(an, items);
+const translated = createCanvas(W, H); const tctx = translated.getContext("2d");
+tctx.putImageData(erase(cv, pixels, an, regionIds).image, 0, 0);
+const drawn = globalThis.GyText.draw(tctx, placements, {});
+an.dispose();
+console.log("items", items.length, "drawn", drawn);
 
 // --- Screenshot 1: before / after (1280x800) ---
 function frame(w, h, title, subtitle) {
