@@ -8,7 +8,8 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
 
 ### Project
 - **Fixed: the release build's zip step**:
-  - The 2.2.0 release failed with "zip error: Could not create output file (dist/…)". zip was working inside its temporary copy, where there is no `dist/`. The script built the output path from `$OLDPWD` in a subshell. That works on Ubuntu 24.04; why it came out wrong on GitHub's ubuntu-26.04 runner isn't pinned down. The script now uses absolute paths.
+  - The 2.2.0 release failed with "zip error: Could not create output file (dist/…)". The release workflow kept the package's path in an environment variable named `ZIP`, added in 2.0.0's release fixes. Info-ZIP's `zip` reads `$ZIP` as extra command-line options, so it took that relative path as the archive name while working in a temporary folder.
+  - The variable is now `PACKAGE`, and `scripts/build-zip.sh` clears `ZIP` and `ZIPOPT` and uses absolute paths.
   - Pull requests that need the extension suite also build the store package the same way, on the same runner image, so a broken package shows up before a tag.
 
 ## [2.3.0] — 2026-11-10

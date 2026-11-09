@@ -1,8 +1,10 @@
 #!/usr/bin/env sh
 # Build the Chrome Web Store upload: the extension folder only, no dev files.
 # Paths are absolute: zip runs inside a temporary copy, and a relative output path would point there.
-# (2.2.0's release failed on the ubuntu-26.04 runner when the output path was rebuilt from $OLDPWD.)
 set -eu
+# Info-ZIP's zip adds $ZIP and $ZIPOPT to its command line as options. The 2.2.0 release workflow had
+# ZIP=dist/….zip in its environment, so zip took that relative path as the archive and failed.
+unset ZIP ZIPOPT
 root=$(cd "$(dirname "$0")/.." && pwd -P)
 v=$(node -p "require('$root/extension/manifest.json').version")
 out="$root/dist/gytakusub-extension-$v.zip"

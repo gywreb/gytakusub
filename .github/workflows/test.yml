@@ -87,11 +87,9 @@ jobs:
         with: { ref: "${{ inputs.ref }}" }
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
-      # what the shell and zip are on this image (2.2.0's release zip step failed on ubuntu-26.04)
-      - run: |
-          echo "sh -> $(readlink -f /bin/sh)"; dpkg-query -W dash zip 2>/dev/null || true
-          sh -c 'tmp=$(mktemp -d); mkdir "$tmp/g"; (cd "$tmp/g" && echo "subshell after cd: PWD=[$PWD] OLDPWD=[$OLDPWD]")'
-      - run: |
+      # ZIP set on purpose: zip reads it as options, which broke the 2.2.0 release; the script must ignore it
+      - env: { ZIP: "dist/not-the-archive.zip" }
+        run: |
           v=$(node -p "require('./extension/manifest.json').version")
           rm -rf dist
           ./scripts/build-zip.sh
