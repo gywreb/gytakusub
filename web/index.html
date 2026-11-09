@@ -68,8 +68,15 @@
           <p><a id="wzDeploy" class="btn primary" target="_blank" rel="noopener">Deploy to Cloudflare ↗</a></p>
           <ol class="sub">
             <li>Sign in to Cloudflare, or create a free account and confirm your email.</li>
-            <li>Connect GitHub or GitLab when asked. Cloudflare copies the fetcher into a new repository on your account and deploys it from there.</li>
-            <li>On the setup page, keep the suggested names or choose your own. Where <code>GYT_KEY</code> is listed, replace <code>CHANGE_ME</code> with your key from step 1.</li>
+            <li>Connect GitHub or GitLab when asked. Cloudflare copies the fetcher into a <b>new</b> repository on your account and deploys it from there. You don't pick an existing repository.</li>
+            <li>On the setup page:
+              <ul>
+                <li><b>Git account:</b> your own GitHub or GitLab account.</li>
+                <li><b>Repository name:</b> a name your account doesn't use yet, for example <code>gytakusub-fetcher</code>. If you already have a repository called <code>gytakusub</code>, don't reuse that name. A private repository is fine: the key is stored in Cloudflare, not in the repository.</li>
+                <li><b>Worker name:</b> keep the suggestion or use <code>gytakusub-fetcher</code>. It becomes part of the address.</li>
+                <li>Where <code>GYT_KEY</code> is listed, replace <code>CHANGE_ME</code> with your key from step 1.</li>
+              </ul>
+            </li>
             <li>Deploy, and wait until the build finishes (about a minute).</li>
             <li>Open the Worker's page (Cloudflare dashboard → <b>Workers &amp; Pages</b> → your Worker) and copy its address, which ends in <b>.workers.dev</b>.</li>
           </ol>

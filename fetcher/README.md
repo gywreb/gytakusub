@@ -24,7 +24,11 @@ Cost: the Workers free plan (100,000 requests a day; one chapter is about one re
 **Follow the steps in the app:** open Gytakusub → **Chapter link**. Until a fetcher is connected, that tab shows the setup instead of the chapter form, and it unlocks only when the fetcher answers with your key. There are three steps, about 5 minutes:
 
 1. **Create your access key.** The app generates a 32-character key.
-2. **Deploy the fetcher.** The [Deploy to Cloudflare](https://deploy.workers.cloudflare.com/?url=https://github.com/gywreb/gytakusub/tree/main/fetcher) button copies this folder into a new repository on your GitHub or GitLab account and deploys it to your free Cloudflare account. On its setup page you replace `CHANGE_ME` with your key. The Worker refuses to run with the placeholder or any key under 24 characters.
+2. **Deploy the fetcher.** The [Deploy to Cloudflare](https://deploy.workers.cloudflare.com/?url=https://github.com/gywreb/gytakusub/tree/main/fetcher) button copies this folder into a **new** repository on your GitHub or GitLab account and deploys it to your free Cloudflare account. On its setup page:
+   - give the repository a name your account doesn't use yet (for example `gytakusub-fetcher`; private is fine);
+   - replace `CHANGE_ME` with your key.
+
+   The Worker refuses to run with the placeholder or any key under 24 characters.
 3. **Connect.** Paste the Worker's `….workers.dev` address and tap Connect.
 
 The app's steps are the maintained version. They name the Cloudflare pages they follow and the date they were last checked against them. A weekly job (`.github/workflows/guide-check.yml`) re-reads those pages and opens an issue when one changes, so the steps get reviewed before anyone meets a changed screen. What it watches: [`guide-sources.json`](guide-sources.json).
