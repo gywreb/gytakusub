@@ -64,7 +64,7 @@ Open https://github.com/gywreb/gytakusub/actions?query=branch%3Arelease%2F2.0 â€
 - the web app in headless Chromium: a screenshot, and a chapter link opened through the real chapter fetcher (pages relayed, next chapter, a bot-check site explained);
 - the chapter fetcher on its own: page extraction on one page of each common reader theme, its key, CORS, address checks and image relay.
 
-A separate weekly workflow, **Guide check**, re-reads the Cloudflare pages the chapter-link setup steps follow (plus the Deploy to Cloudflare link and MangaDex's API) and opens an issue titled "Chapter-link setup guide: review needed" when one changed.
+A separate weekly workflow, **Guide check**, re-reads the Cloudflare pages the chapter-link setup steps follow (plus the repository users fork and MangaDex's API) and opens an issue titled "Chapter-link setup guide: review needed" when one changed.
 
 The **Release** workflow (on a `v*` tag) runs this same Tests workflow on the tagged commit before it builds anything.
 

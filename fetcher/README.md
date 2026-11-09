@@ -21,17 +21,25 @@ Cost: the Workers free plan (100,000 requests a day; one chapter is about one re
 
 ## Set it up
 
-**Follow the steps in the app:** open Gytakusub → **Chapter link**. Until a fetcher is connected, that tab shows the setup instead of the chapter form, and it unlocks only when the fetcher answers with your key. There are three steps, about 5 minutes:
+**Follow the steps in the app:** open Gytakusub → **Chapter link**. Until a fetcher is connected, that tab shows the setup instead of the chapter form. It unlocks only when the fetcher answers with your key. You need free GitHub and Cloudflare accounts, and about 10 minutes:
 
 1. **Create your access key.** The app generates a 32-character key.
-2. **Deploy the fetcher.** The [Deploy to Cloudflare](https://deploy.workers.cloudflare.com/?url=https://github.com/gywreb/gytakusub/tree/main/fetcher) button copies this folder into a new repository on your GitHub or GitLab account and deploys it to your free Cloudflare account. On its setup page you replace `CHANGE_ME` with your key. The Worker refuses to run with the placeholder or any key under 24 characters.
-3. **Connect.** Paste the Worker's `….workers.dev` address and tap Connect.
+2. **Copy the fetcher to your GitHub:** on [github.com/gywreb/gytakusub](https://github.com/gywreb/gytakusub), click **Fork** → **Create fork**.
+3. **Deploy it on Cloudflare:** Workers & Pages → Create application → GitHub → select your `gytakusub`. Fill in:
+   - Worker name `gytakusub`. It must match `wrangler.toml`, or the build fails.
+   - Root directory `fetcher`.
+   - Build command: empty.
+   - Deploy command: `npx wrangler deploy`.
+
+   Then **Save and Deploy**.
+4. **Give it your key:** on the Worker, Settings → Variables and Secrets → Add → Secret `GYT_KEY` = your key → Deploy. Copy the Worker's `….workers.dev` address.
+5. **Connect:** paste the address in the app and tap Connect.
 
 The app's steps are the maintained version. They name the Cloudflare pages they follow and the date they were last checked against them. A weekly job (`.github/workflows/guide-check.yml`) re-reads those pages and opens an issue when one changes, so the steps get reviewed before anyone meets a changed screen. What it watches: [`guide-sources.json`](guide-sources.json).
 
 **Other devices:** once connected, **Fetcher & other devices → Copy connection link**. Open the link on your phone and tap Connect. The link contains your key, so send it only to yourself.
 
-**Sharing your fetcher:** someone you give the address and key to needs no Cloudflare account; they start at step 3. Their reading then counts against your free daily allowance.
+**Sharing your fetcher:** someone you send your connection link to needs no GitHub or Cloudflare account. They paste it into the **Got a connection link?** box at the top of the tab. Their reading then counts against your free daily allowance.
 
 **The key is what protects your fetcher.** Its address isn't secret: the sites it visits can see which Worker made the request.
 - Anyone without the key gets "401" and nothing else.
@@ -40,7 +48,7 @@ The app's steps are the maintained version. They name the Cloudflare pages they 
 
 **Optional:** add a plain-text variable `ALLOWED_ORIGINS` = `https://gywreb.github.io`. Browsers on other websites then can't use your fetcher even with the key. It doesn't stop scripts outside a browser; only the key does that.
 
-**Updating:** when the app says your fetcher is out of date, open the repository Cloudflare created for you and replace `worker.js` with the app's version (the app has a *copy the fetcher code* button under *Update your fetcher*). Commit, and Cloudflare redeploys by itself.
+**Updating:** when the app says your fetcher is out of date, open your fork on GitHub and click **Sync fork** → **Update branch**. Cloudflare redeploys by itself within a minute.
 
 ### Without GitHub or GitLab: the command line
 
@@ -73,8 +81,8 @@ On iPhone, the bookmark opens Gytakusub in Safari, which keeps its own settings 
 | refuses the fetcher | HTTP 401/403: the site needs a login, or blocks servers. |
 | No chapter pages were found | The page has no image list the fetcher can read: the site builds it with a script after loading, or needs a login. |
 | refused the access key | The key in the app isn't the Worker's `GYT_KEY`. |
-| no usable GYT_KEY yet | The Worker's key is missing, still `CHANGE_ME`, or under 24 characters. |
-| version … needs … or newer | The fetcher is older than the app: see *Updating* above. |
+| has no key yet | The Worker has no `GYT_KEY` secret, or one under 24 characters (step 4). |
+| version … needs … or newer | The fetcher is older than the app: **Sync fork** (see *Updating*). |
 | No answer from your fetcher | If **Test fetcher** also fails: the address is wrong, or the Worker isn't deployed. If the test works: the fetcher stopped on this page. The free plan allows 10 ms of work per request, and a page of several hundred KB with thousands of images can exceed it. |
 
 ## How it finds the pages

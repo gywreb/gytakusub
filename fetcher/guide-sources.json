@@ -1,13 +1,14 @@
 {
-  "about": "What the in-app chapter-link setup guide (web/index.html, #fetcherWizard) and fetcher/README.md rely on outside this repository. scripts/check-guide.mjs re-reads these every week (.github/workflows/guide-check.yml) and opens an issue when one changed; after reviewing the guide against the changed page, update its dateModified here and \"checked\" (the app shows that date in step 2).",
+  "about": "What the in-app chapter-link setup guide (web/index.html, #fetcherWizard) and fetcher/README.md rely on outside this repository. scripts/check-guide.mjs re-reads these every week (.github/workflows/guide-check.yml) and opens an issue when one changed; after reviewing the guide against the changed page, update its dateModified here and \"checked\" (the app shows that date).",
   "checked": "2026-11-09",
   "pages": [
-    { "url": "https://developers.cloudflare.com/workers/platform/deploy-buttons/index.md", "dateModified": "2026-10-12", "uses": "Step 2: the Deploy to Cloudflare button, a subdirectory URL as the repository root, secrets prompted from .dev.vars.example" },
-    { "url": "https://developers.cloudflare.com/workers/configuration/secrets/index.md", "dateModified": "2026-10-15", "uses": "Step 2 'Forgot the key': Workers & Pages → Worker → Settings → Variables and Secrets → Add → Secret → Deploy" },
+    { "url": "https://developers.cloudflare.com/workers/ci-cd/builds/index.md", "dateModified": "2026-10-28", "uses": "Step 3: Workers & Pages → Create application → GitHub → select the repository → Save and Deploy; the Worker name must match the name in wrangler.toml" },
+    { "url": "https://developers.cloudflare.com/workers/ci-cd/builds/configuration/index.md", "dateModified": "2026-11-08", "uses": "Step 3 settings: Root directory, Build command (optional), Deploy command npx wrangler deploy" },
+    { "url": "https://developers.cloudflare.com/workers/configuration/secrets/index.md", "dateModified": "2026-10-15", "uses": "Step 4: Worker → Settings → Variables and Secrets → Add → Secret → Deploy" },
     { "url": "https://developers.cloudflare.com/workers/platform/limits/index.md", "dateModified": "2026-10-29", "uses": "Free plan: 10 ms CPU per request, 100,000 requests a day (README, error messages)" }
   ],
   "probes": [
-    { "url": "https://deploy.workers.cloudflare.com/?url=https://github.com/gywreb/gytakusub/tree/main/fetcher", "expect": "status-200", "uses": "Step 2: the Deploy to Cloudflare link" },
+    { "url": "https://github.com/gywreb/gytakusub/tree/main/fetcher", "expect": "status-200", "uses": "Step 2: the repository users fork (must stay public, with the fetcher folder)" },
     { "url": "https://api.mangadex.org/at-home/server/717027ec-4de7-4bd7-ba06-565caf633cbf", "expect": "mangadex-at-home", "uses": "The fetcher's MangaDex path (a chapter that existed on 2026-11-09; if MangaDex removed it, pick another chapter id)" }
   ]
 }

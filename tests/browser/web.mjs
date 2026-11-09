@@ -12,7 +12,7 @@ import path from "node:path";
 import http from "node:http";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { chromium } from "playwright";
+import { chromium, devices } from "playwright";
 import { startMock } from "./mock-api.mjs";
 import { handle as fetcherHandle } from "../../fetcher/worker.js";
 
@@ -114,11 +114,18 @@ await page2.waitForTimeout(500);
 // No fetcher yet: the tab shows the setup steps, and the chapter form is not reachable.
 if (!(await page2.isVisible("#fetcherWizard"))) fail("without a connected fetcher the Chapter link tab must show the setup steps");
 if (await page2.isVisible("#chapterForm")) fail("the chapter form must stay hidden until a fetcher is connected");
-if ((await page2.getAttribute("#wzDeploy", "href")) !== "https://deploy.workers.cloudflare.com/?url=https://github.com/gywreb/gytakusub/tree/main/fetcher") fail("step 2 must link to Deploy to Cloudflare for the fetcher folder");
+if ((await page2.$$('#fetcherWizard a[href="https://github.com/gywreb/gytakusub"]')).length !== 1 || (await page2.$$('#fetcherWizard a[href="https://dash.cloudflare.com/"]')).length !== 1) fail("the steps must link to the repository to fork and to the Cloudflare dashboard");
+if (!/^Step 1 of 6$/.test(await page2.textContent("#wzProgress"))) fail("the setup should start at step 1 of 6: " + await page2.textContent("#wzProgress"));
+if (await page2.isVisible("#wzGen")) fail("only the current step should be open");
+await page2.click("#wzNext");
+await page2.click("#wzNext"); // no key yet: stays on step 2
+if (!/Step 2 of 6/.test(await page2.textContent("#wzProgress"))) fail("Next on step 2 without a key should not advance");
 await page2.click("#wzGen");
 const genKey = (await page2.textContent("#wzKey")).trim();
 if (!/^[A-Za-z0-9]{32}$/.test(genKey) || (await page2.inputValue("#wzKeyInput")) !== genKey) fail("Generate key should make a 32-character key and fill it into step 3: " + genKey);
 await page2.waitForFunction(() => /\d{4}/.test(document.querySelector("#wzChecked").textContent), null, { timeout: 5000 }).catch(() => fail("step 2 should say when the steps were last checked"));
+for (let i = 0; i < 4; i++) await page2.click("#wzNext");
+if (!/Step 6 of 6/.test(await page2.textContent("#wzProgress")) || await page2.isVisible("#wzNext")) fail("the last step is Connect, with no Next");
 const connect = async (url, key) => {
   await page2.fill("#wzUrl", url); await page2.fill("#wzKeyInput", key); await page2.click("#wzConnect");
   await page2.waitForFunction(() => !/Connecting/.test(document.querySelector("#wzMsg").textContent), null, { timeout: 15000 });
@@ -173,10 +180,49 @@ await page3.goto(link); await page3.waitForTimeout(500);
 if (!(await page3.isVisible("#fetcherWizard")) || (await page3.inputValue("#wzKeyInput")) !== KEY || /connect=/.test(page3.url())) fail("a connection link should fill in the fetcher, wait for Connect, and leave the address bar: " + page3.url());
 await page3.click("#wzConnect");
 await page3.waitForSelector("#chapterForm", { state: "visible", timeout: 15000 }).catch(() => fail("the connection link's fetcher should connect on another device"));
+// …or pasted into the "Got a connection link?" box (iPhone: the Home Screen app doesn't receive links opened in Safari)
+const page4 = await (await browser.newContext()).newPage();
+await page4.addInitScript(() => localStorage.setItem("gytakusub.settings", JSON.stringify({ apiKey: "sk-ant-test" })));
+await page4.goto(`http://127.0.0.1:${WEB_PORT}/`); await page4.click('.tab[data-mode="chapter"]'); await page4.waitForTimeout(300);
+await page4.fill("#wzLink", "not a link"); await page4.click("#wzLinkConnect");
+if (!/isn't a connection link/.test(await page4.textContent("#wzLinkMsg"))) fail("pasting something that isn't a connection link should say so");
+await page4.fill("#wzLink", link); await page4.click("#wzLinkConnect");
+await page4.waitForSelector("#chapterForm", { state: "visible", timeout: 15000 }).catch(() => fail("a pasted connection link should connect"));
+await page4.context().close();
 await page2.click('.tab[data-mode="chapter"]');
 await page2.setViewportSize({ width: 390, height: 844 });
 await ctx3.close();
 fetcherSrv.close(); oldSrv.close();
+
+// ---------- install guide ----------
+// Desktop: a QR code with the app's address for the phone; "Not now" hides it for good; Settings brings it back.
+{
+  const ctx = await browser.newContext({ viewport: { width: 1200, height: 900 } });
+  const pg = await ctx.newPage();
+  await pg.goto(`http://127.0.0.1:${WEB_PORT}/`); await pg.waitForTimeout(400);
+  const qr = await pg.$("#installQr svg");
+  if (!(await pg.isVisible("#installCard")) || !qr || !(await pg.isVisible('[data-platform="desktop"]'))) fail("on a computer the install card should show a QR code for the phone");
+  if (!(await pg.isVisible("#settings"))) fail("on a computer the first visit should still ask for the Claude key");
+  await pg.keyboard.press("Escape");
+  await pg.click("#btnInstallLater"); await pg.reload(); await pg.waitForTimeout(300);
+  if (await pg.isVisible("#installCard")) fail("“Not now” should keep the install card closed");
+  await pg.click("#btnSettings"); await pg.click("#btnShowInstall");
+  if (!(await pg.isVisible("#installCard"))) fail("Settings → Install should bring the install card back");
+  await ctx.close();
+}
+// iPhone (Safari): the Home Screen steps come first, before any key is asked for (the installed app keeps its own settings).
+{
+  const ctx = await browser.newContext({ ...devices["iPhone 13"] });
+  const pg = await ctx.newPage();
+  await pg.goto(`http://127.0.0.1:${WEB_PORT}/`); await pg.waitForTimeout(800);
+  const text = await pg.textContent("#installCard");
+  if (!(await pg.isVisible('[data-platform="ios"]')) || !/Add to Home Screen/.test(text) || (await pg.isVisible('[data-platform="desktop"]'))) fail("on iPhone the install card should show the Add to Home Screen steps");
+  if (await pg.isVisible("#settings")) fail("on an iPhone that hasn't installed the app, the key dialog must wait until after installing");
+  await pg.click("#btnInstallLater");
+  if (!(await pg.isVisible("#settings"))) fail("after “Not now” on iPhone, the app should ask for the Claude key");
+  await pg.screenshot({ path: path.join(out, "web-install-iphone.png") });
+  await ctx.close();
+}
 console.log(failures ? `WEB BROWSER TEST FAILED (${failures})` : "WEB BROWSER TEST PASSED");
 await browser.close(); api.close(); statik.close();
 fs.rmSync(web, { recursive: true, force: true });

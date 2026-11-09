@@ -8,7 +8,6 @@
 import { VERSION } from "./fetcher-worker.js";
 
 export const FETCHER_VERSION = VERSION;
-export const DEPLOY_URL = "https://deploy.workers.cloudflare.com/?url=https://github.com/gywreb/gytakusub/tree/main/fetcher";
 export const MIN_KEY = 24;
 
 /** The fetcher's base address from whatever the user pasted (trailing slash, a path, no scheme). */
@@ -61,7 +60,7 @@ const ADVICE = {
   "no-images": "No chapter pages were found on that page. If the site needs a login or builds its pages with a script, use screenshot mode.",
   "not-found": "The site says that page does not exist. Check the link.",
   unauthorized: "Your fetcher refused the access key: the key here is not the GYT_KEY on your Worker.",
-  setup: "Your fetcher has no usable GYT_KEY yet (missing, still CHANGE_ME, or shorter than 24 characters). In Cloudflare open the Worker → Settings → Variables and Secrets, set GYT_KEY to your key, deploy, then Connect again.",
+  setup: "Your fetcher has no key yet (or one shorter than 24 characters). Do step 4: in Cloudflare open the Worker → Settings → Variables and Secrets, add the Secret GYT_KEY with your key, Deploy, then Connect again.",
   "bad-url": "That doesn't look like a web address of a chapter.",
 };
 
@@ -95,7 +94,7 @@ export async function connectFetcher(url, key) {
   if ((key || "").length < MIN_KEY) throw new FetcherError("short-key", `The access key must be at least ${MIN_KEY} characters (generate one in step 1).`);
   const j = await (await call("/ping", {}, base, key)).json();
   if (!j.ok || !j.version) throw new FetcherError("not-fetcher", `${base} answered, but not like a Gytakusub fetcher.`);
-  if (!atLeast(j.version, FETCHER_VERSION)) throw new FetcherError("outdated", `Your fetcher is version ${j.version}; this app needs ${FETCHER_VERSION} or newer. Update it (“Update your fetcher” below), then Connect again.`);
+  if (!atLeast(j.version, FETCHER_VERSION)) throw new FetcherError("outdated", `Your fetcher is version ${j.version}; this app needs ${FETCHER_VERSION} or newer. On GitHub, open your gytakusub copy → Sync fork → Update branch; wait a minute, then Connect again.`);
   return { fetcherUrl: base, fetcherKey: key, fetcherCheck: { sig: await signature(base, key), version: j.version, at: Date.now() } };
 }
 

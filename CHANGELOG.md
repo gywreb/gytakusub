@@ -2,7 +2,24 @@
 
 All notable changes to Gytakusub are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
-## [2.1.0] — unreleased (web app and chapter fetcher; the browser extension is unchanged and stays 2.0.0)
+## [Unreleased]
+
+### Web app
+- **UI overhaul after an audit** against the Web Interface Guidelines, checked at iPhone size (390 px) and desktop (1280 px), dark and light:
+  - **Header:** the mode switch gets its own full-width row on phones; on wider screens it's centred in the header.
+  - **Tap targets:** at least 44 px everywhere.
+  - **Reading width:** pages stay within a 760 px column; two-page spreads only from 1,100 px.
+  - **Page actions** (Original, Redo, Save) and the status moved into a bar under each page instead of floating over the art.
+  - **Modes:** each keeps its own pages. Once pages are on screen, the screenshot drop zone shrinks to its buttons.
+  - **Settings:** a full-screen sheet on phones and a centred panel on wider screens, with a Close button, grouped sections and Save pinned at the bottom.
+  - **Setup wizard:** a numbered vertical stepper, with Back/Next under the open step.
+  - **Install guide:** in-app, per platform (iPhone/iPad steps, the install button where the browser offers one, a QR code on computers). On a phone that hasn't installed the app, it comes before the key prompt.
+  - **Accessibility:** visible keyboard focus, the tablist pattern with arrow keys, toasts and progress announced to screen readers, key fields without autocorrect, a theme colour for light and dark, and reduced motion respected.
+
+### Planned for the next extension release
+- The same audit and overhaul for the extension's popup and Options page.
+
+## [2.1.0] — 2026-11-09 (web app and chapter fetcher, live on GitHub Pages; the browser extension is unchanged and stays 2.0.0, so there is no store package or GitHub Release for 2.1.0)
 
 ### Added
 - **Chapter links from any site that needs no login** in the web app, through a **chapter fetcher** you run on your own free Cloudflare account (`fetcher/worker.js`, set up in the browser in about 10 minutes: `fetcher/README.md`). A web page may not read other sites, so chapter mode cannot work without a server; MangaDex's own API documentation requires one. The fetcher:
@@ -17,8 +34,12 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
 
 - **Guided setup inside the Chapter link tab.** Until a fetcher is connected, the tab shows the setup steps instead of the chapter form, and it unlocks only after the fetcher answers with the user's key and is new enough. The steps:
   1. The app generates a 32-character key.
-  2. **Deploy to Cloudflare** copies the fetcher into the user's GitHub/GitLab and deploys it, asking for the key (a placeholder the Worker refuses until replaced).
-  3. **Connect**.
+  2. Fork the repository on GitHub.
+  3. On Cloudflare, Create application → GitHub → the fork, with the name `gytakusub` and root directory `fetcher`.
+  4. Add the key as the Secret `GYT_KEY`.
+
+  The steps open one at a time: "Step N of 6", Back and Next, and the place is remembered while you're away on GitHub or Cloudflare. They start with the two accounts to create, and every value to type is a tap-to-copy chip. Step 4 says what to check if the build fails. (The first version of this guide used Cloudflare's "Deploy to Cloudflare" button. When the owner tried it, that screen required choosing an existing repository, which a new user doesn't have, so the guide was rewritten around forking.) People given a **connection link** paste it in the box at the top and skip the setup.
+  5. **Connect**.
 
   Each failure is explained: a wrong key, a key not set yet, an outdated fetcher, nothing at that address. A **connection link** sets up another device (the key travels in the `#fragment`, never to a server); someone given a shared address and key starts at step 3.
 - **Keeping the guide current:** step 2 names the Cloudflare pages it follows and the date it was checked against them (`fetcher/guide-sources.json`). A weekly workflow (`guide-check.yml`) re-reads those pages, the Deploy link and MangaDex's API, and opens an issue when one changed. Tests tie the in-app links to that list.
