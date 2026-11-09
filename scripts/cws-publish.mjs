@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Upload a zip to the Chrome Web Store and submit it for review.
 // No dependencies. Needs env: CWS_EXTENSION_ID, CWS_CLIENT_ID, CWS_CLIENT_SECRET, CWS_REFRESH_TOKEN.
-// Usage: node scripts/cws-publish.mjs dist/gytakusub-extension-1.0.1.zip [--no-publish]
+// Usage: node scripts/cws-publish.mjs dist/gytakusub-extension-2.0.1.zip [--no-publish]
 import fs from "node:fs";
 
 const [, , zipPath, ...flags] = process.argv;

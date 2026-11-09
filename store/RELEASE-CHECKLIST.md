@@ -13,7 +13,7 @@ Everything below is a one-time account step or a copy-paste from `store/LISTING.
 - [ ] Optional: verify the GitHub Pages domain under *Account → Verified websites* if you want "by gywreb.github.io" on the listing. Not required.
 
 ## 2. Create the item (2 min)
-- [ ] Dashboard → **New item** → upload `dist/gytakusub-extension-2.0.0.zip`.
+- [ ] Dashboard → **New item** → upload the `gytakusub-extension-X.Y.Z.zip` attached to the GitHub Release.
 - [ ] If the upload reports a manifest problem, stop and paste the message to me.
 
 ## 3. Store listing tab (10 min)
