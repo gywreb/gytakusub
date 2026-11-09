@@ -1,0 +1,45 @@
+name: Pull request rules
+# The project's pull request rules (CONTRIBUTING.md), checked in seconds:
+# - version: every pull request carries a version (scripts/check-version.mjs);
+# - screenshots: one that changes UI has screenshots in its description (scripts/check-screenshots.mjs).
+# Runs again when the description is edited. The checking scripts come from the base branch, so a
+# pull request can't change the rules it is checked against (until a script exists on the base
+# branch, the pull request's own copy is used).
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+permissions:
+  contents: read
+  pull-requests: read
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { path: pr }
+      - uses: actions/checkout@v4
+        with: { ref: "${{ github.base_ref }}", path: base }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - env: { BASE: "${{ github.base_ref }}" }
+        working-directory: pr
+        run: |
+          git fetch --quiet --depth=1 origin "+refs/heads/$BASE:refs/remotes/origin/$BASE"
+          script=../base/scripts/check-version.mjs; [ -f "$script" ] || script=scripts/check-version.mjs
+          node "$script" "origin/$BASE"
+  screenshots:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: "${{ github.base_ref }}", path: base }
+      - uses: actions/checkout@v4
+        with: { path: pr, sparse-checkout: scripts }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          script=base/scripts/check-screenshots.mjs; [ -f "$script" ] || script=pr/scripts/check-screenshots.mjs
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --paginate --jq '.[].filename' | node "$script"

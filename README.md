@@ -42,7 +42,9 @@ The copies under `extension/` are canonical; `node scripts/sync-shared.mjs` copi
 
 ## Releasing
 
-**Every pull request carries a version.** It raises `extension/manifest.json`'s `version` (patch for fixes, minor for features, major for breaking changes) and adds a dated `## [X.Y.Z]` section to `CHANGELOG.md`. Nothing stays under *Unreleased*. CI fails a pull request that doesn't (`scripts/check-version.mjs`). If two open pull requests take the same version, the second to merge takes the next one. The fetcher's own `VERSION` is separate: raise it only when the web app needs a newer fetcher, because every user then has to update theirs.
+**Pull request rules** ([`CONTRIBUTING.md`](CONTRIBUTING.md)), checked by CI (`.github/workflows/pr-checks.yml`):
+- **Every pull request carries a version.** It raises `extension/manifest.json`'s `version` (patch for fixes, minor for features, major for breaking changes) and adds a dated `## [X.Y.Z]` section to `CHANGELOG.md`. Nothing stays under *Unreleased*. If two open pull requests take the same version, the second to merge takes the next one. The fetcher's own `VERSION` is separate: raise it only when the web app needs a newer fetcher, because every user then has to update theirs.
+- **A pull request that changes UI has screenshots in its description.**
 
 Store listing copy, permission justifications and the submission checklist live in `store/`. To release what is on main, run `node scripts/release.mjs` (any OS). It checks and tests, then tags the version main is at and pushes the tag. CI runs the full test suite on the tag, then builds the zip, publishes a GitHub Release and uploads to the Chrome Web Store when the `CWS_*` secrets are configured. A failed release run can be rebuilt for the same tag from Actions → Release → *Run workflow*.
 

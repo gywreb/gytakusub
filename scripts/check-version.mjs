@@ -6,14 +6,12 @@
 // - nothing is left under "## [Unreleased]" (each change belongs to a version).
 // The fetcher's VERSION (fetcher/worker.js) is separate: it is the protocol version the web app
 // requires, and raising it makes every user update their fetcher, so it changes only with the fetcher.
+// Run from the repository root; it checks the files there.
 // Usage:  node scripts/check-version.mjs origin/main      (CI, on pull requests)
 //         node scripts/check-version.mjs --release 2.2.0  (release.mjs: the changelog has that version)
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 
-process.chdir(path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."));
 const errors = [];
 const parse = (v) => (/^(\d+)\.(\d+)\.(\d+)$/.exec(v || "") || []).slice(1).map(Number);
 const newer = (a, b) => { const [x, y] = [parse(a), parse(b)]; for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] > y[i]; return false; };
