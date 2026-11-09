@@ -49,7 +49,7 @@
     <button id="showKey" type="button">Show</button>
     <button id="testKey" type="button">Test</button>
   </div>
-  <div class="hint">Create one at console.anthropic.com → API keys. Billed to your Anthropic console account (separate from a Claude.ai subscription).</div>
+  <div class="hint">Create one at platform.claude.com → Settings → API keys. Usage is billed to that Console account, separately from a Claude subscription (Max, Ultra and Team plans include monthly API credits).</div>
   <label class="check"><input type="checkbox" id="syncApiKey" /> Sync the key to my other browsers (stored in browser sync instead of this device only)</label>
 
   <label for="model">Model</label>
@@ -89,7 +89,7 @@
 
   <label class="check"><input type="checkbox" id="useGpu" /> Use the graphics card (WebGPU) to find text and bubbles — much faster; turn off only if pages come out wrong or the browser misbehaves</label>
   <label class="check"><input type="checkbox" id="peekOnHover" /> Peek at the original lettering while hovering a translated bubble (double-click a bubble to edit its line)</label>
-  <label class="check"><input type="checkbox" id="debugOverlay" /> Debug overlay — draw detected regions and text areas on translated pages, and add a <b>Report</b> button to the hover bar that copies a diagnostic report and downloads the debug image</label>
+  <label class="check"><input type="checkbox" id="debugOverlay" /> Debug overlay — draw detected regions and text areas on translated pages, and add a <b>Report</b> button to the hover bar that downloads a diagnostic report for that page (original, debug render, JSON); the popup's <i>Export debug report</i> does every translated page on the tab</label>
 
   <label for="excludedSites">Disabled on these sites</label>
   <textarea id="excludedSites" placeholder="mail.google.com&#10;youtube.com"></textarea>

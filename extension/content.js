@@ -59,7 +59,7 @@
   const bar = document.createElement("div"); bar.className = "bar"; bar.setAttribute("role", "toolbar"); bar.setAttribute("aria-label", "Gytakusub");
   const btnTranslate = document.createElement("button"); btnTranslate.setAttribute("aria-label", "Translate this image");
   const btnToggle = document.createElement("button"); btnToggle.setAttribute("aria-label", "Show or hide translation");
-  const btnReport = document.createElement("button"); btnReport.textContent = "Report"; btnReport.title = "Download a diagnostic report for this page (original, debug render, JSON)"; btnReport.setAttribute("aria-label", "Copy diagnostic report");
+  const btnReport = document.createElement("button"); btnReport.textContent = "Report"; btnReport.title = "Download a diagnostic report for this page (original, debug render, JSON)"; btnReport.setAttribute("aria-label", "Download diagnostic report");
   const status = document.createElement("span"); status.className = "status";
   bar.append(btnTranslate, btnToggle, btnReport, status);
   const toastEl = document.createElement("div"); toastEl.className = "toast"; toastEl.setAttribute("role", "status"); toastEl.setAttribute("aria-live", "polite"); toastEl.hidden = true;
@@ -178,7 +178,8 @@
   btnReport.addEventListener("click", (ev) => { if (ev.isTrusted && hoverImg) report(hoverImg); });
 
   // Diagnostic report: everything needed to reproduce a placement problem in the
-  // test harness — copied as JSON, plus the debug render as a PNG download.
+  // test harness (tests/replay-report.mjs) — one .zip with the original image,
+  // the debug render and the JSON per page.
   function buildReport(img, e) {
     const res = e.result;
     return {

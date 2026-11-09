@@ -32,7 +32,7 @@ YOU STAY IN CONTROL
 • Double-click a translated bubble to correct a line or add a term to the glossary; an option lets you peek at the original by hovering.
 
 REQUIREMENTS
-You need a Claude API key from platform.claude.com (pay-per-use; Claude Max and Team subscriptions include monthly API credit). The key is stored only in your browser.
+You need a Claude API key from platform.claude.com (pay-per-use; Claude Max, Ultra and Team plans include monthly API credits). The key is stored only in your browser.
 
 PRIVACY
 No analytics, no telemetry, no account. Images go to api.anthropic.com only, with your key. Full policy: https://gywreb.github.io/gytakusub/privacy.html
@@ -94,5 +94,5 @@ https://gywreb.github.io/gytakusub/privacy.html
 
 ## Notes for the reviewer (optional field)
 ```
-Bring-your-own-key tool. To test: open Options, paste any Claude API key (the reviewer may use their own; a test key can be created free at platform.claude.com), open any web page with a comic/manga image, hover it and click "Translate". Without a key the extension shows a clear error and makes no network requests at all. Host permission is needed only to fetch the image the user selected; the content script is registered only for sites the user enables.
+Bring-your-own-key tool. To test: open Options, paste any Claude API key (the reviewer may use their own; keys are created at platform.claude.com, and requests are billed to that account), open any web page with a comic/manga image, hover it and click "Translate". Without a key the extension shows a clear error and makes no network requests at all. Host permission is needed only to fetch the image the user selected; the content script is registered only for sites the user enables.
 ```
