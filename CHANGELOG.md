@@ -14,6 +14,14 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
   - **Where the numbers come from:** the token counts in Claude's own answers, so they're exact for what that browser sent. The cost is an estimate from Anthropic's published prices, checked weekly against the pricing page. The panels say so and point to the Claude Console for the exact bill.
   - Usage stays on the device for 62 days and is never sent anywhere. **Clear usage history** removes it. Each browser, and the installed app on iPhone, keeps its own records.
   - Exact account-wide numbers need Anthropic's Admin API, which isn't available for individual accounts. See ADR 0007.
+- **Monthly API credit at a glance.** Claude Max and Team plans include API credit each month. Pick your plan (or type an amount) and the date it renews, and the usage panels show:
+  - "≈$0.41 of $100 used", with a bar;
+  - "≈$99.59 left · renews Dec 2 (in 23 days)";
+  - the pace: "At this pace (≈$0.06 a day) you'll use ≈$1.70 of it by then", or the day it runs out if that comes first;
+  - a badge when it's almost used, will run out early, or is used up.
+  
+  The popup and the web app's toolbar show "≈$… left" too. Anthropic has no API for the credit balance, so the renewal date comes from the Console's Billing page (Promotional credits). Without a date, the panels assume the 1st of next month and say "probably renews".
+- **Speed limit in plain words.** The rate limit now reads like "Speed limit (a minute's worth, refilling as you go): 47 of 50 requests, 36k of 40k input tokens left at 1:22 AM", instead of raw header values.
 - **Clearer Claude errors:**
   - the monthly spend cap (with when it resets), a self-set spend limit, a low credit balance, a refused key and an overloaded API are each explained;
   - the extension no longer retries a request the spend cap refused.

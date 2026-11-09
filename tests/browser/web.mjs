@@ -76,6 +76,12 @@ await page.click("#btnSettings");
 await page.waitForSelector("#settings[open]");
 const cu = await page.evaluate(() => ({ cost: document.getElementById("cuTodayCost").textContent, sub: document.getElementById("cuTodaySub").textContent, models: document.getElementById("cuModels").textContent, limits: document.getElementById("cuLimits").textContent, progress: document.getElementById("progress").textContent }));
 await page.screenshot({ path: path.join(out, "web-claude-usage.png"), fullPage: true });
+// the monthly API credit: choosing a plan and its renewal date shows what's used and left at once (before Save)
+await page.selectOption("#sCreditPlan", "max5x");
+const renew = new Date(Date.now() + 20 * 864e5).toISOString().slice(0, 10);
+await page.fill("#sCreditRenews", renew);
+const credit = await page.evaluate(() => ({ shown: !document.getElementById("cuCredit").hidden, figure: document.getElementById("cuCreditFigure").textContent, left: document.getElementById("cuCreditLeft").textContent }));
+if (!credit.shown || !/ of \$100 used$/.test(credit.figure) || !/left · renews .* \(in 20 days\)$/.test(credit.left)) fail("choosing Max 5x should show the credit used and left: " + JSON.stringify(credit));
 await page.keyboard.press("Escape");
 // the page's model is Haiku 5.5 by default: 1000 input + 200 output tokens = $0.0002 per answer
 const wantUsd = fmtUsd(calls.length * (1000 * 0.10 + 200 * 0.50) / 1e6);

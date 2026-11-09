@@ -131,11 +131,92 @@ export function summary(log, at = Date.now()) {
   };
 }
 
+// ---------- the monthly API credit of a Max or Team plan ----------
+// Anthropic: Max 5x includes $100 and Max 20x $200 of Claude API credit a month (Team: up to $500,
+// pooled); the credit refreshes each billing cycle with no rollover, is spent before purchased
+// credits, and when it is gone (and nothing was bought) API requests stop until the next credit.
+// There is no API for the balance: the Console's Billing page shows the amount and expiry date.
+// So the reader tells the app the plan and the renewal date, and the app sets this browser's own
+// spending against it.
+export const CREDIT_SOURCE = "https://platform.claude.com/docs/en/about-claude/api-credits-for-subscribers";
+export const CREDIT_PLANS = [
+  { id: "none", label: "None, or I pay as I go", amount: 0 },
+  { id: "max5x", label: "Claude Max 5x: $100 a month", amount: 100 },
+  { id: "max20x", label: "Claude Max 20x: $200 a month", amount: 200 },
+  { id: "custom", label: "Team or another amount", amount: null },
+];
+
+/** The monthly credit in USD from settings {creditPlan, creditCustom}, or 0. */
+export function creditAmount(settings = {}) {
+  const plan = CREDIT_PLANS.find((p) => p.id === settings.creditPlan);
+  if (!plan) return 0;
+  return plan.amount ?? Math.max(0, Number(settings.creditCustom) || 0);
+}
+
+/**
+ * This browser's spending against the monthly credit, or null when no credit is set.
+ * {amount, used, left, share, start, renews, daysLeft, pace, projected, runsOut, guessedDate}
+ * - The cycle ends on the renewal date the reader gave ("YYYY-MM-DD"; a past one moves on by
+ *   months); without one, the calendar month is assumed (guessedDate: true).
+ * - pace: USD a day over the last seven days of the cycle (fewer early in a cycle).
+ * - runsOut: the day the credit would run out at that pace, if before the renewal.
+ */
+export function creditStatus(log, settings, at = Date.now()) {
+  const amount = creditAmount(settings);
+  if (!amount) return null;
+  const now = new Date(at);
+  let renews = /^\d{4}-\d{2}-\d{2}$/.test(settings.creditRenews || "") ? new Date(settings.creditRenews + "T00:00:00Z") : null;
+  const guessedDate = !renews;
+  if (!renews) renews = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+  while (renews <= now) renews = new Date(Date.UTC(renews.getUTCFullYear(), renews.getUTCMonth() + 1, renews.getUTCDate()));
+  const start = new Date(Date.UTC(renews.getUTCFullYear(), renews.getUTCMonth() - 1, renews.getUTCDate()));
+  const days = (from) => Object.keys(log?.days || {}).filter((d) => d >= utcDay(from) && d <= utcDay(at));
+  const used = totals(log, days(start)).cost;
+  const span = Math.min(7, Math.max(1, (at - start) / 864e5));
+  const pace = totals(log, days(Math.max(+start, at - span * 864e5))).cost / span;
+  const daysLeft = (renews - at) / 864e5;
+  const left = Math.max(0, amount - used);
+  const runsOutIn = pace > 0 ? left / pace : Infinity;
+  return {
+    amount, used, left, share: Math.min(1, used / amount), start, renews, daysLeft: Math.ceil(daysLeft), pace,
+    projected: used + pace * daysLeft, runsOut: used >= amount ? now : runsOutIn < daysLeft ? new Date(at + runsOutIn * 864e5) : null, guessedDate,
+  };
+}
+
+/** The credit in plain words: {headline, left, pace, state}. */
+export function creditWords(c, fmtDate = (d) => d.toLocaleDateString([], { month: "short", day: "numeric", timeZone: "UTC" })) {
+  const inDays = (n) => (n <= 1 ? "tomorrow" : `in ${n} days`);
+  const renew = `${c.guessedDate ? "probably renews" : "renews"} ${fmtDate(c.renews)} (${inDays(c.daysLeft)})`;
+  if (c.used >= c.amount) {
+    return { headline: `≈${fmtUsd(c.used)} of ${fmtUsd(c.amount)} used`, left: `Used up: ${renew}`, pace: "Claude now uses any credits you bought. With none left, requests stop until it renews.", state: "Used up" };
+  }
+  const pace = c.pace > 0
+    ? c.runsOut
+      ? `At this pace (≈${fmtUsd(c.pace)} a day) it runs out around ${fmtDate(c.runsOut)}, before it renews.`
+      : `At this pace (≈${fmtUsd(c.pace)} a day) you'll use ≈${fmtUsd(c.projected)} of it by then.`
+    : "Nothing spent in the last few days.";
+  return { headline: `≈${fmtUsd(c.used)} of ${fmtUsd(c.amount)} used`, left: `≈${fmtUsd(c.left)} left · ${renew}`, pace, state: c.runsOut ? "Runs out early" : c.share >= 0.8 ? "Almost used" : "" };
+}
+
+/** The rate limit in plain words, or "" (headers from the last answer, at most five minutes old). */
+export function limitWords(limits, fmtTime = (t) => new Date(t).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })) {
+  if (!limits) return "";
+  const r = limits.requests, i = limits.inputTokens, o = limits.outputTokens;
+  const parts = [r && `${r.remaining} of ${r.limit} requests`, i && `${fmtTokens(i.remaining)} of ${fmtTokens(i.limit)} input tokens`, o && `${fmtTokens(o.remaining)} of ${fmtTokens(o.limit)} output tokens`].filter(Boolean);
+  if (!parts.length) return "";
+  const resets = [r?.reset, i?.reset, o?.reset].filter(Boolean).map((x) => Date.parse(x)).filter(Number.isFinite);
+  const full = resets.length ? ` It's full again by ${fmtTime(Math.max(...resets))}.` : "";
+  return `Speed limit (a minute's worth, refilling as you go): ${parts.join(", ")} left at ${fmtTime(limits.at)}.${full}`;
+}
+
 // ---------- words ----------
+
+// ---------- formatting ----------
 export const fmtTokens = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(n >= 1e7 ? 0 : 1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(n >= 1e4 ? 0 : 1)}k` : String(n));
-/** "$0.0042", "$0.12", "$3.40": small amounts keep two significant digits, so a cheap page doesn't read as $0.00. */
+/** "$0.0042", "$0.12", "$3.40", "$100": small amounts keep two significant digits, so a cheap page doesn't read as $0.00. */
 export function fmtUsd(x) {
   if (!x) return "$0";
+  if (Number.isInteger(x)) return `$${x}`;
   if (x < 0.01) return `$${x.toPrecision(2)}`;
   return `$${x.toFixed(2)}`;
 }

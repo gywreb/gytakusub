@@ -1,6 +1,6 @@
 // Claude usage accounting (extension/usage.js, shared with the web app): prices, costs,
 // the day-by-day log, rate-limit headers, and what API errors mean for the reader.
-import { PRICES, priceOf, tokensOf, costOf, limitsOf, addCall, totals, summary, modelKey, emptyLog, utcDay, KEEP_DAYS, fmtUsd, fmtTokens, explainApiError } from "../extension/usage.js";
+import { PRICES, priceOf, tokensOf, costOf, limitsOf, addCall, totals, summary, modelKey, emptyLog, utcDay, KEEP_DAYS, fmtUsd, fmtTokens, explainApiError, creditAmount, creditStatus, creditWords, limitWords } from "../extension/usage.js";
 
 let passes = 0, failures = 0;
 const ok = (cond, name, extra = "") => { if (cond) { passes++; console.log("ok -", name); } else { failures++; console.log("not ok -", name, extra); } };
@@ -53,8 +53,37 @@ ok(limitsOf(new Headers()) === null && limitsOf(null) === null, "limitsOf: nothi
 const withLimits = addCall(emptyLog(), { model: "claude-sonnet-5-5", usage: {}, limits: l, at: t0 });
 ok(summary(withLimits, t0 + 60e3).limits?.requests.remaining === 49 && summary(withLimits, t0 + 6 * 60e3).limits === null, "rate-limit headroom is shown for five minutes, then it says nothing about now");
 
+// ---- the monthly API credit (Max 5x $100, Max 20x $200; refreshes each billing cycle) ----
+ok(creditAmount({ creditPlan: "max5x" }) === 100 && creditAmount({ creditPlan: "max20x" }) === 200 && creditAmount({ creditPlan: "custom", creditCustom: "250" }) === 250 && creditAmount({ creditPlan: "none" }) === 0 && creditAmount({}) === 0, "creditAmount: the plans' credit, a custom amount, or none");
+{
+  const at = Date.parse("2026-11-10T12:00:00Z");
+  let cl = emptyLog();
+  for (let d = 0; d < 7; d++) cl = addCall(cl, { model: "claude-sonnet-5-5", usage: { input_tokens: 1e6 }, at: at - d * 864e5 }); // $2 a day for 7 days (Nov 4–10)
+  cl = addCall(cl, { model: "claude-sonnet-5-5", usage: { input_tokens: 1e6 }, at: Date.parse("2026-11-01T12:00:00Z") }); // before this cycle (it started Nov 3)
+  const c = creditStatus(cl, { creditPlan: "max5x", creditRenews: "2026-12-03" }, at);
+  ok(c.amount === 100 && near(c.used, 14) && near(c.left, 86) && c.start.toISOString().slice(0, 10) === "2026-11-03" && c.renews.toISOString().slice(0, 10) === "2026-12-03", "creditStatus: spending since the cycle began (a month before the renewal)", JSON.stringify(c));
+  ok(near(c.pace, 2) && c.daysLeft === 23 && Math.abs(c.projected - (14 + 2 * 22.5)) < 1e-9 && c.runsOut === null, "creditStatus: the pace over the last 7 days and where it leads by the renewal");
+  const tight = creditStatus(cl, { creditPlan: "custom", creditCustom: 20, creditRenews: "2026-12-03" }, at);
+  ok(tight.runsOut && tight.runsOut.toISOString().slice(0, 10) === "2026-11-13", "creditStatus: at $2 a day, $6 left runs out in 3 days, before the renewal");
+  const rolled = creditStatus(cl, { creditPlan: "max5x", creditRenews: "2026-10-03" }, at);
+  ok(rolled.renews.toISOString().slice(0, 10) === "2026-12-03", "a renewal date in the past moves on by months");
+  const guess = creditStatus(cl, { creditPlan: "max5x" }, at);
+  ok(guess.guessedDate && guess.renews.toISOString().slice(0, 10) === "2026-12-01" && /probably renews/.test(creditWords(guess).left), "without a renewal date the calendar month is assumed, and said so");
+  ok(creditStatus(cl, { creditPlan: "none" }, at) === null, "no credit set: nothing to show");
+  const w = creditWords(c, (d) => d.toISOString().slice(5, 10));
+  ok(w.headline === "≈$14 of $100 used" && w.left === "≈$86 left · renews 12-03 (in 23 days)" && /\$2 a day\) you'll use ≈\$59 of it by then/.test(w.pace) && w.state === "", "creditWords: used, left, renewal and pace in plain words", JSON.stringify(w));
+  ok(creditWords(tight, (d) => d.toISOString().slice(5, 10)).state === "Runs out early" && /runs out around 11-13, before it renews/.test(creditWords(tight, (d) => d.toISOString().slice(5, 10)).pace), "creditWords: warns when it runs out before the renewal");
+  const spent = creditStatus(cl, { creditPlan: "custom", creditCustom: 10, creditRenews: "2026-12-03" }, at);
+  ok(creditWords(spent).state === "Used up" && /credits you bought.*requests stop until it renews/.test(creditWords(spent).pace), "creditWords: used up, and what that means");
+}
+{
+  const lw = limitWords({ at: Date.parse("2026-11-10T03:00:00Z"), requests: { limit: 50, remaining: 47, reset: "2026-11-10T03:00:40Z" }, inputTokens: { limit: 40000, remaining: 36000, reset: "2026-11-10T03:00:50Z" }, outputTokens: null }, (t) => new Date(t).toISOString().slice(11, 19));
+  ok(lw === "Speed limit (a minute's worth, refilling as you go): 47 of 50 requests, 36k of 40k input tokens left at 03:00:00. It's full again by 03:00:50.", "limitWords: the per-minute limit in plain words", lw);
+  ok(limitWords(null) === "", "limitWords: nothing known, nothing said");
+}
+
 // ---- words ----
-ok(fmtUsd(0) === "$0" && fmtUsd(0.0042) === "$0.0042" && fmtUsd(0.123) === "$0.12" && fmtUsd(3.4) === "$3.40", "fmtUsd: small amounts keep two significant digits");
+ok(fmtUsd(0) === "$0" && fmtUsd(0.0042) === "$0.0042" && fmtUsd(0.123) === "$0.12" && fmtUsd(3.4) === "$3.40" && fmtUsd(100) === "$100", "fmtUsd: small amounts keep two significant digits; whole dollars stay whole");
 ok(fmtTokens(950) === "950" && fmtTokens(1234) === "1.2k" && fmtTokens(56789) === "57k" && fmtTokens(2_500_000) === "2.5M", "fmtTokens");
 
 // ---- errors (Anthropic's rate-limit and errors pages) ----

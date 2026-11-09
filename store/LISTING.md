@@ -29,7 +29,7 @@ YOU STAY IN CONTROL
 • Master switch, per-site enable, per-site auto-translate.
 • Glossary for names and terms; custom instructions; model choice (Haiku for speed, Sonnet/Opus for difficult pages).
 • Results are cached for the browser session so re-reading costs nothing.
-• See what it costs: today's and this month's Claude tokens and estimated cost per model, from this browser's own records (Options → Claude usage).
+• See what it costs: today's and this month's Claude tokens and estimated cost per model, and how much of a plan's monthly API credit is left, from this browser's own records (Options → Claude usage).
 • Double-click a translated bubble to correct a line or add a term to the glossary; an option lets you peek at the original by hovering.
 
 REQUIREMENTS

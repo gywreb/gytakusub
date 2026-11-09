@@ -2,7 +2,7 @@
 import { loadSettings, saveSettings, loadImage, blobToDataUrl, translateImage, renderPage, testKey } from "./translator.js";
 import { isConnected, connectFetcher, loadChapter, fetchPageImage, generateKey, connectionLink, readConnectionLink, fetcherBase, usageToday, onUsage, resetTime, FREE_DAILY, loadCloudUsage } from "./fetcher-client.js";
 import { MODELS } from "./prompt.js";
-import { summary, fmtUsd, fmtTokens, dayStart, PRICES_CHECKED, PRICE_SOURCE } from "./usage.js";
+import { summary, fmtUsd, fmtTokens, dayStart, PRICES_CHECKED, PRICE_SOURCE, CREDIT_PLANS, creditStatus, creditWords, limitWords } from "./usage.js";
 import { readClaudeUsage, onClaudeUsage, clearClaudeUsage } from "./claude-usage.js";
 import qrcode from "./lib/qrcode.mjs";
 
@@ -128,16 +128,37 @@ function showClaudeUsage(log = readClaudeUsage()) {
     return li;
   }));
   $("cuModels").hidden = !month.models.length;
-  const left = (x, unit) => (x ? `${fmtTokens(x.remaining)} of ${fmtTokens(x.limit)} ${unit}` : null);
-  const parts = limits ? [left(limits.requests, "requests"), left(limits.inputTokens, "input tokens"), left(limits.outputTokens, "output tokens")].filter(Boolean) : [];
-  $("cuLimits").hidden = !parts.length;
-  $("cuLimits").textContent = parts.length ? `Rate limit left, from Claude's last answer (${new Date(limits.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}): ${parts.join(", ")}.` : "";
+  const speed = limitWords(limits);
+  $("cuLimits").hidden = !speed;
+  $("cuLimits").textContent = speed;
+  showCredit(log);
   $("cuChecked").textContent = new Date(PRICES_CHECKED + "T00:00:00Z").toLocaleDateString([], { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
   $("cuPriceLink").href = PRICE_SOURCE;
   $("cuDayStart").textContent = dayStart();
   updateToolbar();
 }
 onClaudeUsage(showClaudeUsage);
+// The monthly API credit, with the form's values while Settings is open (a preview before Save).
+function creditSettings() {
+  return $("settings").open ? { creditPlan: $("sCreditPlan").value, creditCustom: $("sCreditCustom").value, creditRenews: $("sCreditRenews").value } : settings;
+}
+function showCredit(log = readClaudeUsage()) {
+  const c = creditStatus(log, creditSettings());
+  $("cuCredit").hidden = !c;
+  if (!c) return;
+  const w = creditWords(c);
+  $("cuCreditFigure").textContent = w.headline;
+  $("cuCreditState").textContent = w.state; $("cuCreditState").hidden = !w.state;
+  $("cuCreditLeft").textContent = w.left;
+  $("cuCreditPace").textContent = w.pace;
+  const m = $("cuCreditMeter");
+  m.setAttribute("aria-valuenow", Math.round(c.share * 100));
+  m.setAttribute("aria-valuetext", `${w.headline}. ${w.left}.`);
+  m.classList.toggle("warn", !!w.state); m.classList.toggle("used", c.used > 0);
+  m.firstElementChild.style.width = `${c.share * 100}%`;
+}
+$("sCreditPlan").innerHTML = CREDIT_PLANS.map((p) => `<option value="${p.id}">${p.label}</option>`).join("");
+for (const id of ["sCreditPlan", "sCreditCustom", "sCreditRenews"]) $(id).addEventListener("input", () => { $("sCreditCustomField").hidden = $("sCreditPlan").value !== "custom"; showCredit(); });
 $("cuClear").onclick = () => {
   if (!confirm("Clear this browser's Claude usage history? The Claude Console keeps its own records.")) return;
   clearClaudeUsage(); toast("Usage history cleared");
@@ -190,7 +211,8 @@ function updateToolbar() {
   $("toolbar").classList.toggle("hidden", list.length === 0);
   $("drop").classList.toggle("compact", currentMode === "shots" && list.length > 0);
   const today = summary(readClaudeUsage()).today;
-  $("progress").textContent = `${done} of ${list.length} translated${busy ? ` · ${busy} in progress` : ""}${today.requests ? ` · Claude today ≈ ${fmtUsd(today.cost)}` : ""}`;
+  const credit = creditStatus(readClaudeUsage(), settings);
+  $("progress").textContent = `${done} of ${list.length} translated${busy ? ` · ${busy} in progress` : ""}${today.requests ? ` · Claude today ≈ ${fmtUsd(today.cost)}` : ""}${credit ? ` · ≈${fmtUsd(credit.left)} credit left` : ""}`;
   $("pages").classList.toggle("spread", list.length > 1);
   $("pages").classList.toggle("rtl", !!settings.rtlSpreads);
 }
@@ -390,12 +412,15 @@ function fillSettings() {
   $("sApiKey").value = settings.apiKey; $("sModel").value = settings.model; $("sTargetLang").value = settings.targetLang;
   $("sGlossary").value = settings.glossary; $("sCustomPrompt").value = settings.customPrompt;
   $("sUseContext").checked = settings.useContext; $("sUppercase").checked = settings.uppercase; $("sRtl").checked = settings.rtlSpreads;
+  $("sCreditPlan").value = settings.creditPlan || "none"; $("sCreditCustom").value = settings.creditCustom || ""; $("sCreditRenews").value = settings.creditRenews || "";
+  $("sCreditCustomField").hidden = $("sCreditPlan").value !== "custom";
   $("sMsg").textContent = "";
 }
 function readSettings() {
   return { ...settings, apiKey: $("sApiKey").value.trim(), model: $("sModel").value, targetLang: $("sTargetLang").value.trim() || "English",
     glossary: $("sGlossary").value, customPrompt: $("sCustomPrompt").value, useContext: $("sUseContext").checked,
-    uppercase: $("sUppercase").checked, rtlSpreads: $("sRtl").checked };
+    uppercase: $("sUppercase").checked, rtlSpreads: $("sRtl").checked,
+    creditPlan: $("sCreditPlan").value, creditCustom: Number($("sCreditCustom").value) || 0, creditRenews: $("sCreditRenews").value };
 }
 $("btnSettings").onclick = () => { fillSettings(); dlg.showModal(); };
 $("sShow").onclick = () => { const i = $("sApiKey"); i.type = i.type === "password" ? "text" : "password"; $("sShow").textContent = i.type === "password" ? "Show" : "Hide"; };
