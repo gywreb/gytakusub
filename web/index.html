@@ -40,10 +40,15 @@
 
   <section id="modeChapter" class="mode hidden">
     <form id="chapterForm" class="chapter-form">
-      <input id="chapterUrl" type="url" inputmode="url" placeholder="Paste a chapter link from a supported reader" required />
+      <input id="chapterUrl" type="url" inputmode="url" placeholder="Paste a chapter link" required />
       <button class="primary" type="submit">Load</button>
     </form>
     <p id="chapterInfo" class="muted small"></p>
+    <div class="chapter-nav"><button id="navPrevTop" class="btn small" hidden>‹ Previous chapter</button><button id="navNextTop" class="btn small" hidden>Next chapter ›</button></div>
+    <div id="fetcherSetup" class="setup hidden">
+      <p><b>Chapter links need your own fetcher.</b> A web page may not read other sites — the browser forbids it — so a small free Cloudflare Worker on your account opens the chapter and passes its pages to this app. Set it up once (about 10 minutes): <a href="https://github.com/gywreb/gytakusub/blob/main/fetcher/README.md" target="_blank" rel="noopener">step-by-step guide</a>, then enter its address and key in Settings → Chapter fetcher.</p>
+      <p class="muted small">No fetcher? Screenshot mode works with any site.</p>
+    </div>
   </section>
 
   <div id="toolbar" class="toolbar hidden">
@@ -53,6 +58,7 @@
   </div>
 
   <div id="pages" class="pages"></div>
+  <div class="chapter-nav"><button id="navPrev" class="btn" hidden>‹ Previous chapter</button><button id="navNext" class="btn" hidden>Next chapter ›</button></div>
 </main>
 
 <div id="toast" class="toast" hidden></div>
@@ -71,16 +77,15 @@
     <label class="check"><input type="checkbox" id="sUseContext" /> Chapter context (names + recent lines)</label>
     <label class="check"><input type="checkbox" id="sUppercase" /> UPPERCASE lettering</label>
     <label class="check"><input type="checkbox" id="sRtl" /> Right-to-left two-page spreads on wide screens</label>
-    <details class="advanced">
-      <summary>Advanced</summary>
-      <label class="check"><input type="checkbox" id="sChapter" /> Show "Chapter link" mode (loads pages from a reader that has an adapter in sources.js)</label>
-    </details>
-    <label>Image proxy (optional, for sites that block cross-origin image reads)
-      <input id="sProxy" type="url" placeholder="https://your-worker.workers.dev/?url=" />
-      <span class="hint">See worker.js in the repo for a small Cloudflare Worker that relays image bytes only.</span>
-    </label>
+    <fieldset class="group">
+      <legend>Chapter fetcher (for Chapter link mode)</legend>
+      <label>Address <input id="sFetcherUrl" type="url" inputmode="url" placeholder="https://gytakusub.your-name.workers.dev" autocomplete="off" /></label>
+      <label>Access key <input id="sFetcherKey" type="password" placeholder="the GYT_KEY you set on the Worker" autocomplete="off" /></label>
+      <span class="hint">Your own Cloudflare Worker (free): <a href="https://github.com/gywreb/gytakusub/blob/main/fetcher/README.md" target="_blank" rel="noopener">setup guide</a>. Chapter pages pass through it; your Claude key never does.</span>
+      <div class="row"><button type="button" id="sTestFetcher" class="btn small">Test fetcher</button></div>
+    </fieldset>
     <div class="row end">
-      <button type="button" id="sTest" class="btn">Test key</button>
+      <button type="button" id="sTest" class="btn">Test Claude key</button>
       <button id="sSave" class="primary" value="save">Save</button>
     </div>
     <p id="sMsg" class="hint"></p>

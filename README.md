@@ -5,7 +5,7 @@ Translate manga, manhwa and comics **in place** with your own Claude API key —
 | | `extension/` | `web/` |
 |---|---|---|
 | Where | Brave / Chrome / Edge on desktop | Any browser, installable as a home-screen app on iPhone/Android |
-| Input | Images on sites you enable; hover → Translate, `Alt+T`, or per-site auto-translate | Screenshots (paste / Photos) or a chapter link via a reader adapter |
+| Input | Images on sites you enable; hover → Translate, `Alt+T`, or per-site auto-translate | Screenshots (paste / Photos), or a chapter link from any site that needs no login, through your own free [chapter fetcher](fetcher/README.md) |
 | Output | Transparent overlay on the page | Translated page images you can save or share |
 
 Both share the same engine, which runs locally in a worker (the extension's service worker, a Web Worker in the web app):
@@ -37,6 +37,7 @@ The copies under `extension/` are canonical; `node scripts/sync-shared.mjs` copi
 
 - **Extension**: see [`extension/README.md`](extension/README.md) (load unpacked, paste API key in Options, then enable the sites you read from the popup).
 - **Web app**: see [`web/README.md`](web/README.md). The `main` branch deploys `web/` to GitHub Pages automatically via `.github/workflows/pages.yml` (enable *Settings → Pages → Source: GitHub Actions* once).
+- **Chapter fetcher** (only for the web app's chapter links): see [`fetcher/README.md`](fetcher/README.md) — a free Cloudflare Worker on your own account, set up once in the browser.
 - **API key**: platform.claude.com → Settings → API keys. Max/Team plans include monthly API credits that cover this.
 
 ## Releasing
@@ -48,9 +49,11 @@ Store listing copy, permission justifications and the submission checklist live 
 ```sh
 cd tests && npm install
 npm run demo          # regenerate the synthetic test pages (needs python3 + Pillow + a Noto CJK font; they are committed)
-npm test              # engine tests on 14 synthetic pages (108 assertions: detection vs ground truth, layout, erase, text fitting),
+npm test              # chapter fetcher (page extraction per reader theme, key/CORS/address checks, image relay),
+                      # engine tests on 14 synthetic pages (108 assertions: detection vs ground truth, layout, erase, text fitting),
                       # plus the bubble model, the runtime-trap fallback, WebGPU (software GPU) and concurrent pages
-npm run test:browser  # the real extension (CPU, GPU, drifted model boxes, a stand-in bubble model) + the web app in headless Chromium against a mock Claude API
+npm run test:browser  # the real extension (CPU, GPU, drifted model boxes, a stand-in bubble model) + the web app (screenshot and
+                      # chapter-link mode through the real fetcher) in headless Chromium against a mock Claude API
 npm run viz -- fixtures/gen-03.png out.png --trace   # what the analyser saw, and why it rejected what it rejected
 npm run e2e           # full render of the demo page through the engine
 npm run vendor        # regenerate OpenCV, ONNX Runtime and hyphen in extension/vendor from the pinned packages (CI verifies)
@@ -67,7 +70,7 @@ Gytakusub is a reading aid: it translates, on the user's own device, images the 
 
 ## Privacy
 
-The only data that leaves the browser is the page image (with numbered marks) sent to `api.anthropic.com` with **your** key, plus optional glossary/context text you configured. No analytics, no third-party server. The optional Cloudflare image proxy (`web/worker.js`) only relays image bytes from allow-listed hosts and never sees the key.
+The only data that leaves the browser is the page image (with numbered marks) sent to `api.anthropic.com` with **your** key, plus optional glossary/context text you configured. No analytics, no third-party server. The web app's chapter-link mode goes through a chapter fetcher you deploy on your own Cloudflare account (`fetcher/worker.js`): it reads the chapter page and relays its images, stores nothing, and never sees the Claude key.
 
 ## License
 

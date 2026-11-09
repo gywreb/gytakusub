@@ -20,7 +20,7 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: tests/package-lock.json
-      - run: for f in extension/*.js extension/engine/*.js web/*.js; do node --check "$f"; done
+      - run: for f in extension/*.js extension/engine/*.js web/*.js fetcher/*.js; do node --check "$f"; done
       # cairo/pango…: node-canvas ships prebuilt binaries; when that download fails it builds
       # from source, which needs these (~1 min). mesa-vulkan-drivers: a software GPU
       # (lavapipe) for Dawn, so gpu.test.mjs runs the WebGPU path for real.
