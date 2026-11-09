@@ -2,6 +2,8 @@
 import { loadSettings, saveSettings, loadImage, blobToDataUrl, translateImage, renderPage, testKey } from "./translator.js";
 import { isConnected, connectFetcher, loadChapter, fetchPageImage, generateKey, connectionLink, readConnectionLink, fetcherBase, usageToday, onUsage, resetTime, FREE_DAILY, loadCloudUsage } from "./fetcher-client.js";
 import { MODELS } from "./prompt.js";
+import { summary, fmtUsd, fmtTokens, dayStart, PRICES_CHECKED, PRICE_SOURCE } from "./usage.js";
+import { readClaudeUsage, onClaudeUsage, clearClaudeUsage } from "./claude-usage.js";
 import qrcode from "./lib/qrcode.mjs";
 
 const $ = (id) => document.getElementById(id);
@@ -107,6 +109,40 @@ async function checkLive(button) {
   if (live.state === "live") toast("Live count from Cloudflare is on.");
 }
 
+// ---------- Claude usage (usage.js): what this browser's translations cost ----------
+function showClaudeUsage(log = readClaudeUsage()) {
+  const { today, month, limits } = summary(log);
+  const line = (t) => (t.requests ? `${t.requests.toLocaleString()} request${t.requests === 1 ? "" : "s"} · ${fmtTokens(t.input + t.read + t.write)} in · ${fmtTokens(t.output)} out` : "No requests yet");
+  const usd = (t) => (t.unpriced && !t.cost ? "—" : `${t.cost ? "≈" : ""}${fmtUsd(t.cost)}`);
+  $("cuTodayCost").textContent = usd(today);
+  $("cuTodaySub").textContent = line(today);
+  $("cuMonthLabel").textContent = new Date().toLocaleDateString([], { month: "long", timeZone: "UTC" });
+  $("cuMonthCost").textContent = usd(month);
+  $("cuMonthSub").textContent = line(month);
+  $("cuModels").replaceChildren(...month.models.map((m) => {
+    const li = document.createElement("li");
+    const name = document.createElement("span"); name.className = "model-name"; name.textContent = m.label;
+    const what = document.createElement("span"); what.className = "model-what"; what.textContent = line(m);
+    const cost = document.createElement("span"); cost.className = "model-cost"; cost.textContent = m.unpriced && !m.cost ? "price unknown" : `≈${fmtUsd(m.cost)}`;
+    li.append(name, cost, what);
+    return li;
+  }));
+  $("cuModels").hidden = !month.models.length;
+  const left = (x, unit) => (x ? `${fmtTokens(x.remaining)} of ${fmtTokens(x.limit)} ${unit}` : null);
+  const parts = limits ? [left(limits.requests, "requests"), left(limits.inputTokens, "input tokens"), left(limits.outputTokens, "output tokens")].filter(Boolean) : [];
+  $("cuLimits").hidden = !parts.length;
+  $("cuLimits").textContent = parts.length ? `Rate limit left, from Claude's last answer (${new Date(limits.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}): ${parts.join(", ")}.` : "";
+  $("cuChecked").textContent = new Date(PRICES_CHECKED + "T00:00:00Z").toLocaleDateString([], { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+  $("cuPriceLink").href = PRICE_SOURCE;
+  $("cuDayStart").textContent = dayStart();
+  updateToolbar();
+}
+onClaudeUsage(showClaudeUsage);
+$("cuClear").onclick = () => {
+  if (!confirm("Clear this browser's Claude usage history? The Claude Console keeps its own records.")) return;
+  clearClaudeUsage(); toast("Usage history cleared");
+};
+
 let ctx = { terms: [], recent: [] }; // chapter context for this session
 const MAX_PARALLEL = 2;
 const pages = []; // { el, img?, url?, status, result? }
@@ -153,7 +189,8 @@ function updateToolbar() {
   const busy = list.filter((p) => p.status === "working" || p.status === "queued").length;
   $("toolbar").classList.toggle("hidden", list.length === 0);
   $("drop").classList.toggle("compact", currentMode === "shots" && list.length > 0);
-  $("progress").textContent = `${done} of ${list.length} translated${busy ? ` · ${busy} in progress` : ""}`;
+  const today = summary(readClaudeUsage()).today;
+  $("progress").textContent = `${done} of ${list.length} translated${busy ? ` · ${busy} in progress` : ""}${today.requests ? ` · Claude today ≈ ${fmtUsd(today.cost)}` : ""}`;
   $("pages").classList.toggle("spread", list.length > 1);
   $("pages").classList.toggle("rtl", !!settings.rtlSpreads);
 }
@@ -349,6 +386,7 @@ $("showOriginal").onchange = (e) => modePages().forEach((p) => p.showOriginal(e.
 const dlg = $("settings");
 $("sModel").innerHTML = MODELS.map((m) => `<option value="${m.id}">${m.label}</option>`).join("");
 function fillSettings() {
+  showClaudeUsage();
   $("sApiKey").value = settings.apiKey; $("sModel").value = settings.model; $("sTargetLang").value = settings.targetLang;
   $("sGlossary").value = settings.glossary; $("sCustomPrompt").value = settings.customPrompt;
   $("sUseContext").checked = settings.useContext; $("sUppercase").checked = settings.uppercase; $("sRtl").checked = settings.rtlSpreads;

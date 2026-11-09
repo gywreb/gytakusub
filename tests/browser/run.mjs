@@ -9,6 +9,7 @@ import { chromium } from "playwright";
 import { execFileSync } from "node:child_process";
 import { createCanvas, loadImage } from "canvas";
 import { startMock } from "./mock-api.mjs";
+import { fmtUsd } from "../../extension/usage.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d; };
@@ -89,6 +90,26 @@ await page.screenshot({ path: path.join(out, "2-redo.png") });
 await page.reload(); await page.waitForLoadState("load"); await page.waitForTimeout(500);
 await translate(false); await waitLogs(3);
 await page.screenshot({ path: path.join(out, "3-cached.png") });
+
+// ---- Claude usage: every API answer is logged, and the popup and Options show it ----
+let usageOk = null;
+if (!process.argv.includes("--bad-boxes")) {
+  const log = await sw.evaluate(async () => (await chrome.storage.local.get("claudeUsage")).claudeUsage);
+  const day = Object.values(log?.days || {})[0] || {}, m = day["claude-sonnet-5-5"] || {};
+  const extId = new URL(sw.url()).host;
+  const pop = await context.newPage(); await pop.goto(`chrome-extension://${extId}/popup.html`);
+  await pop.waitForFunction(() => !document.getElementById("usageToday").hidden, null, { timeout: 5000 }).catch(() => {});
+  const popupText = await pop.textContent("#usageToday"); await pop.close();
+  const opt = await context.newPage(); await opt.goto(`chrome-extension://${extId}/options.html`);
+  await opt.waitForFunction(() => /request/.test(document.getElementById("cuTodaySub").textContent), null, { timeout: 5000 }).catch(() => {});
+  const optText = await opt.evaluate(() => [document.getElementById("cuTodayCost").textContent, document.getElementById("cuTodaySub").textContent, document.getElementById("cuModels").textContent, document.getElementById("cuLimits").textContent]);
+  await opt.screenshot({ path: path.join(out, "options-usage.png"), fullPage: true }); await opt.close();
+  await page.bringToFront();
+  // 1000 input + 200 output tokens per answer on Sonnet 5.5 ($2 / $10 per million) = $0.004
+  usageOk = m.requests === calls.length && Math.abs(m.cost - 0.004 * calls.length) < 1e-9 && log?.limits?.requests?.limit === 50
+    && popupText === `≈${fmtUsd(0.004 * calls.length)} today` && /Claude Sonnet 5\.5/.test(optText[2]) && /requests/.test(optText[3]);
+  console.log(`usage: ${m.requests} logged of ${calls.length} API calls, ≈$${m.cost}; popup "${popupText}"; options ${JSON.stringify(optText)}`);
+}
 
 // ---- peek + edit (first scenario only) ----
 let peekChanged = null, editOk = null, persisted = null;
@@ -185,6 +206,7 @@ if (debugLogs.length) console.log(`engine: ${debugLogs[0].engine}, timing: ${JSO
 if (process.argv.includes("--require-gpu") && !debugLogs.every((d) => /detect:webgpu/.test(d.timing?.backend || "") && /segment:webgpu/.test(d.timing?.backend || ""))) { failures++; console.log(`FAIL: --require-gpu but the models ran on ${debugLogs.map((d) => d.timing?.backend).join(" | ")}`); }
 if (!reportOk) { failures++; console.log("FAIL: diagnostic report incomplete: " + JSON.stringify(rep).slice(0, 200)); }
 if (!zipOk) { failures++; console.log("FAIL: export zip missing files or corrupt: " + JSON.stringify(exp).slice(0, 200)); }
+if (usageOk === false) { failures++; console.log("FAIL: the Claude usage log, popup or Options did not match the API calls"); }
 if (peekChanged === false) { failures++; console.log("FAIL: hovering a bubble did not reveal the original"); }
 if (editOk === false) { failures++; console.log("FAIL: editing a line did not change the overlay"); }
 if (persisted === false) { failures++; console.log("FAIL: the edited line did not survive a reload"); }

@@ -4,6 +4,21 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
 
 ## [Unreleased]
 
+## [2.5.0] — 2026-11-10
+
+### Extension and web app
+- **Claude usage monitor.** See what translating costs, in the extension and in the web app:
+  - **Extension:** the popup shows "≈$… today" next to the model, and Options has a new **Claude usage** section.
+  - **Web app:** Settings has a **Claude usage** group, and the toolbar shows today's cost while you translate.
+  - **What it shows:** today and this month, one row per model (requests, tokens in and out, estimated cost), and the rate-limit headroom from Claude's last answer when the browser can read it.
+  - **Where the numbers come from:** the token counts in Claude's own answers, so they're exact for what that browser sent. The cost is an estimate from Anthropic's published prices, checked weekly against the pricing page. The panels say so and point to the Claude Console for the exact bill.
+  - Usage stays on the device for 62 days and is never sent anywhere. **Clear usage history** removes it. Each browser, and the installed app on iPhone, keeps its own records.
+  - Exact account-wide numbers need Anthropic's Admin API, which isn't available for individual accounts. See ADR 0007.
+- **Clearer Claude errors:**
+  - the monthly spend cap (with when it resets), a self-set spend limit, a low credit balance, a refused key and an overloaded API are each explained;
+  - the extension no longer retries a request the spend cap refused.
+- The weekly check now also compares the Claude prices with Anthropic's pricing page and opens an issue when one changed.
+
 ## [2.4.0] — 2026-11-10
 
 ### Web app and fetcher

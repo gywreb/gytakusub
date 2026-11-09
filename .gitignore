@@ -11,6 +11,7 @@ node_modules
 web/engine/
 web/vendor/
 web/prompt.js
+web/usage.js
 web/text.js
 web/fonts/
 web/LICENSE

@@ -27,11 +27,7 @@ if (out("git rev-parse HEAD") !== out("git rev-parse origin/main")) stop("Your m
 if (out(`git tag --list v${v}`)) stop(`v${v} is already tagged. Merge a pull request with a new version first.`);
 
 // 1. sync shared files (extension/ is canonical); a tracked file changing here means main is out of sync
-for (const f of ["prompt.js", "text.js"]) fs.copyFileSync(`extension/${f}`, `web/${f}`);
-for (const d of ["engine", "vendor"]) { fs.rmSync(`web/${d}`, { recursive: true, force: true }); fs.cpSync(`extension/${d}`, `web/${d}`, { recursive: true }); }
-for (const f of fs.readdirSync("extension/icons")) if (/^icon\d+\.png$/.test(f)) fs.copyFileSync(`extension/icons/${f}`, `web/icons/${f}`);
-fs.mkdirSync("web/fonts", { recursive: true });
-for (const f of fs.readdirSync("extension/fonts")) fs.copyFileSync(`extension/fonts/${f}`, `web/fonts/${f}`);
+run("node scripts/sync-shared.mjs");
 if (out("git status --porcelain")) stop("The web app's copies of shared files differ from extension/. Fix that in a pull request first:\n" + out("git status --short"));
 
 // 2. checks + tests

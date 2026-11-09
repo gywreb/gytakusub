@@ -2,7 +2,7 @@ name: Deploy web app to GitHub Pages
 on:
   push:
     branches: [main]
-    paths: ["web/**", "fetcher/worker.js", "fetcher/guide-sources.json", "extension/engine/**", "extension/vendor/**", "extension/prompt.js", "extension/text.js", "extension/fonts/**", "extension/icons/**", ".github/workflows/pages.yml"]
+    paths: ["web/**", "fetcher/worker.js", "fetcher/guide-sources.json", "extension/engine/**", "extension/vendor/**", "extension/prompt.js", "extension/usage.js", "extension/text.js", "extension/fonts/**", "extension/icons/**", ".github/workflows/pages.yml"]
   workflow_dispatch:
 permissions:
   contents: read

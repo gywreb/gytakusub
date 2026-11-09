@@ -5,8 +5,20 @@
 // cache translations, keep per-tab glossary context, relay keyboard commands.
 
 import { callClaude, mergeContext } from "./prompt.js";
+import { addCall, emptyLog } from "./usage.js";
 import { preparePage, finishPage } from "./engine/page.js";
 import { DEFAULT_SETTINGS, getSettings, CS_FILES, ensureContentScript } from "./settings.js";
+
+// Claude usage log (usage.js) in chrome.storage.local, read by the popup and Options. This worker is
+// its only writer; a page's slices answer in parallel, so the writes queue up instead of racing.
+let usageWrites = Promise.resolve();
+function recordUsage(r) {
+  if (!r?.usage) return;
+  usageWrites = usageWrites.then(async () => {
+    const { claudeUsage } = await chrome.storage.local.get({ claudeUsage: null });
+    await chrome.storage.local.set({ claudeUsage: addCall(claudeUsage?.v === 1 ? claudeUsage : emptyLog(), { model: r.model, usage: r.usage, limits: r.limits }) });
+  }).catch((e) => console.warn("Gytakusub: usage log write failed", e));
+}
 
 const PROMPT_VERSION = 6; // bump when the prompt/coordinate format changes so old cache entries are ignored
 
@@ -147,10 +159,12 @@ async function handleTranslate(msg, sender) {
     results = cached.results; usage = cached.usage;
   } else {
     const ctx = await getTabCtx(tabId);
+    const call = (slice) => callClaude(settings, slice, ctx).then((r) => { recordUsage(r); return r; });
     const withRetry = async (slice) => {
-      try { return await callClaude(settings, slice, ctx); }
+      try { return await call(slice); }
       catch (e) {
-        if (/Claude API (429|529|503)/.test(e.message)) { await new Promise((r) => setTimeout(r, 2500)); return callClaude(settings, slice, ctx); }
+        // a busy moment is worth one more try; a spent budget is not
+        if (/Claude API (429|529|503)/.test(e.message) && !/spend (cap|limit)/i.test(e.message)) { await new Promise((r) => setTimeout(r, 2500)); return call(slice); }
         throw e;
       }
     };

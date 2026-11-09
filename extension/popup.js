@@ -2,6 +2,7 @@
 // service worker may be busy analysing a page for seconds (see settings.js), and
 // the popup must show the real settings the moment it opens.
 import { getSettings, ensureContentScript } from "./settings.js";
+import { summary, fmtUsd } from "./usage.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -107,6 +108,17 @@ $("auto").onchange = async (e) => {
 };
 $("openOptions").onclick = () => chrome.runtime.openOptionsPage();
 $("openOptions2").onclick = (e) => { e.preventDefault(); chrome.runtime.openOptionsPage(); };
+
+/** Today's Claude cost on this browser, next to the model (details: Options → Claude usage). */
+function showUsage(log) {
+  const today = summary(log?.v === 1 ? log : null).today;
+  $("usageToday").hidden = !today.requests;
+  $("usageToday").textContent = today.requests ? `≈${fmtUsd(today.cost)} today` : "";
+  $("usageToday").setAttribute("aria-label", today.requests ? `Claude today: about ${fmtUsd(today.cost)} for ${today.requests} requests. Open details.` : "");
+}
+chrome.storage.local.get({ claudeUsage: null }).then(({ claudeUsage }) => showUsage(claudeUsage));
+chrome.storage.onChanged.addListener((changes, area) => { if (area === "local" && changes.claudeUsage) showUsage(changes.claudeUsage.newValue); });
+$("usageToday").onclick = () => chrome.tabs.create({ url: chrome.runtime.getURL("options.html#sec-usage") });
 
 showShortcuts();
 init().finally(() => document.body.classList.add("ready"));

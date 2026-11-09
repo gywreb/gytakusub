@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const ext = (p) => path.join(root, "extension", p), web = (p) => path.join(root, "web", p);
 
-for (const f of ["prompt.js", "text.js", "LICENSE", "THIRD_PARTY.md"]) fs.copyFileSync(ext(f), web(f));
+for (const f of ["prompt.js", "text.js", "usage.js", "LICENSE", "THIRD_PARTY.md"]) fs.copyFileSync(ext(f), web(f));
 fs.copyFileSync(path.join(root, "fetcher", "worker.js"), web("fetcher-worker.js"));
 fs.copyFileSync(path.join(root, "fetcher", "guide-sources.json"), web("fetcher-guide.json")); // the setup guide shows when it was last checked
 for (const dir of ["engine", "vendor", "fonts"]) {

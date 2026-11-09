@@ -28,6 +28,7 @@ Settings, glossary and (optionally) the API key sync through your browser's sync
 | Redo a page (e.g. after editing the glossary) | Hover → **↻ Redo** |
 | Correct a line / teach the glossary | Double-click a translated bubble → edit → **Ctrl+Enter**; or fill "original term = translation" → *Add* |
 | Peek at the original lettering | Options → *Peek at the original while hovering* (off by default), then rest the pointer on a translated bubble |
+| See what translating costs | Popup → "≈$… today" next to the model; Options → **Claude usage** (today, this month, per model, rate-limit headroom) |
 | Report a bad page | Options → *Debug overlay*, then popup → **Export debug report** (one `.zip` for every translated page on the tab) |
 
 ## How it works

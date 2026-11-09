@@ -15,6 +15,7 @@ import { fileURLToPath } from "node:url";
 import { chromium, devices } from "playwright";
 import { startMock } from "./mock-api.mjs";
 import { handle as fetcherHandle } from "../../fetcher/worker.js";
+import { fmtUsd } from "../../extension/usage.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "../..");
@@ -69,6 +70,19 @@ if (/error/.test(status.cls)) fail("page status is an error: " + status.text);
 if (errors.length) fail("console/page errors: " + errors.slice(0, 3).join(" | "));
 if (inked < 500) fail("translated canvas looks blank (dark samples: " + inked + ")");
 console.log(`API calls: ${JSON.stringify(calls)} status: ${JSON.stringify(status)} dark samples: ${inked}`);
+
+// Claude usage: each answer is logged; Settings shows today, the model and the rate-limit headroom
+await page.click("#btnSettings");
+await page.waitForSelector("#settings[open]");
+const cu = await page.evaluate(() => ({ cost: document.getElementById("cuTodayCost").textContent, sub: document.getElementById("cuTodaySub").textContent, models: document.getElementById("cuModels").textContent, limits: document.getElementById("cuLimits").textContent, progress: document.getElementById("progress").textContent }));
+await page.screenshot({ path: path.join(out, "web-claude-usage.png"), fullPage: true });
+await page.keyboard.press("Escape");
+// the page's model is Haiku 5.5 by default: 1000 input + 200 output tokens = $0.0002 per answer
+const wantUsd = fmtUsd(calls.length * (1000 * 0.10 + 200 * 0.50) / 1e6);
+if (cu.cost !== `≈${wantUsd}` || !cu.sub.startsWith(`${calls.length} request${calls.length === 1 ? "" : "s"} · `) || !/Claude Haiku 5\.5/.test(cu.models)) fail(`Settings should show today's Claude usage (${calls.length} answers, ${wantUsd}): ${JSON.stringify(cu)}`);
+if (!/of 50 requests/.test(cu.limits)) fail("the rate-limit headroom from Claude's last answer should show: " + cu.limits);
+if (!/Claude today ≈/.test(cu.progress)) fail("the toolbar should show today's Claude cost: " + cu.progress);
+console.log("claude usage:", JSON.stringify(cu));
 
 // ---------- chapter link mode through the real fetcher ----------
 // The fetcher's handler on a local port; its outbound fetch is a fake web: two chapter pages on
