@@ -2,6 +2,23 @@
 
 All notable changes to Gytakusub are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Web app
+- **UI overhaul after an audit** against the Web Interface Guidelines, checked at iPhone size (390 px) and desktop (1280 px), dark and light:
+  - **Header:** the mode switch gets its own full-width row on phones; on wider screens it's centred in the header.
+  - **Tap targets:** at least 44 px everywhere.
+  - **Reading width:** pages stay within a 760 px column; two-page spreads only from 1,100 px.
+  - **Page actions** (Original, Redo, Save) and the status moved into a bar under each page instead of floating over the art.
+  - **Modes:** each keeps its own pages. Once pages are on screen, the screenshot drop zone shrinks to its buttons.
+  - **Settings:** a full-screen sheet on phones and a centred panel on wider screens, with a Close button, grouped sections and Save pinned at the bottom.
+  - **Setup wizard:** a numbered vertical stepper, with Back/Next under the open step.
+  - **Install guide:** in-app, per platform (iPhone/iPad steps, the install button where the browser offers one, a QR code on computers). On a phone that hasn't installed the app, it comes before the key prompt.
+  - **Accessibility:** visible keyboard focus, the tablist pattern with arrow keys, toasts and progress announced to screen readers, key fields without autocorrect, a theme colour for light and dark, and reduced motion respected.
+
+### Planned for the next extension release
+- The same audit and overhaul for the extension's popup and Options page.
+
 ## [2.1.0] — 2026-11-09 (web app and chapter fetcher, live on GitHub Pages; the browser extension is unchanged and stays 2.0.0, so there is no store package or GitHub Release for 2.1.0)
 
 ### Added

@@ -2,6 +2,7 @@
 import { loadSettings, saveSettings, loadImage, blobToDataUrl, translateImage, renderPage, testKey } from "./translator.js";
 import { isConnected, connectFetcher, loadChapter, fetchPageImage, generateKey, connectionLink, readConnectionLink } from "./fetcher-client.js";
 import { MODELS } from "./prompt.js";
+import qrcode from "./lib/qrcode.mjs";
 
 const $ = (id) => document.getElementById(id);
 
@@ -42,36 +43,56 @@ function toast(msg, ms = 4000) {
   clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.hidden = true), ms);
 }
 
+// Each mode keeps its own pages: screenshots don't show under Chapter link, and the other way round.
+let currentMode = "shots";
+const modePages = () => pages.filter((p) => p.mode === currentMode);
 function setMode(mode) {
-  document.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", b.dataset.mode === mode));
+  currentMode = mode;
+  document.querySelectorAll(".tab").forEach((b) => {
+    const on = b.dataset.mode === mode;
+    b.classList.toggle("active", on); b.setAttribute("aria-selected", String(on)); b.tabIndex = on ? 0 : -1;
+  });
   $("modeShots").classList.toggle("hidden", mode !== "shots");
   $("modeChapter").classList.toggle("hidden", mode !== "chapter");
+  $("pages").dataset.mode = mode;
+  updateToolbar();
 }
-document.querySelectorAll(".tab").forEach((b) => (b.onclick = () => setMode(b.dataset.mode)));
+const tabs = [...document.querySelectorAll(".tab")];
+tabs.forEach((b, i) => {
+  b.onclick = () => setMode(b.dataset.mode);
+  // tablist keyboard pattern: arrows move between tabs
+  b.onkeydown = (e) => {
+    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+    const next = tabs[(i + (e.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length];
+    setMode(next.dataset.mode); next.focus();
+  };
+});
 
 function updateToolbar() {
-  const done = pages.filter((p) => p.status === "done").length;
-  const busy = pages.filter((p) => p.status === "working" || p.status === "queued").length;
-  $("toolbar").classList.toggle("hidden", pages.length === 0);
-  $("progress").textContent = `${done}/${pages.length} translated${busy ? ` · ${busy} in progress` : ""}`;
-  $("pages").classList.toggle("spread", pages.length > 1);
+  const list = modePages();
+  const done = list.filter((p) => p.status === "done").length;
+  const busy = list.filter((p) => p.status === "working" || p.status === "queued").length;
+  $("toolbar").classList.toggle("hidden", list.length === 0);
+  $("drop").classList.toggle("compact", currentMode === "shots" && list.length > 0);
+  $("progress").textContent = `${done} of ${list.length} translated${busy ? ` · ${busy} in progress` : ""}`;
+  $("pages").classList.toggle("spread", list.length > 1);
   $("pages").classList.toggle("rtl", !!settings.rtlSpreads);
 }
 
 // ---------- pages ----------
 
-function addPage({ img, url, referer, file }) {
-  const el = document.createElement("div");
-  el.className = "page";
-  el.innerHTML = `<span class="status">queued</span><div class="actions"><button data-act="toggle">Original</button><button data-act="redo">Redo</button><button data-act="save">Save</button></div>`;
-  const page = { el, img, url, referer, file, status: "queued" };
-  if (img) el.append(img);
-  el.addEventListener("click", (e) => {
-    if (e.target.closest(".actions")) return;
-    el.classList.toggle("touched");
-    if (page.status === "done") el.classList.toggle("showing-original");
-  });
-  el.querySelector('[data-act="toggle"]').onclick = () => el.classList.toggle("showing-original");
+function addPage({ img, url, referer, file, mode = currentMode }) {
+  const el = document.createElement("article");
+  el.className = "page"; el.dataset.mode = mode;
+  el.innerHTML = `<div class="page-media"></div><div class="page-bar"><span class="status" role="status">queued</span><div class="page-actions"><button type="button" data-act="toggle" aria-pressed="false">Original</button><button type="button" data-act="redo">Redo</button><button type="button" data-act="save">Save</button></div></div>`;
+  const page = { el, media: el.querySelector(".page-media"), img, url, referer, file, mode, status: "queued" };
+  if (img) page.media.append(img);
+  const toggle = el.querySelector('[data-act="toggle"]');
+  const showOriginal = (on) => { el.classList.toggle("showing-original", on); toggle.setAttribute("aria-pressed", String(on)); };
+  page.showOriginal = showOriginal;
+  // tapping the page flips between translation and original, like the button
+  page.media.addEventListener("click", () => { if (page.status === "done") showOriginal(!el.classList.contains("showing-original")); });
+  toggle.onclick = () => showOriginal(!el.classList.contains("showing-original"));
   el.querySelector('[data-act="redo"]').onclick = () => enqueue(page, true);
   el.querySelector('[data-act="save"]').onclick = () => savePage(page);
   $("pages").append(el);
@@ -108,7 +129,7 @@ async function processPage(page) {
     if (!page.img) {
       const blob = page.file || (await fetchPageImage(settings, page.url, page.referer));
       page.img = await loadImage(await blobToDataUrl(blob));
-      page.el.append(page.img);
+      page.media.append(page.img);
     }
     setStatus(page, "translating…");
     const [result] = await Promise.all([
@@ -118,9 +139,9 @@ async function processPage(page) {
     if (settings.useContext) ctx = result.ctx;
     const { original, translated, drawn } = renderPage(page.img, result, settings);
     original.className = "original"; translated.className = "translated";
-    page.el.querySelectorAll("canvas").forEach((c) => c.remove());
+    page.media.querySelectorAll("canvas").forEach((c) => c.remove());
     page.img.remove();
-    page.el.prepend(original, translated);
+    page.media.prepend(original, translated);
     page.result = result;
     page.status = "done";
     setStatus(page, drawn ? "" : "no text found");
@@ -235,14 +256,14 @@ for (const id of ["navPrev", "navPrevTop"]) $(id).onclick = () => chapterNav.pre
 
 $("chapterForm").onsubmit = (e) => { e.preventDefault(); openChapter($("chapterUrl").value.trim()); };
 
-function clearPages() {
-  io?.disconnect(); io = null;
-  queue.length = 0;
-  pages.splice(0).forEach((p) => p.el.remove());
+function clearPages(mode = currentMode) {
+  if (mode === "chapter") { io?.disconnect(); io = null; }
+  for (let k = queue.length - 1; k >= 0; k--) if (queue[k].mode === mode) queue.splice(k, 1);
+  for (let k = pages.length - 1; k >= 0; k--) if (pages[k].mode === mode) { pages[k].el.remove(); pages.splice(k, 1); }
   updateToolbar();
 }
-$("btnClear").onclick = () => { clearPages(); showNav({}); ctx = { terms: [], recent: [] }; history.replaceState(null, "", location.pathname); };
-$("showOriginal").onchange = (e) => document.querySelectorAll(".page").forEach((p) => p.classList.toggle("showing-original", e.target.checked));
+$("btnClear").onclick = () => { clearPages(); ctx = { terms: [], recent: [] }; if (currentMode === "chapter") { showNav({}); history.replaceState(null, "", location.pathname); } };
+$("showOriginal").onchange = (e) => modePages().forEach((p) => p.showOriginal(e.target.checked));
 
 // ---------- settings ----------
 
@@ -296,6 +317,7 @@ function showStep(n) {
   try { localStorage.setItem(STEP_KEY, String(step)); } catch { /* private mode */ }
   stepItems.forEach((li, i) => { li.classList.toggle("active", i + 1 === step); li.classList.toggle("done", i + 1 < step); });
   $("wzProgress").textContent = `Step ${step} of ${stepItems.length}`;
+  stepItems[step - 1].querySelector(".step-body").append($("wzStepNav")); // Back/Next sit right under the open step, not after the list
   $("wzBack").hidden = step === 1;
   $("wzNext").hidden = step === stepItems.length;
 }
@@ -342,6 +364,47 @@ $("mgForget").onclick = async () => {
 
 // ---------- boot ----------
 
+// ---------- install (Home Screen / app) ----------
+
+const INSTALL_LATER = "gytakusub.installLater";
+const installed = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const isAndroid = /Android/i.test(navigator.userAgent);
+const isPhone = isIOS || isAndroid;
+let installPrompt = null; // Chrome/Edge/Brave/Samsung offer this; Safari and Firefox don't
+const appUrl = location.origin + location.pathname;
+
+function renderInstall(force = false) {
+  const card = $("installCard");
+  let later = false; try { later = !!localStorage.getItem(INSTALL_LATER); } catch { /* private mode */ }
+  if (installed || (later && !force)) { card.classList.add("hidden"); return; }
+  const show = isIOS ? ["ios"] : [installPrompt ? "prompt" : isAndroid ? "android" : "", isPhone ? "" : "desktop"].filter(Boolean);
+  card.dataset.show = show.join(" ");
+  if (show.includes("desktop") && !$("installQr").firstChild) {
+    const q = qrcode(0, "M"); q.addData(appUrl); q.make();
+    $("installQr").innerHTML = q.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
+    $("installUrl").textContent = appUrl.replace(/^https:\/\//, "");
+  }
+  $("installDesktopHint").hidden = !!installPrompt;
+  card.classList.remove("hidden");
+}
+addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installPrompt = e; renderInstall(); });
+addEventListener("appinstalled", () => { installPrompt = null; $("installCard").classList.add("hidden"); toast("Installed. Open Gytakusub from your home screen or app list."); });
+$("btnInstall").onclick = async () => {
+  if (!installPrompt) return;
+  installPrompt.prompt();
+  await installPrompt.userChoice.catch(() => null);
+  installPrompt = null; renderInstall();
+};
+$("btnCopyAppLink").onclick = () => copyText(appUrl, "Link");
+$("btnInstallLater").onclick = () => {
+  try { localStorage.setItem(INSTALL_LATER, "1"); } catch { /* private mode */ }
+  $("installCard").classList.add("hidden");
+  if (!settings.apiKey) { fillSettings(); dlg.showModal(); }
+};
+$("btnShowInstall").onclick = () => { dlg.close(); renderInstall(true); $("installCard").scrollIntoView({ block: "start" }); };
+renderInstall();
+
 // A connection link (#connect=…) fills in a fetcher address and key; the user checks the address and taps Connect.
 const shared = readConnectionLink(location.hash);
 if (shared) history.replaceState(null, "", location.pathname + location.search); // don't leave the key in the address bar
@@ -358,6 +421,9 @@ if (shared) {
 // someone else sent can't make the fetcher visit a site or spend Claude credits by itself.
 const linked = new URLSearchParams(location.search).get("chapter");
 if (linked && !shared) { setMode("chapter"); $("chapterUrl").value = linked; $("chapterInfo").textContent = chapterView === "ready" ? "Tap Load to open this chapter." : "Set up chapter links below; this chapter will be waiting."; }
-if (!settings.apiKey) setTimeout(() => { fillSettings(); dlg.showModal(); }, 400);
+// First visit: on a phone that hasn't installed the app yet, installing comes first (on iPhone the installed app
+// keeps its own settings, so a key typed in Safari would not be there); otherwise ask for the Claude key.
+const installFirst = isPhone && !installed && !$("installCard").classList.contains("hidden");
+if (!settings.apiKey && !installFirst) setTimeout(() => { fillSettings(); dlg.showModal(); }, 400);
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 updateToolbar();

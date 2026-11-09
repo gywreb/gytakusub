@@ -12,7 +12,7 @@ import path from "node:path";
 import http from "node:http";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { chromium } from "playwright";
+import { chromium, devices } from "playwright";
 import { startMock } from "./mock-api.mjs";
 import { handle as fetcherHandle } from "../../fetcher/worker.js";
 
@@ -193,6 +193,36 @@ await page2.click('.tab[data-mode="chapter"]');
 await page2.setViewportSize({ width: 390, height: 844 });
 await ctx3.close();
 fetcherSrv.close(); oldSrv.close();
+
+// ---------- install guide ----------
+// Desktop: a QR code with the app's address for the phone; "Not now" hides it for good; Settings brings it back.
+{
+  const ctx = await browser.newContext({ viewport: { width: 1200, height: 900 } });
+  const pg = await ctx.newPage();
+  await pg.goto(`http://127.0.0.1:${WEB_PORT}/`); await pg.waitForTimeout(400);
+  const qr = await pg.$("#installQr svg");
+  if (!(await pg.isVisible("#installCard")) || !qr || !(await pg.isVisible('[data-platform="desktop"]'))) fail("on a computer the install card should show a QR code for the phone");
+  if (!(await pg.isVisible("#settings"))) fail("on a computer the first visit should still ask for the Claude key");
+  await pg.keyboard.press("Escape");
+  await pg.click("#btnInstallLater"); await pg.reload(); await pg.waitForTimeout(300);
+  if (await pg.isVisible("#installCard")) fail("“Not now” should keep the install card closed");
+  await pg.click("#btnSettings"); await pg.click("#btnShowInstall");
+  if (!(await pg.isVisible("#installCard"))) fail("Settings → Install should bring the install card back");
+  await ctx.close();
+}
+// iPhone (Safari): the Home Screen steps come first, before any key is asked for (the installed app keeps its own settings).
+{
+  const ctx = await browser.newContext({ ...devices["iPhone 13"] });
+  const pg = await ctx.newPage();
+  await pg.goto(`http://127.0.0.1:${WEB_PORT}/`); await pg.waitForTimeout(800);
+  const text = await pg.textContent("#installCard");
+  if (!(await pg.isVisible('[data-platform="ios"]')) || !/Add to Home Screen/.test(text) || (await pg.isVisible('[data-platform="desktop"]'))) fail("on iPhone the install card should show the Add to Home Screen steps");
+  if (await pg.isVisible("#settings")) fail("on an iPhone that hasn't installed the app, the key dialog must wait until after installing");
+  await pg.click("#btnInstallLater");
+  if (!(await pg.isVisible("#settings"))) fail("after “Not now” on iPhone, the app should ask for the Claude key");
+  await pg.screenshot({ path: path.join(out, "web-install-iphone.png") });
+  await ctx.close();
+}
 console.log(failures ? `WEB BROWSER TEST FAILED (${failures})` : "WEB BROWSER TEST PASSED");
 await browser.close(); api.close(); statik.close();
 fs.rmSync(web, { recursive: true, force: true });

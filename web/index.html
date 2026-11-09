@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Gytakusub</title>
 <meta name="description" content="Translate manga pages and screenshots with your own Claude API key." />
-<meta name="theme-color" content="#16181d" />
+<meta name="theme-color" content="#1b1e24" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Gytakusub" />
@@ -16,33 +17,65 @@
 </head>
 <body>
 <header class="top">
-  <img src="icons/icon48.png" alt="" class="logo" />
-  <h1>Gytakusub</h1>
-  <nav class="tabs" role="tablist">
-    <button class="tab active" data-mode="shots" role="tab">Screenshots</button>
-    <button class="tab" data-mode="chapter" role="tab">Chapter link</button>
+  <div class="brand"><img src="icons/icon48.png" alt="" class="logo" width="28" height="28" /><h1 translate="no">Gytakusub</h1></div>
+  <nav class="modes" role="tablist" aria-label="Mode">
+    <button type="button" class="tab active" id="tabShots" data-mode="shots" role="tab" aria-selected="true" aria-controls="modeShots">Screenshots</button>
+    <button type="button" class="tab" id="tabChapter" data-mode="chapter" role="tab" aria-selected="false" aria-controls="modeChapter" tabindex="-1">Chapter link</button>
   </nav>
-  <button id="btnSettings" class="icon" title="Settings" aria-label="Settings">⚙</button>
+  <button type="button" id="btnSettings" class="icon-btn" title="Settings" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1.1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34H9a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87V9a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1z"/></svg></button>
 </header>
 
 <main>
-  <section id="modeShots" class="mode">
+  <!-- Install guide: shown until the app runs installed (or the reader says "Not now") -->
+  <section id="installCard" class="install card hidden" aria-labelledby="installTitle">
+    <h2 id="installTitle">Install Gytakusub</h2>
+
+    <div data-platform="ios">
+      <p>Add it to your Home Screen so it opens like an app. Do this <b>before</b> you enter your keys: the installed app keeps its own settings, separate from the browser.</p>
+      <ol>
+        <li>In <b>Safari</b>, tap the <b>Share</b> button <span class="sym" aria-hidden="true">⬆︎</span> (bottom bar, or top right on iPad; on iOS 26 it may be behind the <b>•••</b> button).</li>
+        <li>Scroll down and tap <b>Add to Home Screen</b>.</li>
+        <li>Leave <b>Open as Web App</b> on, if you see it, and tap <b>Add</b>.</li>
+        <li>Open <b>Gytakusub</b> from your Home Screen.</li>
+      </ol>
+      <p class="muted small">Using Brave on iPhone? It can't add web apps. <button type="button" id="btnCopyAppLink" class="linkbtn">Copy this page's link</button>, open it in Safari, and follow the steps there. Chrome on iPhone works too: Share → Add to Home Screen.</p>
+    </div>
+
+    <div data-platform="prompt">
+      <p>Install it so it opens like an app, from your home screen or app list.</p>
+      <div class="row"><button type="button" id="btnInstall" class="primary">Install Gytakusub</button></div>
+    </div>
+
+    <div data-platform="android">
+      <p>Add it to your home screen so it opens like an app: open the browser menu <span class="sym" aria-hidden="true">⋮</span> and tap <b>Install app</b> or <b>Add to Home screen</b>.</p>
+    </div>
+
+    <div data-platform="desktop">
+      <p><b>On your phone:</b> scan this with the phone's camera, then install it from there (the steps appear on the phone).</p>
+      <div class="qr-row"><div id="installQr" class="qr" role="img" aria-label="QR code with the address of this app"></div><p class="muted small">Or open <code id="installUrl"></code> on your phone.</p></div>
+      <p class="muted small" id="installDesktopHint">On this computer, your browser's install button (in the address bar or menu) adds it as an app.</p>
+    </div>
+
+    <div class="row end"><button type="button" id="btnInstallLater" class="btn small">Not now</button></div>
+  </section>
+
+  <section id="modeShots" class="mode" role="tabpanel" aria-labelledby="tabShots">
     <div id="drop" class="drop">
       <p class="big">Add a manga page or screenshot</p>
       <p class="muted">Take a screenshot in any app or reader, then paste it here — or pick it from Photos. Your images go only to the Claude API with your own key.</p>
       <div class="row">
-        <button id="btnPaste" class="primary">Paste image</button>
-        <label class="btn">Choose photos<input id="file" type="file" accept="image/*" multiple hidden /></label>
+        <button type="button" id="btnPaste" class="primary">Paste image</button>
+        <label class="btn">Choose photos<input id="file" name="photos" type="file" accept="image/*" multiple hidden /></label>
       </div>
       <p class="muted small">Tip: on iPhone, tap the screenshot preview → Share → Copy, then come back and tap Paste.</p>
     </div>
   </section>
 
-  <section id="modeChapter" class="mode hidden">
+  <section id="modeChapter" class="mode hidden" role="tabpanel" aria-labelledby="tabChapter">
     <!-- Shown once a fetcher is connected and verified -->
     <div id="chapterReady" class="hidden">
       <form id="chapterForm" class="chapter-form">
-        <input id="chapterUrl" type="url" inputmode="url" placeholder="Paste a chapter link" required />
+        <input id="chapterUrl" name="chapter" type="url" inputmode="url" placeholder="https://…/chapter-1" aria-label="Chapter link" autocomplete="off" spellcheck="false" autocapitalize="off" required />
         <button class="primary" type="submit">Load</button>
       </form>
       <p class="muted small"><span id="fetcherStatus"></span> · <button type="button" id="btnFetcherManage" class="linkbtn">Fetcher &amp; other devices</button></p>
@@ -58,7 +91,7 @@
       <div class="choice">
         <h3>Got a connection link?</h3>
         <p class="muted small">Someone who already has a fetcher can send you one. Paste it here.</p>
-        <div class="row"><input id="wzLink" type="url" inputmode="url" placeholder="https://gywreb.github.io/gytakusub/#connect=…" autocomplete="off" /><button type="button" id="wzLinkConnect" class="primary">Connect</button></div>
+        <div class="row"><input id="wzLink" name="connection-link" type="url" inputmode="url" placeholder="https://gywreb.github.io/gytakusub/#connect=…" aria-label="Connection link" autocomplete="off" spellcheck="false" autocapitalize="off" /><button type="button" id="wzLinkConnect" class="primary">Connect</button></div>
         <p id="wzLinkMsg" class="hint" role="status"></p>
       </div>
 
@@ -127,14 +160,14 @@
           <li data-step="6">
             <h3><button type="button" class="step-title">Connect</button></h3>
             <div class="step-body" id="wzStep5">
-              <label>Fetcher address <input id="wzUrl" type="url" inputmode="url" placeholder="https://gytakusub.your-name.workers.dev" autocomplete="off" /></label>
-              <label>Access key <input id="wzKeyInput" type="password" placeholder="filled in from step 2" autocomplete="off" /></label>
+              <label>Fetcher address <input id="wzUrl" name="fetcher-url" type="url" inputmode="url" placeholder="https://gytakusub.your-name.workers.dev" autocomplete="off" spellcheck="false" autocapitalize="off" /></label>
+              <label>Access key <input id="wzKeyInput" name="fetcher-key" type="password" placeholder="Filled in from step 2…" autocomplete="off" spellcheck="false" autocapitalize="off" /></label>
               <div class="row"><button type="button" id="wzConnect" class="primary">Connect</button></div>
               <p id="wzMsg" class="hint" role="status"></p>
             </div>
           </li>
         </ol>
-        <div class="row step-nav"><button type="button" id="wzBack" class="btn small">‹ Back</button><button type="button" id="wzNext" class="primary">Done, next step ›</button></div>
+        <div class="row step-nav" id="wzStepNav"><button type="button" id="wzBack" class="btn small">‹ Back</button><button type="button" id="wzNext" class="primary">Done, next step ›</button></div>
         <details class="muted small">
           <summary>Update your fetcher later</summary>
           <p>If the app says your fetcher is out of date: open your <button type="button" class="chip" data-copy="gytakusub" title="Copy">gytakusub</button> copy on GitHub and click <b>Sync fork</b> → <b>Update branch</b>. Cloudflare redeploys by itself within a minute. Then Connect again.</p>
@@ -156,37 +189,55 @@
   </section>
 
   <div id="toolbar" class="toolbar hidden">
-    <span id="progress" class="muted small"></span>
-    <label class="check"><input type="checkbox" id="showOriginal" /> Show originals</label>
-    <button id="btnClear" class="btn small">Clear</button>
+    <span id="progress" class="muted small" aria-live="polite"></span>
+    <label class="switch"><input type="checkbox" id="showOriginal" /> Originals</label>
+    <button type="button" id="btnClear" class="btn small">Clear</button>
   </div>
 
-  <div id="pages" class="pages"></div>
+  <div id="pages" class="pages" data-mode="shots"></div>
   <div class="chapter-nav"><button id="navPrev" class="btn" hidden>‹ Previous chapter</button><button id="navNext" class="btn" hidden>Next chapter ›</button></div>
 </main>
 
-<div id="toast" class="toast" hidden></div>
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
-<dialog id="settings">
-  <form method="dialog" class="settings">
-    <h2>Settings</h2>
-    <label>Claude API key
-      <div class="row"><input id="sApiKey" type="password" placeholder="sk-ant-api03-…" autocomplete="off" /><button type="button" id="sShow" class="btn">Show</button></div>
-      <span class="hint">From platform.claude.com → Settings → API keys. Stored only in this browser.</span>
-    </label>
-    <label>Model <select id="sModel"></select></label>
-    <label>Target language <input id="sTargetLang" type="text" placeholder="English" /></label>
-    <label>Glossary <textarea id="sGlossary" rows="3" placeholder="Gojo Satoru = Satoru Gojo"></textarea></label>
-    <label>Extra instructions <textarea id="sCustomPrompt" rows="2" placeholder="Keep the tone casual."></textarea></label>
-    <label class="check"><input type="checkbox" id="sUseContext" /> Chapter context (names + recent lines)</label>
-    <label class="check"><input type="checkbox" id="sUppercase" /> UPPERCASE lettering</label>
-    <label class="check"><input type="checkbox" id="sRtl" /> Right-to-left two-page spreads on wide screens</label>
-    <div class="row end">
-      <button type="button" id="sTest" class="btn">Test Claude key</button>
-      <button id="sSave" class="primary" value="save">Save</button>
+<dialog id="settings" class="sheet-dialog" aria-labelledby="settingsTitle">
+  <form method="dialog" class="sheet">
+    <header class="sheet-head">
+      <h2 id="settingsTitle">Settings</h2>
+      <button type="submit" value="cancel" class="icon-btn" aria-label="Close settings" formnovalidate><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </header>
+    <div class="sheet-body">
+      <section class="group" aria-labelledby="sgClaude">
+        <h3 id="sgClaude">Claude</h3>
+        <label class="field">API key
+          <div class="row"><input id="sApiKey" name="claude-key" type="password" placeholder="sk-ant-api03-…" autocomplete="off" spellcheck="false" autocapitalize="off" /><button type="button" id="sShow" class="btn">Show</button></div>
+          <span class="hint">From platform.claude.com → Settings → API keys. Stored only on this device.</span>
+        </label>
+        <label class="field">Model <select id="sModel" name="model"></select></label>
+        <div class="row"><button type="button" id="sTest" class="btn small">Test the key</button></div>
+        <p id="sMsg" class="hint" role="status"></p>
+      </section>
+      <section class="group" aria-labelledby="sgTranslate">
+        <h3 id="sgTranslate">Translation</h3>
+        <label class="field">Target language <input id="sTargetLang" name="target-language" type="text" placeholder="English" autocomplete="off" /></label>
+        <label class="field">Glossary <textarea id="sGlossary" name="glossary" rows="3" placeholder="Gojo Satoru = Satoru Gojo" spellcheck="false"></textarea></label>
+        <label class="field">Extra instructions <textarea id="sCustomPrompt" name="instructions" rows="2" placeholder="Keep the tone casual."></textarea></label>
+        <label class="check"><input type="checkbox" id="sUseContext" name="context" /> Chapter context (names and recent lines)</label>
+        <label class="check"><input type="checkbox" id="sUppercase" name="uppercase" /> UPPERCASE lettering</label>
+      </section>
+      <section class="group" aria-labelledby="sgReading">
+        <h3 id="sgReading">Reading</h3>
+        <label class="check"><input type="checkbox" id="sRtl" name="rtl" /> Right-to-left two-page spreads on wide screens</label>
+      </section>
+      <section class="group" aria-labelledby="sgApp">
+        <h3 id="sgApp">App</h3>
+        <div class="row"><button type="button" id="btnShowInstall" class="btn small">Install on your phone or computer</button></div>
+        <p class="hint">Free software under the <a href="LICENSE" target="_blank">GNU AGPL v3</a> · <a href="https://github.com/gywreb/gytakusub" target="_blank" rel="noopener">source code</a> · <a href="THIRD_PARTY.md" target="_blank">third-party components</a></p>
+      </section>
     </div>
-    <p id="sMsg" class="hint"></p>
-    <p class="hint">Free software under the <a href="LICENSE" target="_blank">GNU AGPL v3</a> · <a href="https://github.com/gywreb/gytakusub" target="_blank" rel="noopener">source code</a> · <a href="THIRD_PARTY.md" target="_blank">third-party components</a></p>
+    <footer class="sheet-foot">
+      <button id="sSave" class="primary" value="save">Save</button>
+    </footer>
   </form>
 </dialog>
 
