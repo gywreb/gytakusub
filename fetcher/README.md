@@ -27,7 +27,7 @@ Cost: the Workers free plan (100,000 requests a day; one chapter is about one re
 2. **Copy the fetcher to your GitHub:** on [github.com/gywreb/gytakusub](https://github.com/gywreb/gytakusub), click **Fork** → **Create fork**.
 3. **Deploy it on Cloudflare:** Workers & Pages → Create application → GitHub → select your `gytakusub`. Fill in:
    - Worker name `gytakusub`. It must match `wrangler.toml`, or the build fails.
-   - Root directory `fetcher`.
+   - Path `fetcher`, under **Advanced settings**. (In the Worker's Settings → Build afterwards, the same field is called *Root directory*.)
    - Build command: empty.
    - Deploy command: `npx wrangler deploy`.
 

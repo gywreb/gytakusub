@@ -17,6 +17,7 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
   - **Setup wizard:** a numbered vertical stepper, with Back/Next under the open step.
   - **Install guide:** in-app, per platform (iPhone/iPad steps, the install button where the browser offers one, a QR code on computers). On a phone that hasn't installed the app, it comes before the key prompt.
   - **Accessibility:** visible keyboard focus, the tablist pattern with arrow keys, toasts and progress announced to screen readers, key fields without autocorrect, a theme colour for light and dark, and reduced motion respected.
+- Fixed in the fetcher setup guide: Cloudflare's create screen calls the root directory **Path**, under *Advanced settings*; the guide said *Root directory*, the name the docs and the Worker's Settings → Build use.
 
 ### Extension
 - **Popup and Options page redesigned** with the same look as the web app (`extension/ui.css`), checked in dark and light and in narrow windows:
