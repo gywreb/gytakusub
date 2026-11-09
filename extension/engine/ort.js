@@ -47,14 +47,25 @@ export function gpuAvailable() {
 /**
  * Loads a model for inference, on the GPU when asked and available, else the CPU.
  * @param {Uint8Array} bytes the .onnx file
- * @param {{gpu?: boolean} & object} [opts] gpu: try WebGPU first; the rest are getOrt options
+ * @param {{gpu?: boolean, strict?: boolean} & object} [opts] gpu: try WebGPU first; strict: fail instead of
+ *   falling back to the CPU (a caller with a separate CPU variant of the model); the rest are getOrt options
  * @returns {Promise<{session: object, ep: "webgpu"|"wasm"}>}
  */
-export async function createSession(bytes, opts = {}) {
+export function createSession(bytes, opts = {}) {
+  // One at a time: ORT's WebGPU backend refuses to create a session while another
+  // is being created ("another WebGPU EP inference session is being created"),
+  // and the text detector and the bubble model load in parallel.
+  const next = creating.then(() => create(bytes, opts));
+  creating = next.catch(() => {});
+  return next;
+}
+let creating = Promise.resolve();
+
+async function create(bytes, opts) {
   const o = getOrt(opts);
   if (opts.gpu && await gpuAvailable()) {
     try { return { session: await o.InferenceSession.create(bytes, { executionProviders: ["webgpu"], graphOptimizationLevel: "all" }), ep: "webgpu" }; }
-    catch (e) { console.warn("Gytakusub: GPU session failed, using the CPU", e); }
-  }
+    catch (e) { if (opts.strict) throw e; console.warn("Gytakusub: GPU session failed, using the CPU", e); }
+  } else if (opts.strict) throw new Error("no WebGPU adapter");
   return { session: await o.InferenceSession.create(bytes, { executionProviders: ["wasm"], graphOptimizationLevel: "all" }), ep: "wasm" };
 }

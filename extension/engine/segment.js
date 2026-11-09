@@ -12,6 +12,8 @@
 // Coordinates are those of the letterboxed model input; results are mapped
 // back to the pixels of the image given.
 
+import { createSession } from "./ort.js";
+
 const sigmoid = (v) => 1 / (1 + Math.exp(-v));
 
 /**
@@ -34,8 +36,9 @@ const sigmoid = (v) => 1 / (1 + Math.exp(-v));
  * @returns {Promise<Segmenter>}
  */
 export async function loadSegmenter(ort, bytes, cfg = {}) {
-  const ep = (cfg.executionProviders || ["wasm"])[0];
-  const session = await ort.InferenceSession.create(bytes, { executionProviders: [ep], graphOptimizationLevel: "all" });
+  const want = (cfg.executionProviders || ["wasm"])[0];
+  // through engine/ort.js, which serialises session creation (WebGPU requires it)
+  const { session, ep } = await createSession(bytes, { gpu: want === "webgpu", strict: want === "webgpu" });
   const inputName = session.inputNames[0];
   // a static input shape wins over the configured size
   const meta = session.inputMetadata?.[inputName] || session.inputMetadata?.[0];

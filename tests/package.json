@@ -4,7 +4,7 @@
   "type": "commonjs",
   "scripts": {
     "test": "node engine.test.mjs && node segment.test.mjs && node gpu.test.mjs",
-    "test:browser": "node browser/run.mjs --out /tmp/gyt-browser/good && node browser/run.mjs --bad-boxes --out /tmp/gyt-browser/bad-boxes && node browser/run.mjs --segmenter /tmp/gyt-fake-seg.onnx --out /tmp/gyt-browser/segmented && node browser/run.mjs --gpu --out /tmp/gyt-browser/gpu && node browser/web.mjs --out /tmp/gyt-browser/web",
+    "test:browser": "node browser/run.mjs --out /tmp/gyt-browser/good && node browser/run.mjs --bad-boxes --out /tmp/gyt-browser/bad-boxes && node browser/run.mjs --segmenter /tmp/gyt-fake-seg.onnx --out /tmp/gyt-browser/segmented && node browser/run.mjs --gpu --require-gpu --out /tmp/gyt-browser/gpu && node browser/web.mjs --out /tmp/gyt-browser/web",
     "e2e": "node engine-e2e.mjs fixtures/demo-page.png fixtures/demo-items.json /tmp/gyt-e2e.png",
     "viz": "node engine-viz.mjs",
     "demo": "python3 make-demo-page.py fixtures && python3 make-pages.py fixtures 12",
