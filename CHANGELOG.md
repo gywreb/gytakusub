@@ -17,8 +17,12 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
 
 - **Guided setup inside the Chapter link tab.** Until a fetcher is connected, the tab shows the setup steps instead of the chapter form, and it unlocks only after the fetcher answers with the user's key and is new enough. The steps:
   1. The app generates a 32-character key.
-  2. **Deploy to Cloudflare** copies the fetcher into the user's GitHub/GitLab and deploys it, asking for the key (a placeholder the Worker refuses until replaced).
-  3. **Connect**.
+  2. Fork the repository on GitHub.
+  3. On Cloudflare, Create application → GitHub → the fork, with the name `gytakusub` and root directory `fetcher`.
+  4. Add the key as the Secret `GYT_KEY`.
+
+  (The first version of this guide used Cloudflare's "Deploy to Cloudflare" button. When the owner tried it, that screen required choosing an existing repository, which a new user doesn't have, so the guide was rewritten around forking.) People given a **connection link** paste it in the box at the top and skip the setup.
+  5. **Connect**.
 
   Each failure is explained: a wrong key, a key not set yet, an outdated fetcher, nothing at that address. A **connection link** sets up another device (the key travels in the `#fragment`, never to a server); someone given a shared address and key starts at step 3.
 - **Keeping the guide current:** step 2 names the Cloudflare pages it follows and the date it was checked against them (`fetcher/guide-sources.json`). A weekly workflow (`guide-check.yml`) re-reads those pages, the Deploy link and MangaDex's API, and opens an issue when one changed. Tests tie the in-app links to that list.

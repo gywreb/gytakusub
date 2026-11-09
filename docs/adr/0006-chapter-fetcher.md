@@ -198,20 +198,29 @@ succeeds:
 - A 401, a setup error or an outdated fetcher during reading sends the user
   back to the steps, with the reason.
 
-**Deploy path.** Cloudflare's dashboard docs (updated June 2026) now describe
-dashboard-created Workers as Git-connected and no longer describe editing
-code in the dashboard. Their official one-click route is the *Deploy to
-Cloudflare* button (docs updated 12 Oct 2026):
+**Deploy path.** The first version of this guide used Cloudflare's *Deploy to
+Cloudflare* button. The docs (updated 12 Oct 2026) say the button clones the
+source into a new repository on the user's account. When the owner tried it
+on 2026-11-09, the screen instead required choosing an *existing* repository
+in his GitHub account, which a new user doesn't have. The guide was rewritten
+around the route Cloudflare documents for existing repositories (Workers
+Builds, docs updated 28 Oct and 8 Nov 2026):
 
-- The button URL points at the `fetcher/` folder, which is self-contained, as
-  the button requires.
-- `fetcher/.dev.vars.example` makes the deploy page ask for `GYT_KEY`. Its
-  placeholder `CHANGE_ME` is shorter than 24 characters, so the Worker
-  refuses to run until the user puts their key in.
-- The command line (`wrangler`) is the alternative for users without
-  GitHub/GitLab.
-- The paste-into-dashboard route was dropped, because current docs can't
-  confirm it.
+1. Fork `gywreb/gytakusub`.
+2. Workers & Pages → Create application → GitHub → select the fork.
+3. Worker name `gytakusub`: Cloudflare fails the build unless it matches
+   `name` in the root directory's `wrangler.toml`. A test keeps the guide and
+   `wrangler.toml` in step.
+4. Root directory `fetcher`; build command empty; deploy command
+   `npx wrangler deploy`.
+5. Add the Secret `GYT_KEY` (this route doesn't prompt for it), then Connect.
+
+**Updates:** GitHub's *Sync fork*; Workers Builds redeploys on the push. The
+dashboard-paste route remains out, since current docs don't describe it.
+
+**People given access** don't touch either service. The tab's first box takes
+a pasted connection link. Pasting matters on iPhone, where a link opened in
+Safari doesn't reach the Home Screen app's storage.
 
 **Staying current.**
 
@@ -220,8 +229,10 @@ Cloudflare* button (docs updated 12 Oct 2026):
 - `guide-check.yml` runs weekly. It reads each page's `dateModified`, probes
   the Deploy link and MangaDex's at-home API, and opens or updates one issue
   when anything changed or broke.
-- `tests/fetcher.test.mjs` fails if the app links to a Cloudflare page or a
-  deploy URL the check doesn't watch.
+- `tests/fetcher.test.mjs` fails in three cases:
+  - the app links to a Cloudflare page the check doesn't watch;
+  - the guide's Worker name differs from `wrangler.toml`;
+  - the root directory isn't `fetcher`.
 
 What this can't do: notice a change in the deploy screens that Cloudflare
 makes without updating those pages. The check date shown in the app and
@@ -229,10 +240,9 @@ Cloudflare's own help links are the fallback for that.
 
 ## Consequences
 
-- Chapter links need about 5 minutes of setup once (Cloudflare and GitHub or
-  GitLab accounts), or a shared address and key. The fetcher is updated by
-  replacing `worker.js` in the user's repository; the app says when that is
-  needed.
+- Chapter links need about 10 minutes of setup once (GitHub and Cloudflare
+  accounts), or a connection link from someone who has a fetcher. Updating is
+  *Sync fork* on GitHub; the app says when it is needed.
 - **Not covered:**
   - sites behind Cloudflare or DDoS-Guard bot checks (common on large
     aggregators);

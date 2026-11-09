@@ -53,52 +53,71 @@
     <!-- Setup: the Chapter link form stays hidden until this is done -->
     <div id="fetcherWizard" class="wizard hidden">
       <h2>Set up chapter links</h2>
-      <p>To open a chapter from another site, Gytakusub needs a small <b>fetcher</b> on your own free Cloudflare account. A web page isn't allowed to read other sites (the browser blocks it), but your fetcher can: it opens the chapter and passes its pages to this app. It stores nothing and never sees your Claude key.</p>
-      <p class="muted small">About 5 minutes, once. You need a free Cloudflare account and a GitHub or GitLab account. A computer is easiest; afterwards, a link connects your phone. Screenshot mode works without any of this.</p>
-      <p class="muted small"><b>Already have a fetcher address and key</b> (for example, someone shared theirs)? Go straight to step 3.</p>
+      <p>Browsers don't let a web page read other websites. So chapter links go through a small program called a <b>fetcher</b>, running on a free Cloudflare account. It opens the chapter and passes the pages to this app. Screenshot mode works without it.</p>
 
-      <ol class="steps">
-        <li id="wzStep1">
-          <h3>Create your access key</h3>
-          <p>Only someone with this key can use your fetcher. Keep it private.</p>
-          <div class="row"><code id="wzKey" class="key">—</code><button type="button" id="wzGen" class="btn small">Generate key</button><button type="button" id="wzCopyKey" class="btn small" disabled>Copy</button></div>
-        </li>
-        <li id="wzStep2">
-          <h3>Deploy the fetcher to your Cloudflare account</h3>
-          <p><a id="wzDeploy" class="btn primary" target="_blank" rel="noopener">Deploy to Cloudflare ↗</a></p>
-          <ol class="sub">
-            <li>Sign in to Cloudflare, or create a free account and confirm your email.</li>
-            <li>Connect GitHub or GitLab when asked. Cloudflare copies the fetcher into a new repository on your account and deploys it from there.</li>
-            <li>On the setup page, keep the suggested names or choose your own. Where <code>GYT_KEY</code> is listed, replace <code>CHANGE_ME</code> with your key from step 1.</li>
-            <li>Deploy, and wait until the build finishes (about a minute).</li>
-            <li>Open the Worker's page (Cloudflare dashboard → <b>Workers &amp; Pages</b> → your Worker) and copy its address, which ends in <b>.workers.dev</b>.</li>
-          </ol>
-          <details class="muted small">
-            <summary>Forgot the key, or deployed without it?</summary>
-            <p>In Cloudflare, open the Worker → <b>Settings</b> → <b>Variables and Secrets</b>. Add (or edit) a <b>Secret</b> named <code>GYT_KEY</code> with your key, then <b>Deploy</b>.</p>
-          </details>
-          <details class="muted small">
-            <summary>No GitHub or GitLab account? Use the command line on a computer with Node.js</summary>
-            <p>Download the repository (<a href="https://github.com/gywreb/gytakusub/archive/refs/heads/main.zip" target="_blank" rel="noopener">zip</a>), open a terminal in its <code>fetcher</code> folder, and run:</p>
-            <pre>npx wrangler login
-npx wrangler secret put GYT_KEY
-npx wrangler deploy</pre>
-            <p>Paste your key when asked; <code>deploy</code> prints the address.</p>
-          </details>
-          <p class="muted small">Cloudflare's own help, if a screen looks different: <a href="https://developers.cloudflare.com/workers/platform/deploy-buttons/" target="_blank" rel="noopener">Deploy to Cloudflare</a> · <a href="https://developers.cloudflare.com/workers/configuration/secrets/" target="_blank" rel="noopener">secrets</a>. The steps were checked against those pages on <span id="wzChecked"></span>.</p>
-        </li>
-        <li id="wzStep3">
-          <h3>Connect</h3>
-          <label>Fetcher address <input id="wzUrl" type="url" inputmode="url" placeholder="https://gytakusub.your-name.workers.dev" autocomplete="off" /></label>
-          <label>Access key <input id="wzKeyInput" type="password" placeholder="the key from step 1" autocomplete="off" /></label>
-          <div class="row"><button type="button" id="wzConnect" class="primary">Connect</button></div>
-          <p id="wzMsg" class="hint" role="status"></p>
-        </li>
-      </ol>
-      <details class="muted small">
-        <summary>Update your fetcher</summary>
-        <p>When Gytakusub says your fetcher is out of date: in the repository Cloudflare created on your GitHub or GitLab, open <code>worker.js</code> and edit it. Replace its whole content with this app's version (<button type="button" id="wzCopyCode" class="linkbtn">copy the fetcher code</button>), and commit. Cloudflare deploys the change by itself; then Connect again.</p>
-      </details>
+      <div class="choice">
+        <h3>Got a connection link?</h3>
+        <p class="muted small">Someone who already has a fetcher can send you one. Paste it here.</p>
+        <div class="row"><input id="wzLink" type="url" inputmode="url" placeholder="https://gywreb.github.io/gytakusub/#connect=…" autocomplete="off" /><button type="button" id="wzLinkConnect" class="primary">Connect</button></div>
+        <p id="wzLinkMsg" class="hint" role="status"></p>
+      </div>
+
+      <div class="choice">
+        <h3>Or set up your own fetcher</h3>
+        <p class="muted small">Free, about 10 minutes, once. You need a free <b>GitHub</b> account and a free <b>Cloudflare</b> account. A computer is easiest; afterwards you can connect your phone with a link.</p>
+        <ol class="steps">
+          <li id="wzStep1">
+            <h3>Create your access key</h3>
+            <p>Only someone with this key can use your fetcher. You'll paste it in step 4.</p>
+            <div class="row"><code id="wzKey" class="key">—</code><button type="button" id="wzGen" class="btn small">Generate key</button><button type="button" id="wzCopyKey" class="btn small" disabled>Copy</button></div>
+          </li>
+          <li id="wzStep2">
+            <h3>Copy the fetcher to your GitHub</h3>
+            <ol class="sub">
+              <li>Open <a href="https://github.com/gywreb/gytakusub" target="_blank" rel="noopener">github.com/gywreb/gytakusub ↗</a> and sign in (or create a free account).</li>
+              <li>Click <b>Fork</b> (top right), then <b>Create fork</b>. You now have your own copy, also called <code>gytakusub</code>.</li>
+            </ol>
+          </li>
+          <li id="wzStep3">
+            <h3>Deploy it on Cloudflare</h3>
+            <ol class="sub">
+              <li>Open <a href="https://dash.cloudflare.com/" target="_blank" rel="noopener">dash.cloudflare.com ↗</a> and sign in (or create a free account and confirm your email).</li>
+              <li>Go to <b>Workers &amp; Pages</b> → <b>Create application</b> → <b>GitHub</b>. If asked, allow Cloudflare to see your GitHub repositories.</li>
+              <li>Select your copy, <b>gytakusub</b>.</li>
+              <li>Fill in the settings. Anything not listed here, leave as it is:
+                <ul>
+                  <li><b>Project / Worker name:</b> <code>gytakusub</code>. It must be exactly this, or the build fails.</li>
+                  <li><b>Root directory:</b> <code>fetcher</code> (it may be under <i>Advanced settings</i>).</li>
+                  <li><b>Build command:</b> leave empty.</li>
+                  <li><b>Deploy command:</b> <code>npx wrangler deploy</code>.</li>
+                </ul>
+              </li>
+              <li>Click <b>Save and Deploy</b> and wait for it to finish (about a minute).</li>
+            </ol>
+          </li>
+          <li id="wzStep4">
+            <h3>Give the fetcher your key</h3>
+            <ol class="sub">
+              <li>On the Worker's page, open <b>Settings</b> → <b>Variables and Secrets</b> → <b>Add</b>.</li>
+              <li>Type: <b>Secret</b>. Variable name: <code>GYT_KEY</code>. Value: your key from step 1.</li>
+              <li>Click <b>Deploy</b>.</li>
+              <li>Copy the Worker's address from its page. It looks like <code>https://gytakusub.<i>your-name</i>.workers.dev</code>.</li>
+            </ol>
+          </li>
+          <li id="wzStep5">
+            <h3>Connect</h3>
+            <label>Fetcher address <input id="wzUrl" type="url" inputmode="url" placeholder="https://gytakusub.your-name.workers.dev" autocomplete="off" /></label>
+            <label>Access key <input id="wzKeyInput" type="password" placeholder="the key from step 1" autocomplete="off" /></label>
+            <div class="row"><button type="button" id="wzConnect" class="primary">Connect</button></div>
+            <p id="wzMsg" class="hint" role="status"></p>
+          </li>
+        </ol>
+        <details class="muted small">
+          <summary>Update your fetcher later</summary>
+          <p>If the app says your fetcher is out of date: open your <code>gytakusub</code> copy on GitHub, click <b>Sync fork</b> → <b>Update branch</b>. Cloudflare redeploys by itself within a minute. Then tap Connect again.</p>
+        </details>
+        <p class="muted small">If a Cloudflare screen looks different, see Cloudflare's own help: <a href="https://developers.cloudflare.com/workers/ci-cd/builds/" target="_blank" rel="noopener">deploying from GitHub</a> · <a href="https://developers.cloudflare.com/workers/configuration/secrets/" target="_blank" rel="noopener">adding a secret</a>. These steps were last checked against those pages on <span id="wzChecked"></span>.</p>
+      </div>
     </div>
 
     <!-- Fetcher management, once connected -->
@@ -106,7 +125,7 @@ npx wrangler deploy</pre>
       <h2>Your fetcher</h2>
       <p id="manageStatus"></p>
       <h3>Use it on another device</h3>
-      <p>Copy this link and open it on your phone or other computer, for example by sending it to yourself. It fills in the address and key there; you then tap Connect. It contains your key: don't share it with anyone you wouldn't give the key to.</p>
+      <p>Copy this link and open it on your phone or another computer, or paste it into the Chapter link tab there. Give it only to people you trust with your fetcher: it contains your key.</p>
       <div class="row"><button type="button" id="mgCopyLink" class="btn small">Copy connection link</button></div>
       <h3>Change or disconnect</h3>
       <div class="row"><button type="button" id="mgSetup" class="btn small">Open the setup steps</button><button type="button" id="mgForget" class="btn small">Disconnect this device</button><button type="button" id="mgDone" class="btn small">Back to chapters</button></div>

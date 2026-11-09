@@ -192,15 +192,14 @@ for (const [what, html] of [["100 KB of unclosed <img ", "<img ".repeat(20000)],
 {
   const guide = JSON.parse(fs.readFileSync(new URL("../fetcher/guide-sources.json", import.meta.url), "utf8"));
   const html = fs.readFileSync(new URL("../web/index.html", import.meta.url), "utf8");
-  const client = fs.readFileSync(new URL("../web/fetcher-client.js", import.meta.url), "utf8");
-  const deploy = /DEPLOY_URL = "([^"]+)"/.exec(client)?.[1];
-  ok(guide.probes.some((p) => p.url === deploy), "the app's Deploy to Cloudflare link is one the weekly check probes");
+  ok(html.includes('href="https://github.com/gywreb/gytakusub"') && guide.probes.some((p) => p.url.startsWith("https://github.com/gywreb/gytakusub")), "the repository the guide tells people to fork is probed weekly");
+  const toml = fs.readFileSync(new URL("../fetcher/wrangler.toml", import.meta.url), "utf8");
+  const name = /^name\s*=\s*"([^"]+)"/m.exec(toml)?.[1];
+  ok(name && html.includes(`<b>Project / Worker name:</b> <code>${name}</code>`), `the Worker name the guide asks for is the one in wrangler.toml (${name}); Cloudflare fails the build otherwise`);
+  ok(html.includes("<b>Root directory:</b> <code>fetcher</code>"), "the guide's root directory is the fetcher folder");
   const docLinks = [...html.matchAll(/href="(https:\/\/developers\.cloudflare\.com\/[^"]+)"/g)].map((m) => m[1]);
   ok(docLinks.length >= 2 && docLinks.every((u) => guide.pages.some((p) => p.url.replace(/index\.md$/, "") === u)), "every Cloudflare page the guide links to is watched by the weekly check", JSON.stringify(docLinks));
   ok(/^\d{4}-\d{2}-\d{2}$/.test(guide.checked) && guide.pages.every((p) => /^\d{4}-\d{2}-\d{2}$/.test(p.dateModified)), "the guide sources carry their check dates");
-  const ex = fs.readFileSync(new URL("../fetcher/.dev.vars.example", import.meta.url), "utf8");
-  const placeholder = /^GYT_KEY=(.*)$/m.exec(ex)?.[1];
-  ok(placeholder && placeholder.length < 24, "the deploy prompt's placeholder key (.dev.vars.example) is refused by the Worker until replaced");
 }
 
 console.log(failures ? `FETCHER TESTS FAILED (${failures} of ${failures + passes})` : `FETCHER TESTS PASSED (${passes})`);

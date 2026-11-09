@@ -114,7 +114,7 @@ await page2.waitForTimeout(500);
 // No fetcher yet: the tab shows the setup steps, and the chapter form is not reachable.
 if (!(await page2.isVisible("#fetcherWizard"))) fail("without a connected fetcher the Chapter link tab must show the setup steps");
 if (await page2.isVisible("#chapterForm")) fail("the chapter form must stay hidden until a fetcher is connected");
-if ((await page2.getAttribute("#wzDeploy", "href")) !== "https://deploy.workers.cloudflare.com/?url=https://github.com/gywreb/gytakusub/tree/main/fetcher") fail("step 2 must link to Deploy to Cloudflare for the fetcher folder");
+if (!(await page2.isVisible('a[href="https://github.com/gywreb/gytakusub"]')) || !(await page2.isVisible('a[href="https://dash.cloudflare.com/"]'))) fail("the steps must link to the repository to fork and to the Cloudflare dashboard");
 await page2.click("#wzGen");
 const genKey = (await page2.textContent("#wzKey")).trim();
 if (!/^[A-Za-z0-9]{32}$/.test(genKey) || (await page2.inputValue("#wzKeyInput")) !== genKey) fail("Generate key should make a 32-character key and fill it into step 3: " + genKey);
@@ -173,6 +173,15 @@ await page3.goto(link); await page3.waitForTimeout(500);
 if (!(await page3.isVisible("#fetcherWizard")) || (await page3.inputValue("#wzKeyInput")) !== KEY || /connect=/.test(page3.url())) fail("a connection link should fill in the fetcher, wait for Connect, and leave the address bar: " + page3.url());
 await page3.click("#wzConnect");
 await page3.waitForSelector("#chapterForm", { state: "visible", timeout: 15000 }).catch(() => fail("the connection link's fetcher should connect on another device"));
+// …or pasted into the "Got a connection link?" box (iPhone: the Home Screen app doesn't receive links opened in Safari)
+const page4 = await (await browser.newContext()).newPage();
+await page4.addInitScript(() => localStorage.setItem("gytakusub.settings", JSON.stringify({ apiKey: "sk-ant-test" })));
+await page4.goto(`http://127.0.0.1:${WEB_PORT}/`); await page4.click('.tab[data-mode="chapter"]'); await page4.waitForTimeout(300);
+await page4.fill("#wzLink", "not a link"); await page4.click("#wzLinkConnect");
+if (!/isn't a connection link/.test(await page4.textContent("#wzLinkMsg"))) fail("pasting something that isn't a connection link should say so");
+await page4.fill("#wzLink", link); await page4.click("#wzLinkConnect");
+await page4.waitForSelector("#chapterForm", { state: "visible", timeout: 15000 }).catch(() => fail("a pasted connection link should connect"));
+await page4.context().close();
 await page2.click('.tab[data-mode="chapter"]');
 await page2.setViewportSize({ width: 390, height: 844 });
 await ctx3.close();

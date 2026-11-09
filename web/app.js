@@ -1,6 +1,6 @@
 // Gytakusub Web – UI.
 import { loadSettings, saveSettings, loadImage, blobToDataUrl, translateImage, renderPage, testKey } from "./translator.js";
-import { isConnected, connectFetcher, loadChapter, fetchPageImage, generateKey, connectionLink, readConnectionLink, FETCHER_VERSION, DEPLOY_URL } from "./fetcher-client.js";
+import { isConnected, connectFetcher, loadChapter, fetchPageImage, generateKey, connectionLink, readConnectionLink } from "./fetcher-client.js";
 import { MODELS } from "./prompt.js";
 
 const $ = (id) => document.getElementById(id);
@@ -274,7 +274,6 @@ async function copyText(text, what) {
   try { await navigator.clipboard.writeText(text); toast(`${what} copied`); }
   catch { prompt(`Copy ${what.toLowerCase()}:`, text); }
 }
-$("wzDeploy").href = DEPLOY_URL;
 // When the steps were last checked against Cloudflare's pages (fetcher/guide-sources.json; a weekly CI job flags changes).
 fetch("fetcher-guide.json").then((r) => r.json()).then((g) => { $("wzChecked").textContent = new Date(g.checked + "T00:00:00Z").toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }); }).catch(() => {});
 $("wzGen").onclick = () => {
@@ -284,19 +283,27 @@ $("wzGen").onclick = () => {
   settings = { ...settings, fetcherKey: key, fetcherCheck: null }; saveSettings(settings);
 };
 $("wzCopyKey").onclick = () => copyText($("wzKey").textContent, "Key");
-$("wzConnect").onclick = async () => {
-  wizardMsg("", "Connecting…"); $("wzConnect").disabled = true;
+async function connect(url, key, button, show) {
+  show("", "Connecting…"); button.disabled = true;
   try {
-    const fields = await connectFetcher($("wzUrl").value, $("wzKeyInput").value.trim());
+    const fields = await connectFetcher(url, key);
     settings = { ...settings, ...fields }; saveSettings(settings);
-    wizardMsg("ok", `Connected (fetcher version ${fields.fetcherCheck.version}).`);
+    show("ok", `Connected (fetcher version ${fields.fetcherCheck.version}).`);
     await applyChapterMode("ready");
     toast("Fetcher connected. Paste a chapter link.");
   } catch (e) {
-    wizardMsg("err", e.message);
-  } finally { $("wzConnect").disabled = false; }
+    show("err", e.message);
+  } finally { button.disabled = false; }
+}
+$("wzConnect").onclick = () => connect($("wzUrl").value, $("wzKeyInput").value.trim(), $("wzConnect"), wizardMsg);
+// A connection link pasted as text (on iPhone the Home Screen app and Safari keep separate settings, so opening the link may not reach the app)
+$("wzLinkConnect").onclick = () => {
+  const show = (kind, text) => { const m = $("wzLinkMsg"); m.className = "hint" + (kind ? " " + kind : ""); m.textContent = text; };
+  const raw = $("wzLink").value.trim();
+  const shared = readConnectionLink(raw.includes("#") ? raw.slice(raw.indexOf("#")) : "");
+  if (!shared) return show("err", "That isn't a connection link. It looks like https://gywreb.github.io/gytakusub/#connect=…");
+  connect(shared.url, shared.key, $("wzLinkConnect"), show);
 };
-$("wzCopyCode").onclick = async () => copyText(await (await fetch("fetcher-worker.js")).text(), "Fetcher code");
 $("btnFetcherManage").onclick = () => applyChapterMode("manage");
 $("mgDone").onclick = () => applyChapterMode("ready");
 $("mgSetup").onclick = () => applyChapterMode("wizard");
@@ -317,9 +324,10 @@ await applyChapterMode();
 if (shared) {
   setMode("chapter");
   await applyChapterMode("wizard");
+  $("wzLink").value = location.origin + location.pathname + "#connect=…";
   $("wzUrl").value = shared.url; $("wzKeyInput").value = shared.key;
-  wizardMsg("", `A connection link filled in the fetcher at ${shared.url}. If that is your fetcher, tap Connect.`);
-  $("wzStep3").scrollIntoView({ block: "center" });
+  wizardMsg("", `A connection link filled in the fetcher at ${shared.url}. If you trust it, tap Connect.`);
+  $("wzStep5").scrollIntoView({ block: "center" });
 }
 // ?chapter=<link> (the bookmarklet in fetcher/README.md) fills in that chapter; it opens on a tap of Load, so a link
 // someone else sent can't make the fetcher visit a site or spend Claude credits by itself.
