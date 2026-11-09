@@ -181,11 +181,58 @@ the documented theme markup, not saved copies of real pages. Live coverage is
 verified once the owner's Worker is deployed, starting with the two sites he
 reads (MangaDex and a MangaThemesia raw site).
 
+## Setup and keeping it current (added the same day, at the owner's request)
+
+The owner asked for the setup guide to live inside the feature, for the
+feature to stay locked until everything is in place, and for the guide not to
+go out of date.
+
+**Gate.** The Chapter link tab shows the setup steps until *Connect*
+succeeds:
+
+- `/ping` must answer with the user's key, and with a version at least that
+  of the `fetcher/worker.js` the app was built with.
+- The app stores a SHA-256 signature of address and key with the version it
+  saw.
+- The chapter form appears only while that signature matches.
+- A 401, a setup error or an outdated fetcher during reading sends the user
+  back to the steps, with the reason.
+
+**Deploy path.** Cloudflare's dashboard docs (updated June 2026) now describe
+dashboard-created Workers as Git-connected and no longer describe editing
+code in the dashboard. Their official one-click route is the *Deploy to
+Cloudflare* button (docs updated 12 Oct 2026):
+
+- The button URL points at the `fetcher/` folder, which is self-contained, as
+  the button requires.
+- `fetcher/.dev.vars.example` makes the deploy page ask for `GYT_KEY`. Its
+  placeholder `CHANGE_ME` is shorter than 24 characters, so the Worker
+  refuses to run until the user puts their key in.
+- The command line (`wrangler`) is the alternative for users without
+  GitHub/GitLab.
+- The paste-into-dashboard route was dropped, because current docs can't
+  confirm it.
+
+**Staying current.**
+
+- The guide names the Cloudflare pages it follows and the date it was last
+  checked against them (`fetcher/guide-sources.json`, shown in step 2).
+- `guide-check.yml` runs weekly. It reads each page's `dateModified`, probes
+  the Deploy link and MangaDex's at-home API, and opens or updates one issue
+  when anything changed or broke.
+- `tests/fetcher.test.mjs` fails if the app links to a Cloudflare page or a
+  deploy URL the check doesn't watch.
+
+What this can't do: notice a change in the deploy screens that Cloudflare
+makes without updating those pages. The check date shown in the app and
+Cloudflare's own help links are the fallback for that.
+
 ## Consequences
 
-- Chapter links need about 10 minutes of setup once (Cloudflare account,
-  paste, secret), and the fetcher must be updated by hand (paste again) when
-  `worker.js` changes.
+- Chapter links need about 5 minutes of setup once (Cloudflare and GitHub or
+  GitLab accounts), or a shared address and key. The fetcher is updated by
+  replacing `worker.js` in the user's repository; the app says when that is
+  needed.
 - **Not covered:**
   - sites behind Cloudflare or DDoS-Guard bot checks (common on large
     aggregators);

@@ -19,38 +19,30 @@ The app tells you when that's the case. For those sites use screenshot mode, or 
 
 Cost: the Workers free plan (100,000 requests a day; one chapter is about one request per page plus one). No card needed.
 
-## Set it up in the browser (about 10 minutes, no tools)
+## Set it up
 
-1. Create a free account at https://dash.cloudflare.com/sign-up and verify your email.
-2. In the dashboard, open **Workers & Pages** → **Create** → **Start with Hello World** (or *Create Worker*). Name it `gytakusub` → **Deploy**.
-   The first time, Cloudflare asks you to pick a `workers.dev` subdomain; any name works.
-3. On the Worker's page, open **Edit code**:
-   1. Delete everything in the editor.
-   2. Paste the whole of [`worker.js`](https://raw.githubusercontent.com/gywreb/gytakusub/main/fetcher/worker.js) (open the link, select all, copy).
-   3. Click **Deploy**.
-4. Go back to the Worker → **Settings** → **Variables and Secrets** → **Add**:
-   1. Type: **Secret**.
-   2. Name: `GYT_KEY`.
-   3. Value: a random password of at least 24 characters (a password manager can generate one). The Worker refuses shorter keys.
-   4. Click **Deploy** (or **Save**).
-5. Copy the Worker's address from its overview page, for example `https://gytakusub.your-name.workers.dev`.
-6. In Gytakusub (web app) → ⚙ Settings → **Chapter fetcher**:
-   1. Paste the address and the same `GYT_KEY` value.
-   2. Click **Test fetcher**. It should say *Fetcher works (version 2.1.0)*.
-   3. Click **Save**.
+**Follow the steps in the app:** open Gytakusub → **Chapter link**. Until a fetcher is connected, that tab shows the setup instead of the chapter form, and it unlocks only when the fetcher answers with your key. There are three steps, about 5 minutes:
 
-Then open **Chapter link**, paste a chapter's address, and **Load**. Pages translate as you scroll; **Next chapter ›** at the bottom opens the next one, keeping the names and recent lines for consistency.
+1. **Create your access key.** The app generates a 32-character key.
+2. **Deploy the fetcher.** The [Deploy to Cloudflare](https://deploy.workers.cloudflare.com/?url=https://github.com/gywreb/gytakusub/tree/main/fetcher) button copies this folder into a new repository on your GitHub or GitLab account and deploys it to your free Cloudflare account. On its setup page you replace `CHANGE_ME` with your key. The Worker refuses to run with the placeholder or any key under 24 characters.
+3. **Connect.** Paste the Worker's `….workers.dev` address and tap Connect.
+
+The app's steps are the maintained version. They name the Cloudflare pages they follow and the date they were last checked against them. A weekly job (`.github/workflows/guide-check.yml`) re-reads those pages and opens an issue when one changes, so the steps get reviewed before anyone meets a changed screen. What it watches: [`guide-sources.json`](guide-sources.json).
+
+**Other devices:** once connected, **Fetcher & other devices → Copy connection link**. Open the link on your phone and tap Connect. The link contains your key, so send it only to yourself.
+
+**Sharing your fetcher:** someone you give the address and key to needs no Cloudflare account; they start at step 3. Their reading then counts against your free daily allowance.
 
 **The key is what protects your fetcher.** Its address isn't secret: the sites it visits can see which Worker made the request.
 - Anyone without the key gets "401" and nothing else.
 - Anyone who knows the address can still use up the free plan's daily request allowance, which only stops your fetcher until midnight UTC.
-- If the key leaks, change `GYT_KEY` on the Worker and in the app.
+- If the key leaks, change `GYT_KEY` on the Worker (Settings → Variables and Secrets) and connect again.
 
 **Optional:** add a plain-text variable `ALLOWED_ORIGINS` = `https://gywreb.github.io`. Browsers on other websites then can't use your fetcher even with the key. It doesn't stop scripts outside a browser; only the key does that.
 
-**Updating:** when a new version of `worker.js` is released, repeat step 3. Your key stays.
+**Updating:** when the app says your fetcher is out of date, open the repository Cloudflare created for you and replace `worker.js` with the app's version (the app has a *copy the fetcher code* button under *Update your fetcher*). Commit, and Cloudflare redeploys by itself.
 
-## Or with the command line
+### Without GitHub or GitLab: the command line
 
 ```sh
 cd fetcher
@@ -58,6 +50,8 @@ npx wrangler login
 npx wrangler secret put GYT_KEY
 npx wrangler deploy
 ```
+
+`deploy` prints the address to paste in step 3.
 
 ## Open a chapter from the site you're reading (iPhone Safari, any desktop browser)
 
@@ -69,7 +63,7 @@ javascript:location.href='https://gywreb.github.io/gytakusub/?chapter='+encodeUR
 
 On a chapter page, open the bookmark. Gytakusub opens with that chapter filled in; tap **Load**. (Links never load by themselves, so a link someone sends you can't spend your credits.)
 
-On iPhone, the bookmark opens Gytakusub in Safari, which keeps its own settings separate from the Home Screen app's. Enter your Claude key and fetcher there once too.
+On iPhone, the bookmark opens Gytakusub in Safari, which keeps its own settings separate from the Home Screen app's. Enter your Claude key there once too, and connect the fetcher with your connection link.
 
 ## Errors the app may show
 
@@ -78,7 +72,9 @@ On iPhone, the bookmark opens Gytakusub in Safari, which keeps its own settings 
 | "checking your browser" wall | The site sends servers a bot check. The fetcher can't pass it. |
 | refuses the fetcher | HTTP 401/403: the site needs a login, or blocks servers. |
 | No chapter pages were found | The page has no image list the fetcher can read: the site builds it with a script after loading, or needs a login. |
-| refused the access key | The key in the app differs from the Worker's `GYT_KEY`. |
+| refused the access key | The key in the app isn't the Worker's `GYT_KEY`. |
+| no usable GYT_KEY yet | The Worker's key is missing, still `CHANGE_ME`, or under 24 characters. |
+| version … needs … or newer | The fetcher is older than the app: see *Updating* above. |
 | No answer from your fetcher | If **Test fetcher** also fails: the address is wrong, or the Worker isn't deployed. If the test works: the fetcher stopped on this page. The free plan allows 10 ms of work per request, and a page of several hundred KB with thousands of images can exceed it. |
 
 ## How it finds the pages

@@ -37,7 +37,7 @@ The copies under `extension/` are canonical; `node scripts/sync-shared.mjs` copi
 
 - **Extension**: see [`extension/README.md`](extension/README.md) (load unpacked, paste API key in Options, then enable the sites you read from the popup).
 - **Web app**: see [`web/README.md`](web/README.md). The `main` branch deploys `web/` to GitHub Pages automatically via `.github/workflows/pages.yml` (enable *Settings → Pages → Source: GitHub Actions* once).
-- **Chapter fetcher** (only for the web app's chapter links): see [`fetcher/README.md`](fetcher/README.md) — a free Cloudflare Worker on your own account, set up once in the browser.
+- **Chapter fetcher** (only for the web app's chapter links): a free Cloudflare Worker on your own account. The web app's Chapter link tab walks you through it and stays locked until it works; details in [`fetcher/README.md`](fetcher/README.md).
 - **API key**: platform.claude.com → Settings → API keys. Max/Team plans include monthly API credits that cover this.
 
 ## Releasing

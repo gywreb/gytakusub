@@ -21,7 +21,7 @@ const root = path.resolve(here, "../..");
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d; };
 const out = arg("--out", "/tmp/gyt-browser/web"); fs.mkdirSync(out, { recursive: true });
 const pageImage = path.resolve(here, "../fixtures/demo-page.png");
-const API_PORT = 8787, WEB_PORT = 8788, FETCHER_PORT = 8789;
+const API_PORT = 8787, WEB_PORT = 8788, FETCHER_PORT = 8789, OLD_FETCHER_PORT = 8790;
 
 // Test copy of the web app with the shared files synced and the API URL mocked.
 execFileSync("sh", [path.join(root, "scripts/sync-shared.sh")], { stdio: "ignore" });
@@ -97,15 +97,49 @@ const fetcherSrv = http.createServer(async (req, res) => {
   res.end(Buffer.from(await r.arrayBuffer()));
 });
 await new Promise((r) => fetcherSrv.listen(FETCHER_PORT, "127.0.0.1", r));
+// a fetcher from an older release: answers /ping with version 2.0.0
+const oldSrv = http.createServer((req, res) => {
+  const cors = { "Access-Control-Allow-Origin": req.headers.origin || "*", "Access-Control-Allow-Headers": "Authorization" };
+  if (req.method === "OPTIONS") { res.writeHead(204, cors); return res.end(); }
+  res.writeHead(200, { ...cors, "Content-Type": "application/json" }); res.end(JSON.stringify({ ok: true, version: "2.0.0" }));
+});
+await new Promise((r) => oldSrv.listen(OLD_FETCHER_PORT, "127.0.0.1", r));
 
 const page2 = await browser.newPage({ viewport: { width: 900, height: 1200 } });
 const errors2 = [];
 page2.on("pageerror", (e) => errors2.push(String(e)));
-await page2.addInitScript(([port, key]) => localStorage.setItem("gytakusub.settings", JSON.stringify({ apiKey: "sk-ant-test", useContext: true, fetcherUrl: `http://127.0.0.1:${port}/`, fetcherKey: key })), [FETCHER_PORT, KEY]);
+await page2.addInitScript(() => { if (!localStorage.getItem("gytakusub.settings")) localStorage.setItem("gytakusub.settings", JSON.stringify({ apiKey: "sk-ant-test", useContext: true })); });
 await page2.goto(`http://127.0.0.1:${WEB_PORT}/?chapter=${encodeURIComponent("https://reader.example/series-chapter-1/")}`);
 await page2.waitForTimeout(500);
+// No fetcher yet: the tab shows the setup steps, and the chapter form is not reachable.
+if (!(await page2.isVisible("#fetcherWizard"))) fail("without a connected fetcher the Chapter link tab must show the setup steps");
+if (await page2.isVisible("#chapterForm")) fail("the chapter form must stay hidden until a fetcher is connected");
+if ((await page2.getAttribute("#wzDeploy", "href")) !== "https://deploy.workers.cloudflare.com/?url=https://github.com/gywreb/gytakusub/tree/main/fetcher") fail("step 2 must link to Deploy to Cloudflare for the fetcher folder");
+await page2.click("#wzGen");
+const genKey = (await page2.textContent("#wzKey")).trim();
+if (!/^[A-Za-z0-9]{32}$/.test(genKey) || (await page2.inputValue("#wzKeyInput")) !== genKey) fail("Generate key should make a 32-character key and fill it into step 3: " + genKey);
+await page2.waitForFunction(() => /\d{4}/.test(document.querySelector("#wzChecked").textContent), null, { timeout: 5000 }).catch(() => fail("step 2 should say when the steps were last checked"));
+const connect = async (url, key) => {
+  await page2.fill("#wzUrl", url); await page2.fill("#wzKeyInput", key); await page2.click("#wzConnect");
+  await page2.waitForFunction(() => !/Connecting/.test(document.querySelector("#wzMsg").textContent), null, { timeout: 15000 });
+  return page2.textContent("#wzMsg");
+};
+// the generated key is not the Worker's GYT_KEY yet: refused, explained
+const m1 = await connect(`http://127.0.0.1:${FETCHER_PORT}/`, genKey);
+if (!/refused the access key/.test(m1)) fail("a key that is not the Worker's should be explained: " + m1);
+const m2 = await connect(`http://127.0.0.1:${OLD_FETCHER_PORT}`, KEY);
+if (!/version 2\.0\.0.*needs/.test(m2)) fail("an outdated fetcher should be refused with its version: " + m2);
+const m3 = await connect("http://127.0.0.1:9/", KEY);
+if (!/No answer from/.test(m3)) fail("an address with nothing behind it should say so: " + m3);
+if (await page2.isVisible("#chapterForm")) fail("failed connections must not unlock the chapter form");
+const m4 = await connect(`http://127.0.0.1:${FETCHER_PORT}/`, KEY);
+if (!/Connected/.test(m4) || !(await page2.isVisible("#chapterForm"))) fail("a working fetcher should connect and unlock the chapter form: " + m4);
+// connected state survives a reload (verified address + key), and the connection link round-trips
+await page2.reload(); await page2.waitForTimeout(400);
+await page2.click('.tab[data-mode="chapter"]');
+if (!(await page2.isVisible("#chapterForm"))) fail("after a reload the connected fetcher should still unlock chapters");
 if (fetched.length) fail("a ?chapter= link must wait for a tap on Load, but the fetcher was already called");
-if ((await page2.inputValue("#chapterUrl")) !== "https://reader.example/series-chapter-1/") fail("a ?chapter= link should fill in the chapter address");
+await page2.fill("#chapterUrl", "https://reader.example/series-chapter-1/");
 await page2.click('#chapterForm button[type="submit"]');
 await page2.waitForFunction(() => document.querySelectorAll(".page canvas.translated").length >= 1, null, { timeout: 90000 });
 const info1 = await page2.textContent("#chapterInfo");
@@ -130,7 +164,19 @@ const wrongKey = await page2.evaluate(async (port) => (await fetch(`http://127.0
 if (wrongKey !== 401) fail("the fetcher must refuse a wrong key from the browser, got " + wrongKey);
 if (errors2.length) fail("chapter mode page errors: " + errors2.slice(0, 3).join(" | "));
 console.log(`chapter mode: ${nPages1} pages, info "${info1}", next shown ${nextShown}; bot-check message: "${challengeMsg.slice(0, 80)}…"; fetches: ${fetched.length}`);
-fetcherSrv.close();
+// another device: the connection link fills in address and key, and waits for Connect
+const link = await page2.evaluate(async () => { const m = await import("./fetcher-client.js"); return m.connectionLink(JSON.parse(localStorage.getItem("gytakusub.settings"))); });
+const ctx3 = await browser.newContext();
+const page3 = await ctx3.newPage();
+await page3.addInitScript(() => localStorage.setItem("gytakusub.settings", JSON.stringify({ apiKey: "sk-ant-test" })));
+await page3.goto(link); await page3.waitForTimeout(500);
+if (!(await page3.isVisible("#fetcherWizard")) || (await page3.inputValue("#wzKeyInput")) !== KEY || /connect=/.test(page3.url())) fail("a connection link should fill in the fetcher, wait for Connect, and leave the address bar: " + page3.url());
+await page3.click("#wzConnect");
+await page3.waitForSelector("#chapterForm", { state: "visible", timeout: 15000 }).catch(() => fail("the connection link's fetcher should connect on another device"));
+await page2.click('.tab[data-mode="chapter"]');
+await page2.setViewportSize({ width: 390, height: 844 });
+await ctx3.close();
+fetcherSrv.close(); oldSrv.close();
 console.log(failures ? `WEB BROWSER TEST FAILED (${failures})` : "WEB BROWSER TEST PASSED");
 await browser.close(); api.close(); statik.close();
 fs.rmSync(web, { recursive: true, force: true });

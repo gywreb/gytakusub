@@ -39,15 +39,77 @@
   </section>
 
   <section id="modeChapter" class="mode hidden">
-    <form id="chapterForm" class="chapter-form">
-      <input id="chapterUrl" type="url" inputmode="url" placeholder="Paste a chapter link" required />
-      <button class="primary" type="submit">Load</button>
-    </form>
-    <p id="chapterInfo" class="muted small"></p>
-    <div class="chapter-nav"><button id="navPrevTop" class="btn small" hidden>‹ Previous chapter</button><button id="navNextTop" class="btn small" hidden>Next chapter ›</button></div>
-    <div id="fetcherSetup" class="setup hidden">
-      <p><b>Chapter links need your own fetcher.</b> A web page may not read other sites — the browser forbids it — so a small free Cloudflare Worker on your account opens the chapter and passes its pages to this app. Set it up once (about 10 minutes): <a href="https://github.com/gywreb/gytakusub/blob/main/fetcher/README.md" target="_blank" rel="noopener">step-by-step guide</a>, then enter its address and key in Settings → Chapter fetcher.</p>
-      <p class="muted small">No fetcher? Screenshot mode works with any site.</p>
+    <!-- Shown once a fetcher is connected and verified -->
+    <div id="chapterReady" class="hidden">
+      <form id="chapterForm" class="chapter-form">
+        <input id="chapterUrl" type="url" inputmode="url" placeholder="Paste a chapter link" required />
+        <button class="primary" type="submit">Load</button>
+      </form>
+      <p class="muted small"><span id="fetcherStatus"></span> · <button type="button" id="btnFetcherManage" class="linkbtn">Fetcher &amp; other devices</button></p>
+      <p id="chapterInfo" class="muted small"></p>
+      <div class="chapter-nav"><button id="navPrevTop" class="btn small" hidden>‹ Previous chapter</button><button id="navNextTop" class="btn small" hidden>Next chapter ›</button></div>
+    </div>
+
+    <!-- Setup: the Chapter link form stays hidden until this is done -->
+    <div id="fetcherWizard" class="wizard hidden">
+      <h2>Set up chapter links</h2>
+      <p>To open a chapter from another site, Gytakusub needs a small <b>fetcher</b> on your own free Cloudflare account. A web page isn't allowed to read other sites (the browser blocks it), but your fetcher can: it opens the chapter and passes its pages to this app. It stores nothing and never sees your Claude key.</p>
+      <p class="muted small">About 5 minutes, once. You need a free Cloudflare account and a GitHub or GitLab account. A computer is easiest; afterwards, a link connects your phone. Screenshot mode works without any of this.</p>
+      <p class="muted small"><b>Already have a fetcher address and key</b> (for example, someone shared theirs)? Go straight to step 3.</p>
+
+      <ol class="steps">
+        <li id="wzStep1">
+          <h3>Create your access key</h3>
+          <p>Only someone with this key can use your fetcher. Keep it private.</p>
+          <div class="row"><code id="wzKey" class="key">—</code><button type="button" id="wzGen" class="btn small">Generate key</button><button type="button" id="wzCopyKey" class="btn small" disabled>Copy</button></div>
+        </li>
+        <li id="wzStep2">
+          <h3>Deploy the fetcher to your Cloudflare account</h3>
+          <p><a id="wzDeploy" class="btn primary" target="_blank" rel="noopener">Deploy to Cloudflare ↗</a></p>
+          <ol class="sub">
+            <li>Sign in to Cloudflare, or create a free account and confirm your email.</li>
+            <li>Connect GitHub or GitLab when asked. Cloudflare copies the fetcher into a new repository on your account and deploys it from there.</li>
+            <li>On the setup page, keep the suggested names or choose your own. Where <code>GYT_KEY</code> is listed, replace <code>CHANGE_ME</code> with your key from step 1.</li>
+            <li>Deploy, and wait until the build finishes (about a minute).</li>
+            <li>Open the Worker's page (Cloudflare dashboard → <b>Workers &amp; Pages</b> → your Worker) and copy its address, which ends in <b>.workers.dev</b>.</li>
+          </ol>
+          <details class="muted small">
+            <summary>Forgot the key, or deployed without it?</summary>
+            <p>In Cloudflare, open the Worker → <b>Settings</b> → <b>Variables and Secrets</b>. Add (or edit) a <b>Secret</b> named <code>GYT_KEY</code> with your key, then <b>Deploy</b>.</p>
+          </details>
+          <details class="muted small">
+            <summary>No GitHub or GitLab account? Use the command line on a computer with Node.js</summary>
+            <p>Download the repository (<a href="https://github.com/gywreb/gytakusub/archive/refs/heads/main.zip" target="_blank" rel="noopener">zip</a>), open a terminal in its <code>fetcher</code> folder, and run:</p>
+            <pre>npx wrangler login
+npx wrangler secret put GYT_KEY
+npx wrangler deploy</pre>
+            <p>Paste your key when asked; <code>deploy</code> prints the address.</p>
+          </details>
+          <p class="muted small">Cloudflare's own help, if a screen looks different: <a href="https://developers.cloudflare.com/workers/platform/deploy-buttons/" target="_blank" rel="noopener">Deploy to Cloudflare</a> · <a href="https://developers.cloudflare.com/workers/configuration/secrets/" target="_blank" rel="noopener">secrets</a>. The steps were checked against those pages on <span id="wzChecked"></span>.</p>
+        </li>
+        <li id="wzStep3">
+          <h3>Connect</h3>
+          <label>Fetcher address <input id="wzUrl" type="url" inputmode="url" placeholder="https://gytakusub.your-name.workers.dev" autocomplete="off" /></label>
+          <label>Access key <input id="wzKeyInput" type="password" placeholder="the key from step 1" autocomplete="off" /></label>
+          <div class="row"><button type="button" id="wzConnect" class="primary">Connect</button></div>
+          <p id="wzMsg" class="hint" role="status"></p>
+        </li>
+      </ol>
+      <details class="muted small">
+        <summary>Update your fetcher</summary>
+        <p>When Gytakusub says your fetcher is out of date: in the repository Cloudflare created on your GitHub or GitLab, open <code>worker.js</code> and edit it. Replace its whole content with this app's version (<button type="button" id="wzCopyCode" class="linkbtn">copy the fetcher code</button>), and commit. Cloudflare deploys the change by itself; then Connect again.</p>
+      </details>
+    </div>
+
+    <!-- Fetcher management, once connected -->
+    <div id="fetcherManage" class="wizard hidden">
+      <h2>Your fetcher</h2>
+      <p id="manageStatus"></p>
+      <h3>Use it on another device</h3>
+      <p>Copy this link and open it on your phone or other computer, for example by sending it to yourself. It fills in the address and key there; you then tap Connect. It contains your key: don't share it with anyone you wouldn't give the key to.</p>
+      <div class="row"><button type="button" id="mgCopyLink" class="btn small">Copy connection link</button></div>
+      <h3>Change or disconnect</h3>
+      <div class="row"><button type="button" id="mgSetup" class="btn small">Open the setup steps</button><button type="button" id="mgForget" class="btn small">Disconnect this device</button><button type="button" id="mgDone" class="btn small">Back to chapters</button></div>
     </div>
   </section>
 
@@ -77,13 +139,6 @@
     <label class="check"><input type="checkbox" id="sUseContext" /> Chapter context (names + recent lines)</label>
     <label class="check"><input type="checkbox" id="sUppercase" /> UPPERCASE lettering</label>
     <label class="check"><input type="checkbox" id="sRtl" /> Right-to-left two-page spreads on wide screens</label>
-    <fieldset class="group">
-      <legend>Chapter fetcher (for Chapter link mode)</legend>
-      <label>Address <input id="sFetcherUrl" type="url" inputmode="url" placeholder="https://gytakusub.your-name.workers.dev" autocomplete="off" /></label>
-      <label>Access key <input id="sFetcherKey" type="password" placeholder="the GYT_KEY you set on the Worker" autocomplete="off" /></label>
-      <span class="hint">Your own Cloudflare Worker (free): <a href="https://github.com/gywreb/gytakusub/blob/main/fetcher/README.md" target="_blank" rel="noopener">setup guide</a>. Chapter pages pass through it; your Claude key never does.</span>
-      <div class="row"><button type="button" id="sTestFetcher" class="btn small">Test fetcher</button></div>
-    </fieldset>
     <div class="row end">
       <button type="button" id="sTest" class="btn">Test Claude key</button>
       <button id="sSave" class="primary" value="save">Save</button>

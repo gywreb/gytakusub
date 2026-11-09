@@ -1,0 +1,30 @@
+name: Guide check
+# Weekly: are the Cloudflare pages, the Deploy to Cloudflare link and MangaDex's
+# API that the chapter-link setup guide relies on unchanged? If not, open (or
+# update) one issue so the guide is reviewed before readers hit a changed screen.
+on:
+  schedule:
+    - cron: "17 3 * * 1" # Mondays 03:17 UTC
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - id: check
+        run: node scripts/check-guide.mjs > /tmp/guide-report.md
+        continue-on-error: true
+      - name: Open or update the review issue
+        if: steps.check.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="Chapter-link setup guide: review needed"
+          n=$(gh issue list --state open --search "\"$title\" in:title" --json number --jq '.[0].number')
+          if [ -n "$n" ]; then gh issue comment "$n" --body-file /tmp/guide-report.md
+          else gh issue create --title "$title" --body-file /tmp/guide-report.md; fi

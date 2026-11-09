@@ -1,15 +1,32 @@
 // Gytakusub Web – UI.
 import { loadSettings, saveSettings, loadImage, blobToDataUrl, translateImage, renderPage, testKey } from "./translator.js";
-import { hasFetcher, loadChapter, fetchPageImage, testFetcher } from "./fetcher-client.js";
+import { isConnected, connectFetcher, loadChapter, fetchPageImage, generateKey, connectionLink, readConnectionLink, FETCHER_VERSION, DEPLOY_URL } from "./fetcher-client.js";
 import { MODELS } from "./prompt.js";
 
 const $ = (id) => document.getElementById(id);
 
 let settings = loadSettings();
 
-// "Chapter link" mode needs the user's own fetcher (fetcher/README.md); without one it explains how to set it up.
-function applyChapterMode() {
-  $("fetcherSetup").classList.toggle("hidden", hasFetcher(settings));
+// "Chapter link" mode works only through a fetcher the user deployed and connected (verified with /ping).
+// Until then the tab shows the setup steps instead of the chapter form.
+let chapterView = "wizard"; // wizard | ready | manage
+async function applyChapterMode(view) {
+  const ok = await isConnected(settings);
+  chapterView = view || (ok ? "ready" : "wizard");
+  if (!ok && chapterView === "ready") chapterView = "wizard";
+  $("chapterReady").classList.toggle("hidden", chapterView !== "ready");
+  $("fetcherWizard").classList.toggle("hidden", chapterView !== "wizard");
+  $("fetcherManage").classList.toggle("hidden", chapterView !== "manage");
+  if (ok) {
+    const where = new URL(settings.fetcherUrl).host;
+    $("fetcherStatus").textContent = `Fetcher connected: ${where} (version ${settings.fetcherCheck.version})`;
+    $("manageStatus").textContent = `Connected to ${where}, version ${settings.fetcherCheck.version}, checked ${new Date(settings.fetcherCheck.at).toLocaleDateString()}.`;
+  }
+  if (chapterView === "wizard") {
+    if (!$("wzUrl").value && settings.fetcherUrl) $("wzUrl").value = settings.fetcherUrl;
+    if (!$("wzKeyInput").value && settings.fetcherKey) $("wzKeyInput").value = settings.fetcherKey;
+    if (settings.fetcherKey) { $("wzKey").textContent = settings.fetcherKey; $("wzCopyKey").disabled = false; $("wzGen").textContent = "New key"; }
+  }
 }
 let ctx = { terms: [], recent: [] }; // chapter context for this session
 const MAX_PARALLEL = 2;
@@ -198,7 +215,12 @@ async function openChapter(link, { keepContext = false } = {}) {
     window.scrollTo({ top: 0 });
   } catch (err) {
     $("chapterInfo").textContent = "⚠ " + err.message;
-    if (err.code === "setup") $("fetcherSetup").classList.remove("hidden");
+    // the fetcher no longer accepts this app's key or setup: back to the setup steps, with the reason
+    if (["unauthorized", "setup", "outdated"].includes(err.code)) {
+      settings = { ...settings, fetcherCheck: null }; saveSettings(settings);
+      await applyChapterMode("wizard");
+      wizardMsg("err", err.message);
+    }
   }
 }
 
@@ -229,12 +251,12 @@ function fillSettings() {
   $("sApiKey").value = settings.apiKey; $("sModel").value = settings.model; $("sTargetLang").value = settings.targetLang;
   $("sGlossary").value = settings.glossary; $("sCustomPrompt").value = settings.customPrompt;
   $("sUseContext").checked = settings.useContext; $("sUppercase").checked = settings.uppercase; $("sRtl").checked = settings.rtlSpreads;
-  $("sFetcherUrl").value = settings.fetcherUrl || ""; $("sFetcherKey").value = settings.fetcherKey || ""; $("sMsg").textContent = "";
+  $("sMsg").textContent = "";
 }
 function readSettings() {
   return { ...settings, apiKey: $("sApiKey").value.trim(), model: $("sModel").value, targetLang: $("sTargetLang").value.trim() || "English",
     glossary: $("sGlossary").value, customPrompt: $("sCustomPrompt").value, useContext: $("sUseContext").checked,
-    uppercase: $("sUppercase").checked, rtlSpreads: $("sRtl").checked, fetcherUrl: $("sFetcherUrl").value.trim(), fetcherKey: $("sFetcherKey").value.trim() };
+    uppercase: $("sUppercase").checked, rtlSpreads: $("sRtl").checked };
 }
 $("btnSettings").onclick = () => { fillSettings(); dlg.showModal(); };
 $("sShow").onclick = () => { const i = $("sApiKey"); i.type = i.type === "password" ? "text" : "password"; $("sShow").textContent = i.type === "password" ? "Show" : "Hide"; };
@@ -243,20 +265,66 @@ $("sTest").onclick = async () => {
   try { await testKey(s); $("sMsg").className = "hint ok"; $("sMsg").textContent = `Key works (${s.model}).`; }
   catch (e) { $("sMsg").className = "hint err"; $("sMsg").textContent = "Failed: " + e.message; }
 };
-$("sTestFetcher").onclick = async () => {
-  const s = readSettings(); $("sMsg").className = "hint"; $("sMsg").textContent = "Testing the fetcher…";
-  try { const v = await testFetcher(s); $("sMsg").className = "hint ok"; $("sMsg").textContent = `Fetcher works (version ${v}).`; }
-  catch (e) { $("sMsg").className = "hint err"; $("sMsg").textContent = "Fetcher: " + e.message; }
+dlg.addEventListener("close", () => { if (dlg.returnValue === "save") { settings = readSettings(); saveSettings(settings); updateToolbar(); toast("Saved"); } });
+
+// ---------- chapter fetcher setup ----------
+
+function wizardMsg(kind, text) { const m = $("wzMsg"); m.className = "hint" + (kind ? " " + kind : ""); m.textContent = text; }
+async function copyText(text, what) {
+  try { await navigator.clipboard.writeText(text); toast(`${what} copied`); }
+  catch { prompt(`Copy ${what.toLowerCase()}:`, text); }
+}
+$("wzDeploy").href = DEPLOY_URL;
+// When the steps were last checked against Cloudflare's pages (fetcher/guide-sources.json; a weekly CI job flags changes).
+fetch("fetcher-guide.json").then((r) => r.json()).then((g) => { $("wzChecked").textContent = new Date(g.checked + "T00:00:00Z").toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }); }).catch(() => {});
+$("wzGen").onclick = () => {
+  const key = generateKey();
+  $("wzKey").textContent = key; $("wzKeyInput").value = key; $("wzCopyKey").disabled = false; $("wzGen").textContent = "New key";
+  // remembered (not yet connected), so leaving for Cloudflare and coming back keeps it
+  settings = { ...settings, fetcherKey: key, fetcherCheck: null }; saveSettings(settings);
 };
-dlg.addEventListener("close", () => { if (dlg.returnValue === "save") { settings = readSettings(); saveSettings(settings); updateToolbar(); applyChapterMode(); toast("Saved"); } });
+$("wzCopyKey").onclick = () => copyText($("wzKey").textContent, "Key");
+$("wzConnect").onclick = async () => {
+  wizardMsg("", "Connecting…"); $("wzConnect").disabled = true;
+  try {
+    const fields = await connectFetcher($("wzUrl").value, $("wzKeyInput").value.trim());
+    settings = { ...settings, ...fields }; saveSettings(settings);
+    wizardMsg("ok", `Connected (fetcher version ${fields.fetcherCheck.version}).`);
+    await applyChapterMode("ready");
+    toast("Fetcher connected. Paste a chapter link.");
+  } catch (e) {
+    wizardMsg("err", e.message);
+  } finally { $("wzConnect").disabled = false; }
+};
+$("wzCopyCode").onclick = async () => copyText(await (await fetch("fetcher-worker.js")).text(), "Fetcher code");
+$("btnFetcherManage").onclick = () => applyChapterMode("manage");
+$("mgDone").onclick = () => applyChapterMode("ready");
+$("mgSetup").onclick = () => applyChapterMode("wizard");
+$("mgCopyLink").onclick = () => copyText(connectionLink(settings), "Connection link");
+$("mgForget").onclick = async () => {
+  if (!confirm("Remove the fetcher address and key from this device? Chapter links stop working here until you connect again.")) return;
+  settings = { ...settings, fetcherUrl: "", fetcherKey: "", fetcherCheck: null }; saveSettings(settings);
+  $("wzUrl").value = ""; $("wzKeyInput").value = ""; wizardMsg("", "");
+  await applyChapterMode("wizard");
+};
 
 // ---------- boot ----------
 
-applyChapterMode();
+// A connection link (#connect=…) fills in a fetcher address and key; the user checks the address and taps Connect.
+const shared = readConnectionLink(location.hash);
+if (shared) history.replaceState(null, "", location.pathname + location.search); // don't leave the key in the address bar
+await applyChapterMode();
+if (shared) {
+  setMode("chapter");
+  await applyChapterMode("wizard");
+  $("wzUrl").value = shared.url; $("wzKeyInput").value = shared.key;
+  wizardMsg("", `A connection link filled in the fetcher at ${shared.url}. If that is your fetcher, tap Connect.`);
+  $("wzStep3").scrollIntoView({ block: "center" });
+}
 // ?chapter=<link> (the bookmarklet in fetcher/README.md) fills in that chapter; it opens on a tap of Load, so a link
 // someone else sent can't make the fetcher visit a site or spend Claude credits by itself.
 const linked = new URLSearchParams(location.search).get("chapter");
-if (linked) { setMode("chapter"); $("chapterUrl").value = linked; $("chapterInfo").textContent = "Tap Load to open this chapter."; }
+if (linked && !shared) { setMode("chapter"); $("chapterUrl").value = linked; $("chapterInfo").textContent = chapterView === "ready" ? "Tap Load to open this chapter." : "Set up chapter links below; this chapter will be waiting."; }
 if (!settings.apiKey) setTimeout(() => { fillSettings(); dlg.showModal(); }, 400);
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 updateToolbar();
