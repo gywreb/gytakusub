@@ -1,6 +1,6 @@
 # ADR 0004 — Bubbles from a learned segmentation model
 
-Status: **accepted for 1.1.1 on `feature/learned-layout`** (2026-11-09),
+Status: **accepted for 2.0.0** (2026-11-09),
 pending the user's live test and the licensing decision below. Supersedes the
 bubble half of ADR 0002 (the light-region tests become the fallback); ADR
 0003's layout invariants stay.
@@ -170,7 +170,7 @@ untested would have been slower than the CPU, not faster.
 ## Licensing
 
 **Decided 2026-11-09 by the owner: Gytakusub is relicensed to AGPL-3.0 from
-1.1.1** (`LICENSE`, `THIRD_PARTY.md`, licence files inside the package, source
+2.0.0** (first numbered 1.1.1 while it was a branch) (`LICENSE`, `THIRD_PARTY.md`, licence files inside the package, source
 link in Options). The analysis that led to it:
 
 - The model card says GPL-3.0; the ONNX metadata says Ultralytics AGPL-3.0,

@@ -64,4 +64,4 @@ The only data that leaves the browser is the page image (with numbered marks) se
 
 ## License
 
-GNU Affero General Public License v3.0 (`LICENSE`) from 1.1.1, which bundles a GPL/AGPL bubble segmentation model; versions up to 1.1.0 were MIT. Bundled third-party components and their licences: [`THIRD_PARTY.md`](THIRD_PARTY.md).
+GNU Affero General Public License v3.0 (`LICENSE`) from 2.0.0, which bundles a GPL/AGPL bubble segmentation model; 1.0.x was MIT. Bundled third-party components and their licences: [`THIRD_PARTY.md`](THIRD_PARTY.md).

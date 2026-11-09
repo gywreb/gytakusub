@@ -1,4 +1,4 @@
-# Chrome Web Store listing — Gytakusub 1.1.0
+# Chrome Web Store listing — Gytakusub 2.0.0
 
 Copy each block into the matching field of the Developer Dashboard. Keep the wording: it is written to match what the extension actually does (reviewers compare listing claims against behaviour) and to stay generic about content sources.
 
@@ -49,9 +49,9 @@ Gytakusub is an independent, open-source reading aid (GNU AGPL v3, source on Git
 - Small promo tile 440×280: `promo-small-440x280.png`
 - Marquee 1400×560: optional, not provided
 
-**What's new in 1.1.0** (paste into the version notes if the dashboard asks)
+**What's new in 2.0.0** (paste into the version notes if the dashboard asks)
 ```
-Rebuilt page engine: text is found by an open-source detector running locally in your browser, bubbles by OpenCV, original lettering is removed by inpainting (artwork and outlines untouched), Japanese vertical text and dark bubbles are handled, and a bundled font keeps pages consistent. Double-click a bubble to edit a line or teach the glossary (an option adds hover-to-peek at the original). Fixes translations being placed in the wrong panel on the first render.
+New page engine. Text and speech bubbles are found by open-source models running locally in your browser (on the graphics card when available), original lettering is removed by inpainting with artwork and outlines untouched, and translations are placed over the lettering they replace. Japanese raw manga is supported: vertical text and furigana are erased and the English is set at a readable size. Double-click a bubble to edit a line or teach the glossary. Now open source under the GNU AGPL v3.
 ```
 
 ## Privacy practices tab

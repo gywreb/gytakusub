@@ -1,6 +1,6 @@
 # ADR 0003 — Translations are anchored to the lettering they replace
 
-Status: accepted (1.1.0). Date: 2026-11-08. Refines the layout half of ADR 0001.
+Status: accepted (2.0.0). Date: 2026-11-08. Refines the layout half of ADR 0001.
 
 ## Context
 

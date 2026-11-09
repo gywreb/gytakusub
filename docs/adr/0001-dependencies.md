@@ -1,6 +1,6 @@
 # ADR 0001 — Where we use libraries and where we don't
 
-Status: accepted (1.1.0). Date: 2026-11-08.
+Status: accepted (2.0.0). Date: 2026-11-08.
 
 ## Context
 
