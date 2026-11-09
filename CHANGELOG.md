@@ -12,6 +12,9 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
   - **A pull request that changes UI has screenshots in its description** (`scripts/check-screenshots.mjs`, which lists the files that count). The check runs again when the description is edited.
   - The checks use the base branch's copy of the scripts, so a pull request can't change the rules it is checked against.
 - `scripts/release.mjs` no longer bumps the version. It checks and tests, then tags the version main is at.
+- **Fixed: the release build's zip step**:
+  - 2.2.0's release failed with "zip error: Could not create output file". `scripts/build-zip.sh` rebuilt the output path from `$OLDPWD` inside a subshell, and that went wrong on GitHub's new ubuntu-26.04 runners. It now uses absolute paths.
+  - Pull requests that need the extension suite also build the store package the same way, on the same runner image, so a broken package shows up before a tag.
 - **CI runs only the tests a change needs:**
   - **Pull requests:** tested once, as pull requests. Before, each push to a pull request branch ran the full 20-minute suite twice, once as a push and once as a pull request.
   - **Cancelling:** a newer push cancels the older run.
@@ -19,7 +22,7 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
   - **Full runs:** every push to `main` and every release still run everything.
   - **One check:** a single `test` check sums up the suites that ran, so it can be required on `main`. This follows GitHub's advice to skip jobs rather than whole workflows for required checks.
 
-## [2.2.0] — 2026-11-09 (extension on GitHub Releases, not yet submitted to the Chrome Web Store, which still has 2.0.0; there is no extension 2.1.0. Web app live on GitHub Pages)
+## [2.2.0] — 2026-11-09 (tagged, but its release build failed at the zip step, so 2.2.0 has no GitHub Release: 2.2.1 is the first extension release with these changes. There is no extension 2.1.0. Web app live on GitHub Pages)
 
 ### Web app
 - **UI overhaul after an audit** against the Web Interface Guidelines, checked at iPhone size (390 px) and desktop (1280 px), dark and light:
