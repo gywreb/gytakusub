@@ -97,7 +97,9 @@ const fakeWeb = async (url, init = {}) => {
   const r = fakeSite[String(url)];
   return r ? new Response(r.body, { status: r.status || 200, headers: { "Content-Type": r.type } }) : new Response("nope", { status: 404 });
 };
+const served = []; // every request the fetcher receives, as Cloudflare would count it (permission checks included)
 const fetcherSrv = http.createServer(async (req, res) => {
+  served.push(`${req.method} ${req.url}`);
   const request = new Request(`http://127.0.0.1:${FETCHER_PORT}${req.url}`, { method: req.method, headers: req.headers });
   const r = await fetcherHandle(request, fetcherEnv, fakeWeb);
   res.writeHead(r.status, Object.fromEntries(r.headers));
@@ -146,6 +148,7 @@ if (!/version 2\.0\.0.*needs/.test(m2)) fail("an outdated fetcher should be refu
 const m3 = await connect("http://127.0.0.1:9/", KEY);
 if (!/No answer from/.test(m3)) fail("an address with nothing behind it should say so: " + m3);
 if (await page2.isVisible("#chapterForm")) fail("failed connections must not unlock the chapter form");
+served.length = 0; // the device count starts again here too: the last attempts went to other addresses
 const m4 = await connect(`http://127.0.0.1:${FETCHER_PORT}/`, KEY);
 if (!/Connected/.test(m4) || !(await page2.isVisible("#chapterForm"))) fail("a working fetcher should connect and unlock the chapter form: " + m4);
 // connected state survives a reload (verified address + key), and the connection link round-trips
@@ -178,6 +181,9 @@ if (!/checking your browser/i.test(challengeMsg)) fail("a bot-check site should 
 const usage = await page2.textContent("#fetcherUsage");
 const used = Number(((/^≈([\d,]+) \/ 100,000 free today/.exec(usage) || [])[1] || "").replace(/,/g, ""));
 if (!(used >= 6)) fail("the tab should show today's requests from this device: " + usage);
+// the estimate counts the browser's permission checks (OPTIONS) too, so in Chromium it matches what the fetcher received
+const preflights = served.filter((r) => r.startsWith("OPTIONS")).length;
+if (used !== served.length || preflights < 4) fail(`the device count should match the requests the fetcher received, permission checks included: ${used} counted, ${served.length} received (${preflights} OPTIONS)`);
 await page2.click("#btnFetcherManage");
 // opening the panel asks the fetcher for Cloudflare's count (/usage), itself one more request on this device
 // wait for that request to be counted in the chip and the meter (it lands a moment after the panel opens), rather than racing it
@@ -187,7 +193,7 @@ await page2.waitForFunction((want) => {
   return chip >= want && Number(document.querySelector("#usageMeter").getAttribute("aria-valuenow")) >= want;
 }, used + 1, { timeout: 10000 }).catch(() => {});
 const usedNow = await page2.evaluate(countNow);
-if (usedNow !== used + 1) fail(`asking for the live count is a request too: ${used} → ${usedNow}`);
+if (usedNow !== used + 1 || served.length !== usedNow) fail(`asking for the live count is a request too: ${used} → ${usedNow} (the fetcher received ${served.length})`);
 const meterNow = Number(await page2.getAttribute("#usageMeter", "aria-valuenow"));
 const usageNote = await page2.textContent("#usageNote");
 await page2.screenshot({ path: path.join(out, "web-fetcher-manage.png"), fullPage: true });

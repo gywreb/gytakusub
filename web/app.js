@@ -88,7 +88,7 @@ function showUsage() {
     const split = cloud.workers.length > 1 ? `${cloud.workers[0].name} ${n(cloud.workers[0].requests)}, other Workers ${n(others)} · ` : "";
     $("usageNote").textContent = `${split}All your devices · starts again at ${resetTime()}`;
   } else {
-    $("usageNote").textContent = `Sent from this device · ${n(device.chapters)} chapter${device.chapters === 1 ? "" : "s"} (one request per page, plus one) · starts again at ${resetTime()}`;
+    $("usageNote").textContent = `Sent from this device · ${n(device.chapters)} chapter${device.chapters === 1 ? "" : "s"} (about 2 requests a page) · starts again at ${resetTime()}`;
   }
   document.querySelectorAll("[data-usage=device]").forEach((el) => (el.hidden = isLive));
   document.querySelectorAll("[data-usage=live]").forEach((el) => (el.hidden = !isLive));

@@ -18,10 +18,10 @@ It stores nothing. Your Claude API key never passes through it.
 The app tells you when that's the case. For those sites use screenshot mode, or the browser extension on a computer.
 
 Cost: nothing. The fetcher runs on Cloudflare's Workers Free plan, and no card is needed:
-- **Allowance:** 100,000 requests a day for your whole Cloudflare account, counted from midnight UTC. One chapter takes about one request per page, plus one.
+- **Allowance:** 100,000 requests a day for your whole Cloudflare account, counted from midnight UTC. Each page of a chapter takes 2: the browser first asks the fetcher for permission (a CORS preflight), and Cloudflare counts that too. So a 20-page chapter takes about 42.
 - **Past the allowance:** Cloudflare stops answering until the reset (its error 1027). Nothing is charged.
-- **Watching it:** the chip under the chapter form and **Your fetcher** show today's count. By default that's an estimate of what this device sent. It misses your other devices and the browser's permission checks (preflights), which Cloudflare counts too.
-- **Live count (optional, about 3 minutes):** add two Secrets to the Worker, and it reads today's exact count from Cloudflare's analytics (`/usage`). Every browser and the installed app then show the same number, refreshed every minute while the Chapter link tab is open.
+- **Watching it:** the chip under the chapter form and **Your fetcher** show today's count. By default that's an estimate of what this device sent, permission checks included. It errs high (a page your browser already had is counted again), and it misses your other devices.
+- **Live count (optional, about 3 minutes):** add two Secrets to the Worker, and it reads today's count from Cloudflare's analytics (`/usage`). Every browser and the installed app then show the same number, refreshed every minute while the Chapter link tab is open. Each refresh is one request, and Cloudflare adds requests to its count a few minutes after they happen.
   1. Create a token: Account API tokens → Create Token → Custom token. Give it only **Account · Account Analytics · Read**. Cloudflare shows the token once.
   2. Copy your account ID: press Ctrl/Cmd+K in the dashboard → *Copy account ID*.
   3. On the Worker: Settings → Variables and Secrets → add Secret `CF_API_TOKEN` (the token) and Secret `CF_ACCOUNT_ID` (the ID) → Deploy.

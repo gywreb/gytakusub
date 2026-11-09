@@ -191,14 +191,15 @@
         </div>
         <ul class="usage-facts small">
           <li><b>Free:</b> if it runs out, the fetcher stops until <span id="usageReset">the reset</span>. Nothing is charged.</li>
-          <li data-usage="device"><b>Estimate:</b> only what this browser or app sent. Your other devices and anyone with your connection link use the same allowance, and the browser's own permission checks count at Cloudflare too.</li>
-          <li data-usage="live" hidden><b>From Cloudflare:</b> every request to every Worker on your account today, the browser's permission checks included. Your browsers and the installed app show the same number; it refreshes every minute while this tab is open.</li>
-          <li data-usage="device"><b>Exact count:</b> <a href="https://dash.cloudflare.com/" target="_blank" rel="noopener">dash.cloudflare.com ↗</a> → Workers &amp; Pages → your Worker → Metrics, or set up the live count below.</li>
+          <li data-usage="device"><b>Estimate:</b> what this browser or app sent. Before each new page the browser asks the fetcher for permission, and Cloudflare counts that too, so a page costs 2 requests. The estimate counts both, and errs high rather than low. Your other devices and anyone with your connection link use the same allowance.</li>
+          <li data-usage="live" hidden><b>From Cloudflare:</b> every request to every Worker on your account today, the browser's permission checks included. Your browsers and the installed app show the same number.</li>
+          <li data-usage="live" hidden><b>A few minutes behind:</b> Cloudflare adds requests to its count a few minutes after they happen. The count refreshes every minute while this tab is open, and each refresh is itself one request.</li>
+          <li data-usage="device"><b>Cloudflare's own count:</b> <a href="https://dash.cloudflare.com/" target="_blank" rel="noopener">dash.cloudflare.com ↗</a> → Workers &amp; Pages → your Worker → Metrics, or set up the live count below.</li>
         </ul>
 
         <!-- live count: the fetcher reads it from Cloudflare's analytics (optional) -->
         <div id="liveSetup" class="callout" hidden>
-          <h4>Show Cloudflare's exact count here</h4>
+          <h4>Show Cloudflare's own count here</h4>
           <p class="muted small">Optional, about 3 minutes, easiest on a computer. The fetcher then reads today's count from Cloudflare with a token that can only read analytics.</p>
           <ol class="sub">
             <li>In <a href="https://dash.cloudflare.com/" target="_blank" rel="noopener">dash.cloudflare.com ↗</a> open <b>Account API tokens</b> (press <kbd>Ctrl</kbd> <kbd>K</kbd>, or <kbd>⌘</kbd> <kbd>K</kbd> on a Mac, and search for it). Click <b>Create Token</b>, then under <b>Custom token</b> click <b>Get started</b>.</li>
@@ -210,7 +211,7 @@
           <p class="muted small">Cloudflare's guides: <a href="https://developers.cloudflare.com/analytics/graphql-api/getting-started/authentication/api-token-auth/" target="_blank" rel="noopener">analytics token ↗</a> · <a href="https://developers.cloudflare.com/fundamentals/account/find-account-and-zone-ids/" target="_blank" rel="noopener">account ID ↗</a></p>
         </div>
         <div id="liveUpdate" class="callout" hidden>
-          <h4>Show Cloudflare's exact count here</h4>
+          <h4>Show Cloudflare's own count here</h4>
           <p class="small">Your fetcher is too old for this. On GitHub open your <b>gytakusub</b> copy, click <b>Sync fork</b> → <b>Update branch</b>. Cloudflare redeploys it in about a minute.</p>
           <div class="row"><button type="button" id="liveCheck2" class="btn small">Check again</button></div>
         </div>

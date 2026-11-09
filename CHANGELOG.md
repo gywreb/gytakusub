@@ -7,10 +7,11 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
 ## [2.4.0] — 2026-11-10
 
 ### Web app and fetcher
-- **Live count from Cloudflare.** Optional: add a read-only analytics token and your account ID to the fetcher as two Secrets. The chip and **Your fetcher** then show today's exact request count for your whole Cloudflare account. It's the same number in every browser and in the installed app, refreshed every minute while the Chapter link tab is open.
+- **Live count from Cloudflare.** Optional: add a read-only analytics token and your account ID to the fetcher as two Secrets. The chip and **Your fetcher** then show Cloudflare's own request count for your whole account today. It's the same number in every browser and in the installed app, refreshed every minute while the Chapter link tab is open. Cloudflare adds requests to it a few minutes late, and the panel says so.
   - The fetcher reads the count with Cloudflare's GraphQL Analytics API (`/usage`) and reuses an answer for 30 s. The token never leaves the Worker.
   - When there's more than one Worker on the account, the count is split by Worker.
-  - Without the token, the app keeps its own count, now marked as an estimate (≈ and "This device"). The panel explains the gap: other devices, and the browser's permission checks, which Cloudflare counts too. It also offers the setup in four steps.
+  - Without the token, the app keeps its own count, now marked as an estimate (≈ and "This device"). It also offers the setup in four steps.
+  - **The estimate now counts what Cloudflare counts.** Before each new address the browser asks the fetcher for permission (a CORS preflight), and Cloudflare counts that as a request. The app counted only the page itself, so it showed about half of Cloudflare's number. It now counts both, and errs high rather than low; a browser test checks it against every request the fetcher receives.
   - A fetcher older than 2.4.0 still works; the panel says to Sync fork for the live count. The app's minimum fetcher stays 2.1.0, so nobody is forced to update.
 - `wrangler.toml` keeps variables set in the dashboard when Workers Builds redeploys (`keep_vars = true`).
 - The weekly guide check also watches the three Cloudflare pages the live-count setup relies on.
