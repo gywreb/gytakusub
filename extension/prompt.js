@@ -115,11 +115,39 @@ export function apiHeaders(apiKey) {
   };
 }
 
+/**
+ * The answer's JSON Schema, sent as structured output (output_config.format):
+ * the API then constrains the model's sampling to it, so the reply is always
+ * valid JSON of this shape — a translation that quotes someone ("…") can no
+ * longer break the parse. Every property is required and objects are closed,
+ * as structured outputs require.
+ */
+export function answerSchema(includeSource) {
+  const item = {
+    type: "object", additionalProperties: false,
+    properties: {
+      tag: { type: ["integer", "null"] },
+      box: { type: "array", items: { type: "number" } },
+      kind: { type: "string", enum: ["bubble", "narration", "sign"] },
+      size: { type: "string", enum: ["small", "normal", "large"] },
+      ...(includeSource ? { source: { type: "string" } } : {}),
+      text: { type: "string" },
+    },
+    required: ["tag", "box", "kind", "size", ...(includeSource ? ["source"] : []), "text"],
+  };
+  const term = { type: "object", additionalProperties: false, properties: { source: { type: "string" }, translation: { type: "string" } }, required: ["source", "translation"] };
+  return { type: "object", additionalProperties: false, properties: { items: { type: "array", items: item }, terms: { type: "array", items: term } }, required: ["items", "terms"] };
+}
+
+// Set when the API rejects structured output (an older model or API version):
+// later calls in this worker send the plain request, whose JSON is parsed leniently.
+let structuredRejected = false;
+
 /** One Claude call for one prepared slice. Returns {items(raw), terms, usage}. */
 export async function callClaude(settings, slice, ctx, fetchFn = fetch) {
   const body = {
     model: settings.model,
-    max_tokens: 4096,
+    max_tokens: 8192, // billed per token used; a dense page with transcriptions needs ~3k
     messages: [{
       role: "user",
       content: [
@@ -128,16 +156,32 @@ export async function callClaude(settings, slice, ctx, fetchFn = fetch) {
       ],
     }],
   };
+  const structured = !structuredRejected;
+  if (structured) body.output_config = { format: { type: "json_schema", schema: answerSchema(!!settings.includeSource) } };
   const res = await fetchFn(API_URL, { method: "POST", headers: apiHeaders(settings.apiKey), body: JSON.stringify(body) });
   if (!res.ok) {
     let detail = "";
     try { const j = await res.json(); detail = j?.error?.message || JSON.stringify(j); }
     catch { detail = await res.text(); }
+    if (structured && res.status === 400 && /output_config|json_schema|schema|structured/i.test(detail)) {
+      console.warn("Gytakusub: structured output not accepted, using a plain request:", detail);
+      structuredRejected = true;
+      return callClaude(settings, slice, ctx, fetchFn);
+    }
     throw new Error(`Claude API ${res.status}: ${detail}`);
   }
   const data = await res.json();
   const text = (data.content || []).filter((c) => c.type === "text").map((c) => c.text).join("\n");
-  const parsed = extractJson(text);
+  // Say why there is nothing to read, rather than failing on the parse.
+  if (data.stop_reason === "refusal") throw new Error("Claude declined to translate this page (refusal)");
+  if (data.stop_reason === "max_tokens") throw new Error(`Claude's answer was cut off (max_tokens, ${data.usage?.output_tokens ?? "?"} tokens)`);
+  if (!text.trim()) throw new Error(`Empty model response (stop_reason: ${data.stop_reason ?? "none"})`);
+  let parsed;
+  try { parsed = extractJson(text); }
+  catch (e) {
+    console.warn("Gytakusub: unreadable model answer:", text.slice(0, 4000));
+    throw new Error(`Unreadable model answer (${e.message}; stop_reason: ${data.stop_reason ?? "none"})`);
+  }
   return {
     items: Array.isArray(parsed.items) ? parsed.items : [],
     terms: Array.isArray(parsed.terms) ? parsed.terms : [],

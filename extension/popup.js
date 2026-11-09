@@ -1,14 +1,25 @@
+// The popup talks to storage and to the tab's content script directly: the
+// service worker may be busy analysing a page for seconds (see settings.js), and
+// the popup must show the real settings the moment it opens.
+import { getSettings, ensureContentScript } from "./settings.js";
+
 const $ = (id) => document.getElementById(id);
 
+let tab = null; // the active tab, when it is a web page
+
+/** A message to the content script in the active tab (injecting it first if asked). */
 async function relay(payload, inject = false) {
-  try { return await chrome.runtime.sendMessage({ type: "RELAY_TO_TAB", payload, inject }); }
-  catch (e) { return { error: e.message }; }
+  if (!tab) return { error: "Not a web page" };
+  try {
+    if (inject) await ensureContentScript(tab.id);
+    return await chrome.tabs.sendMessage(tab.id, payload);
+  } catch (e) { return { error: e.message }; }
 }
 
 let currentHost = null;
 
 async function init() {
-  const s = await chrome.runtime.sendMessage({ type: "GET_SETTINGS" });
+  const [s, [active]] = await Promise.all([getSettings(), chrome.tabs.query({ active: true, currentWindow: true })]);
   $("nokey").style.display = s.apiKey ? "none" : "block";
   $("enabled").checked = !!s.enabled;
   document.body.classList.toggle("off", !s.enabled);
@@ -16,17 +27,19 @@ async function init() {
   $("useContext").checked = !!s.useContext;
   $("exportReport").style.display = s.debugOverlay ? "" : "none";
 
-  const info = await chrome.runtime.sendMessage({ type: "ACTIVE_TAB_INFO" });
-  currentHost = info?.host || null;
+  tab = active && /^https?:/.test(active.url || "") ? active : null;
+  try { currentHost = tab ? new URL(tab.url).hostname : null; } catch { currentHost = null; }
   if (!currentHost) {
     $("site").disabled = $("auto").disabled = $("translate").disabled = $("toggle").disabled = true;
     $("host").textContent = "this page";
     $("state").textContent = "Not a web page.";
+    document.body.classList.add("ready");
     return;
   }
   $("host").textContent = currentHost;
   $("site").checked = (s.enabledSites || []).includes(currentHost) || (s.autoSites || []).includes(currentHost);
   $("auto").checked = (s.autoSites || []).includes(currentHost);
+  document.body.classList.add("ready");
 
   const st = await relay({ type: "GET_STATE" });
   if (st && !st.error) {
@@ -80,4 +93,4 @@ $("auto").onchange = async (e) => {
 $("openOptions").onclick = () => chrome.runtime.openOptionsPage();
 $("openOptions2").onclick = (e) => { e.preventDefault(); chrome.runtime.openOptionsPage(); };
 
-init();
+init().finally(() => document.body.classList.add("ready"));

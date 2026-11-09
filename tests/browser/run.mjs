@@ -46,7 +46,7 @@ let sw = context.serviceWorkers()[0] || (await context.waitForEvent("servicework
 // the worker's own warnings (a GPU session that fails to start, a model that will not load)
 context.on("console", (m) => { if (m.type() === "warning" && /Gytakusub/.test(m.text())) console.log("  [worker]", m.text().slice(0, 300)); });
 await sw.evaluate(async () => {
-  await chrome.storage.sync.set({ enabled: true, enabledSites: ["127.0.0.1"], debugOverlay: true, peekOnHover: true, useContext: false, includeSource: false });
+  await chrome.storage.sync.set({ enabled: true, enabledSites: ["127.0.0.1"], debugOverlay: true, peekOnHover: true, useContext: false, includeSource: false, model: "claude-sonnet-5-5" });
   await chrome.storage.local.set({ apiKey: "sk-ant-test" });
 });
 await new Promise((r) => setTimeout(r, 300)); // let syncRegistration run
@@ -60,11 +60,27 @@ await page.waitForTimeout(500);
 
 const tabId = await sw.evaluate(async () => (await chrome.tabs.query({ url: "http://127.0.0.1:*/*" }))[0]?.id);
 const translate = (force) => sw.evaluate(async ({ tabId, force }) => chrome.tabs.sendMessage(tabId, { type: "TRANSLATE_VISIBLE", force }), { tabId, force });
-// a software GPU is slow (the bubble model takes ~10 s on lavapipe): give the --gpu run time
-const waitTicks = process.argv.includes("--gpu") ? 3000 : 100;
+// a software GPU is slow (the bubble model takes ~10 s on lavapipe): give the --gpu run time;
+// on the CPU a render takes 5–8 s on a CI runner, more on a busy machine
+const waitTicks = process.argv.includes("--gpu") ? 3000 : 300;
 const waitLogs = async (n) => { for (let i = 0; i < waitTicks && debugLogs.length < n; i++) await page.waitForTimeout(100); if (debugLogs.length < n) throw new Error(`timeout waiting for render ${n}`); await page.waitForTimeout(400); };
 
 const r = await translate(false); if (!r?.ok) throw new Error("content script did not answer: " + JSON.stringify(r));
+// ---- the extension's own pages, opened while the worker analyses that page ----
+// They must show the stored settings at once: a page that waited for the busy
+// worker showed its HTML defaults, and an options page saved then wiped settings.
+let pages = null;
+if (!process.argv.includes("--bad-boxes")) {
+  const extId = new URL(sw.url()).host, open = async (file, ready) => {
+    const t0 = Date.now(), p = await context.newPage();
+    await p.goto(`chrome-extension://${extId}/${file}`); await p.waitForFunction(ready, null, { timeout: 20000 });
+    const ms = Date.now() - t0, model = await p.$eval("#model", (e) => e.value); await p.close();
+    return { ms, model };
+  };
+  pages = { popup: await open("popup.html", () => document.body.classList.contains("ready")), options: await open("options.html", () => !document.getElementById("save").disabled) };
+  pages.workerBusy = debugLogs.length === 0; // the first render had not finished meanwhile
+  await page.bringToFront(); // a background tab does not paint
+}
 await waitLogs(1);
 await page.screenshot({ path: path.join(out, "1-first.png") });
 await translate(true); await waitLogs(2);
@@ -173,6 +189,13 @@ if (peekChanged === false) { failures++; console.log("FAIL: hovering a bubble di
 if (editOk === false) { failures++; console.log("FAIL: editing a line did not change the overlay"); }
 if (persisted === false) { failures++; console.log("FAIL: the edited line did not survive a reload"); }
 if (peekChanged !== null) console.log(`peek: ${peekChanged} edit: ${editOk} persisted: ${persisted}`);
+if (pages) {
+  console.log(`popup ready in ${pages.popup.ms} ms, options in ${pages.options.ms} ms, while the worker was ${pages.workerBusy ? "busy" : "idle"}`);
+  for (const [name, p] of Object.entries({ popup: pages.popup, options: pages.options })) {
+    if (p.model !== "claude-sonnet-5-5") { failures++; console.log(`FAIL: the ${name} page shows model ${p.model}, not the stored one`); }
+    if (p.ms > 3000) { failures++; console.log(`FAIL: the ${name} page took ${p.ms} ms to show the settings`); }
+  }
+}
 console.log(failures ? `BROWSER TEST FAILED (${failures})` : "BROWSER TEST PASSED");
 process.exitCode = failures ? 1 : 0;
 for (const [i, d] of debugLogs.entries()) console.log(`render ${i + 1}: work=${d.work.W}x${d.work.H} natural=${d.natural} items=${d.items.length} regions=${d.regions.length} placed=${d.placements.length} tags=${d.items.map((it) => it.tag).join(",")}`);

@@ -169,3 +169,24 @@ geometry the new detector returns.
   shares a bubble with others can still be squeezed into a narrow column when
   the model's box for it is small; credit pages and site logos are often left
   as they are.
+
+## Addendum (same day, after the owner's second test of the raw chapter)
+
+- **Two translations on one paragraph.** The detector merges a narration and its
+  parenthesis (or a speech and its last line) into one paragraph; the model
+  translates them as two items. The second used to get only its own box — often
+  a sliver beside the first — and tiny text. Members whose boxes lie on the same
+  paragraph now share it, cut across its lines between their boxes
+  (engine/layout.js `shareBlocks`). On the Latin pages: rendered below 0.7× the
+  original 9.2% → 6.5%, lines hyphenated 133 → 60 (48 with v4), words broken
+  letter by letter 10 → 9.
+- **A panel's background is not a bubble.** v6 reads loose lettering set on a
+  panel's light background, and the light-region rules then took the whole panel
+  for a bubble with that lettering in it (the stamp sat at the panel's corner, the
+  model left the text untagged, its box was off by 240 px). With the bubble model
+  running, the rules now stop at 8% of the page: no bubble they found that the
+  model then used was larger, on any of the Latin exports. The lettering becomes
+  loose text, placed where it is. The scorer's "dialogue recognised as a bubble"
+  on the raws drops 98.4% → 95.1% for exactly these items (the model labels such
+  narration "bubble"); placement on those pages was checked by eye and is better.
+

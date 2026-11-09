@@ -171,13 +171,14 @@ function nearestRegion(an, px) {
  */
 function assignAnchors(blocks, members, bbox, letter) {
   if (members.length === 1 && blocks.length) return [{ ...union(blocks.map((b) => b.gbox)), fromLettering: true }];
-  const free = blocks.map((b) => ({ ...b.gbox, fromLettering: true })).sort((a, b) => (a.y - b.y) || (a.x - b.x));
+  const free = blocks.map((b) => ({ ...b.gbox, fromLettering: true, vertical: !!b.vertical })).sort((a, b) => (a.y - b.y) || (a.x - b.x));
   const anchors = new Array(members.length).fill(null);
   // boxes first, best overlap first, so two members never claim one block
   const claims = [];
   members.forEach((m, i) => { if (m.px) for (const g of free) { const o = overlap(m.px, g); if (o > 0) claims.push({ i, g, o: o / Math.min(area(m.px), area(g)) }); } });
   claims.sort((a, b) => b.o - a.o);
   for (const c of claims) if (!anchors[c.i] && free.includes(c.g)) { anchors[c.i] = c.g; free.splice(free.indexOf(c.g), 1); }
+  shareBlocks(anchors, members);
   members.forEach((m, i) => { if (!anchors[i] && free.length) anchors[i] = free.shift(); });
   members.forEach((m, i) => {
     if (anchors[i]) return;
@@ -185,6 +186,41 @@ function assignAnchors(blocks, members, bbox, letter) {
     anchors[i] = m.px && inBox(bbox, m.px.x + m.px.w / 2, m.px.y + m.px.h / 2) ? m.px : { x: cx - letter, y: cy - letter, w: 2 * letter, h: 2 * letter };
   });
   return anchors;
+}
+
+/**
+ * A member whose box lies on lettering another member already took shares that
+ * block: the detector merged into one paragraph lines the model translated as
+ * separate items (a narration column and its parenthesis). Without this the
+ * second member gets only its own box, often a sliver, and its text comes out
+ * tiny. The block is cut across its lines — between columns for vertical text,
+ * between rows otherwise — midway between the members' boxes, and each member
+ * anchors to its part. Updates `anchors` in place.
+ */
+function shareBlocks(anchors, members) {
+  const groups = new Map(); // claimed block → indices of the members on it
+  members.forEach((m, i) => {
+    if (anchors[i] || !m.px) return;
+    let best = null, most = 0;
+    for (const g of anchors) if (g && g.fromLettering) { const o = overlap(m.px, g); if (o > most) { most = o; best = g; } }
+    if (!best || most < 0.3 * area(m.px)) return;
+    if (!groups.has(best)) groups.set(best, [anchors.indexOf(best)]);
+    groups.get(best).push(i);
+  });
+  for (const [g, idx] of groups) {
+    const across = g.vertical ? "x" : "y", len = g.vertical ? "w" : "h";
+    const at = (i) => members[i].px[across] + members[i].px[len] / 2;
+    idx.sort((a, b) => at(a) - at(b));
+    const lo = g[across], hi = g[across] + g[len], margin = 0.1 * g[len];
+    let start = lo;
+    // the cut: midway between the two boxes' facing edges (between their centres if they overlap)
+    const cut = (a, b) => { const pa = members[a].px, pb = members[b].px, e = pa[across] + pa[len], f = pb[across]; return e <= f ? (e + f) / 2 : (at(a) + at(b)) / 2; };
+    idx.forEach((i, k) => {
+      const end = k === idx.length - 1 ? hi : clamp(cut(i, idx[k + 1]), start + margin, hi - margin);
+      anchors[i] = { ...g, [across]: start, [len]: Math.max(1, end - start) };
+      start = end;
+    });
+  }
 }
 
 /**

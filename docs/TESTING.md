@@ -28,7 +28,8 @@ Work through this list on a chapter you know. Tick what passes; for anything tha
 8. **Hide / Show** (hover bar or **Alt+Shift+T**) and **Alt+T** (translate everything on screen) still work.
 9. **Dark bubbles** (white lettering on black), if the chapter has them.
 10. **A banner / credits page** with big lettering: no art is wiped.
-11. **Graphics card.** Export a debug report (below): `timing.backend` in a page's JSON says `detect:webgpu segment:webgpu` when the models ran on the graphics card. Untick Options → *Use the graphics card* once and translate a page: same result, slower.
+11. **Popup while translating.** With a chapter translating, click the toolbar icon: it opens at once with your settings (master switch, model, site toggles) — not the defaults.
+12. **Graphics card.** Export a debug report (below): `timing.backend` in a page's JSON says `detect:webgpu segment:webgpu` when the models ran on the graphics card. Untick Options → *Use the graphics card* once and translate a page: same result, slower.
 
 ### If something looks wrong
 

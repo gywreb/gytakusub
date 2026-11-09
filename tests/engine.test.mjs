@@ -53,6 +53,52 @@ test("extractJson tolerates fences and prose", () => {
   assert.deepEqual(prompt.extractJson('Here you go:\n```json\n{"items":[],"terms":[]}\n```'), { items: [], terms: [] });
   assert.throws(() => prompt.extractJson("no json here"));
 });
+// callClaude against a fake API: what is asked for, and what each kind of answer becomes
+{
+  const settings = { model: "m", apiKey: "k", targetLang: "English", glossary: "", customPrompt: "", useContext: false, includeSource: false };
+  const slice = { b64: "x", mediaType: "image/jpeg", cw: 10, ch: 10, tagFrom: 1, tagTo: 2 };
+  const ctx = { terms: [], recent: [] };
+  const sent = [];
+  const fake = (...replies) => async (url, init) => {
+    sent.push(JSON.parse(init.body));
+    const [status, reply] = replies.length > 1 ? replies.shift() : replies[0];
+    return { ok: status === 200, status, json: async () => reply, text: async () => JSON.stringify(reply) };
+  };
+  const answer = { items: [{ tag: 1, box: [1, 2, 3, 4], kind: "bubble", size: "normal", text: 'He said "stop" — twice' }], terms: [] };
+  const good = [200, { content: [{ type: "text", text: JSON.stringify(answer) }], stop_reason: "end_turn" }];
+  const ok = await prompt.callClaude(settings, slice, ctx, fake(good));
+  test("callClaude asks for structured output: a closed schema, every property required", () => {
+    const f = sent[0].output_config?.format;
+    assert.equal(f?.type, "json_schema");
+    const walk = (o) => {
+      if (o.type === "object") { assert.equal(o.additionalProperties, false); assert.deepEqual([...o.required].sort(), Object.keys(o.properties).sort()); Object.values(o.properties).forEach(walk); }
+      if (o.type === "array") walk(o.items);
+    };
+    walk(f.schema);
+    assert.ok(!("source" in f.schema.properties.items.items.properties));
+    assert.ok("source" in prompt.answerSchema(true).properties.items.items.properties);
+    assert.equal(ok.items[0].text, 'He said "stop" — twice');
+  });
+  const fails = async (...replies) => { try { await prompt.callClaude(settings, slice, ctx, fake(...replies)); return "no error"; } catch (e) { return e.message; } };
+  const refusal = await fails([200, { content: [], stop_reason: "refusal" }]);
+  const cut = await fails([200, { content: [{ type: "text", text: '{"items":[{"tag":1,' }], stop_reason: "max_tokens", usage: { output_tokens: 8192 } }]);
+  const empty = await fails([200, { content: [], stop_reason: "end_turn" }]);
+  const garbled = await fails([200, { content: [{ type: "text", text: '{"items":[{"text":"a" "b"}]}' }], stop_reason: "end_turn" }]);
+  test("callClaude names why an answer cannot be read (refusal, cut off, empty, garbled)", () => {
+    assert.match(refusal, /declined/);
+    assert.match(cut, /cut off \(max_tokens, 8192/);
+    assert.match(empty, /Empty model response \(stop_reason: end_turn\)/);
+    assert.match(garbled, /Unreadable model answer .*stop_reason: end_turn/);
+  });
+  // last: the fallback is remembered for the rest of the process
+  sent.length = 0;
+  const fallback = await prompt.callClaude(settings, slice, ctx, fake([400, { error: { message: "output_config.format: unsupported for this model" } }], good));
+  test("callClaude falls back to a plain request when structured output is rejected", () => {
+    assert.equal(sent.length, 2);
+    assert.ok(sent[0].output_config && !sent[1].output_config);
+    assert.equal(fallback.items.length, 1);
+  });
+}
 test("normalizeItems maps slice pixels to page fractions and validates tags", () => {
   const s = { x: 0, y: 100, w: 1000, h: 500, cw: 500, ch: 250, tagFrom: 3, tagTo: 5 };
   const [a, b] = prompt.normalizeItems([{ tag: 4, box: [50, 25, 100, 50], text: "hi" }, { tag: 9, box: [0, 0, 10, 10], text: "x" }], s, 1000, 1000);

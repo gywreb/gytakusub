@@ -320,7 +320,13 @@ export function analyze(cv, img, opts = {}) {
     const x = S[li * 5], y = S[li * 5 + 1], w = S[li * 5 + 2], h = S[li * 5 + 3], a = S[li * 5 + 4];
     const frac = a / (W * H), rbox = { x, y, w, h };
     const reject = (why, extra) => trace("region", rbox, why, { frac, blocks: inBlocks.length, ...extra });
-    if (frac < 0.0006 || frac > 0.2) { reject("area out of range"); continue; }
+    // With the segmentation model running, these rules only catch the bubbles it misses
+    // (toned ones): none of those in the owner's exports covered more than 8% of the
+    // page, while every light region larger than that was a panel's background with
+    // loose lettering on it — which reads better as loose text than as a "bubble"
+    // the size of the panel. Without the model, the rules are the only bubble finder.
+    const maxFrac = opts.instances ? 0.08 : 0.2;
+    if (frac < 0.0006 || frac > maxFrac) { reject("area out of range", { maxFrac }); continue; }
     if (w > 0.8 * W || h > 0.6 * H || w * h > 0.3 * W * H) { reject("too large for a bubble"); continue; }
     // lettering has room around it inside a bubble (see bubblesFromInstances)
     // (a "line" filling the shape edge to edge with a mark or two in it: a face read as "ö")
