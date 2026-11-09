@@ -136,14 +136,14 @@
                 <li>Set these four fields; leave everything else as it is:
                   <ul>
                     <li><b>Project / Worker name:</b> <button type="button" class="chip" data-copy="gytakusub" title="Copy">gytakusub</button>. Exactly this, or the build fails.</li>
-                    <li><b>Root directory:</b> <button type="button" class="chip" data-copy="fetcher" title="Copy">fetcher</button>. It may be under <i>Advanced settings</i>.</li>
+                    <li><b>Path:</b> <button type="button" class="chip" data-copy="fetcher" title="Copy">fetcher</button>. Open <i>Advanced settings</i> to see it. It's the folder the fetcher is in.</li>
                     <li><b>Build command:</b> leave empty.</li>
                     <li><b>Deploy command:</b> <button type="button" class="chip" data-copy="npx wrangler deploy" title="Copy">npx wrangler deploy</button></li>
                   </ul>
                 </li>
                 <li>Click <b>Save and Deploy</b> and wait about a minute until it says it's deployed.</li>
               </ol>
-              <p class="muted small">If the build fails, check those four fields under the Worker's <b>Settings</b> → <b>Build</b>, correct them, and deploy again.</p>
+              <p class="muted small">If the build fails, open the Worker's <b>Settings</b> → <b>Build</b>, check the same fields (the path is called <b>Root directory</b> there), correct them, and deploy again.</p>
             </div>
           </li>
           <li data-step="5">

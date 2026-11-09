@@ -16,6 +16,13 @@ function show(kind, text) {
 }
 
 let loaded = false;
+let dirty = false;
+
+/** Unsaved edits are shown next to Save, and leaving the page asks first. */
+function markDirty(on) {
+  dirty = on;
+  if (on) show("dirty", "Unsaved changes");
+}
 
 async function load() {
   const s = await getSettings();
@@ -26,6 +33,7 @@ async function load() {
   $("apiKey").value = s.apiKey || "";
   loaded = true;
   for (const id of ["save", "testKey"]) $(id).disabled = false;
+  markDirty(false);
 }
 
 async function save() {
@@ -47,6 +55,7 @@ async function save() {
     await chrome.storage.sync.remove("apiKey");
   }
   await chrome.storage.sync.set(sync);
+  dirty = false;
   show("ok", "Saved.");
 }
 
@@ -55,6 +64,7 @@ $("showKey").onclick = () => {
   const i = $("apiKey");
   i.type = i.type === "password" ? "text" : "password";
   $("showKey").textContent = i.type === "password" ? "Show" : "Hide";
+  $("showKey").setAttribute("aria-pressed", String(i.type !== "password"));
 };
 $("testKey").onclick = async () => {
   await save();
@@ -68,9 +78,19 @@ $("testKey").onclick = async () => {
   } catch (e) { show("err", "Key test failed: " + e.message); }
 };
 $("clearCache").onclick = async () => {
+  if (!confirm("Clear the translated pages, the names found per tab and your edited lines?")) return;
   await chrome.storage.session.clear();
-  show("ok", "Cache cleared.");
+  show("ok", dirty ? "Cache cleared. Your other changes are not saved yet." : "Cache cleared.");
 };
 
+document.querySelector("main").addEventListener("input", () => { if (loaded) markDirty(true); });
+// The popup can change settings while this page is open: show them, unless that would lose edits here.
+chrome.storage.onChanged.addListener(() => { if (loaded && !dirty) load().catch(() => {}); });
+addEventListener("beforeunload", (e) => { if (dirty) e.preventDefault(); });
+addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); $("save").click(); }
+});
+
+$("save").title = /Mac|iPhone|iPad/.test(navigator.platform) ? "Save (⌘S)" : "Save (Ctrl+S)";
 for (const id of ["save", "testKey"]) $(id).disabled = true;
 load().catch((e) => show("err", "Could not read the settings: " + e.message));

@@ -196,7 +196,7 @@ for (const [what, html] of [["100 KB of unclosed <img ", "<img ".repeat(20000)],
   const toml = fs.readFileSync(new URL("../fetcher/wrangler.toml", import.meta.url), "utf8");
   const name = /^name\s*=\s*"([^"]+)"/m.exec(toml)?.[1];
   ok(name && html.includes(`<b>Project / Worker name:</b> <button type="button" class="chip" data-copy="${name}"`), `the Worker name the guide asks for is the one in wrangler.toml (${name}); Cloudflare fails the build otherwise`);
-  ok(html.includes('<b>Root directory:</b> <button type="button" class="chip" data-copy="fetcher"'), "the guide's root directory is the fetcher folder");
+  ok(html.includes('<b>Path:</b> <button type="button" class="chip" data-copy="fetcher"'), "the guide's path (root directory) is the fetcher folder");
   const docLinks = [...html.matchAll(/href="(https:\/\/developers\.cloudflare\.com\/[^"]+)"/g)].map((m) => m[1]);
   ok(docLinks.length >= 2 && docLinks.every((u) => guide.pages.some((p) => p.url.replace(/index\.md$/, "") === u)), "every Cloudflare page the guide links to is watched by the weekly check", JSON.stringify(docLinks));
   ok(/^\d{4}-\d{2}-\d{2}$/.test(guide.checked) && guide.pages.every((p) => /^\d{4}-\d{2}-\d{2}$/.test(p.dateModified)), "the guide sources carry their check dates");

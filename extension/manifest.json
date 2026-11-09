@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Gytakusub",
-  "version": "2.0.0",
+  "version": "2.2.0",
   "description": "Translate manga and comic pages in place on any site, using your own Claude API key. No account, no server.",
   "minimum_chrome_version": "116",
   "icons": {

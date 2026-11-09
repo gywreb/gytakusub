@@ -211,7 +211,9 @@ Builds, docs updated 28 Oct and 8 Nov 2026):
 3. Worker name `gytakusub`: Cloudflare fails the build unless it matches
    `name` in the root directory's `wrangler.toml`. A test keeps the guide and
    `wrangler.toml` in step.
-4. Root directory `fetcher`; build command empty; deploy command
+4. Root directory `fetcher` (on the create screen it is *Path*, under
+   *Advanced settings*; the docs only name it *Root directory*, as in
+   Settings → Build); build command empty; deploy command
    `npx wrangler deploy`.
 5. Add the Secret `GYT_KEY` (this route doesn't prompt for it), then Connect.
 

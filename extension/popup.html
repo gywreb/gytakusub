@@ -1,73 +1,89 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
 <meta charset="utf-8" />
+<title>Gytakusub</title>
+<link rel="stylesheet" href="ui.css" />
 <style>
-  :root {
-    color-scheme: light dark;
-    --bg: #ffffff; --fg: #111827; --muted: #6b7280; --border: #d1d5db; --line: #e5e7eb;
-    --btn: #f9fafb; --btn-hover: #f3f4f6; --primary: #111827; --primary-fg: #fff; --primary-hover: #1f2937;
-    --warn-fg: #b45309; --warn-bg: #fffbeb; --warn-border: #fcd34d; --link: #2563eb;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #1f2124; --fg: #e5e7eb; --muted: #9ca3af; --border: #3f4449; --line: #2f3338;
-      --btn: #2a2d31; --btn-hover: #34383d; --primary: #e5e7eb; --primary-fg: #111827; --primary-hover: #ffffff;
-      --warn-fg: #fcd34d; --warn-bg: #3a2f10; --warn-border: #6b5416; --link: #60a5fa;
-    }
-  }
-  body { width: 260px; margin: 0; padding: 12px; font: 13px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--fg); background: var(--bg); }
-  h1 { font-size: 14px; margin: 0 0 10px; display: flex; align-items: center; gap: 8px; }
-  h1 img { width: 20px; height: 20px; }
-  .row { display: flex; gap: 6px; margin-bottom: 8px; }
-  button { flex: 1; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--btn); color: var(--fg); cursor: pointer; font: inherit; }
-  button:hover { background: var(--btn-hover); }
-  button.primary { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); }
-  button.primary:hover { background: var(--primary-hover); }
-  label.toggle { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-top: 1px solid var(--line); }
-  .muted { color: var(--muted); font-size: 12px; }
-  .warn { color: var(--warn-fg); background: var(--warn-bg); border: 1px solid var(--warn-border); border-radius: 6px; padding: 6px 8px; margin-bottom: 8px; font-size: 12px; }
-  a { color: var(--link); }
-  select { width: 100%; padding: 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--btn); color: var(--fg); font: inherit; margin-bottom: 8px; }
-  input[type=checkbox] { accent-color: var(--link); }
-  h1 .switch { margin-left: auto; position: relative; width: 38px; height: 22px; }
-  h1 .switch input { opacity: 0; width: 0; height: 0; }
-  h1 .switch span { position: absolute; inset: 0; border-radius: 22px; background: #9ca3af; transition: 150ms; cursor: pointer; }
-  h1 .switch span::before { content: ""; position: absolute; width: 16px; height: 16px; left: 3px; top: 3px; border-radius: 50%; background: #fff; transition: 150ms; }
-  h1 .switch input:checked + span { background: #16a34a; }
-  h1 .switch input:checked + span::before { transform: translateX(16px); }
-  body.off .row, body.off select, body.off label.toggle { opacity: 0.45; pointer-events: none; }
+  body { width: 340px; }
+  .pop-head { display: flex; align-items: center; gap: var(--s2); padding: 10px var(--s4); border-bottom: 1px solid var(--border); background: var(--surface); }
+  .pop-title { margin: 0; font-weight: 700; font-size: 15px; }
+  .master { margin-left: auto; display: flex; align-items: center; gap: var(--s2); cursor: pointer; color: var(--muted); font-size: var(--t-caption); font-weight: 600; }
+  .pop-body { display: grid; gap: 10px; padding: var(--s3) var(--s4); }
+  .actions { display: flex; gap: var(--s2); }
+  .actions .primary { flex: 1; min-width: 0; }
+  .icon-btn { flex: none; width: 40px; min-height: 40px; padding: 0; }
+  .icon-btn svg { width: 20px; height: 20px; }
+  .status { min-height: 1.5em; margin-top: -2px; color: var(--muted); font-size: var(--t-caption); }
+  .option { padding: var(--s2) 0; }
+  .group { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r2); padding: var(--s1) var(--s3); }
+  .group-title { margin: var(--s2) 0 0; font-size: var(--t-caption); font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .group-title #host { text-transform: none; letter-spacing: 0; color: var(--fg); overflow-wrap: anywhere; }
+  .group .field { padding: var(--s2) 0 10px; border-bottom: 1px solid var(--border); }
+  .group .field + .option { border-top: 0; }
+  .pop-foot { display: flex; gap: var(--s2); padding: 0 var(--s4) var(--s4); }
+  .pop-foot .btn { flex: 1 1 auto; white-space: nowrap; }
+  #nokey { margin: var(--s3) var(--s4) 0; }
+  #offNote { padding: var(--s3) var(--s4) var(--s4); }
+  body:not(.off) #offNote, body.off .pop-body { display: none; }
   /* until the settings are read (a few ms): never show the HTML defaults as if they were the user's */
-  body:not(.ready) h1 .switch, body:not(.ready) select, body:not(.ready) label.toggle { visibility: hidden; }
-  #host { font-weight: 600; }
+  body:not(.ready) .switch, body:not(.ready) select, body:not(.ready) #enabledText { visibility: hidden; }
 </style>
 </head>
 <body>
-  <h1><img src="icons/icon32.png" alt="" />Gytakusub <label class="switch" title="Master switch"><input type="checkbox" id="enabled" /><span></span></label></h1>
-  <div id="nokey" class="warn" style="display:none">No API key yet — <a href="#" id="openOptions2">add one in options</a>.</div>
+  <header class="pop-head">
+    <img src="icons/icon32.png" width="22" height="22" alt="" />
+    <h1 class="pop-title">Gytakusub</h1>
+    <label class="master" title="Turn Gytakusub on or off on every site"><span id="enabledText">On</span><input type="checkbox" id="enabled" class="switch" aria-label="Gytakusub on" /></label>
+  </header>
 
-  <div class="row">
-    <button id="translate" class="primary">Translate visible images (Alt+T)</button>
-  </div>
-  <div class="row">
-    <button id="toggle">Hide / show (Alt+Shift+T)</button>
-  </div>
+  <p id="offNote" class="hint">Gytakusub is off on every site. Turn it on with the switch above; your settings are kept.</p>
 
-  <select id="model" title="Model">
-    <option value="claude-haiku-5-5">Claude Haiku 5.5 — fastest, cheapest</option>
-    <option value="claude-sonnet-5-5">Claude Sonnet 5.5 — better on dense pages</option>
-    <option value="claude-opus-5-5">Claude Opus 5.5 — best, most expensive</option>
-  </select>
+  <div id="nokey" class="notice" hidden><span>No Claude API key yet.</span><button id="openOptions2" class="btn small" type="button">Add key</button></div>
 
-  <label class="toggle"><span>Enable on <b id="host">this site</b> <span class="muted">(hover button, shortcuts)</span></span><input type="checkbox" id="site" /></label>
-  <label class="toggle"><span>Auto-translate while scrolling here</span><input type="checkbox" id="auto" /></label>
-  <label class="toggle"><span>Chapter context (names + recent lines)</span><input type="checkbox" id="useContext" /></label>
+  <main class="pop-body">
 
-  <div class="muted" id="state" style="margin-top:8px"></div>
-  <div class="row" style="margin-top:10px">
-    <button id="openOptions">Options</button>
-    <button id="exportReport" style="display:none" title="One .zip with every translated page on this tab: original image, debug render and JSON">Export debug report</button>
-  </div>
+    <div class="actions">
+      <button id="translate" class="primary block" type="button"><span>Translate visible images</span><kbd id="kbdTranslate">Alt+T</kbd></button>
+      <button id="toggle" class="btn icon-btn" type="button" title="Hide / show translations (Alt+Shift+T)" aria-label="Hide or show translations">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+      </button>
+    </div>
+    <p id="state" class="status" role="status" aria-live="polite"></p>
+
+    <section class="group" aria-labelledby="siteHead">
+      <h2 id="siteHead" class="group-title">On <span id="host">this site</span></h2>
+      <label class="option">
+        <span class="option-text"><span class="option-title">Enable here</span><span class="option-desc">Hover button and keyboard shortcuts</span></span>
+        <input type="checkbox" id="site" class="switch" />
+      </label>
+      <label class="option">
+        <span class="option-text"><span class="option-title">Auto-translate while scrolling</span><span class="option-desc">Sends pages to Claude as you scroll</span></span>
+        <input type="checkbox" id="auto" class="switch" />
+      </label>
+    </section>
+
+    <section class="group" aria-labelledby="trHead">
+      <h2 id="trHead" class="group-title">Translation</h2>
+      <label class="field">
+        <span>Model</span>
+        <select id="model">
+          <option value="claude-haiku-5-5">Haiku 5.5 — fastest, cheapest</option>
+          <option value="claude-sonnet-5-5">Sonnet 5.5 — better on dense pages</option>
+          <option value="claude-opus-5-5">Opus 5.5 — best, most expensive</option>
+        </select>
+      </label>
+      <label class="option">
+        <span class="option-text"><span class="option-title">Chapter context</span><span class="option-desc">Names + recent lines, for continuity</span></span>
+        <input type="checkbox" id="useContext" class="switch" />
+      </label>
+    </section>
+  </main>
+
+  <footer class="pop-foot">
+    <button id="openOptions" class="btn" type="button">All settings</button>
+    <button id="exportReport" class="btn" type="button" hidden title="One .zip with every translated page on this tab: original image, debug render and JSON">Export debug report</button>
+  </footer>
   <script type="module" src="popup.js"></script>
 </body>
 </html>

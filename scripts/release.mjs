@@ -44,9 +44,9 @@ m.version = v;
 fs.writeFileSync(mp, JSON.stringify(m, null, 2) + "\n");
 
 
-// 5. commit, tag, push
+// 5. commit (nothing to commit when the version was bumped in a pull request), tag, push
 run("git add -A");
-run(`git commit -m "Release v${v}"`);
+if (out("git status --porcelain")) run(`git commit -m "Release v${v}"`);
 run(`git tag v${v}`);
 run(`git push origin main v${v}`);
 console.log(`\nPushed v${v} — watch https://github.com/gywreb/gytakusub/actions`);
