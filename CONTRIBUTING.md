@@ -18,7 +18,7 @@ CI checks these on every pull request, and a pull request that fails one is not 
    - icons or fonts.
 
    Show before and after; phone and desktop, dark and light where the change shows there. The list of files that count is in `scripts/check-screenshots.mjs`.
-3. **The tests pass** (`test`: unit tests and the real-browser tests; see `docs/TESTING.md`).
+3. **The tests pass.** The `test` check covers the unit tests and the real-browser tests (see `docs/TESTING.md`). A pull request runs the suites its changes need. Documentation alone runs none; a web app or fetcher change runs the web suite; anything else runs both. `main` and releases always run everything.
 
 `main` is protected: changes reach it only through a pull request with these checks green, and it can't be force-pushed or deleted.
 

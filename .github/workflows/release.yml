@@ -16,6 +16,7 @@ on:
         type: string
 jobs:
   test:
+    permissions: { contents: read, pull-requests: read }
     uses: ./.github/workflows/test.yml
     with:
       ref: refs/tags/${{ inputs.tag || github.ref_name }}

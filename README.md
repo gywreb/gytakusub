@@ -66,6 +66,15 @@ npm run score -- *.zip         # detection on real pages from debug reports (cov
 npm run score:layout -- *.zip  # where and how large translations land on those pages
 ```
 
+`npm run test:web` / `test:extension` and `test:browser:web` / `test:browser:extension` run one half.
+
+**In CI** (`.github/workflows/test.yml`), each pull request runs only the suites its changes need (`scripts/ci-changes.mjs`):
+- documentation alone runs none;
+- changes only to the web app or the fetcher run the web suite (about 4 minutes);
+- anything else runs both, including the extension suite (about 18 minutes).
+
+A raised version number alone doesn't count as a change. Every push to `main` and every release tag runs everything. A newer push to the same pull request cancels the older run. One `test` check sums it up.
+
 `GYT_CHANNEL=chrome npm run test:browser` uses an installed Chrome for Testing instead of Playwright's Chromium (branded Google Chrome ≥ 137 ignores `--load-extension`). Put your own pages in `tests/fixtures/real/` (git-ignored) for local tuning. Testing, verifying and merging a release branch step by step: [`docs/TESTING.md`](docs/TESTING.md).
 
 ## Scope and content
