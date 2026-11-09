@@ -27,7 +27,7 @@ const models = { v8: "/tmp/gyt-fake-seg.onnx", e2e: "/tmp/gyt-fake-seg-e2e.onnx"
 execFileSync("python3", ["make-fake-seg.py", page, truthPath, models.v8]);
 execFileSync("python3", ["make-fake-seg.py", page, truthPath, models.e2e, "--e2e"]);
 
-const ort = getOrt({ wasmBinary: fs.readFileSync("../extension/vendor/ort/ort-wasm-simd-threaded.wasm").buffer });
+const ort = getOrt({ wasmBinary: fs.readFileSync("../extension/vendor/ort/ort-wasm-simd-threaded.asyncify.wasm").buffer });
 const img = await loadImage(page);
 const c = createCanvas(img.width, img.height), ctx = c.getContext("2d"); ctx.drawImage(img, 0, 0);
 const pixels = ctx.getImageData(0, 0, img.width, img.height);

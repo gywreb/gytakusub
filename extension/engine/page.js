@@ -2,7 +2,7 @@
 // text regions for the model) and finish (place the translations, erase the
 // original lettering, hand back a cleaned page plus text placements).
 // Used by the extension's service worker and by the web app's Web Worker.
-import { getCV, getDetector, getSegmenter } from "./cv.js";
+import { getCV, getDetector, getSegmenter, setEnginePrefs } from "./cv.js";
 import { analyze } from "./analyze.js";
 import { segment } from "./segment.js";
 import { detectText } from "./detect.js";
@@ -16,6 +16,7 @@ import { sliceGeometry, normalizeItems } from "../prompt.js";
  * @returns {Promise<Job>}
  */
 export async function preparePage(bitmap, settings) {
+  setEnginePrefs({ gpu: settings?.useGpu !== false });
   const cv = await getCV();
   const [detector, segmenter] = await Promise.all([getDetector(), getSegmenter()]);
   const W = bitmap.width, H = bitmap.height;
@@ -39,6 +40,7 @@ export async function preparePage(bitmap, settings) {
     const seg = segmenter ? await segment(segmenter, imageData) : null;
     const analysis = analyze(cv, imageData, { detector, lines, instances: seg ? seg.instances : null, bubbleClasses: segmenter?.bubbleClasses });
     analysis.segmentMs = seg ? seg.ms : 0; analysis.detectMs = detectMs;
+    analysis.backend = `detect:${detector ? detector.ep : "none"} segment:${segmenter ? segmenter.ep : "none"}`;
     const tagFrom = nextId;
     for (const r of analysis.regions) r.id = nextId++; // page-wide numbering
     const tagTo = nextId - 1;
@@ -95,7 +97,8 @@ export async function finishPage(job, results, opts = {}) {
     c.getContext("2d").drawImage(canvas, r.x, r.y, r.w, r.h, 0, 0, r.w, r.h);
     return { x: r.x, y: r.y, w: r.w, h: r.h, canvas: c };
   });
-  return { items, placements, regions, work, letter, canvas, patches, engine, segmentMs, detectMs };
+  const backend = job.slices[0]?.analysis.backend || null;
+  return { items, placements, regions, work, letter, canvas, patches, engine, segmentMs, detectMs, backend };
 }
 
 /** Red numbered stamps at the top-left of each text region. */

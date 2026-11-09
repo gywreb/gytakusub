@@ -34,7 +34,8 @@ const sigmoid = (v) => 1 / (1 + Math.exp(-v));
  * @returns {Promise<Segmenter>}
  */
 export async function loadSegmenter(ort, bytes, cfg = {}) {
-  const session = await ort.InferenceSession.create(bytes, { executionProviders: cfg.executionProviders || ["wasm"], graphOptimizationLevel: "all" });
+  const ep = (cfg.executionProviders || ["wasm"])[0];
+  const session = await ort.InferenceSession.create(bytes, { executionProviders: [ep], graphOptimizationLevel: "all" });
   const inputName = session.inputNames[0];
   // a static input shape wins over the configured size
   const meta = session.inputMetadata?.[inputName] || session.inputMetadata?.[0];
@@ -45,7 +46,7 @@ export async function loadSegmenter(ort, bytes, cfg = {}) {
     session, inputName, inputSize: staticSize || cfg.inputSize || 640, classes,
     bubbleClasses: new Set(cfg.bubbleClasses || classes.map((c, i) => (/bubble|balloon/i.test(c) ? i : -1)).filter((i) => i >= 0)),
     textClasses: new Set(cfg.textClasses || classes.map((c, i) => (/text/i.test(c) && !/onomatop|sfx|sound/i.test(c) ? i : -1)).filter((i) => i >= 0)),
-    conf: cfg.conf ?? 0.25, iou: cfg.iou ?? 0.45, maskThreshold: cfg.maskThreshold ?? 0.5, ort,
+    conf: cfg.conf ?? 0.25, iou: cfg.iou ?? 0.45, maskThreshold: cfg.maskThreshold ?? 0.5, ort, ep,
   };
 }
 

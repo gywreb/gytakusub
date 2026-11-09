@@ -36,7 +36,10 @@ const context = await chromium.launchPersistentContext(profile, {
   // Branded Google Chrome ≥137 ignores --load-extension; Playwright's Chromium and
   // Chrome for Testing keep it. CI installs chromium; set GYT_CHANNEL=chrome locally.
   channel: process.env.GYT_CHANNEL || "chromium", headless: false,
-  args: ["--headless=new", "--no-sandbox", `--disable-extensions-except=${ext}`, `--load-extension=${ext}`, "--window-size=1200,900"],
+  // --gpu: let Chromium's WebGPU run on Vulkan (in CI, Mesa's software lavapipe), so
+  // the service worker takes the GPU path; --require-gpu fails if it does not.
+  args: ["--headless=new", "--no-sandbox", `--disable-extensions-except=${ext}`, `--load-extension=${ext}`, "--window-size=1200,900",
+    ...(process.argv.includes("--gpu") ? ["--enable-unsafe-webgpu", "--enable-features=Vulkan", "--use-angle=vulkan", "--ignore-gpu-blocklist"] : [])],
   viewport: { width: 1200, height: 900 },
 });
 let sw = context.serviceWorkers()[0] || (await context.waitForEvent("serviceworker"));
@@ -157,6 +160,7 @@ for (const [i, d] of debugLogs.entries()) {
 if (!debugLogs.length) { failures++; console.log("FAIL: no render happened"); }
 if (segModel && debugLogs.some((d) => d.engine !== "segmented")) { failures++; console.log(`FAIL: a segmentation model was shipped but the engine ran as ${debugLogs.map((d) => d.engine).join(",")}`); }
 if (debugLogs.length) console.log(`engine: ${debugLogs[0].engine}, timing: ${JSON.stringify(debugLogs[0].timing)}`);
+if (process.argv.includes("--require-gpu") && !debugLogs.every((d) => /detect:webgpu/.test(d.timing?.backend || "") && /segment:webgpu/.test(d.timing?.backend || ""))) { failures++; console.log(`FAIL: --require-gpu but the models ran on ${debugLogs.map((d) => d.timing?.backend).join(" | ")}`); }
 if (!reportOk) { failures++; console.log("FAIL: diagnostic report incomplete: " + JSON.stringify(rep).slice(0, 200)); }
 if (!zipOk) { failures++; console.log("FAIL: export zip missing files or corrupt: " + JSON.stringify(exp).slice(0, 200)); }
 if (peekChanged === false) { failures++; console.log("FAIL: hovering a bubble did not reveal the original"); }

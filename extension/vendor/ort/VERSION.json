@@ -2,7 +2,7 @@
   "package": "onnxruntime-web",
   "version": "1.31.1",
   "files": {
-    "ort.bundle.js": "dist/ort.wasm.bundle.min.mjs",
-    "ort-wasm-simd-threaded.wasm": "dist/ort-wasm-simd-threaded.wasm"
+    "ort.bundle.js": "dist/ort.webgpu.bundle.min.mjs",
+    "ort-wasm-simd-threaded.asyncify.wasm": "dist/ort-wasm-simd-threaded.asyncify.wasm"
   }
 }

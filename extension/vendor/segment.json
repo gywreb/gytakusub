@@ -1,5 +1,5 @@
 {
-  "source": "https://huggingface.co/kitsumed/yolov8m_seg-speech-bubble (model_dynamic.onnx), quantized to int8 by scripts/quantize-segment.py on 55 pages, detection head in float",
+  "source": "https://huggingface.co/kitsumed/yolov8m_seg-speech-bubble (model_dynamic.onnx), quantized by scripts/quantize-segment.py: CPU = static int8 QDQ on 55 pages (detection head in float); GPU = weight-only int8, input fixed at 512",
   "license": "GPL-3.0 (model card); Ultralytics AGPL-3.0 (ONNX metadata)",
   "file": "kitsumed-int8.onnx",
   "bytes": 43267244,
@@ -10,5 +10,10 @@
   "inputSize": 512,
   "conf": 0.25,
   "iou": 0.45,
-  "maskThreshold": 0.5
+  "maskThreshold": 0.5,
+  "gpu": {
+    "file": "kitsumed-gpu-512.onnx",
+    "bytes": 27922731,
+    "sha256": "f251b6b5c011d267fa8646de7d11639a1842ba97b691265390fa5f46084236e9"
+  }
 }

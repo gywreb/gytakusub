@@ -114,6 +114,37 @@ sees the stick figures' round heads as bubbles (dropped: no lettering inside);
 the tests accept a truth bubble covered by several lobes and measure erasure
 where the lettering was. 100 assertions pass with the model in place.
 
+## GPU (WebGPU), added 2026-11-09
+
+Both models run on ONNX Runtime's WebGPU execution provider when the context
+has a WebGPU adapter — extension service workers since Chrome 124 (Brave keeps
+WebGPU on and only blanks the adapter's identifying strings), dedicated
+workers in Safari 26 for the web app — and on the wasm CPU provider
+otherwise. The vendored runtime is ORT's WebGPU build (29 MB wasm), which also
+carries the CPU provider; its CPU speed equals the plain build's (1.86 vs
+1.93 s for the bubble model), so one runtime serves both.
+
+The int8 QDQ bubble model is wrong for the GPU: ORT's WebGPU provider has no
+QuantizeLinear kernel, so 295 of its nodes ran on the CPU between GPU nodes
+(measured with Dawn on a software GPU). The GPU therefore loads a second
+variant, `segment-gpu.onnx`: weight-only int8 (Conv weights int8 per output
+channel behind DequantizeLinear, activations float) with the input fixed at
+512 px — all 273 nodes on the GPU, 28 MB. On the CPU that variant would be
+slower (2.8 vs 1.9 s), which is why the CPU keeps the QDQ model; transformers.js
+picks a quantisation per device the same way.
+
+Verified: `tests/gpu.test.mjs` runs both models on WebGPU through Google's Dawn
+(the implementation in Chrome) on Mesa's software Vulkan driver, in CI as
+well, and requires the same text lines and confident bubbles as the CPU path
+on every fixture page. Speed on a real GPU is not measurable here; the
+owner's debug reports carry `timing.backend`, `timing.detect` and
+`timing.segment`.
+
+Why not first: the GPU path could not be exercised in the build environment
+or CI until a software WebGPU (Dawn + lavapipe) was set up, and the QDQ model
+chosen for the CPU turned out to be the wrong format for the GPU — shipping it
+untested would have been slower than the CPU, not faster.
+
 ## Licensing
 
 **Decided 2026-11-09 by the owner: Gytakusub is relicensed to AGPL-3.0 from

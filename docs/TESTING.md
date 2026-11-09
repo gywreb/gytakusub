@@ -88,8 +88,9 @@ git pull
 
 1. Read the same chapters as before with auto-translate on.
 2. What should look different: bubbles shaded with tone or gradients get full-size text; text no longer lands on a bright sky between bubbles; fewer lines with an outline "halo" instead of sitting in a bubble.
-3. Options → Debug overlay → popup → **Export debug report** on each chapter. Every page in the report says `"engine": "segmented"`; `timing.detect` and `timing.segment` show where the time goes.
-4. To go back to 1.1: `git checkout release/1.1` and reload.
+3. Options → Debug overlay → popup → **Export debug report** on each chapter. Every page in the report says `"engine": "segmented"`; `timing.backend` says where the models ran (`detect:webgpu segment:webgpu` on the graphics card, `wasm` on the CPU) and `timing.detect` / `timing.segment` how long they took.
+4. Compare once with Options → *Use the graphics card* unticked (CPU): same bubbles, slower.
+5. To go back to 1.1: `git checkout release/1.1` and reload.
 
 ## F. If a problem shows up after merging
 

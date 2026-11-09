@@ -2,7 +2,7 @@
 // (extension service worker, the web app's Web Worker, or Node in tests).
 import loadOpenCV from "../vendor/opencv.js";
 import { loadDetector } from "./detect.js"; // static: MV3 service workers do not support dynamic import()
-import { getOrt } from "./ort.js";
+import { getOrt, gpuAvailable } from "./ort.js";
 import { loadSegmenter } from "./segment.js";
 
 let ready = null;
@@ -28,6 +28,14 @@ export function getCV(overrides = {}) {
   return ready;
 }
 
+// Engine preferences that change which models load: `gpu` (run on WebGPU when
+// available). A change drops the loaded models so the next page loads them again.
+const prefs = { gpu: true };
+export function setEnginePrefs(next = {}) {
+  const gpu = next.gpu !== false;
+  if (gpu !== prefs.gpu) { prefs.gpu = gpu; detectorReady = null; segmenterReady = null; }
+}
+
 let detectorReady = null;
 /**
  * Resolves to the learned text detector (engine/detect.js), loaded once from
@@ -44,7 +52,7 @@ export function getDetector(overrides = {}) {
         bytes = overrides.modelBytes || new Uint8Array(await (await fetch(new URL("../vendor/ppocr-det.onnx", import.meta.url))).arrayBuffer());
       } catch (e) { console.warn("Gytakusub: text detector unavailable, using heuristics", e); return null; }
       // ONNX Runtime first (about four times faster than OpenCV's dnn on wasm); dnn if it will not start
-      try { return await loadDetector(cv, bytes, { ort: getOrt(overrides.wasmBinary ? { wasmBinary: overrides.wasmBinary } : {}) }); }
+      try { return await loadDetector(cv, bytes, { ort: getOrt(overrides.wasmBinary ? { wasmBinary: overrides.wasmBinary } : {}), gpu: overrides.gpu ?? prefs.gpu, wasmBinary: overrides.wasmBinary }); }
       catch (e) { console.warn("Gytakusub: ONNX Runtime unavailable for the text detector, using OpenCV dnn", e); }
       try { return await loadDetector(cv, bytes); }
       catch (e) { console.warn("Gytakusub: text detector unavailable, using heuristics", e); return null; }
@@ -55,28 +63,35 @@ export function getDetector(overrides = {}) {
 
 let segmenterReady = null;
 /**
- * Resolves to the learned bubble segmenter (engine/segment.js) — the model file
- * vendor/segment.onnx and its description vendor/segment.json next to this module
- * — loaded once by ONNX Runtime. Resolves to null when there is no model (the
- * analysis then decides bubbles from pixel statistics) or when it fails to load.
- * @param {object} [overrides] tests pass `modelBytes`, `config`, `wasmBinary`
+ * Resolves to the learned bubble segmenter (engine/segment.js), loaded once by
+ * ONNX Runtime from the files next to this module: vendor/segment.json (its
+ * description) and one of two variants of the model — vendor/segment-gpu.onnx
+ * (weight-only int8, float compute) on WebGPU when available, vendor/segment.onnx
+ * (int8 QDQ, integer kernels) on the CPU otherwise. Resolves to null when there
+ * is no model (the analysis then decides bubbles from pixel statistics) or when
+ * it fails to load.
+ * @param {object} [overrides] tests pass `modelBytes` / `gpuModelBytes`, `config`, `wasmBinary`, `gpu`
  */
 export function getSegmenter(overrides = {}) {
   if (!segmenterReady) {
     segmenterReady = (async () => {
+      const read = async (name) => { const res = await fetch(new URL("../vendor/" + name, import.meta.url)).catch(() => null); return res && res.ok ? new Uint8Array(await res.arrayBuffer()) : null; };
       try {
-        let bytes = overrides.modelBytes, config = overrides.config;
-        if (!bytes) {
-          const res = await fetch(new URL("../vendor/segment.onnx", import.meta.url));
-          if (!res.ok) return null;
-          bytes = new Uint8Array(await res.arrayBuffer());
-        }
+        let config = overrides.config;
         if (!config) {
           const res = await fetch(new URL("../vendor/segment.json", import.meta.url)).catch(() => null);
           config = res && res.ok ? await res.json() : {};
         }
         const ort = getOrt(overrides.wasmBinary ? { wasmBinary: overrides.wasmBinary } : {});
-        return await loadSegmenter(ort, bytes, config);
+        const wantGpu = (overrides.gpu ?? prefs.gpu) && (overrides.gpuModelBytes || config.gpu) && await gpuAvailable();
+        if (wantGpu) {
+          try {
+            const bytes = overrides.gpuModelBytes || await read("segment-gpu.onnx");
+            if (bytes) return await loadSegmenter(ort, bytes, { ...config, executionProviders: ["webgpu"] });
+          } catch (e) { console.warn("Gytakusub: bubble segmenter could not start on the GPU, using the CPU", e); }
+        }
+        const bytes = overrides.modelBytes || await read("segment.onnx");
+        return bytes ? await loadSegmenter(ort, bytes, { ...config, executionProviders: ["wasm"] }) : null;
       } catch (e) { console.warn("Gytakusub: bubble segmenter unavailable, deciding bubbles from pixels", e); return null; }
     })();
   }

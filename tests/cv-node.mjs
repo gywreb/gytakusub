@@ -21,7 +21,7 @@ process.removeAllListeners("uncaughtException");
 
 // The learned text detector, from the vendored model file (fetch() cannot read files in Node).
 // GYT_DETECTOR=dnn runs the text detector on OpenCV's dnn instead of ONNX Runtime (the fallback path).
-const ortWasm = fs.readFileSync(path.join(here, "../extension/vendor/ort/ort-wasm-simd-threaded.wasm")).buffer;
+const ortWasm = fs.readFileSync(path.join(here, "../extension/vendor/ort/ort-wasm-simd-threaded.asyncify.wasm")).buffer;
 const detBytes = new Uint8Array(fs.readFileSync(path.join(here, "../extension/vendor/ppocr-det.onnx")));
 export const detector = process.env.GYT_DETECTOR === "dnn"
   ? await (await import("../extension/engine/detect.js")).loadDetector(cv, detBytes)

@@ -9,20 +9,22 @@
 // HardSigmoid nodes rewritten as Mul/Add/Clip, which OpenCV 4.5 lacks and
 // ONNX Runtime does not mind; see scripts/vendor-detector.mjs.
 
+import { createSession } from "./ort.js";
+
 const MEAN = [0.485, 0.456, 0.406], STD = [0.229, 0.224, 0.225];
 
 /**
  * @param {typeof import("../vendor/opencv.js")} cv
  * @param {Uint8Array} modelBytes ONNX file contents
- * @param {{ort?: object}} [opts] the ONNX Runtime namespace (engine/ort.js getOrt()) to run on it; OpenCV dnn otherwise
+ * @param {{ort?: object, gpu?: boolean, wasmBinary?: ArrayBuffer}} [opts] ort: the ONNX Runtime namespace (engine/ort.js getOrt()) to run on it — on the GPU when `gpu` and available; OpenCV dnn otherwise
  * @returns {Promise<Detector>}
  */
 export async function loadDetector(cv, modelBytes, opts = {}) {
   if (opts.ort) {
-    const session = await opts.ort.InferenceSession.create(modelBytes, { executionProviders: ["wasm"], graphOptimizationLevel: "all" });
-    return { kind: "ort", ort: opts.ort, session, bytes: modelBytes, cv };
+    const { session, ep } = await createSession(modelBytes, { gpu: !!opts.gpu, wasmBinary: opts.wasmBinary });
+    return { kind: "ort", ort: opts.ort, session, ep, bytes: modelBytes, cv };
   }
-  return { kind: "dnn", ...loadDnn(cv, modelBytes), bytes: modelBytes, cv };
+  return { kind: "dnn", ep: "opencv", ...loadDnn(cv, modelBytes), bytes: modelBytes, cv };
 }
 
 function loadDnn(cv, modelBytes) {

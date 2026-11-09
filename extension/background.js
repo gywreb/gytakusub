@@ -24,6 +24,7 @@ export const DEFAULT_SETTINGS = {
   syncApiKey: false,
   excludedSites: "",
   debugOverlay: false, // draw detection boxes and log results (for diagnosing placement)
+  useGpu: true, // run the page models on the GPU (WebGPU) when the browser offers one; CPU otherwise
   peekOnHover: false, // hovering a translated bubble shows the original lettering (off by default: it flickers while reading)
   // Image prep
   maxLongEdge: 1600, // px sent to Claude for a normal page
@@ -223,6 +224,7 @@ async function handleTranslate(msg, sender) {
   timing.patchBytes = patches.reduce((s, p) => s + p.dataUrl.length, 0);
   if (page.detectMs) timing.detect = page.detectMs; // parts of "analyze": the text detector's and the bubble model's shares
   if (page.segmentMs) timing.segment = page.segmentMs;
+  if (page.backend) timing.backend = page.backend; // where the models ran: webgpu / wasm / opencv
   return {
     items: page.items, placements: page.placements, regions: page.regions, letter: page.letter, engine: page.engine,
     work: page.work, width: job.width, height: job.height, usage, timing,
