@@ -4,6 +4,13 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
 
 ## [Unreleased]
 
+## [2.3.1] — 2026-11-10 (the first GitHub Release since 2.0.0: it carries 2.2.0, 2.2.1 and 2.3.0, which were not released on their own)
+
+### Project
+- **Fixed: the release build's zip step**:
+  - The 2.2.0 release failed with "zip error: Could not create output file (dist/…)". zip was working inside its temporary copy, where there is no `dist/`. The script built the output path from `$OLDPWD` in a subshell. That works on Ubuntu 24.04; why it came out wrong on GitHub's ubuntu-26.04 runner isn't pinned down. The script now uses absolute paths.
+  - Pull requests that need the extension suite also build the store package the same way, on the same runner image, so a broken package shows up before a tag.
+
 ## [2.3.0] — 2026-11-10
 
 ### Web app
@@ -33,7 +40,7 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
   - **Full runs:** every push to `main` and every release still run everything.
   - **One check:** a single `test` check sums up the suites that ran, so it can be required on `main`. This follows GitHub's advice to skip jobs rather than whole workflows for required checks.
 
-## [2.2.0] — 2026-11-09 (extension on GitHub Releases, not yet submitted to the Chrome Web Store, which still has 2.0.0; there is no extension 2.1.0. Web app live on GitHub Pages)
+## [2.2.0] — 2026-11-09 (tagged, but its release build failed at the zip step, so 2.2.0 has no GitHub Release: 2.3.1 is the first release with these changes. There is no extension 2.1.0. Web app live on GitHub Pages)
 
 ### Web app
 - **UI overhaul after an audit** against the Web Interface Guidelines, checked at iPhone size (390 px) and desktop (1280 px), dark and light:
