@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const ext = (p) => path.join(root, "extension", p), web = (p) => path.join(root, "web", p);
 
-for (const f of ["prompt.js", "text.js"]) fs.copyFileSync(ext(f), web(f));
+for (const f of ["prompt.js", "text.js", "LICENSE", "THIRD_PARTY.md"]) fs.copyFileSync(ext(f), web(f));
 for (const dir of ["engine", "vendor", "fonts"]) {
   fs.rmSync(web(dir), { recursive: true, force: true });
   fs.cpSync(ext(dir), web(dir), { recursive: true });

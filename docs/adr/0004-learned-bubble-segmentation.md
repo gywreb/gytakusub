@@ -114,7 +114,11 @@ sees the stick figures' round heads as bubbles (dropped: no lettering inside);
 the tests accept a truth bubble covered by several lobes and measure erasure
 where the lettering was. 100 assertions pass with the model in place.
 
-## Licensing (decision for the owner, recorded here)
+## Licensing
+
+**Decided 2026-11-09 by the owner: Gytakusub is relicensed to AGPL-3.0 from
+1.1.1** (`LICENSE`, `THIRD_PARTY.md`, licence files inside the package, source
+link in Options). The analysis that led to it:
 
 - The model card says GPL-3.0; the ONNX metadata says Ultralytics AGPL-3.0,
   which is Ultralytics' position for every model trained with its code unless

@@ -37,7 +37,7 @@ You need a Claude API key from platform.claude.com (pay-per-use; Claude Max and 
 PRIVACY
 No analytics, no telemetry, no account. Images go to api.anthropic.com only, with your key. Full policy: https://gywreb.github.io/gytakusub/privacy.html
 
-Gytakusub is an independent, open-source reading aid (MIT licence, source on GitHub). It is not affiliated with any publisher, reader or translation service. Use it with content you have the right to read.
+Gytakusub is an independent, open-source reading aid (GNU AGPL v3, source on GitHub: https://github.com/gywreb/gytakusub). It is not affiliated with any publisher, reader or translation service. Use it with content you have the right to read.
 ```
 
 **Category:** Productivity (alternative: Accessibility)

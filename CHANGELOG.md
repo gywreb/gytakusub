@@ -10,8 +10,10 @@ Bubbles from a learned model, and a faster runtime. See `docs/adr/0004-learned-b
 - **Learned bubble segmentation.** A YOLOv8-seg speech-bubble model (from `kitsumed/yolov8m_seg-speech-bubble`, quantized to int8, 43 MB) returns bubble masks; the engine uses them as bubble interiors and assigns the detected lettering to them. The light-region rules remain for lettering the model leaves outside any mask (it misses some heavily toned bubbles), and a model bubble with no lettering inside is ignored (never stamped, never erased). Measured on 270 pages from the user's exports, model answers as witness: dialogue recognised as a bubble **92.4% → 98.8%** (by text 95.0 → 99.4%), coverage 93.5 → 95.4%; lines left outside any bubble 190 → 119; translations rendered under 0.7× the original 9.6% → 8.8%; overlap with un-erased lettering 70 → 52. Cost: about 1.9 s more per page on the CPU wasm backend (512 px input) — overall about the same as 1.1.0, whose text detector was slower.
 - **ONNX Runtime Web** (Microsoft, MIT; 15 MB wasm, ~4 MB compressed) runs both models. The text detector moved to it from OpenCV's dnn: 2.1 s → 0.7 s per page, same lines found; dnn stays as the fallback.
 
+### Changed
+- **Licence: GNU AGPL v3** (was MIT up to 1.1.0). The bubble model is GPL-3.0 per its card and AGPL-3.0 under Ultralytics' terms; publishing the whole extension under the AGPL keeps the store build compliant. The licence text and `THIRD_PARTY.md` ship inside the package, and Options links to the source.
+
 ### Known limitations
-- The bubble model is licensed GPL-3.0 on its card (Ultralytics AGPL-3.0 in its metadata); shipping it in a store build is a licensing decision recorded in ADR 0004.
 - Package size: +58 MB unpacked (runtime 15 MB, model 43 MB; ~45 MB compressed).
 
 ## [1.1.0] — 2026-11-08
