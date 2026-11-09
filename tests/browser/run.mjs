@@ -142,7 +142,12 @@ for (const [i, d] of debugLogs.entries()) {
   const byId = new Map(d.regions.map((r) => { const pad = r.kind === "block" ? r.letter : 0; return [r.id, { x: r.box.x - pad, y: r.box.y - pad, w: r.box.w + 2 * pad, h: r.box.h + 2 * pad }]; })); // free text keeps its footprint plus half a letter of air
   const tagged = d.items.filter((it) => it.tag != null && byId.has(it.tag)).length;
   const placed = d.placements.filter((p) => p.tag != null);
-  if (placed.length < tagged) { failures++; console.log(`FAIL render ${i + 1}: ${tagged} tagged items but only ${placed.length} placed by tag`); }
+  if (placed.length < tagged) {
+    failures++; console.log(`FAIL render ${i + 1}: ${tagged} tagged items but only ${placed.length} placed by tag`);
+    console.log("  regions:", JSON.stringify(d.regions.map((r) => [r.id, r.kind, r.box])));
+    console.log("  items:", JSON.stringify(d.items.map((it) => [it.tag, it.box])));
+    console.log("  placements:", JSON.stringify(d.placements.map((p) => [p.tag, p.item, Math.round(p.rect.x), Math.round(p.rect.y), p.halo])));
+  }
   for (const p of placed) {
     const b = byId.get(p.tag); const tol = 0.05;
     const inside = p.rect.x >= b.x - b.w * tol && p.rect.y >= b.y - b.h * tol && p.rect.x + p.rect.w <= b.x + b.w * (1 + tol) && p.rect.y + p.rect.h <= b.y + b.h * (1 + tol);
