@@ -29,3 +29,6 @@ jobs:
           path: web
       - id: deployment
         uses: actions/deploy-pages@v4
+        # GitHub's default is 10 minutes. On 2026-11-09, during GitHub's Actions incident, the
+        # 78 MB site sat in "syncing files" past that twice; it normally deploys in under a minute.
+        with: { timeout: 1800000 }
