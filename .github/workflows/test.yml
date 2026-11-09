@@ -20,6 +20,13 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: tests/package-lock.json
+      # The project's rule: every pull request carries a version (raised manifest + its CHANGELOG section).
+      - name: Pull request carries a version
+        if: github.event_name == 'pull_request'
+        env: { BASE: "${{ github.base_ref }}" }
+        run: |
+          git fetch --quiet --depth=1 origin "+refs/heads/$BASE:refs/remotes/origin/$BASE"
+          node scripts/check-version.mjs "origin/$BASE"
       - run: for f in extension/*.js extension/engine/*.js web/*.js fetcher/*.js; do node --check "$f"; done
       # cairo/pango…: node-canvas ships prebuilt binaries; when that download fails it builds
       # from source, which needs these (~1 min). mesa-vulkan-drivers: a software GPU

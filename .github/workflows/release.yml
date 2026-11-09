@@ -1,5 +1,5 @@
 name: Release
-# Triggered by scripts/release.mjs (pushes a vX.Y.Z tag), or by hand for an
+# Triggered by scripts/release.mjs (tags the version main is at; pull requests set it), or by hand for an
 # existing tag (Actions → Release → Run workflow, or
 # `gh workflow run release.yml -f tag=v2.0.0`). Runs the full Tests workflow on
 # the tagged commit first — the same environment as every push, so the two
