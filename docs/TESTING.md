@@ -61,7 +61,10 @@ Open https://github.com/gywreb/gytakusub/actions?query=branch%3Arelease%2F2.0 â€
 - 108 engine assertions on fourteen synthetic pages (detection against ground truth, placement inside bubbles, lettering erased, outlines kept; one page of vertical Japanese with furigana);
 - the bubble model's output parsing, the fallback when the runtime traps, both models on WebGPU (a software GPU) giving the same lines and bubbles as the CPU, and three pages at once on the GPU;
 - the real extension in headless Chromium against a mock Claude API: first render = Redo = cached render, every tagged line inside its bubble, the drifted-box scenario, a stand-in bubble model, the GPU path, peek, edit, persistence, and the popup and Options showing the stored settings while the worker is busy;
-- the web app in headless Chromium.
+- the web app in headless Chromium: a screenshot, and a chapter link opened through the real chapter fetcher (pages relayed, next chapter, a bot-check site explained);
+- the chapter fetcher on its own: page extraction on one page of each common reader theme, its key, CORS, address checks and image relay.
+
+A separate weekly workflow, **Guide check**, re-reads the Cloudflare pages the chapter-link setup steps follow (plus the Deploy to Cloudflare link and MangaDex's API) and opens an issue titled "Chapter-link setup guide: review needed" when one changed.
 
 The **Release** workflow (on a `v*` tag) runs this same Tests workflow on the tagged commit before it builds anything.
 

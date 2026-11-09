@@ -1,0 +1,12 @@
+# Deploy from this folder with Cloudflare's CLI (or paste worker.js in the dashboard; see README.md):
+#   npx wrangler login
+#   npx wrangler secret put GYT_KEY     # the access key you also enter in the app
+#   npx wrangler deploy
+name = "gytakusub"
+main = "worker.js"
+compatibility_date = "2026-11-01"
+workers_dev = true
+
+# Optional: only answer the app at these origins (the access key is required either way).
+# [vars]
+# ALLOWED_ORIGINS = "https://gywreb.github.io"

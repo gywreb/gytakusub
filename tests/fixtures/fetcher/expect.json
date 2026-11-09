@@ -1,0 +1,56 @@
+{
+  "themesia-img.html": {
+    "url": "https://scans.example.com/star-harbor-chapter-12/",
+    "pages": ["https://cdn.examplecdn.net/star-harbor/12/01.jpg", "https://cdn.examplecdn.net/star-harbor/12/02.jpg", "https://cdn.examplecdn.net/star-harbor/12/03.jpg", "https://cdn.examplecdn.net/star-harbor/12/04.webp"],
+    "next": "https://scans.example.com/star-harbor-chapter-13/",
+    "prev": "https://scans.example.com/star-harbor-chapter-11/"
+  },
+  "themesia-tsreader.html": {
+    "url": "https://raw.example.net/manga/sea-king/chapter-1197.430413/",
+    "pages": ["https://cdn.rawexample.com/o/sea-king-raw/1197/1.jpg", "https://cdn.rawexample.com/o/sea-king-raw/1197/2.jpg", "https://cdn.rawexample.com/o/sea-king-raw/1197/3.jpg", "https://cdn.rawexample.com/o/sea-king-raw/1197/4.jpg", "https://cdn.rawexample.com/o/sea-king-raw/1197/5.jpg"],
+    "next": null,
+    "prev": "https://raw.example.net/manga/sea-king/chapter-1196.430001/"
+  },
+  "themesia-base64.html": {
+    "url": "https://raw.example.net/manga/sea-king/chapter-1197/",
+    "pages": ["https://cdn.rawexample.com/o/sea-king-raw/1197/1.jpg", "https://cdn.rawexample.com/o/sea-king-raw/1197/2.jpg", "https://cdn.rawexample.com/o/sea-king-raw/1197/3.jpg"],
+    "next": "https://raw.example.net/manga/sea-king/chapter-1198/",
+    "prev": "https://raw.example.net/manga/sea-king/chapter-1196/"
+  },
+  "madara.html": {
+    "url": "https://madara.example.org/manga/garden-of-blades/chapter-5/",
+    "pages": ["https://madara.example.org/wp-content/uploads/WP-manga/data/manga_5f1/ch5-abc/01.jpg", "https://madara.example.org/wp-content/uploads/WP-manga/data/manga_5f1/ch5-abc/02.jpg", "https://madara.example.org/wp-content/uploads/WP-manga/data/manga_5f1/ch5-abc/03.jpg"],
+    "next": "https://madara.example.org/manga/garden-of-blades/chapter-6/",
+    "prev": "https://madara.example.org/manga/garden-of-blades/chapter-4/"
+  },
+  "mangabox.html": {
+    "url": "https://box.example/manga-xy123/chapter-40",
+    "pages": ["https://v12.boxcdn.example/img/tab_12/01/02/xy123/chapter_40/1-o.jpg", "https://v13.boxcdn.example/img/tab_12/01/02/xy123/chapter_40/2-o.jpg", "https://v12.boxcdn.example/img/tab_12/01/02/xy123/chapter_40/3-o.jpg", "https://v13.boxcdn.example/img/tab_12/01/02/xy123/chapter_40/4-o.jpg"],
+    "next": "https://box.example/manga-xy123/chapter-41",
+    "prev": "https://box.example/manga-xy123/chapter-39"
+  },
+  "blogger.html": {
+    "url": "https://blogscans.example.com/2026/10/moon-path-3.html",
+    "pages": ["https://blogger.googleusercontent.com/img/b/R29vZ2xlAAA1/s1600/001.jpg", "https://blogger.googleusercontent.com/img/b/R29vZ2xlAAA2/s1600/002.jpg", "https://blogger.googleusercontent.com/img/b/R29vZ2xlAAA3/s1600/003.jpg", "https://blogger.googleusercontent.com/img/b/R29vZ2xlAAA4/s1600/004.jpg"],
+    "next": "https://blogscans.example.com/2026/10/moon-path-4.html",
+    "prev": null
+  },
+  "nextjs.html": {
+    "url": "https://nextreader.example/series/abc/chapter-88",
+    "pages": ["https://media.nextreader.example/series/abc/ch-88/01.webp", "https://media.nextreader.example/series/abc/ch-88/02.webp", "https://media.nextreader.example/series/abc/ch-88/03.webp", "https://media.nextreader.example/series/abc/ch-88/04.webp", "https://media.nextreader.example/series/abc/ch-88/05.webp"],
+    "next": "https://nextreader.example/series/abc/chapter-89",
+    "prev": null
+  },
+  "foolslide.html": {
+    "url": "https://reader.example.io/read/small_hours/en/0/2/",
+    "pages": ["https://reader.example.io/content/comics/small_hours/2_0/01.png", "https://reader.example.io/content/comics/small_hours/2_0/02.png", "https://reader.example.io/content/comics/small_hours/2_0/03.png"],
+    "next": null,
+    "prev": null
+  },
+  "spa-empty.html": {
+    "url": "https://spa.example.app/read/123",
+    "pages": [],
+    "next": null,
+    "prev": null
+  }
+}

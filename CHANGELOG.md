@@ -2,6 +2,33 @@
 
 All notable changes to Gytakusub are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
+## [2.1.0] — unreleased (web app and chapter fetcher; the browser extension is unchanged and stays 2.0.0)
+
+### Added
+- **Chapter links from any site that needs no login** in the web app, through a **chapter fetcher** you run on your own free Cloudflare account (`fetcher/worker.js`, set up in the browser in about 10 minutes: `fetcher/README.md`). A web page may not read other sites, so chapter mode cannot work without a server; MangaDex's own API documentation requires one. The fetcher:
+  - opens the chapter page;
+  - finds its page images by reading the reader themes most sites use (MangaThemesia including `ts_reader`, Madara including its encrypted "chapter protector", MangaBox, FoOlSlide, Blogger), other sites' HTML and scripts, and MangaDex through its API;
+  - relays the images with the chapter site as referrer.
+
+  It needs an access key (24+ characters) and stores nothing. It refuses IP addresses, local names, odd ports and unchecked redirects, and relays only JPEG, PNG, GIF, WebP and AVIF images up to 40 MB. Your Claude key never passes through it. An independent security review found no critical issue; its medium findings are fixed. `docs/adr/0006-chapter-fetcher.md`.
+- **Next chapter / Previous chapter** buttons, kept from the site's own links; the chapter context (names, recent lines) carries over to the next chapter.
+- **Deep links:** `?chapter=<link>` fills in a chapter, and a bookmarklet in the fetcher guide sends the chapter you are reading to Gytakusub. It opens on a tap of **Load**, so a link from someone else can't use your fetcher or Claude credits by itself.
+- Clear messages when a site can't be read that way: a "checking your browser" wall, a login, pages built by a script, a wrong key, an unreachable fetcher. Each says to use screenshot mode or the extension instead.
+
+- **Guided setup inside the Chapter link tab.** Until a fetcher is connected, the tab shows the setup steps instead of the chapter form, and it unlocks only after the fetcher answers with the user's key and is new enough. The steps:
+  1. The app generates a 32-character key.
+  2. **Deploy to Cloudflare** copies the fetcher into the user's GitHub/GitLab and deploys it, asking for the key (a placeholder the Worker refuses until replaced).
+  3. **Connect**.
+
+  Each failure is explained: a wrong key, a key not set yet, an outdated fetcher, nothing at that address. A **connection link** sets up another device (the key travels in the `#fragment`, never to a server); someone given a shared address and key starts at step 3.
+- **Keeping the guide current:** step 2 names the Cloudflare pages it follows and the date it was checked against them (`fetcher/guide-sources.json`). A weekly workflow (`guide-check.yml`) re-reads those pages, the Deploy link and MangaDex's API, and opens an issue when one changed. Tests tie the in-app links to that list.
+
+### Changed
+- The Chapter link tab is always shown. Settings no longer has *Image proxy* or the Advanced chapter-mode switch; the fetcher is set up and managed in the tab.
+
+### Removed
+- `web/sources.js` (MangaDex-only adapter, blocked by MangaDex's CORS rule) and `web/worker.js` (image-only proxy), both replaced by the fetcher.
+
 ## [2.0.0] — 2026-11-09
 
 A new page engine built on open-source models that run in the browser, and a new licence. 1.0 found bubbles, erased lettering and fitted text with hand-written heuristics that were tuned one reported page at a time; each fix risked the last one. 2.0 finds text and bubbles with learned models (on the graphics card when there is one), does the geometry with [OpenCV](https://opencv.org/) (WebAssembly, bundled), and ships only what passes a test corpus and a measurement on real pages. Nothing leaves the browser except the call to Claude with your own key. Decisions and measurements: `docs/adr/0001`–`0005`. (Developed as 1.1.0 and 1.1.1; never released under those numbers.)

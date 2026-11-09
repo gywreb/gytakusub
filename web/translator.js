@@ -28,8 +28,8 @@ export const DEFAULT_SETTINGS = {
   uppercase: false,
   fontFamily: "",
   rtlSpreads: true,
-  imageProxy: "", // optional: https://your-worker.workers.dev/?url=
-  chapterMode: false, // advanced: show the "Chapter link" tab
+  fetcherUrl: "", // your chapter fetcher (fetcher/worker.js on Cloudflare), e.g. https://gytakusub.<you>.workers.dev
+  fetcherKey: "", // its access key (the Worker's GYT_KEY secret)
   maxLongEdge: 1600,
   stripWidth: 1000,
   sliceHeight: 1800,
@@ -50,20 +50,6 @@ export function blobToDataUrl(blob) {
 
 export function loadImage(src) {
   return new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error("Could not decode image")); im.src = src; });
-}
-
-/** Fetch an image, optionally through the configured CORS proxy. */
-export async function fetchImageBlob(url, settings) {
-  const attempt = async (u) => {
-    const r = await fetch(u, { mode: "cors", credentials: "omit" });
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    return r.blob();
-  };
-  try { return await attempt(url); }
-  catch (e) {
-    if (settings.imageProxy) return attempt(settings.imageProxy + encodeURIComponent(url));
-    throw new Error(`Could not load image directly (${e.message}). The site blocks cross-origin reads; set an image proxy in Settings, or use screenshot mode.`);
-  }
 }
 
 /**

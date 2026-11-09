@@ -16,7 +16,7 @@
 </head>
 <body>
 <h1>Gytakusub — Privacy Policy</h1>
-<p class="muted">Effective 8 November 2026. Applies to the Gytakusub browser extension and the Gytakusub web app (gywreb.github.io/gytakusub).</p>
+<p class="muted">Effective 8 November 2026; chapter fetcher section added 9 November 2026. Applies to the Gytakusub browser extension and the Gytakusub web app (gywreb.github.io/gytakusub).</p>
 
 <h2>Summary</h2>
 <p>Gytakusub has no server and no account system. The developer never receives your data. The only data that leaves your device is sent, by your browser, directly to Anthropic's Claude API using <strong>your own API key</strong>, in order to translate the image you asked to translate.</p>
@@ -33,11 +33,11 @@
 <ul>
   <li>No analytics, telemetry, crash reporting, or advertising identifiers.</li>
   <li>No browsing history. The extension runs only on sites you enable, or on a page where you explicitly invoke it from the toolbar or a shortcut.</li>
-  <li>No images, translations, or keys are ever sent to the developer or to any party other than Anthropic.</li>
+  <li>No images, translations, or keys are ever sent to the developer or to any party other than Anthropic (and, in the web app's chapter-link mode, the fetcher on your own Cloudflare account; see below).</li>
 </ul>
 
-<h2>Optional image proxy (web app only)</h2>
-<p>If you deploy and configure your own Cloudflare Worker from <code>worker.js</code>, image bytes for chapter pages pass through <em>your</em> worker. The developer does not operate any proxy.</p>
+<h2>Optional chapter fetcher (web app only)</h2>
+<p>The web app's "Chapter link" mode works through a chapter fetcher that <em>you</em> deploy on your own Cloudflare account (<code>fetcher/worker.js</code> in the repository). When you open a chapter link, the address of that chapter, the chapter page and its images pass through your fetcher, which reads the page to find its images and relays them to the app; it stores nothing, and Cloudflare may cache the images at its edge for up to a day within your account. The sites see these requests come from Cloudflare's network, with a header identifying your Worker's Cloudflare zone, your browser's User-Agent and language, and (for images) the chapter site as referrer. If Workers Logs is enabled for your Worker, Cloudflare keeps request details, including chapter addresses, in your account for a few days. Your Claude API key never passes through the fetcher; its own access key is stored in the web app's localStorage. Cloudflare processes these requests under its terms. The developer does not operate any fetcher or proxy and never sees these requests.</p>
 
 <h2>Permissions (extension)</h2>
 <ul>
