@@ -180,8 +180,13 @@ const used = Number(((/^≈([\d,]+) \/ 100,000 free today/.exec(usage) || [])[1]
 if (!(used >= 6)) fail("the tab should show today's requests from this device: " + usage);
 await page2.click("#btnFetcherManage");
 // opening the panel asks the fetcher for Cloudflare's count (/usage), itself one more request on this device
-await page2.waitForSelector("#liveSetup", { state: "visible", timeout: 10000 }).catch(() => {});
-const usedNow = Number(((/^≈([\d,]+) \//.exec(await page2.textContent("#fetcherUsage")) || [])[1] || "").replace(/,/g, ""));
+// wait for that request to be counted in the chip and the meter (it lands a moment after the panel opens), rather than racing it
+const countNow = () => Number(((/^≈([\d,]+) \//.exec(document.querySelector("#fetcherUsage").textContent) || [])[1] || "").replace(/,/g, ""));
+await page2.waitForFunction((want) => {
+  const chip = Number(((/^≈([\d,]+) \//.exec(document.querySelector("#fetcherUsage").textContent) || [])[1] || "").replace(/,/g, ""));
+  return chip >= want && Number(document.querySelector("#usageMeter").getAttribute("aria-valuenow")) >= want;
+}, used + 1, { timeout: 10000 }).catch(() => {});
+const usedNow = await page2.evaluate(countNow);
 if (usedNow !== used + 1) fail(`asking for the live count is a request too: ${used} → ${usedNow}`);
 const meterNow = Number(await page2.getAttribute("#usageMeter", "aria-valuenow"));
 const usageNote = await page2.textContent("#usageNote");
