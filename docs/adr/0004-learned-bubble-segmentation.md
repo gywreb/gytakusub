@@ -148,6 +148,20 @@ on every fixture page. Speed on a real GPU is not measurable here; the
 owner's debug reports carry `timing.backend`, `timing.detect` and
 `timing.segment`.
 
+First real use (owner's Mac, 2026-11-09): detect 120–300 ms and segment
+95–165 ms per page on the GPU (CPU: ~0.7 s and ~1.9 s) — and "memory access out
+of bounds" on 18 of 25 pages while auto-translating. Cause: several pages in
+flight (content script runs three at a time) entered the one ORT WebAssembly
+instance while another call was suspended inside it (the WebGPU build uses
+asyncify to wait for the GPU); the instance's memory was corrupted. Sequential
+tests could not see it. Fix: every runtime entry point (session creation and
+`run`) goes through one queue in `engine/ort.js`; a trap marks the runtime as
+stopped and the worker continues on the OpenCV text detector with no bubble
+model. `tests/concurrency.test.mjs` runs three pages at once on WebGPU (Dawn)
+and on the CPU and requires the sequential results — on the old code it
+hung on the software GPU; `tests/ort-trap.test.mjs` covers the lock and the
+fallback.
+
 Why not first: the GPU path could not be exercised in the build environment
 or CI until a software WebGPU (Dawn + lavapipe) was set up, and the QDQ model
 chosen for the CPU turned out to be the wrong format for the GPU — shipping it

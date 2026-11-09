@@ -9,7 +9,7 @@
 // HardSigmoid nodes rewritten as Mul/Add/Clip, which OpenCV 4.5 lacks and
 // ONNX Runtime does not mind; see scripts/vendor-detector.mjs.
 
-import { createSession } from "./ort.js";
+import { createSession, run } from "./ort.js";
 
 const MEAN = [0.485, 0.456, 0.406], STD = [0.229, 0.224, 0.225];
 
@@ -49,7 +49,7 @@ export async function detectText(cv, det, img, opts = {}) {
   if (det.kind === "ort") {
     const tensor = new det.ort.Tensor("float32", new Float32Array(inp.data), [1, 3, inp.h, inp.w]); // a copy: the blob lives in OpenCV's heap
     inp.blob.delete();
-    const out = await det.session.run({ [det.session.inputNames[0]]: tensor });
+    const out = await run(det.session, { [det.session.inputNames[0]]: tensor });
     prob = out[det.session.outputNames[0]].data;
   } else { prob = forwardDnn(cv, det, inp); inp.blob.delete(); }
   return decodeOutput(cv, prob, inp, opts);

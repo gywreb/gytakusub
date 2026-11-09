@@ -52,20 +52,48 @@ export function gpuAvailable() {
  * @returns {Promise<{session: object, ep: "webgpu"|"wasm"}>}
  */
 export function createSession(bytes, opts = {}) {
-  // One at a time: ORT's WebGPU backend refuses to create a session while another
-  // is being created ("another WebGPU EP inference session is being created"),
-  // and the text detector and the bubble model load in parallel.
-  const next = creating.then(() => create(bytes, opts));
-  creating = next.catch(() => {});
+  return exclusive(() => create(bytes, opts));
+}
+
+/**
+ * Runs a model: `session.run(feeds)` under the runtime's lock.
+ * @returns {Promise<object>} the outputs
+ */
+export function run(session, feeds) {
+  return exclusive(() => session.run(feeds));
+}
+
+// One call into the runtime at a time. All sessions share one WebAssembly
+// instance, and the WebGPU build suspends a call while the GPU works (asyncify);
+// a second call entering the instance meanwhile corrupts its memory — "memory
+// access out of bounds" on every page after — and session creation refuses to
+// overlap ("another WebGPU EP inference session is being created"). Auto-
+// translate starts a page while the previous one is still inside a model, so
+// every entry point goes through this queue.
+let tail = Promise.resolve(), broken = null;
+function exclusive(fn) {
+  const next = tail.then(() => {
+    if (broken) throw new Error(`ONNX Runtime stopped after an internal error (${broken})`);
+    return fn();
+  }).catch((e) => {
+    // A trap leaves the instance unusable for this worker's life; say so once and
+    // let the callers fall back (engine/cv.js). The worker restarts when idle.
+    if (!broken && isTrap(e)) { broken = e.message; console.warn("Gytakusub: ONNX Runtime failed; falling back to the CPU text detector until the extension restarts", e); }
+    throw e;
+  });
+  tail = next.catch(() => {});
   return next;
 }
-let creating = Promise.resolve();
+const isTrap = (e) => e instanceof WebAssembly.RuntimeError || /memory access out of bounds|unreachable|table index is out of bounds|null function/i.test(String(e?.message || e));
+
+/** Why the runtime stopped, or null while it works. */
+export function ortBroken() { return broken; }
 
 async function create(bytes, opts) {
   const o = getOrt(opts);
   if (opts.gpu && await gpuAvailable()) {
     try { return { session: await o.InferenceSession.create(bytes, { executionProviders: ["webgpu"], graphOptimizationLevel: "all" }), ep: "webgpu" }; }
-    catch (e) { if (opts.strict) throw e; console.warn("Gytakusub: GPU session failed, using the CPU", e); }
+    catch (e) { if (opts.strict || isTrap(e)) throw e; console.warn("Gytakusub: GPU session failed, using the CPU", e); }
   } else if (opts.strict) throw new Error("no WebGPU adapter");
   return { session: await o.InferenceSession.create(bytes, { executionProviders: ["wasm"], graphOptimizationLevel: "all" }), ep: "wasm" };
 }

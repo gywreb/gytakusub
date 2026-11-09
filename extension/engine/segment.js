@@ -12,7 +12,7 @@
 // Coordinates are those of the letterboxed model input; results are mapped
 // back to the pixels of the image given.
 
-import { createSession } from "./ort.js";
+import { createSession, run } from "./ort.js";
 
 const sigmoid = (v) => 1 / (1 + Math.exp(-v));
 
@@ -89,7 +89,7 @@ export async function segment(seg, img) {
   const t0 = Date.now();
   const lb = letterbox(img, seg.inputSize);
   const input = new seg.ort.Tensor("float32", lb.data, [1, 3, lb.size, lb.size]);
-  const out = await seg.session.run({ [seg.inputName]: input });
+  const out = await run(seg.session, { [seg.inputName]: input });
   const tensors = seg.session.outputNames.map((n) => out[n]);
   // the prototype tensor is the 4-D one; the detections the other
   const protos = tensors.find((t) => t.dims.length === 4), dets = tensors.find((t) => t !== protos);

@@ -2,7 +2,7 @@
 // (extension service worker, the web app's Web Worker, or Node in tests).
 import loadOpenCV from "../vendor/opencv.js";
 import { loadDetector } from "./detect.js"; // static: MV3 service workers do not support dynamic import()
-import { getOrt, gpuAvailable } from "./ort.js";
+import { getOrt, gpuAvailable, ortBroken } from "./ort.js";
 import { loadSegmenter } from "./segment.js";
 
 let ready = null;
@@ -44,6 +44,7 @@ let detectorReady = null;
  * @param {object} [overrides] tests pass `modelBytes`
  */
 export function getDetector(overrides = {}) {
+  if (ortBroken()) return getFallbackDetector();
   if (!detectorReady) {
     detectorReady = (async () => {
       let cv, bytes;
@@ -61,6 +62,19 @@ export function getDetector(overrides = {}) {
   return detectorReady;
 }
 
+let fallbackReady = null;
+/** The text detector on OpenCV's dnn, for when ONNX Runtime has failed (engine/ort.js ortBroken()). */
+export function getFallbackDetector() {
+  if (!fallbackReady) fallbackReady = (async () => {
+    try {
+      const cv = await getCV();
+      const bytes = new Uint8Array(await (await fetch(new URL("../vendor/ppocr-det.onnx", import.meta.url))).arrayBuffer());
+      return await loadDetector(cv, bytes);
+    } catch (e) { console.warn("Gytakusub: text detector unavailable, using heuristics", e); return null; }
+  })();
+  return fallbackReady;
+}
+
 let segmenterReady = null;
 /**
  * Resolves to the learned bubble segmenter (engine/segment.js), loaded once by
@@ -73,6 +87,7 @@ let segmenterReady = null;
  * @param {object} [overrides] tests pass `modelBytes` / `gpuModelBytes`, `config`, `wasmBinary`, `gpu`
  */
 export function getSegmenter(overrides = {}) {
+  if (ortBroken()) return Promise.resolve(null);
   if (!segmenterReady) {
     segmenterReady = (async () => {
       const read = async (name) => { const res = await fetch(new URL("../vendor/" + name, import.meta.url)).catch(() => null); return res && res.ok ? new Uint8Array(await res.arrayBuffer()) : null; };

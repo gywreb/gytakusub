@@ -2,7 +2,8 @@
 // text regions for the model) and finish (place the translations, erase the
 // original lettering, hand back a cleaned page plus text placements).
 // Used by the extension's service worker and by the web app's Web Worker.
-import { getCV, getDetector, getSegmenter, setEnginePrefs } from "./cv.js";
+import { getCV, getDetector, getSegmenter, getFallbackDetector, setEnginePrefs } from "./cv.js";
+import { ortBroken } from "./ort.js";
 import { analyze } from "./analyze.js";
 import { segment } from "./segment.js";
 import { detectText, detectInEmptyBubbles } from "./detect.js";
@@ -15,6 +16,19 @@ import { sliceGeometry, normalizeItems } from "../prompt.js";
  * @param {{maxLongEdge:number, stripWidth:number, sliceHeight:number}} settings
  * @returns {Promise<Job>}
  */
+/** Text lines (and bubbles, with a segmenter) for one slice, then the analysis. */
+async function analyzeSlice(cv, detector, segmenter, imageData) {
+  const t0 = Date.now();
+  let lines = detector ? await detectText(cv, detector, imageData) : null;
+  let detectMs = Date.now() - t0;
+  const seg = segmenter ? await segment(segmenter, imageData) : null;
+  if (lines && seg) { const t1 = Date.now(); lines = await detectInEmptyBubbles(cv, detector, imageData, lines, seg.instances, segmenter.bubbleClasses); detectMs += Date.now() - t1; }
+  const analysis = analyze(cv, imageData, { detector, lines, instances: seg ? seg.instances : null, bubbleClasses: segmenter?.bubbleClasses });
+  analysis.segmentMs = seg ? seg.ms : 0; analysis.detectMs = detectMs;
+  analysis.backend = `detect:${detector ? detector.ep : "none"} segment:${segmenter ? segmenter.ep : "none"}`;
+  return analysis;
+}
+
 export async function preparePage(bitmap, settings) {
   setEnginePrefs({ gpu: settings?.useGpu !== false });
   const cv = await getCV();
@@ -34,14 +48,14 @@ export async function preparePage(bitmap, settings) {
     const imageData = ctx.getImageData(0, 0, cw, ch);
     // bubbles from the segmentation model when there is one; the analysis then
     // only has to read the text inside them
-    const t0 = Date.now();
-    let lines = detector ? await detectText(cv, detector, imageData) : null;
-    let detectMs = Date.now() - t0;
-    const seg = segmenter ? await segment(segmenter, imageData) : null;
-    if (lines && seg) { const t1 = Date.now(); lines = await detectInEmptyBubbles(cv, detector, imageData, lines, seg.instances, segmenter.bubbleClasses); detectMs += Date.now() - t1; }
-    const analysis = analyze(cv, imageData, { detector, lines, instances: seg ? seg.instances : null, bubbleClasses: segmenter?.bubbleClasses });
-    analysis.segmentMs = seg ? seg.ms : 0; analysis.detectMs = detectMs;
-    analysis.backend = `detect:${detector ? detector.ep : "none"} segment:${segmenter ? segmenter.ep : "none"}`;
+    let analysis;
+    try { analysis = await analyzeSlice(cv, detector, segmenter, imageData); }
+    catch (e) {
+      // The model runtime failed (engine/ort.js): this page and the rest of this
+      // worker's life use the OpenCV text detector and no bubble model.
+      if (!ortBroken()) throw e;
+      analysis = await analyzeSlice(cv, await getFallbackDetector(), null, imageData);
+    }
     const tagFrom = nextId;
     for (const r of analysis.regions) r.id = nextId++; // page-wide numbering
     const tagTo = nextId - 1;
