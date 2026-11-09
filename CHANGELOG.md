@@ -4,6 +4,20 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
 
 ## [Unreleased]
 
+## [2.3.0] — 2026-11-10
+
+### Web app
+- **Fetcher allowance at a glance:**
+  - A status chip under the chapter form shows today's requests against Cloudflare's free 100,000 a day. It turns red with *almost used up* from 80 %, and says when it starts again once it runs out.
+  - Tapping the chip opens **Your fetcher**. There a meter shows the count, with the chapters opened and the reset time in your own time zone. Three short facts follow: it's free (when it runs out, the fetcher just stops until the reset), it's shared with your other devices and anyone you gave the link, and where to see the exact count in Cloudflare.
+  - The count is what *this device* sent. A Worker can't read its account's usage without an extra Cloudflare API token, which would add setup steps for everyone.
+- **Clearer failures:**
+  - When Cloudflare answers with its daily-limit page (1027) or its "exceeded resource limits" page (1102), the message says so.
+  - When a connected fetcher doesn't answer at all, the message names both likely causes: the allowance is used up (with the reset time), or the page needed more than 10 ms of work.
+- **Your fetcher** is laid out like Settings: a back button, sections with dividers, and *Disconnect* marked as destructive.
+- Small buttons are 44 px tall on touch screens.
+- Fixed: an element hidden with the `hidden` attribute could still show when its class set a display style.
+
 ## [2.2.1] — 2026-11-10
 
 ### Project

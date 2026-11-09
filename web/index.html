@@ -78,7 +78,7 @@
         <input id="chapterUrl" name="chapter" type="url" inputmode="url" placeholder="https://…/chapter-1" aria-label="Chapter link" autocomplete="off" spellcheck="false" autocapitalize="off" required />
         <button class="primary" type="submit">Load</button>
       </form>
-      <p class="muted small"><span id="fetcherStatus"></span> · <button type="button" id="btnFetcherManage" class="linkbtn">Fetcher &amp; other devices</button></p>
+      <button type="button" id="btnFetcherManage" class="status-chip"><span class="dot" aria-hidden="true"></span><span id="fetcherStatus">Fetcher</span><span id="fetcherUsage"></span><span class="chev" aria-hidden="true">›</span></button>
       <p id="chapterInfo" class="muted small"></p>
       <div class="chapter-nav"><button id="navPrevTop" class="btn small" hidden>‹ Previous chapter</button><button id="navNextTop" class="btn small" hidden>Next chapter ›</button></div>
     </div>
@@ -177,14 +177,35 @@
     </div>
 
     <!-- Fetcher management, once connected -->
-    <div id="fetcherManage" class="wizard hidden">
+    <div id="fetcherManage" class="wizard manage hidden">
+      <button type="button" id="mgDone" class="btn small back">‹ Back to chapters</button>
       <h2>Your fetcher</h2>
-      <p id="manageStatus"></p>
-      <h3>Use it on another device</h3>
-      <p>Copy this link and open it on your phone or another computer, or paste it into the Chapter link tab there. Give it only to people you trust with your fetcher: it contains your key.</p>
-      <div class="row"><button type="button" id="mgCopyLink" class="btn small">Copy connection link</button></div>
-      <h3>Change or disconnect</h3>
-      <div class="row"><button type="button" id="mgSetup" class="btn small">Open the setup steps</button><button type="button" id="mgForget" class="btn small">Disconnect this device</button><button type="button" id="mgDone" class="btn small">Back to chapters</button></div>
+      <p id="manageStatus" class="muted"></p>
+
+      <section class="mg-section" aria-labelledby="usageHead">
+        <h3 id="usageHead">Free allowance today</h3>
+        <div class="usage">
+          <p class="usage-figure"><span id="usageCount">0</span> <span class="muted">of <span id="usageMax">100,000</span> requests</span> <span id="usageState" class="usage-state" hidden></span></p>
+          <div id="usageMeter" class="meter" role="meter" aria-labelledby="usageHead" aria-valuemin="0" aria-valuemax="100000" aria-valuenow="0"><span class="meter-fill"></span></div>
+          <p id="usageNote" class="muted small"></p>
+        </div>
+        <ul class="usage-facts small">
+          <li><b>Free:</b> if it runs out, the fetcher stops until <span id="usageReset">the reset</span>. Nothing is charged.</li>
+          <li><b>Shared:</b> your other devices and anyone with your connection link use the same allowance, but only this device is counted here.</li>
+          <li><b>Exact count</b> for your whole account: <a href="https://dash.cloudflare.com/" target="_blank" rel="noopener">dash.cloudflare.com ↗</a> → Workers &amp; Pages → your Worker → Metrics.</li>
+        </ul>
+      </section>
+
+      <section class="mg-section" aria-labelledby="mgDevicesHead">
+        <h3 id="mgDevicesHead">Use it on another device</h3>
+        <p>Copy this link and open it on your phone or another computer, or paste it into the Chapter link tab there. Give it only to people you trust with your fetcher: it contains your key.</p>
+        <div class="row"><button type="button" id="mgCopyLink" class="btn small">Copy connection link</button></div>
+      </section>
+
+      <section class="mg-section" aria-labelledby="mgChangeHead">
+        <h3 id="mgChangeHead">Change or disconnect</h3>
+        <div class="row"><button type="button" id="mgSetup" class="btn small">Open the setup steps</button><button type="button" id="mgForget" class="btn small danger">Disconnect this device</button></div>
+      </section>
     </div>
   </section>
 

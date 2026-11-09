@@ -68,17 +68,65 @@ export class FetcherError extends Error {
   constructor(code, message) { super(message); this.code = code; }
 }
 
-async function call(path, params, base, key) {
+// ---------- the free allowance ----------
+// Cloudflare's Workers Free plan allows 100,000 requests a day per account, counted from midnight UTC.
+// Past that, requests fail (Cloudflare error 1027) until the reset; the free plan has no billing.
+// A Worker can't read its account's usage without an extra Cloudflare API token, so the app counts
+// the requests *this device* sends. Other devices, and people given the connection link, use the
+// same allowance but are not in this count; the exact total is in the Cloudflare dashboard.
+// (A page the browser serves from its own cache is still counted: the count errs high, never low.)
+export const FREE_DAILY = 100_000;
+const USAGE_KEY = "gytakusub.fetcherUsage";
+const utcDay = () => new Date().toISOString().slice(0, 10);
+const listeners = new Set();
+
+/** Today's count for the fetcher at `base`: {requests, chapters}. */
+export function usageToday(base) {
+  try {
+    const u = JSON.parse(localStorage.getItem(USAGE_KEY) || "{}");
+    if (u.day === utcDay() && u.base === base) return { requests: u.requests || 0, chapters: u.chapters || 0 };
+  } catch { /* storage unavailable */ }
+  return { requests: 0, chapters: 0 };
+}
+
+/** Calls fn() whenever the count changes. */
+export function onUsage(fn) { listeners.add(fn); }
+
+function countRequest(base, path, ok) {
+  const u = usageToday(base);
+  u.requests++;
+  if (path === "/chapter" && ok) u.chapters++;
+  try { localStorage.setItem(USAGE_KEY, JSON.stringify({ day: utcDay(), base, ...u })); } catch { /* not counted */ }
+  for (const fn of listeners) fn();
+}
+
+/** When the free allowance starts again, in the reader's own time: midnight UTC, e.g. "7:00 AM". */
+export function resetTime() {
+  const d = new Date();
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1)).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
+const LIMIT_REACHED = () => `Your fetcher has used today's ${FREE_DAILY.toLocaleString()} free requests on Cloudflare. It works again at ${resetTime()}, and nothing is charged. Screenshot mode still works.`;
+
+// `inUse`: the fetcher was connected before, so a silent failure is about this request, not the address.
+async function call(path, params, base, key, inUse = false) {
   let res;
   try {
     res = await fetch(`${base}${path}?${new URLSearchParams(params)}`, { headers: { Authorization: `Bearer ${key}` }, credentials: "omit" });
   } catch {
-    throw new FetcherError("unreachable", `No answer from ${base}. Check the address (copy it from the Worker's page in Cloudflare) and that the deploy finished. If Connect worked before and only this chapter fails, the fetcher stopped on that page: Cloudflare's free plan allows 10 ms of work per request, and a very large page can exceed it.`);
+    throw new FetcherError("unreachable", inUse
+      ? `No answer from your fetcher. Check that you're online. Otherwise, either today's ${FREE_DAILY.toLocaleString()} free requests are used up (it works again at ${resetTime()}, and nothing is charged), or this page needed more work than Cloudflare's free plan allows per request (10 ms). Screenshot mode still works.`
+      : `No answer from ${base}. Check the address (copy it from the Worker's page in Cloudflare) and that the deploy finished.`);
   }
+  countRequest(base, path, res.ok);
   if (res.ok) return res;
+  const text = await res.text().catch(() => "");
   let body = {};
-  try { body = await res.json(); } catch { /* not JSON: not a Gytakusub fetcher, or a Cloudflare error page */ }
+  try { body = JSON.parse(text); } catch { /* not JSON: not a Gytakusub fetcher, or a Cloudflare error page */ }
   const code = body.error || `http-${res.status}`;
+  // Cloudflare's own error pages, when the browser may read them
+  if (!body.error && /\b1027\b/.test(text)) throw new FetcherError("daily-limit", LIMIT_REACHED());
+  if (!body.error && /\b1102\b/.test(text)) throw new FetcherError("cpu", "This page needed more work than Cloudflare's free plan allows per request (10 ms). Try again; if it keeps failing, use screenshot mode for this chapter.");
   if (!body.error) throw new FetcherError(code, `${base} answered HTTP ${res.status}, not like a Gytakusub fetcher. Check the address.`);
   const extra = body.message && !["unauthorized", "setup"].includes(code) ? ` (${body.message})` : "";
   throw new FetcherError(code, ADVICE[code] ? ADVICE[code] + extra : body.message || `The fetcher answered HTTP ${res.status}.`);
@@ -100,12 +148,12 @@ export async function connectFetcher(url, key) {
 
 /** The chapter at `url`: {url, title, pages[], referer, next, prev, method}. */
 export async function loadChapter(s, url) {
-  return (await call("/chapter", { url }, fetcherBase(s.fetcherUrl), s.fetcherKey)).json();
+  return (await call("/chapter", { url }, fetcherBase(s.fetcherUrl), s.fetcherKey, true)).json();
 }
 
 /** One page image through the fetcher, with the chapter page as its referrer. */
 export async function fetchPageImage(s, url, referer) {
-  return (await call("/image", referer ? { url, ref: referer } : { url }, fetcherBase(s.fetcherUrl), s.fetcherKey)).blob();
+  return (await call("/image", referer ? { url, ref: referer } : { url }, fetcherBase(s.fetcherUrl), s.fetcherKey, true)).blob();
 }
 
 /** A link that fills in this fetcher on another device (address and key in the #fragment, which never reaches a server). */
