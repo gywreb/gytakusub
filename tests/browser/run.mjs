@@ -109,7 +109,9 @@ const reportOk = rep && !rep.error && Array.isArray(rep.placements) && Array.isA
 fs.writeFileSync(path.join(out, "report.json"), JSON.stringify(rep, null, 1));
 // one-click export: a .zip with original + debug render + json per page
 const [download, exp] = await Promise.all([
-  page.waitForEvent("download", { timeout: process.argv.includes("--gpu") ? 180000 : 30000 }),
+  // the export analyses the page once more (for the clean render): on the software GPU
+  // that is a render's time again, so it gets a render's budget
+  page.waitForEvent("download", { timeout: process.argv.includes("--gpu") ? waitTicks * 100 : 30000 }),
   sw.evaluate(async ({ tabId }) => chrome.tabs.sendMessage(tabId, { type: "EXPORT_REPORT" }), { tabId }),
 ]);
 const zipPath = path.join(out, "report.zip"); await download.saveAs(zipPath);
