@@ -34,13 +34,23 @@ h1, h2, h3 { text-wrap: balance; }
 p { margin: 0 0 var(--s3); text-wrap: pretty; }
 a { color: var(--accent); }
 code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .92em; }
-.hidden { display: none !important; }
+.hidden, [hidden] { display: none !important; }
 .muted { color: var(--muted); }
 .small { font-size: var(--t-caption); }
 .row { display: flex; gap: var(--s2); align-items: center; flex-wrap: wrap; }
 .row.end { justify-content: flex-end; }
 .hint { font-size: var(--t-caption); color: var(--muted); font-weight: 400; margin: 0; }
 .hint.ok { color: var(--ok); } .hint.err { color: var(--danger); }
+/* fetcher status chip under the chapter form: state at a glance, tap for details (the "Your fetcher" page) */
+.status-chip { display: inline-flex; align-items: center; gap: var(--s2); max-width: 100%; min-height: 36px; margin: var(--s3) 0; padding: var(--s1) var(--s3); border: 1px solid var(--border); border-radius: var(--r2); background: var(--surface); color: var(--muted); font: inherit; font-size: var(--t-caption); cursor: pointer; text-align: left; transition: background-color .15s ease; }
+.status-chip:hover { background: var(--surface-2); }
+@media (pointer: coarse) { .status-chip { min-height: var(--tap); } }
+.status-chip .dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
+.status-chip #fetcherStatus { color: var(--fg); font-weight: 600; }
+.status-chip .chev { font-size: 1.2em; line-height: 1; }
+#fetcherUsage { font-variant-numeric: tabular-nums; }
+.status-chip.warn .dot { background: var(--danger); }
+.status-chip.warn #fetcherUsage { color: var(--danger); font-weight: 600; }
 
 /* focus: visible for keyboard, never for taps */
 :focus { outline: none; }
@@ -56,6 +66,8 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fo
 button.primary { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); }
 button.primary:hover { opacity: .9; }
 .btn.small { min-height: 36px; padding: 0 var(--s3); font-size: var(--t-caption); border-radius: var(--r1); }
+@media (pointer: coarse) { .btn.small { min-height: var(--tap); } } /* 44 px to a finger */
+.btn.danger { color: var(--danger); }
 button:disabled { opacity: .45; cursor: default; }
 .btn:active:not(:disabled), button.primary:active:not(:disabled) { transform: scale(.98); }
 .icon-btn { display: inline-grid; place-items: center; width: var(--tap); height: var(--tap); border: 0; border-radius: var(--r2); background: transparent; }
@@ -176,6 +188,26 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline-offs
 .wizard details { margin: var(--s3) 0; }
 .wizard summary { cursor: pointer; min-height: 32px; display: list-item; }
 .wizard pre { background: var(--bg); border: 1px solid var(--border); border-radius: var(--r1); padding: var(--s2) var(--s3); overflow-x: auto; }
+/* "Your fetcher": a sub-page with a back button and divided sections, like Settings */
+.manage .back { margin: calc(-1 * var(--s2)) 0 var(--s2) calc(-1 * var(--s3)); border-color: transparent; background: transparent; }
+.manage #manageStatus { margin: 0; }
+.manage .back:hover { background: var(--surface-2); }
+/* the same space above and below each divider */
+.mg-section { border-top: 1px solid var(--border); margin-top: var(--s5); padding-top: var(--s5); }
+.mg-section h3 { margin-bottom: var(--s3); }
+.mg-section > :last-child { margin-bottom: 0; }
+/* usage meter (fetcher's free allowance): figure, bar, caption; from 80 % the bar turns red and a label says so */
+.usage { display: grid; gap: var(--s2); margin: 0 0 var(--s4); }
+.usage p { margin: 0; }
+.usage-figure { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: var(--s2); row-gap: var(--s1); font-variant-numeric: tabular-nums; }
+.usage-figure #usageCount { font-size: var(--t-h2); font-weight: 700; }
+.meter { height: 8px; border-radius: 4px; background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--border); overflow: hidden; }
+.meter-fill { display: block; height: 100%; width: 0; border-radius: inherit; background: var(--ok); transition: width .3s ease; }
+.meter.used .meter-fill { min-width: 4px; } /* a little use still shows */
+.meter.warn .meter-fill { background: var(--danger); }
+.usage-facts { margin: 0; padding-left: 1.2em; display: grid; gap: var(--s2); color: var(--muted); }
+.usage-facts b { color: var(--fg); }
+.usage-state { align-self: center; padding: 2px var(--s2); border-radius: 999px; font-size: var(--t-caption); font-weight: 600; color: var(--danger); border: 1px solid currentColor; }
 .wizard .progress { font-size: var(--t-caption); font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin: var(--s4) 0 var(--s2); }
 
 /* vertical stepper: numbered markers, one step open, Back/Next under it */

@@ -1,6 +1,6 @@
 // Gytakusub Web – UI.
 import { loadSettings, saveSettings, loadImage, blobToDataUrl, translateImage, renderPage, testKey } from "./translator.js";
-import { isConnected, connectFetcher, loadChapter, fetchPageImage, generateKey, connectionLink, readConnectionLink } from "./fetcher-client.js";
+import { isConnected, connectFetcher, loadChapter, fetchPageImage, generateKey, connectionLink, readConnectionLink, fetcherBase, usageToday, onUsage, resetTime, FREE_DAILY } from "./fetcher-client.js";
 import { MODELS } from "./prompt.js";
 import qrcode from "./lib/qrcode.mjs";
 
@@ -20,8 +20,8 @@ async function applyChapterMode(view) {
   $("fetcherManage").classList.toggle("hidden", chapterView !== "manage");
   if (ok) {
     const where = new URL(settings.fetcherUrl).host;
-    $("fetcherStatus").textContent = `Fetcher connected: ${where} (version ${settings.fetcherCheck.version})`;
     $("manageStatus").textContent = `Connected to ${where}, version ${settings.fetcherCheck.version}, checked ${new Date(settings.fetcherCheck.at).toLocaleDateString()}.`;
+    showUsage();
   }
   if (chapterView === "wizard") {
     if (!$("wzUrl").value && settings.fetcherUrl) $("wzUrl").value = settings.fetcherUrl;
@@ -29,6 +29,31 @@ async function applyChapterMode(view) {
     if (settings.fetcherKey) { $("wzKey").textContent = settings.fetcherKey; $("wzCopyKey").disabled = false; $("wzGen").textContent = "New key"; }
   }
 }
+// Today's use of the free allowance, as counted on this device (see fetcher-client.js).
+function showUsage() {
+  if (!settings.fetcherUrl) return;
+  const { requests, chapters } = usageToday(fetcherBase(settings.fetcherUrl));
+  const n = (x) => x.toLocaleString(), share = Math.min(1, requests / FREE_DAILY), warn = share >= 0.8;
+  // the state in words too, not only in red
+  const state = share >= 1 ? `used up until ${resetTime()}` : warn ? "almost used up" : "";
+  $("fetcherUsage").textContent = share >= 1 ? `free requests ${state}` : (state ? `${n(requests)} / ${n(FREE_DAILY)} · ${state}` : `${n(requests)} / ${n(FREE_DAILY)} free today`);
+  $("btnFetcherManage").classList.toggle("warn", warn);
+  $("usageState").textContent = state ? state[0].toUpperCase() + state.slice(1) : "";
+  $("usageState").hidden = !state;
+  $("usageCount").textContent = n(requests);
+  $("usageMax").textContent = n(FREE_DAILY);
+  const meter = $("usageMeter");
+  meter.setAttribute("aria-valuemax", FREE_DAILY);
+  meter.setAttribute("aria-valuenow", Math.min(requests, FREE_DAILY));
+  meter.setAttribute("aria-valuetext", `${n(requests)} of ${n(FREE_DAILY)} requests used today`);
+  meter.classList.toggle("warn", warn);
+  meter.classList.toggle("used", requests > 0);
+  meter.firstElementChild.style.width = `${share * 100}%`;
+  $("usageNote").textContent = `Sent from this device · ${n(chapters)} chapter${chapters === 1 ? "" : "s"} (one request per page, plus one) · starts again at ${resetTime()}`;
+  $("usageReset").textContent = resetTime();
+}
+onUsage(showUsage);
+
 let ctx = { terms: [], recent: [] }; // chapter context for this session
 const MAX_PARALLEL = 2;
 const pages = []; // { el, img?, url?, status, result? }

@@ -17,7 +17,10 @@ It stores nothing. Your Claude API key never passes through it.
 
 The app tells you when that's the case. For those sites use screenshot mode, or the browser extension on a computer.
 
-Cost: the Workers free plan (100,000 requests a day; one chapter is about one request per page plus one). No card needed.
+Cost: nothing. The fetcher runs on Cloudflare's Workers Free plan, and no card is needed:
+- **Allowance:** 100,000 requests a day for your whole Cloudflare account, counted from midnight UTC. One chapter takes about one request per page, plus one.
+- **Past the allowance:** Cloudflare stops answering until the reset (its error 1027). Nothing is charged.
+- **Watching it:** the app shows how much this device used today, on the chip under the chapter form and in **Your fetcher**. The exact count for the account is in the Cloudflare dashboard: Workers & Pages → your Worker → Metrics.
 
 ## Set it up
 
