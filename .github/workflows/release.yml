@@ -34,13 +34,18 @@ jobs:
       - name: Check version matches tag
         run: |
           v=$(node -p "require('./extension/manifest.json').version"); [ "v$v" = "$TAG" ] || { echo "::error::manifest version $v != tag $TAG"; exit 1; }
+          echo "ZIP=dist/gytakusub-extension-$v.zip" >> "$GITHUB_ENV"
       - name: Build store zip
-        run: ./scripts/build-zip.sh
+        # exactly one file: the release and the store upload must never pick up another zip
+        run: |
+          rm -rf dist
+          ./scripts/build-zip.sh
+          [ "$(ls dist)" = "$(basename "$ZIP")" ] || { echo "::error::dist/ holds $(ls dist), expected $(basename "$ZIP")"; exit 1; }
       - name: GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.TAG }}
-          files: dist/*.zip
+          files: ${{ env.ZIP }}
           generate_release_notes: true
       - name: Upload to Chrome Web Store and submit for review
         if: env.HAS_CWS == 'true'
@@ -49,7 +54,7 @@ jobs:
           CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
           CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
           CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
-        run: node scripts/cws-publish.mjs dist/*.zip
+        run: node scripts/cws-publish.mjs "$ZIP"
       - name: Skipped store upload
         if: env.HAS_CWS != 'true'
         run: echo "::notice::CWS secrets not set — zip attached to the GitHub Release only. See store/RELEASE-CHECKLIST.md § Automating updates."
