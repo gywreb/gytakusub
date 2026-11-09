@@ -1,7 +1,12 @@
 name: Tests
+# Pull requests run the suites their changes need (scripts/ci-changes.mjs): documentation alone runs
+# none, web app/fetcher changes run the web suite, anything else runs both. Pushes to main (after each
+# merge) and releases (release.yml calls this workflow) always run everything. A newer push to the same
+# pull request cancels the older run. The "test" job at the end is the one required check: it passes
+# when every suite that ran passed (a skipped suite counts as passed).
 on:
   push:
-    branches: ["**"] # tags are tested by the Release workflow, which calls this one
+    branches: [main]
   pull_request:
   workflow_call:
     inputs:
@@ -9,8 +14,36 @@ on:
         description: "Commit, branch or tag to test (default: the caller's)"
         type: string
         default: ""
+concurrency:
+  group: tests-${{ github.event.pull_request.number || inputs.ref || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+permissions:
+  contents: read
+  pull-requests: read
 jobs:
-  test:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      extension: ${{ steps.pick.outputs.extension }}
+      web: ${{ steps.pick.outputs.web }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: "${{ inputs.ref }}", sparse-checkout: scripts }
+      - id: pick
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+            gh api "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --paginate --jq '.[] | {filename, patch} | @json' | node scripts/ci-changes.mjs >> "$GITHUB_OUTPUT"
+          else
+            printf 'extension=true\nweb=true\n' >> "$GITHUB_OUTPUT"
+          fi
+
+  # The engine, the models and the real extension in a browser (~18 min).
+  extension:
+    needs: changes
+    if: needs.changes.outputs.extension == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -34,12 +67,50 @@ jobs:
           curl -sSfL -o /tmp/ppocr-det.onnx https://huggingface.co/PaddlePaddle/PP-OCRv6_small_det_onnx/resolve/28fe5895c24fd108c19eb3e8479f4ab385fbfc62/inference.onnx
           node scripts/vendor-detector.mjs /tmp/ppocr-det.onnx --source "PaddlePaddle/PP-OCRv6_small_det_onnx@28fe5895c24fd108c19eb3e8479f4ab385fbfc62"
           git diff --exit-code -- extension/vendor || { echo "::error::extension/vendor/ppocr-det.* differs from scripts/vendor-detector.mjs output"; exit 1; }
-      - run: cd tests && npm test
+      - run: cd tests && npm run test:extension
         env:
           GYT_REQUIRE_GPU: "1"
-      # Real-browser tests: the actual extension and the web app in headless Chromium against a mock API.
+      # Real-browser tests: the actual extension in headless Chromium against a mock API.
       - run: cd tests && npx playwright install --with-deps chromium
-      - run: cd tests && npm run test:browser
+      - run: cd tests && npm run test:browser:extension
       - uses: actions/upload-artifact@v4
         if: always()
-        with: { name: browser-renders, path: /tmp/gyt-browser/**/*.png, if-no-files-found: ignore }
+        with: { name: extension-renders, path: /tmp/gyt-browser/**/*.png, if-no-files-found: ignore }
+
+  # The fetcher and the web app in a browser (~4 min).
+  web:
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: "${{ inputs.ref }}" }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: tests/package-lock.json
+      - run: for f in web/*.js fetcher/*.js; do node --check "$f"; done
+      - run: sudo apt-get update -q >/dev/null && sudo apt-get install -y --no-install-recommends libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev >/dev/null
+      - run: cd tests && npm ci --no-audit --no-fund
+      - run: cd tests && npm run test:web
+      - run: cd tests && npx playwright install --with-deps chromium
+      - run: cd tests && npm run test:browser:web
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: web-renders, path: /tmp/gyt-browser/**/*.png, if-no-files-found: ignore }
+
+  # The required check: every suite that ran passed.
+  test:
+    needs: [changes, extension, web]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          CHANGES: ${{ needs.changes.result }}
+          EXTENSION: ${{ needs.extension.result }}
+          WEB: ${{ needs.web.result }}
+        run: |
+          echo "changes: $CHANGES, extension suite: $EXTENSION, web suite: $WEB"
+          [ "$CHANGES" = success ] || { echo "::error::could not work out which suites to run"; exit 1; }
+          for r in "$EXTENSION" "$WEB"; do case "$r" in success|skipped) ;; *) echo "::error::a test suite did not pass ($r)"; exit 1;; esac; done

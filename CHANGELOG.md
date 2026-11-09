@@ -4,6 +4,21 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
 
 ## [Unreleased]
 
+## [2.2.1] — 2026-11-10
+
+### Project
+- **Pull request rules**, checked in seconds by a new workflow (`pr-checks.yml`) and written down in `CONTRIBUTING.md` with a pull request template:
+  - **Every pull request carries a version.** It raises `extension/manifest.json` and adds its dated section here (`scripts/check-version.mjs`).
+  - **A pull request that changes UI has screenshots in its description** (`scripts/check-screenshots.mjs`, which lists the files that count). The check runs again when the description is edited.
+  - The checks use the base branch's copy of the scripts, so a pull request can't change the rules it is checked against.
+- `scripts/release.mjs` no longer bumps the version. It checks and tests, then tags the version main is at.
+- **CI runs only the tests a change needs:**
+  - **Pull requests:** tested once, as pull requests. Before, each push to a pull request branch ran the full 20-minute suite twice, once as a push and once as a pull request.
+  - **Cancelling:** a newer push cancels the older run.
+  - **Choosing suites:** `scripts/ci-changes.mjs` picks from the changed files. Documentation alone runs none. Web app or fetcher changes run the web suite (about 4 min). Anything else runs both, including the extension suite (about 18 min). A raised version number alone doesn't count.
+  - **Full runs:** every push to `main` and every release still run everything.
+  - **One check:** a single `test` check sums up the suites that ran, so it can be required on `main`. This follows GitHub's advice to skip jobs rather than whole workflows for required checks.
+
 ## [2.2.0] — 2026-11-09 (extension on GitHub Releases, not yet submitted to the Chrome Web Store, which still has 2.0.0; there is no extension 2.1.0. Web app live on GitHub Pages)
 
 ### Web app

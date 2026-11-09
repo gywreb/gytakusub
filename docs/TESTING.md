@@ -43,7 +43,7 @@ Untick Debug overlay afterwards.
 
 ## C. Web app (phone path) — optional before merge
 
-The web app is deployed from `main` by GitHub Pages, so the simplest check is **after** the merge: open `https://gywreb.github.io/gytakusub/` on the iPhone (or Brave), paste a screenshot of a page, confirm it translates. The automated browser test already runs the web app end to end on every push, so this is a sanity check, not the only safety net.
+The web app is deployed from `main` by GitHub Pages, so the simplest check is **after** the merge: open `https://gywreb.github.io/gytakusub/` on the iPhone (or Brave), paste a screenshot of a page, confirm it translates. The automated browser test already runs the web app end to end on every pull request that touches it and on every push to `main`, so this is a sanity check, not the only safety net.
 
 To try it before merging, in PowerShell:
 

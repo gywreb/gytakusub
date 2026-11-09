@@ -42,7 +42,11 @@ The copies under `extension/` are canonical; `node scripts/sync-shared.mjs` copi
 
 ## Releasing
 
-Store listing copy, permission justifications and the submission checklist live in `store/`. Release a new version with `node scripts/release.mjs X.Y.Z` (any OS): it bumps the manifest, tests, tags and pushes; CI runs the full test suite on the tag, then builds the zip, publishes a GitHub Release and uploads to the Chrome Web Store when the `CWS_*` secrets are configured. A failed release run can be rebuilt for the same tag from Actions → Release → *Run workflow*.
+**Pull request rules** ([`CONTRIBUTING.md`](CONTRIBUTING.md)), checked by CI (`.github/workflows/pr-checks.yml`):
+- **Every pull request carries a version.** It raises `extension/manifest.json`'s `version` (patch for fixes, minor for features, major for breaking changes) and adds a dated `## [X.Y.Z]` section to `CHANGELOG.md`. Nothing stays under *Unreleased*. If two open pull requests take the same version, the second to merge takes the next one. The fetcher's own `VERSION` is separate: raise it only when the web app needs a newer fetcher, because every user then has to update theirs.
+- **A pull request that changes UI has screenshots in its description.**
+
+Store listing copy, permission justifications and the submission checklist live in `store/`. To release what is on main, run `node scripts/release.mjs` (any OS). It checks and tests, then tags the version main is at and pushes the tag. CI runs the full test suite on the tag, then builds the zip, publishes a GitHub Release and uploads to the Chrome Web Store when the `CWS_*` secrets are configured. A failed release run can be rebuilt for the same tag from Actions → Release → *Run workflow*.
 
 ## Development
 
@@ -61,6 +65,15 @@ npm run replay -- report.zip   # reproduce a user's "Export debug report" offlin
 npm run score -- *.zip         # detection on real pages from debug reports (coverage, dialogue as bubble, waste)
 npm run score:layout -- *.zip  # where and how large translations land on those pages
 ```
+
+`npm run test:web` / `test:extension` and `test:browser:web` / `test:browser:extension` run one half.
+
+**In CI** (`.github/workflows/test.yml`), each pull request runs only the suites its changes need (`scripts/ci-changes.mjs`):
+- documentation alone runs none;
+- changes only to the web app or the fetcher run the web suite (about 4 minutes);
+- anything else runs both, including the extension suite (about 18 minutes).
+
+A raised version number alone doesn't count as a change. Every push to `main` and every release tag runs everything. A newer push to the same pull request cancels the older run. One `test` check sums it up.
 
 `GYT_CHANNEL=chrome npm run test:browser` uses an installed Chrome for Testing instead of Playwright's Chromium (branded Google Chrome ≥ 137 ignores `--load-extension`). Put your own pages in `tests/fixtures/real/` (git-ignored) for local tuning. Testing, verifying and merging a release branch step by step: [`docs/TESTING.md`](docs/TESTING.md).
 
