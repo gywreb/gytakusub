@@ -215,6 +215,13 @@ Builds, docs updated 28 Oct and 8 Nov 2026):
    `npx wrangler deploy`.
 5. Add the Secret `GYT_KEY` (this route doesn't prompt for it), then Connect.
 
+**Presentation:** the usual onboarding pattern.
+- One step open at a time (*Step N of 6*, Back and Next), and the current step is remembered across the trips to GitHub and Cloudflare.
+- The accounts needed come first, with sign-up links.
+- Every value to type is a tap-to-copy chip.
+- The likely failure (a wrong Worker name or root directory) gets a fix-it line.
+- Connect validates the whole chain at the end.
+
 **Updates:** GitHub's *Sync fork*; Workers Builds redeploys on the push. The
 dashboard-paste route remains out, since current docs don't describe it.
 

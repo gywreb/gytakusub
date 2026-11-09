@@ -21,7 +21,7 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
   3. On Cloudflare, Create application → GitHub → the fork, with the name `gytakusub` and root directory `fetcher`.
   4. Add the key as the Secret `GYT_KEY`.
 
-  (The first version of this guide used Cloudflare's "Deploy to Cloudflare" button. When the owner tried it, that screen required choosing an existing repository, which a new user doesn't have, so the guide was rewritten around forking.) People given a **connection link** paste it in the box at the top and skip the setup.
+  The steps open one at a time: "Step N of 6", Back and Next, and the place is remembered while you're away on GitHub or Cloudflare. They start with the two accounts to create, and every value to type is a tap-to-copy chip. Step 4 says what to check if the build fails. (The first version of this guide used Cloudflare's "Deploy to Cloudflare" button. When the owner tried it, that screen required choosing an existing repository, which a new user doesn't have, so the guide was rewritten around forking.) People given a **connection link** paste it in the box at the top and skip the setup.
   5. **Connect**.
 
   Each failure is explained: a wrong key, a key not set yet, an outdated fetcher, nothing at that address. A **connection link** sets up another device (the key travels in the `#fragment`, never to a server); someone given a shared address and key starts at step 3.

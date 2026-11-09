@@ -94,3 +94,19 @@ dialog::backdrop { background: rgba(0,0,0,.5); }
 .wizard .choice { border-top: 1px solid var(--border); padding-top: 12px; margin-top: 14px; }
 .wizard .choice .row input { flex: 1 1 200px; width: auto; }
 .wizard .sub ul { padding-left: 18px; margin: 4px 0; display: grid; gap: 2px; }
+
+/* setup wizard: one step at a time */
+.wizard .progress { font-weight: 600; margin: 10px 0 4px; }
+.wizard .steps > li > h3 { margin: 0; }
+.wizard .step-title { all: unset; cursor: pointer; font-weight: 600; }
+.wizard .steps > li.done > h3 .step-title::after { content: " ✓"; color: #34d399; }
+.wizard .steps > li:not(.active) > h3 .step-title { color: var(--muted); font-weight: 500; }
+.wizard .steps > li:not(.active) > .step-body { display: none; }
+.wizard .steps { gap: 10px; }
+.wizard .step-body { margin-top: 6px; }
+.wizard .step-nav { justify-content: space-between; margin: 6px 0 12px; }
+.wizard .step-nav [hidden] { display: none; }
+.wizard .step-nav #wzNext { margin-left: auto; }
+.chip, .chip-demo { all: unset; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; padding: 1px 6px; border-radius: 6px; background: var(--bg); border: 1px solid var(--border); }
+.chip:active { opacity: .6; }
+.chip-demo { cursor: default; font-family: inherit; }

@@ -64,59 +64,82 @@
 
       <div class="choice">
         <h3>Or set up your own fetcher</h3>
-        <p class="muted small">Free, about 10 minutes, once. You need a free <b>GitHub</b> account and a free <b>Cloudflare</b> account. A computer is easiest; afterwards you can connect your phone with a link.</p>
-        <ol class="steps">
-          <li id="wzStep1">
-            <h3>Create your access key</h3>
-            <p>Only someone with this key can use your fetcher. You'll paste it in step 4.</p>
-            <div class="row"><code id="wzKey" class="key">—</code><button type="button" id="wzGen" class="btn small">Generate key</button><button type="button" id="wzCopyKey" class="btn small" disabled>Copy</button></div>
+        <p class="muted small">Free. About 10 minutes, once. Easiest on a computer; afterwards you connect your phone with a link. Tap a <span class="chip-demo">grey value</span> to copy it.</p>
+        <p id="wzProgress" class="progress" aria-live="polite"></p>
+        <ol class="steps" id="wzSteps">
+          <li data-step="1">
+            <h3><button type="button" class="step-title">Get the two free accounts</button></h3>
+            <div class="step-body">
+              <p>You need both. Skip any you already have.</p>
+              <ol class="sub">
+                <li><b>GitHub</b> (where your copy of the fetcher lives): <a href="https://github.com/signup" target="_blank" rel="noopener">github.com/signup ↗</a></li>
+                <li><b>Cloudflare</b> (where it runs): <a href="https://dash.cloudflare.com/sign-up" target="_blank" rel="noopener">dash.cloudflare.com/sign-up ↗</a>. Confirm your email.</li>
+              </ol>
+            </div>
           </li>
-          <li id="wzStep2">
-            <h3>Copy the fetcher to your GitHub</h3>
-            <ol class="sub">
-              <li>Open <a href="https://github.com/gywreb/gytakusub" target="_blank" rel="noopener">github.com/gywreb/gytakusub ↗</a> and sign in (or create a free account).</li>
-              <li>Click <b>Fork</b> (top right), then <b>Create fork</b>. You now have your own copy, also called <code>gytakusub</code>.</li>
-            </ol>
+          <li data-step="2">
+            <h3><button type="button" class="step-title">Create your access key</button></h3>
+            <div class="step-body">
+              <p>Only someone with this key can use your fetcher. The app remembers it; you'll paste it into Cloudflare in step 5.</p>
+              <div class="row"><code id="wzKey" class="key">—</code><button type="button" id="wzGen" class="btn small">Generate key</button><button type="button" id="wzCopyKey" class="btn small" disabled>Copy</button></div>
+            </div>
           </li>
-          <li id="wzStep3">
-            <h3>Deploy it on Cloudflare</h3>
-            <ol class="sub">
-              <li>Open <a href="https://dash.cloudflare.com/" target="_blank" rel="noopener">dash.cloudflare.com ↗</a> and sign in (or create a free account and confirm your email).</li>
-              <li>Go to <b>Workers &amp; Pages</b> → <b>Create application</b> → <b>GitHub</b>. If asked, allow Cloudflare to see your GitHub repositories.</li>
-              <li>Select your copy, <b>gytakusub</b>.</li>
-              <li>Fill in the settings. Anything not listed here, leave as it is:
-                <ul>
-                  <li><b>Project / Worker name:</b> <code>gytakusub</code>. It must be exactly this, or the build fails.</li>
-                  <li><b>Root directory:</b> <code>fetcher</code> (it may be under <i>Advanced settings</i>).</li>
-                  <li><b>Build command:</b> leave empty.</li>
-                  <li><b>Deploy command:</b> <code>npx wrangler deploy</code>.</li>
-                </ul>
-              </li>
-              <li>Click <b>Save and Deploy</b> and wait for it to finish (about a minute).</li>
-            </ol>
+          <li data-step="3">
+            <h3><button type="button" class="step-title">Copy the fetcher to your GitHub</button></h3>
+            <div class="step-body">
+              <ol class="sub">
+                <li>Open <a href="https://github.com/gywreb/gytakusub" target="_blank" rel="noopener">github.com/gywreb/gytakusub ↗</a> while signed in.</li>
+                <li>Click <b>Fork</b> (top right), then <b>Create fork</b>.</li>
+              </ol>
+              <p class="muted small">You now have your own copy, also named <button type="button" class="chip" data-copy="gytakusub" title="Copy">gytakusub</button>. Cloudflare can only deploy from a repository in your own account, which is why this copy is needed.</p>
+            </div>
           </li>
-          <li id="wzStep4">
-            <h3>Give the fetcher your key</h3>
-            <ol class="sub">
-              <li>On the Worker's page, open <b>Settings</b> → <b>Variables and Secrets</b> → <b>Add</b>.</li>
-              <li>Type: <b>Secret</b>. Variable name: <code>GYT_KEY</code>. Value: your key from step 1.</li>
-              <li>Click <b>Deploy</b>.</li>
-              <li>Copy the Worker's address from its page. It looks like <code>https://gytakusub.<i>your-name</i>.workers.dev</code>.</li>
-            </ol>
+          <li data-step="4">
+            <h3><button type="button" class="step-title">Deploy it on Cloudflare</button></h3>
+            <div class="step-body">
+              <ol class="sub">
+                <li>Open <a href="https://dash.cloudflare.com/" target="_blank" rel="noopener">dash.cloudflare.com ↗</a>, then <b>Workers &amp; Pages</b> → <b>Create application</b> → <b>GitHub</b>.</li>
+                <li>If asked, allow Cloudflare to see your GitHub repositories. Then select your <button type="button" class="chip" data-copy="gytakusub" title="Copy">gytakusub</button>.</li>
+                <li>Set these four fields; leave everything else as it is:
+                  <ul>
+                    <li><b>Project / Worker name:</b> <button type="button" class="chip" data-copy="gytakusub" title="Copy">gytakusub</button>. Exactly this, or the build fails.</li>
+                    <li><b>Root directory:</b> <button type="button" class="chip" data-copy="fetcher" title="Copy">fetcher</button>. It may be under <i>Advanced settings</i>.</li>
+                    <li><b>Build command:</b> leave empty.</li>
+                    <li><b>Deploy command:</b> <button type="button" class="chip" data-copy="npx wrangler deploy" title="Copy">npx wrangler deploy</button></li>
+                  </ul>
+                </li>
+                <li>Click <b>Save and Deploy</b> and wait about a minute until it says it's deployed.</li>
+              </ol>
+              <p class="muted small">If the build fails, check those four fields under the Worker's <b>Settings</b> → <b>Build</b>, correct them, and deploy again.</p>
+            </div>
           </li>
-          <li id="wzStep5">
-            <h3>Connect</h3>
-            <label>Fetcher address <input id="wzUrl" type="url" inputmode="url" placeholder="https://gytakusub.your-name.workers.dev" autocomplete="off" /></label>
-            <label>Access key <input id="wzKeyInput" type="password" placeholder="the key from step 1" autocomplete="off" /></label>
-            <div class="row"><button type="button" id="wzConnect" class="primary">Connect</button></div>
-            <p id="wzMsg" class="hint" role="status"></p>
+          <li data-step="5">
+            <h3><button type="button" class="step-title">Give the fetcher your key</button></h3>
+            <div class="step-body">
+              <ol class="sub">
+                <li>On the Worker's page: <b>Settings</b> → <b>Variables and Secrets</b> → <b>Add</b>.</li>
+                <li>Type: <b>Secret</b>. Variable name: <button type="button" class="chip" data-copy="GYT_KEY" title="Copy">GYT_KEY</button>. Value: your key (<button type="button" class="linkbtn" id="wzCopyKey2">copy it</button>).</li>
+                <li>Click <b>Deploy</b>.</li>
+                <li>Copy the Worker's address from its page. It looks like <code>https://gytakusub.<i>your-name</i>.workers.dev</code>.</li>
+              </ol>
+            </div>
+          </li>
+          <li data-step="6">
+            <h3><button type="button" class="step-title">Connect</button></h3>
+            <div class="step-body" id="wzStep5">
+              <label>Fetcher address <input id="wzUrl" type="url" inputmode="url" placeholder="https://gytakusub.your-name.workers.dev" autocomplete="off" /></label>
+              <label>Access key <input id="wzKeyInput" type="password" placeholder="filled in from step 2" autocomplete="off" /></label>
+              <div class="row"><button type="button" id="wzConnect" class="primary">Connect</button></div>
+              <p id="wzMsg" class="hint" role="status"></p>
+            </div>
           </li>
         </ol>
+        <div class="row step-nav"><button type="button" id="wzBack" class="btn small">‹ Back</button><button type="button" id="wzNext" class="primary">Done, next step ›</button></div>
         <details class="muted small">
           <summary>Update your fetcher later</summary>
-          <p>If the app says your fetcher is out of date: open your <code>gytakusub</code> copy on GitHub, click <b>Sync fork</b> → <b>Update branch</b>. Cloudflare redeploys by itself within a minute. Then tap Connect again.</p>
+          <p>If the app says your fetcher is out of date: open your <button type="button" class="chip" data-copy="gytakusub" title="Copy">gytakusub</button> copy on GitHub and click <b>Sync fork</b> → <b>Update branch</b>. Cloudflare redeploys by itself within a minute. Then Connect again.</p>
         </details>
-        <p class="muted small">If a Cloudflare screen looks different, see Cloudflare's own help: <a href="https://developers.cloudflare.com/workers/ci-cd/builds/" target="_blank" rel="noopener">deploying from GitHub</a> · <a href="https://developers.cloudflare.com/workers/configuration/secrets/" target="_blank" rel="noopener">adding a secret</a>. These steps were last checked against those pages on <span id="wzChecked"></span>.</p>
+        <p class="muted small">If a Cloudflare screen looks different, Cloudflare's own help: <a href="https://developers.cloudflare.com/workers/ci-cd/builds/" target="_blank" rel="noopener">deploying from GitHub</a> · <a href="https://developers.cloudflare.com/workers/configuration/secrets/" target="_blank" rel="noopener">adding a secret</a>. Steps last checked against those pages on <span id="wzChecked"></span>.</p>
       </div>
     </div>
 

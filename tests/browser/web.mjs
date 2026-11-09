@@ -114,11 +114,18 @@ await page2.waitForTimeout(500);
 // No fetcher yet: the tab shows the setup steps, and the chapter form is not reachable.
 if (!(await page2.isVisible("#fetcherWizard"))) fail("without a connected fetcher the Chapter link tab must show the setup steps");
 if (await page2.isVisible("#chapterForm")) fail("the chapter form must stay hidden until a fetcher is connected");
-if (!(await page2.isVisible('a[href="https://github.com/gywreb/gytakusub"]')) || !(await page2.isVisible('a[href="https://dash.cloudflare.com/"]'))) fail("the steps must link to the repository to fork and to the Cloudflare dashboard");
+if ((await page2.$$('#fetcherWizard a[href="https://github.com/gywreb/gytakusub"]')).length !== 1 || (await page2.$$('#fetcherWizard a[href="https://dash.cloudflare.com/"]')).length !== 1) fail("the steps must link to the repository to fork and to the Cloudflare dashboard");
+if (!/^Step 1 of 6$/.test(await page2.textContent("#wzProgress"))) fail("the setup should start at step 1 of 6: " + await page2.textContent("#wzProgress"));
+if (await page2.isVisible("#wzGen")) fail("only the current step should be open");
+await page2.click("#wzNext");
+await page2.click("#wzNext"); // no key yet: stays on step 2
+if (!/Step 2 of 6/.test(await page2.textContent("#wzProgress"))) fail("Next on step 2 without a key should not advance");
 await page2.click("#wzGen");
 const genKey = (await page2.textContent("#wzKey")).trim();
 if (!/^[A-Za-z0-9]{32}$/.test(genKey) || (await page2.inputValue("#wzKeyInput")) !== genKey) fail("Generate key should make a 32-character key and fill it into step 3: " + genKey);
 await page2.waitForFunction(() => /\d{4}/.test(document.querySelector("#wzChecked").textContent), null, { timeout: 5000 }).catch(() => fail("step 2 should say when the steps were last checked"));
+for (let i = 0; i < 4; i++) await page2.click("#wzNext");
+if (!/Step 6 of 6/.test(await page2.textContent("#wzProgress")) || await page2.isVisible("#wzNext")) fail("the last step is Connect, with no Next");
 const connect = async (url, key) => {
   await page2.fill("#wzUrl", url); await page2.fill("#wzKeyInput", key); await page2.click("#wzConnect");
   await page2.waitForFunction(() => !/Connecting/.test(document.querySelector("#wzMsg").textContent), null, { timeout: 15000 });

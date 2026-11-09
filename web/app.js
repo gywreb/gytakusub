@@ -219,6 +219,7 @@ async function openChapter(link, { keepContext = false } = {}) {
     if (["unauthorized", "setup", "outdated"].includes(err.code)) {
       settings = { ...settings, fetcherCheck: null }; saveSettings(settings);
       await applyChapterMode("wizard");
+      showStep(err.code === "setup" ? 5 : 6);
       wizardMsg("err", err.message);
     }
   }
@@ -283,6 +284,30 @@ $("wzGen").onclick = () => {
   settings = { ...settings, fetcherKey: key, fetcherCheck: null }; saveSettings(settings);
 };
 $("wzCopyKey").onclick = () => copyText($("wzKey").textContent, "Key");
+$("wzCopyKey2").onclick = () => settings.fetcherKey ? copyText(settings.fetcherKey, "Key") : toast("Generate a key in step 2 first");
+// Copyable values in the steps (names and settings to type into GitHub/Cloudflare)
+document.querySelectorAll("#fetcherWizard .chip").forEach((b) => (b.onclick = () => copyText(b.dataset.copy, `“${b.dataset.copy}”`)));
+
+// One step at a time; where you are is remembered, so going off to GitHub or Cloudflare and back keeps your place.
+const STEP_KEY = "gytakusub.setupStep";
+const stepItems = [...document.querySelectorAll("#wzSteps > li")];
+function showStep(n) {
+  const step = Math.max(1, Math.min(stepItems.length, n | 0));
+  try { localStorage.setItem(STEP_KEY, String(step)); } catch { /* private mode */ }
+  stepItems.forEach((li, i) => { li.classList.toggle("active", i + 1 === step); li.classList.toggle("done", i + 1 < step); });
+  $("wzProgress").textContent = `Step ${step} of ${stepItems.length}`;
+  $("wzBack").hidden = step === 1;
+  $("wzNext").hidden = step === stepItems.length;
+}
+stepItems.forEach((li, i) => (li.querySelector(".step-title").onclick = () => showStep(i + 1)));
+$("wzBack").onclick = () => showStep(Number(localStorage.getItem(STEP_KEY) || 1) - 1);
+$("wzNext").onclick = () => {
+  const step = Number(localStorage.getItem(STEP_KEY) || 1);
+  if (step === 2 && !settings.fetcherKey) return toast("Tap Generate key first");
+  showStep(step + 1);
+  $("wzProgress").scrollIntoView({ block: "nearest" });
+};
+showStep(Number(localStorage.getItem(STEP_KEY) || 1));
 async function connect(url, key, button, show) {
   show("", "Connecting…"); button.disabled = true;
   try {
@@ -327,7 +352,7 @@ if (shared) {
   $("wzLink").value = location.origin + location.pathname + "#connect=…";
   $("wzUrl").value = shared.url; $("wzKeyInput").value = shared.key;
   wizardMsg("", `A connection link filled in the fetcher at ${shared.url}. If you trust it, tap Connect.`);
-  $("wzStep5").scrollIntoView({ block: "center" });
+  showStep(6); $("wzStep5").scrollIntoView({ block: "center" });
 }
 // ?chapter=<link> (the bookmarklet in fetcher/README.md) fills in that chapter; it opens on a tap of Load, so a link
 // someone else sent can't make the fetcher visit a site or spend Claude credits by itself.
