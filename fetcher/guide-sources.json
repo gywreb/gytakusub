@@ -5,7 +5,10 @@
     { "url": "https://developers.cloudflare.com/workers/ci-cd/builds/index.md", "dateModified": "2026-10-28", "uses": "Step 3: Workers & Pages → Create application → GitHub → select the repository → Save and Deploy; the Worker name must match the name in wrangler.toml" },
     { "url": "https://developers.cloudflare.com/workers/ci-cd/builds/configuration/index.md", "dateModified": "2026-11-08", "uses": "Step 3 settings: Root directory, Build command (optional), Deploy command npx wrangler deploy" },
     { "url": "https://developers.cloudflare.com/workers/configuration/secrets/index.md", "dateModified": "2026-10-15", "uses": "Step 4: Worker → Settings → Variables and Secrets → Add → Secret → Deploy" },
-    { "url": "https://developers.cloudflare.com/workers/platform/limits/index.md", "dateModified": "2026-10-29", "uses": "Free plan: 10 ms CPU per request, 100,000 requests a day (README, error messages)" }
+    { "url": "https://developers.cloudflare.com/workers/platform/limits/index.md", "dateModified": "2026-10-29", "uses": "Free plan: 10 ms CPU per request, 100,000 requests a day (README, error messages)" },
+    { "url": "https://developers.cloudflare.com/analytics/graphql-api/getting-started/authentication/api-token-auth/index.md", "dateModified": "2026-04-23", "uses": "Live count: Account API tokens → Create Token → Custom token → Account · Account Analytics · Read → Continue to summary → Create Token (shown once)" },
+    { "url": "https://developers.cloudflare.com/fundamentals/account/find-account-and-zone-ids/index.md", "dateModified": "2026-08-03", "uses": "Live count: search (Ctrl/Cmd+K) → Copy account ID; or Workers & Pages → Account Details → Account ID" },
+    { "url": "https://developers.cloudflare.com/analytics/graphql-api/tutorials/querying-workers-metrics/index.md", "dateModified": "2026-04-23", "uses": "The fetcher's /usage query: viewer.accounts(accountTag).workersInvocationsAdaptive sum.requests, POST https://api.cloudflare.com/client/v4/graphql with a Bearer token" }
   ],
   "probes": [
     { "url": "https://github.com/gywreb/gytakusub/tree/main/fetcher", "expect": "status-200", "uses": "Step 2: the repository users fork (must stay public, with the fetcher folder)" },

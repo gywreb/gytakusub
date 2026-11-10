@@ -1,6 +1,6 @@
 // Gytakusub Web – UI.
 import { loadSettings, saveSettings, loadImage, blobToDataUrl, translateImage, renderPage, testKey } from "./translator.js";
-import { isConnected, connectFetcher, loadChapter, fetchPageImage, generateKey, connectionLink, readConnectionLink, fetcherBase, usageToday, onUsage, resetTime, FREE_DAILY } from "./fetcher-client.js";
+import { isConnected, connectFetcher, loadChapter, fetchPageImage, generateKey, connectionLink, readConnectionLink, fetcherBase, usageToday, onUsage, resetTime, FREE_DAILY, loadCloudUsage } from "./fetcher-client.js";
 import { MODELS } from "./prompt.js";
 import qrcode from "./lib/qrcode.mjs";
 
@@ -22,6 +22,7 @@ async function applyChapterMode(view) {
     const where = new URL(settings.fetcherUrl).host;
     $("manageStatus").textContent = `Connected to ${where}, version ${settings.fetcherCheck.version}, checked ${new Date(settings.fetcherCheck.at).toLocaleDateString()}.`;
     showUsage();
+    if (chapterView === "manage") refreshLive(true);
   }
   if (chapterView === "wizard") {
     if (!$("wzUrl").value && settings.fetcherUrl) $("wzUrl").value = settings.fetcherUrl;
@@ -29,30 +30,82 @@ async function applyChapterMode(view) {
     if (settings.fetcherKey) { $("wzKey").textContent = settings.fetcherKey; $("wzCopyKey").disabled = false; $("wzGen").textContent = "New key"; }
   }
 }
-// Today's use of the free allowance, as counted on this device (see fetcher-client.js).
+// Today's use of the free allowance. With the live count (the fetcher reads Cloudflare's analytics)
+// every browser and the installed app show the same number; without it, what this device sent, as an
+// estimate. The live count refreshes every minute while the Chapter link tab is on screen.
+const LIVE_EVERY = 60e3, LIVE_MIN_GAP = 20e3;
+let live = { state: "unknown", data: null, at: 0, error: "" }; // state: unknown | live | setup | old | error
+let liveBusy = false;
+
+async function refreshLive(force = false) {
+  if (liveBusy || !settings.fetcherUrl || !(await isConnected(settings))) return;
+  if (!force && Date.now() - live.at < LIVE_MIN_GAP) return;
+  liveBusy = true;
+  try {
+    const data = await loadCloudUsage(settings);
+    live = { state: "live", data, at: Date.now(), error: "" };
+  } catch (e) {
+    const state = e.code === "usage-setup" ? "setup" : e.code === "usage-old" ? "old" : "error";
+    // a passing failure keeps the last count on screen, marked with its time
+    live = { state, data: state === "error" ? live.data : null, at: Date.now(), error: state === "error" ? e.message : "" };
+  } finally {
+    liveBusy = false;
+  }
+  showUsage();
+}
+const liveWanted = () => currentMode === "chapter" && document.visibilityState === "visible" && !["setup", "old"].includes(live.state);
+setInterval(() => { if (liveWanted()) refreshLive(); }, LIVE_EVERY);
+document.addEventListener("visibilitychange", () => { if (liveWanted()) refreshLive(); });
+
 function showUsage() {
   if (!settings.fetcherUrl) return;
-  const { requests, chapters } = usageToday(fetcherBase(settings.fetcherUrl));
-  const n = (x) => x.toLocaleString(), share = Math.min(1, requests / FREE_DAILY), warn = share >= 0.8;
+  const n = (x) => x.toLocaleString(), time = (iso) => new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const device = usageToday(fetcherBase(settings.fetcherUrl));
+  const cloud = live.data, isLive = !!cloud;
+  const requests = isLive ? cloud.requests : device.requests, limit = (isLive && cloud.limit) || FREE_DAILY;
+  const share = Math.min(1, requests / limit), warn = share >= 0.8;
   // the state in words too, not only in red
   const state = share >= 1 ? `used up until ${resetTime()}` : warn ? "almost used up" : "";
-  $("fetcherUsage").textContent = share >= 1 ? `free requests ${state}` : (state ? `${n(requests)} / ${n(FREE_DAILY)} · ${state}` : `${n(requests)} / ${n(FREE_DAILY)} free today`);
+  const figure = `${isLive ? "" : "≈"}${n(requests)} / ${n(limit)}`;
+  $("fetcherUsage").textContent = share >= 1 ? `free requests ${state}` : (state ? `${figure} · ${state}` : `${figure} free today`);
   $("btnFetcherManage").classList.toggle("warn", warn);
+  $("btnFetcherManage").title = isLive ? `Cloudflare's count, ${time(cloud.asOf)}` : "Estimated from this device";
+  $("usageSource").textContent = isLive ? `Cloudflare · ${time(cloud.asOf)}` : "This device";
+  $("usageSource").classList.toggle("live", isLive);
   $("usageState").textContent = state ? state[0].toUpperCase() + state.slice(1) : "";
   $("usageState").hidden = !state;
   $("usageCount").textContent = n(requests);
-  $("usageMax").textContent = n(FREE_DAILY);
+  $("usageMax").textContent = n(limit);
   const meter = $("usageMeter");
-  meter.setAttribute("aria-valuemax", FREE_DAILY);
-  meter.setAttribute("aria-valuenow", Math.min(requests, FREE_DAILY));
-  meter.setAttribute("aria-valuetext", `${n(requests)} of ${n(FREE_DAILY)} requests used today`);
+  meter.setAttribute("aria-valuemax", limit);
+  meter.setAttribute("aria-valuenow", Math.min(requests, limit));
+  meter.setAttribute("aria-valuetext", `${n(requests)} of ${n(limit)} requests used today${isLive ? "" : ", estimated from this device"}`);
   meter.classList.toggle("warn", warn);
   meter.classList.toggle("used", requests > 0);
   meter.firstElementChild.style.width = `${share * 100}%`;
-  $("usageNote").textContent = `Sent from this device · ${n(chapters)} chapter${chapters === 1 ? "" : "s"} (one request per page, plus one) · starts again at ${resetTime()}`;
+  if (isLive) {
+    const others = cloud.workers.slice(1).reduce((t, w) => t + w.requests, 0);
+    const split = cloud.workers.length > 1 ? `${cloud.workers[0].name} ${n(cloud.workers[0].requests)}, other Workers ${n(others)} · ` : "";
+    $("usageNote").textContent = `${split}All your devices · starts again at ${resetTime()}`;
+  } else {
+    $("usageNote").textContent = `Sent from this device · ${n(device.chapters)} chapter${device.chapters === 1 ? "" : "s"} (about 2 requests a page) · starts again at ${resetTime()}`;
+  }
+  document.querySelectorAll("[data-usage=device]").forEach((el) => (el.hidden = isLive));
+  document.querySelectorAll("[data-usage=live]").forEach((el) => (el.hidden = !isLive));
   $("usageReset").textContent = resetTime();
+  $("liveSetup").hidden = live.state !== "setup";
+  $("liveUpdate").hidden = live.state !== "old";
+  $("liveError").hidden = live.state !== "error";
+  $("liveError").textContent = live.state === "error" ? `Cloudflare's count didn't update: ${live.error}${cloud ? ` Showing the count from ${time(cloud.asOf)}.` : ""}` : "";
 }
 onUsage(showUsage);
+async function checkLive(button) {
+  button.disabled = true; $("liveMsg").textContent = "Checking…";
+  await refreshLive(true);
+  button.disabled = false;
+  $("liveMsg").textContent = live.state === "live" ? "" : live.state === "setup" ? "Not yet: the Worker has no CF_API_TOKEN and CF_ACCOUNT_ID secrets (after adding them, click Deploy)." : "";
+  if (live.state === "live") toast("Live count from Cloudflare is on.");
+}
 
 let ctx = { terms: [], recent: [] }; // chapter context for this session
 const MAX_PARALLEL = 2;
@@ -81,6 +134,7 @@ function setMode(mode) {
   $("modeChapter").classList.toggle("hidden", mode !== "chapter");
   $("pages").dataset.mode = mode;
   updateToolbar();
+  if (mode === "chapter") refreshLive();
 }
 const tabs = [...document.querySelectorAll(".tab")];
 tabs.forEach((b, i) => {
@@ -332,7 +386,7 @@ $("wzGen").onclick = () => {
 $("wzCopyKey").onclick = () => copyText($("wzKey").textContent, "Key");
 $("wzCopyKey2").onclick = () => settings.fetcherKey ? copyText(settings.fetcherKey, "Key") : toast("Generate a key in step 2 first");
 // Copyable values in the steps (names and settings to type into GitHub/Cloudflare)
-document.querySelectorAll("#fetcherWizard .chip").forEach((b) => (b.onclick = () => copyText(b.dataset.copy, `“${b.dataset.copy}”`)));
+document.querySelectorAll("#fetcherWizard .chip, #fetcherManage .chip").forEach((b) => (b.onclick = () => copyText(b.dataset.copy, `“${b.dataset.copy}”`)));
 
 // One step at a time; where you are is remembered, so going off to GitHub or Cloudflare and back keeps your place.
 const STEP_KEY = "gytakusub.setupStep";
@@ -377,6 +431,8 @@ $("wzLinkConnect").onclick = () => {
   connect(shared.url, shared.key, $("wzLinkConnect"), show);
 };
 $("btnFetcherManage").onclick = () => applyChapterMode("manage");
+$("liveCheck").onclick = (e) => checkLive(e.currentTarget);
+$("liveCheck2").onclick = (e) => checkLive(e.currentTarget);
 $("mgDone").onclick = () => applyChapterMode("ready");
 $("mgSetup").onclick = () => applyChapterMode("wizard");
 $("mgCopyLink").onclick = () => copyText(connectionLink(settings), "Connection link");

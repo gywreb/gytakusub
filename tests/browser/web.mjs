@@ -84,15 +84,24 @@ const fakeSite = {
   "https://guarded.example/ch/1/": { status: 503, body: "<title>Just a moment...</title><script src=/cdn-cgi/challenge-platform/x></script>", type: "text/html" },
 };
 const fetched = [];
+// Cloudflare's analytics, for the live count: 1,256 requests today over two Workers
+const graphqlAnswer = { data: { viewer: { accounts: [{ workersInvocationsAdaptive: [
+  { sum: { requests: 1200, errors: 0 }, dimensions: { scriptName: "gytakusub" } },
+  { sum: { requests: 56, errors: 0 }, dimensions: { scriptName: "other-worker" } },
+] }] } } };
+const fetcherEnv = { GYT_KEY: KEY }; // the live-count secrets are added later in the test
 const fakeWeb = async (url, init = {}) => {
+  if (String(url) === "https://api.cloudflare.com/client/v4/graphql") return new Response(JSON.stringify(graphqlAnswer), { headers: { "Content-Type": "application/json" } });
   fetched.push({ url: String(url), referer: init.headers?.Referer || null });
   if (/^https:\/\/cdn\.reader\.example\/series\/\d+\/0\d\.png$/.test(String(url))) return new Response(png, { headers: { "Content-Type": "image/png" } });
   const r = fakeSite[String(url)];
   return r ? new Response(r.body, { status: r.status || 200, headers: { "Content-Type": r.type } }) : new Response("nope", { status: 404 });
 };
+const served = []; // every request the fetcher receives, as Cloudflare would count it (permission checks included)
 const fetcherSrv = http.createServer(async (req, res) => {
+  served.push(`${req.method} ${req.url}`);
   const request = new Request(`http://127.0.0.1:${FETCHER_PORT}${req.url}`, { method: req.method, headers: req.headers });
-  const r = await fetcherHandle(request, { GYT_KEY: KEY }, fakeWeb);
+  const r = await fetcherHandle(request, fetcherEnv, fakeWeb);
   res.writeHead(r.status, Object.fromEntries(r.headers));
   res.end(Buffer.from(await r.arrayBuffer()));
 });
@@ -139,6 +148,7 @@ if (!/version 2\.0\.0.*needs/.test(m2)) fail("an outdated fetcher should be refu
 const m3 = await connect("http://127.0.0.1:9/", KEY);
 if (!/No answer from/.test(m3)) fail("an address with nothing behind it should say so: " + m3);
 if (await page2.isVisible("#chapterForm")) fail("failed connections must not unlock the chapter form");
+served.length = 0; // the device count starts again here too: the last attempts went to other addresses
 const m4 = await connect(`http://127.0.0.1:${FETCHER_PORT}/`, KEY);
 if (!/Connected/.test(m4) || !(await page2.isVisible("#chapterForm"))) fail("a working fetcher should connect and unlock the chapter form: " + m4);
 // connected state survives a reload (verified address + key), and the connection link round-trips
@@ -169,13 +179,37 @@ const challengeMsg = await page2.textContent("#chapterInfo");
 if (!/checking your browser/i.test(challengeMsg)) fail("a bot-check site should be explained: " + challengeMsg);
 // the free allowance: this device's requests today, in the tab and in the manage panel
 const usage = await page2.textContent("#fetcherUsage");
-const used = Number(((/^([\d,]+) \/ 100,000 free today/.exec(usage) || [])[1] || "").replace(/,/g, ""));
+const used = Number(((/^≈([\d,]+) \/ 100,000 free today/.exec(usage) || [])[1] || "").replace(/,/g, ""));
 if (!(used >= 6)) fail("the tab should show today's requests from this device: " + usage);
+// the estimate counts the browser's permission checks (OPTIONS) too, so in Chromium it matches what the fetcher received
+const preflights = served.filter((r) => r.startsWith("OPTIONS")).length;
+if (used !== served.length || preflights < 4) fail(`the device count should match the requests the fetcher received, permission checks included: ${used} counted, ${served.length} received (${preflights} OPTIONS)`);
 await page2.click("#btnFetcherManage");
+// opening the panel asks the fetcher for Cloudflare's count (/usage), itself one more request on this device
+// wait for that request to be counted in the chip and the meter (it lands a moment after the panel opens), rather than racing it
+const countNow = () => Number(((/^≈([\d,]+) \//.exec(document.querySelector("#fetcherUsage").textContent) || [])[1] || "").replace(/,/g, ""));
+await page2.waitForFunction((want) => {
+  const chip = Number(((/^≈([\d,]+) \//.exec(document.querySelector("#fetcherUsage").textContent) || [])[1] || "").replace(/,/g, ""));
+  return chip >= want && Number(document.querySelector("#usageMeter").getAttribute("aria-valuenow")) >= want;
+}, used + 1, { timeout: 10000 }).catch(() => {});
+const usedNow = await page2.evaluate(countNow);
+if (usedNow !== used + 1 || served.length !== usedNow) fail(`asking for the live count is a request too: ${used} → ${usedNow} (the fetcher received ${served.length})`);
 const meterNow = Number(await page2.getAttribute("#usageMeter", "aria-valuenow"));
 const usageNote = await page2.textContent("#usageNote");
 await page2.screenshot({ path: path.join(out, "web-fetcher-manage.png"), fullPage: true });
-if (meterNow !== used || !/2 chapters/.test(usageNote) || !/starts again at/.test(usageNote)) fail(`the manage panel's meter should show the same count (${meterNow} vs ${used}) and the chapters opened: ${usageNote}`);
+if (meterNow !== usedNow || !/2 chapters/.test(usageNote) || !/starts again at/.test(usageNote)) fail(`the manage panel's meter should show the same count (${meterNow} vs ${usedNow}) and the chapters opened: ${usageNote}`);
+// without the analytics secrets on the Worker, the panel offers the live-count setup
+await page2.waitForSelector("#liveSetup", { state: "visible", timeout: 10000 }).catch(() => fail("a fetcher without the analytics secrets should offer the live-count setup"));
+if ((await page2.textContent("#usageSource")) !== "This device") fail("the device count should say it is this device's");
+// with them, the count comes from Cloudflare: the same number on every device
+fetcherEnv.CF_API_TOKEN = "cf-token-test"; fetcherEnv.CF_ACCOUNT_ID = "acc-test";
+await page2.click("#liveCheck");
+await page2.waitForFunction(() => /^1,256 \/ 100,000 free today$/.test(document.getElementById("fetcherUsage").textContent), null, { timeout: 10000 })
+  .catch(async () => fail("the live count should replace the estimate: " + (await page2.textContent("#fetcherUsage"))));
+const liveSource = await page2.textContent("#usageSource"), liveNote = await page2.textContent("#usageNote");
+if (!/^Cloudflare · /.test(liveSource) || !(await page2.isHidden("#liveSetup")) || !/gytakusub 1,200, other Workers 56/.test(liveNote)) fail(`the panel should show Cloudflare's count and its Workers: ${liveSource} / ${liveNote}`);
+if (Number(await page2.getAttribute("#usageMeter", "aria-valuenow")) !== 1256) fail("the meter should follow the live count");
+await page2.screenshot({ path: path.join(out, "web-fetcher-live.png"), fullPage: true });
 await page2.click("#mgDone");
 // past the allowance Cloudflare answers with its own error page (1027); with no answer at all, both likely causes are named
 const chapterAt = `http://127.0.0.1:${FETCHER_PORT}/chapter?*`;

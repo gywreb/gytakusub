@@ -12,15 +12,20 @@
 //   /ping                         → {ok, version}
 //   /chapter?url=<chapter page>   → {url, title, pages[], referer, next, prev, method}
 //   /image?url=<image>&ref=<page> → the image bytes
+//   /usage                        → {ok, requests, errors, limit, day, asOf, workers[]}: today's Workers requests on
+//                                   this Cloudflare account, read from Cloudflare's analytics (optional; needs the
+//                                   secrets CF_API_TOKEN and CF_ACCOUNT_ID, see README.md)
 // Errors are JSON {error, message} with a code the app explains:
 //   challenge (the site shows a bot check), blocked (401/403), not-found,
 //   no-images (nothing that looks like a chapter's pages), upstream, not-image,
-//   bad-url, unauthorized.
+//   bad-url, unauthorized, usage-setup (no analytics token), usage-upstream (Cloudflare's analytics refused).
 //
 // One file, no dependencies, so it can be pasted into the Cloudflare dashboard
 // as is. The extraction functions are exported for the tests (tests/fetcher.test.mjs).
 
-export const VERSION = "2.1.0";
+export const VERSION = "2.4.0";
+export const FREE_DAILY = 100_000; // Workers Free plan: requests a day per account, counted from midnight UTC
+const USAGE_TTL = 30e3; // ms an analytics answer is reused, so several open apps don't each ask Cloudflare
 const MAX_HTML = 2e6; // bytes of HTML read from a chapter page (real ones are 50–500 KB); bounds the free plan's 10 ms of CPU
 const MAX_IMAGE = 40e6; // bytes; a manga page is well under this
 const MIN_KEY = 24; // characters of GYT_KEY: the Worker's address is not secret, the key is
@@ -59,6 +64,10 @@ export async function handle(request, env = {}, fetchFn = fetch) {
       const out = await chapter(target, client, fetchFn);
       return json(request, env, out.body, out.status, out.status === 200 ? { "Cache-Control": "private, max-age=300" } : {});
     }
+    case "/usage": {
+      const out = await usage(env, fetchFn);
+      return json(request, env, out.body, out.status, { "Cache-Control": "no-store" });
+    }
     case "/image": {
       const target = checkTarget(url.searchParams.get("url"));
       const ref = url.searchParams.get("ref") ? checkTarget(url.searchParams.get("ref")) : null;
@@ -68,6 +77,60 @@ export async function handle(request, env = {}, fetchFn = fetch) {
     default:
       return json(request, env, { error: "not-found", message: "Unknown endpoint." }, 404);
   }
+}
+
+// ---------- usage: today's requests, from Cloudflare's own analytics ----------
+// The free plan's 100,000 requests a day count every Worker on the account, preflights included, so
+// the exact number can only come from Cloudflare. Its GraphQL Analytics API answers that with an API
+// token that can only read analytics (Account · Account Analytics · Read). Both values are optional
+// secrets; without them /usage says so and the app counts on the device instead.
+const USAGE_QUERY = `query GytakusubUsage($accountTag: string, $datetimeStart: string, $datetimeEnd: string) {
+  viewer { accounts(filter: {accountTag: $accountTag}) {
+    workersInvocationsAdaptive(limit: 100, filter: {datetime_geq: $datetimeStart, datetime_leq: $datetimeEnd}) {
+      sum { requests errors }
+      dimensions { scriptName }
+    }
+  } }
+}`;
+let usageCache = null; // {at, account, body}: reused for USAGE_TTL within one Worker instance
+
+export async function usage(env, fetchFn = fetch, now = Date.now()) {
+  const token = (env.CF_API_TOKEN || "").trim(), account = (env.CF_ACCOUNT_ID || "").trim();
+  if (!token || !account) {
+    return { status: 409, body: { error: "usage-setup", version: VERSION, message: "Add the secrets CF_API_TOKEN and CF_ACCOUNT_ID to the Worker to read today's count from Cloudflare." } };
+  }
+  if (usageCache && usageCache.account === account && now - usageCache.at < USAGE_TTL) return { status: 200, body: usageCache.body };
+  const start = new Date(now); start.setUTCHours(0, 0, 0, 0);
+  let res, j = {};
+  try {
+    res = await fetchFn("https://api.cloudflare.com/client/v4/graphql", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ query: USAGE_QUERY, variables: { accountTag: account, datetimeStart: start.toISOString(), datetimeEnd: new Date(now).toISOString() } }),
+    });
+    j = await res.json();
+  } catch (e) {
+    return { status: 502, body: { error: "usage-upstream", message: `Cloudflare's analytics did not answer (${e?.message || e}).` } };
+  }
+  const problem = j.errors?.[0]?.message || (!res.ok ? `HTTP ${res.status}` : "");
+  const accounts = j.data?.viewer?.accounts;
+  if (problem || !Array.isArray(accounts)) {
+    return { status: 502, body: { error: "usage-upstream", message: `Cloudflare's analytics refused: ${problem || "no data"}. Check that the token has Account Analytics: Read for this account, and the account ID.` } };
+  }
+  if (!accounts.length) {
+    return { status: 502, body: { error: "usage-upstream", message: "Cloudflare's analytics know no account with that ID for this token. Check CF_ACCOUNT_ID." } };
+  }
+  const rows = accounts[0].workersInvocationsAdaptive || [];
+  const workers = rows.map((r) => ({ name: r.dimensions?.scriptName || "", requests: r.sum?.requests || 0, errors: r.sum?.errors || 0 }))
+    .sort((a, b) => b.requests - a.requests);
+  const body = {
+    ok: true, version: VERSION,
+    requests: workers.reduce((n, w) => n + w.requests, 0),
+    errors: workers.reduce((n, w) => n + w.errors, 0),
+    limit: FREE_DAILY, day: start.toISOString().slice(0, 10), asOf: new Date(now).toISOString(), workers,
+  };
+  usageCache = { at: now, account, body };
+  return { status: 200, body };
 }
 
 // ---------- HTTP plumbing ----------

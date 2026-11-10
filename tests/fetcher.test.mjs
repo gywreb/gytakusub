@@ -4,7 +4,7 @@
 // with the network mocked. Run: node fetcher.test.mjs
 import fs from "node:fs";
 import crypto from "node:crypto";
-import { extractChapter, pickPages, findNav, checkTarget, md5, handle, sniffImage } from "../fetcher/worker.js";
+import { extractChapter, pickPages, findNav, checkTarget, md5, handle, sniffImage, usage, FREE_DAILY } from "../fetcher/worker.js";
 
 let failures = 0, passes = 0;
 const ok = (cond, name, extra = "") => { if (cond) { passes++; console.log("ok -", name); } else { failures++; console.log("not ok -", name, extra); } };
@@ -186,6 +186,51 @@ for (const [what, html] of [["100 KB of unclosed <img ", "<img ".repeat(20000)],
   await extractChapter(html, "https://x.example/c/1");
   const ms = performance.now() - t;
   ok(ms < 40, `${what}: ${ms.toFixed(1)} ms (linear)`);
+}
+
+// ---------- /usage: today's requests from Cloudflare's GraphQL Analytics API ----------
+{
+  const graphql = (answer) => {
+    const calls = [];
+    const f = async (url, init = {}) => { calls.push({ url: String(url), init }); return typeof answer === "function" ? answer() : new Response(JSON.stringify(answer), { headers: { "Content-Type": "application/json" } }); };
+    return { f, calls };
+  };
+  const t0 = Date.parse("2026-11-10T05:30:00Z");
+  const rows = { data: { viewer: { accounts: [{ workersInvocationsAdaptive: [
+    { sum: { requests: 1200, errors: 3 }, dimensions: { scriptName: "gytakusub" } },
+    { sum: { requests: 56, errors: 0 }, dimensions: { scriptName: "other-worker" } },
+  ] }] } } };
+  const cf = { GYT_KEY: KEY, CF_API_TOKEN: "cf-token-123", CF_ACCOUNT_ID: "acc123" };
+
+  const { f, calls } = graphql(rows);
+  const u = await usage(cf, f, t0);
+  ok(u.status === 200 && u.body.requests === 1256 && u.body.errors === 3 && u.body.limit === FREE_DAILY && u.body.day === "2026-11-10", "usage: sums today's requests over every Worker on the account", JSON.stringify(u.body));
+  ok(u.body.workers[0].name === "gytakusub" && u.body.workers.length === 2, "usage: lists Workers, busiest first");
+  const sent = JSON.parse(calls[0].init.body);
+  ok(calls[0].url === "https://api.cloudflare.com/client/v4/graphql" && calls[0].init.method === "POST" && calls[0].init.headers.Authorization === "Bearer cf-token-123", "usage: asks Cloudflare's GraphQL endpoint with the analytics token");
+  ok(sent.variables.accountTag === "acc123" && sent.variables.datetimeStart === "2026-11-10T00:00:00.000Z" && sent.variables.datetimeEnd === "2026-11-10T05:30:00.000Z" && /workersInvocationsAdaptive/.test(sent.query), "usage: from midnight UTC (when the free allowance resets) to now");
+  const again = await usage(cf, f, t0 + 10e3);
+  ok(calls.length === 1 && again.body.requests === 1256, "usage: reuses an answer for 30 s, so several open apps don't each ask Cloudflare");
+  await usage(cf, f, t0 + 31e3);
+  ok(calls.length === 2, "usage: asks again after 30 s");
+
+  const none = await usage({ GYT_KEY: KEY }, graphql(rows).f, t0 + 1e6);
+  ok(none.status === 409 && none.body.error === "usage-setup", "usage: without the secrets, says so (the app falls back to its own count)");
+  const refused = await usage({ ...cf, CF_ACCOUNT_ID: "acc-x" }, graphql({ errors: [{ message: "not authorized for that account" }], data: null }).f, t0 + 2e6);
+  ok(refused.status === 502 && refused.body.error === "usage-upstream" && /not authorized/.test(refused.body.message), "usage: passes on Cloudflare's refusal with what to check");
+  const empty = await usage({ ...cf, CF_ACCOUNT_ID: "acc-y" }, graphql({ data: { viewer: { accounts: [] } } }).f, t0 + 3e6);
+  ok(empty.body.error === "usage-upstream" && /CF_ACCOUNT_ID/.test(empty.body.message), "usage: an unknown account ID is named");
+  const down = await usage({ ...cf, CF_ACCOUNT_ID: "acc-z" }, graphql(() => { throw new Error("network down"); }).f, t0 + 4e6);
+  ok(down.status === 502 && down.body.error === "usage-upstream", "usage: no answer from Cloudflare is an error, not a crash");
+  const quiet = await usage({ ...cf, CF_ACCOUNT_ID: "acc-q" }, graphql({ data: { viewer: { accounts: [{ workersInvocationsAdaptive: [] }] } } }).f, t0 + 5e6);
+  ok(quiet.status === 200 && quiet.body.requests === 0, "usage: no requests yet today is 0");
+
+  const r1 = await handle(req("/usage", { key: "wrong-key-0123456789abcdefgh" }), cf, graphql(rows).f);
+  ok(r1.status === 401, "usage: needs the access key like every endpoint");
+  const r2 = await handle(req("/usage"), { ...cf, CF_ACCOUNT_ID: "acc-h" }, graphql(rows).f);
+  const j2 = await r2.json();
+  ok(r2.status === 200 && j2.requests === 1256 && r2.headers.get("Cache-Control") === "no-store" && r2.headers.get("Access-Control-Allow-Origin"), "usage: served with CORS and never cached", JSON.stringify(j2));
+  ok(!JSON.stringify(j2).includes("cf-token-123"), "usage: the analytics token never leaves the Worker");
 }
 
 // ---------- the in-app setup guide stays tied to the sources the weekly guide check watches ----------

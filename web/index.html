@@ -183,7 +183,7 @@
       <p id="manageStatus" class="muted"></p>
 
       <section class="mg-section" aria-labelledby="usageHead">
-        <h3 id="usageHead">Free allowance today</h3>
+        <div class="sec-head"><h3 id="usageHead">Free allowance today</h3><span id="usageSource" class="source-badge"></span></div>
         <div class="usage">
           <p class="usage-figure"><span id="usageCount">0</span> <span class="muted">of <span id="usageMax">100,000</span> requests</span> <span id="usageState" class="usage-state" hidden></span></p>
           <div id="usageMeter" class="meter" role="meter" aria-labelledby="usageHead" aria-valuemin="0" aria-valuemax="100000" aria-valuenow="0"><span class="meter-fill"></span></div>
@@ -191,9 +191,31 @@
         </div>
         <ul class="usage-facts small">
           <li><b>Free:</b> if it runs out, the fetcher stops until <span id="usageReset">the reset</span>. Nothing is charged.</li>
-          <li><b>Shared:</b> your other devices and anyone with your connection link use the same allowance, but only this device is counted here.</li>
-          <li><b>Exact count</b> for your whole account: <a href="https://dash.cloudflare.com/" target="_blank" rel="noopener">dash.cloudflare.com ↗</a> → Workers &amp; Pages → your Worker → Metrics.</li>
+          <li data-usage="device"><b>Estimate:</b> what this browser or app sent. Before each new page the browser asks the fetcher for permission, and Cloudflare counts that too, so a page costs 2 requests. The estimate counts both, and errs high rather than low. Your other devices and anyone with your connection link use the same allowance.</li>
+          <li data-usage="live" hidden><b>From Cloudflare:</b> every request to every Worker on your account today, the browser's permission checks included. Your browsers and the installed app show the same number.</li>
+          <li data-usage="live" hidden><b>A few minutes behind:</b> Cloudflare adds requests to its count a few minutes after they happen. The count refreshes every minute while this tab is open, and each refresh is itself one request.</li>
+          <li data-usage="device"><b>Cloudflare's own count:</b> <a href="https://dash.cloudflare.com/" target="_blank" rel="noopener">dash.cloudflare.com ↗</a> → Workers &amp; Pages → your Worker → Metrics, or set up the live count below.</li>
         </ul>
+
+        <!-- live count: the fetcher reads it from Cloudflare's analytics (optional) -->
+        <div id="liveSetup" class="callout" hidden>
+          <h4>Show Cloudflare's own count here</h4>
+          <p class="muted small">Optional, about 3 minutes, easiest on a computer. The fetcher then reads today's count from Cloudflare with a token that can only read analytics.</p>
+          <ol class="sub">
+            <li>In <a href="https://dash.cloudflare.com/" target="_blank" rel="noopener">dash.cloudflare.com ↗</a> open <b>Account API tokens</b> (press <kbd>Ctrl</kbd> <kbd>K</kbd>, or <kbd>⌘</kbd> <kbd>K</kbd> on a Mac, and search for it). Click <b>Create Token</b>, then under <b>Custom token</b> click <b>Get started</b>.</li>
+            <li>Token name: <button type="button" class="chip" data-copy="gytakusub-usage" title="Copy">gytakusub-usage</button>. Permissions: <b>Account</b> · <b>Account Analytics</b> · <b>Read</b>, nothing else. Click <b>Continue to summary</b>, then <b>Create Token</b>, and copy the token: Cloudflare shows it only once.</li>
+            <li>Press <kbd>Ctrl</kbd> <kbd>K</kbd> again and choose <b>Copy account ID</b>.</li>
+            <li>On your Worker: <b>Settings</b> → <b>Variables and Secrets</b> → <b>Add</b>, type <b>Secret</b>, name <button type="button" class="chip" data-copy="CF_API_TOKEN" title="Copy">CF_API_TOKEN</button>, value the token. <b>Add</b> one more Secret: <button type="button" class="chip" data-copy="CF_ACCOUNT_ID" title="Copy">CF_ACCOUNT_ID</button>, value the account ID. Click <b>Deploy</b>.</li>
+          </ol>
+          <div class="row"><button type="button" id="liveCheck" class="btn small">Check now</button><span id="liveMsg" class="hint" role="status"></span></div>
+          <p class="muted small">Cloudflare's guides: <a href="https://developers.cloudflare.com/analytics/graphql-api/getting-started/authentication/api-token-auth/" target="_blank" rel="noopener">analytics token ↗</a> · <a href="https://developers.cloudflare.com/fundamentals/account/find-account-and-zone-ids/" target="_blank" rel="noopener">account ID ↗</a></p>
+        </div>
+        <div id="liveUpdate" class="callout" hidden>
+          <h4>Show Cloudflare's own count here</h4>
+          <p class="small">Your fetcher is too old for this. On GitHub open your <b>gytakusub</b> copy, click <b>Sync fork</b> → <b>Update branch</b>. Cloudflare redeploys it in about a minute.</p>
+          <div class="row"><button type="button" id="liveCheck2" class="btn small">Check again</button></div>
+        </div>
+        <p id="liveError" class="hint err" role="status" hidden></p>
       </section>
 
       <section class="mg-section" aria-labelledby="mgDevicesHead">
