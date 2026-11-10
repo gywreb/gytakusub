@@ -18,6 +18,9 @@
   .option { padding: var(--s2) 0; }
   .group { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r2); padding: var(--s1) var(--s3); }
   .group-title { margin: var(--s2) 0 0; font-size: var(--t-caption); font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .group-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s2); }
+  .usage-link { margin-top: var(--s2); padding: 2px 0; border: 0; background: none; color: var(--muted); font: inherit; font-size: var(--t-caption); font-variant-numeric: tabular-nums; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+  .usage-link:hover { color: var(--fg); }
   .group-title #host { text-transform: none; letter-spacing: 0; color: var(--fg); overflow-wrap: anywhere; }
   .group .field { padding: var(--s2) 0 10px; border-bottom: 1px solid var(--border); }
   .group .field + .option { border-top: 0; }
@@ -64,12 +67,15 @@
     </section>
 
     <section class="group" aria-labelledby="trHead">
-      <h2 id="trHead" class="group-title">Translation</h2>
+      <div class="group-head">
+        <h2 id="trHead" class="group-title">Translation</h2>
+        <button id="usageToday" class="usage-link" type="button" hidden title="Claude usage today, estimated from this browser (details in Options)"></button>
+      </div>
       <label class="field">
         <span>Model</span>
         <select id="model">
           <option value="claude-haiku-5-5">Haiku 5.5 — fastest, cheapest</option>
-          <option value="claude-sonnet-5-5">Sonnet 5.5 — better on dense pages</option>
+          <option value="claude-sonnet-5-5">Sonnet 5.5 — for dense pages</option>
           <option value="claude-opus-5-5">Opus 5.5 — best, most expensive</option>
         </select>
       </label>

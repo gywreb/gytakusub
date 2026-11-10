@@ -207,9 +207,30 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline-offs
 .meter.warn .meter-fill { background: var(--danger); }
 .usage-facts { margin: 0; padding-left: 1.2em; display: grid; gap: var(--s2); color: var(--muted); }
 .usage-facts b { color: var(--fg); }
+/* the monthly API credit: figure, meter, what's left and when it renews, the pace */
+.credit { display: grid; gap: var(--s2); padding: var(--s3); border: 1px solid var(--border); border-radius: var(--r2); }
+.credit p { margin: 0; }
+.credit-figure { font-size: var(--t-h3); font-weight: 700; font-variant-numeric: tabular-nums; display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); }
+.credit-left { font-weight: 600; font-variant-numeric: tabular-nums; }
+.state-badge { padding: 2px var(--s2); border-radius: 999px; font-size: var(--t-caption); font-weight: 600; color: var(--danger); border: 1px solid currentColor; }
+.credit-fields { display: grid; gap: var(--s3); grid-template-columns: 1fr; }
+@media (min-width: 640px) { .credit-fields { grid-template-columns: 1fr 1fr; } }
+/* Claude usage: two stat tiles (today, this month), then one row per model */
+.stats { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s3); }
+.stat { display: grid; gap: 2px; padding: var(--s3); border: 1px solid var(--border); border-radius: var(--r2); background: var(--bg); min-width: 0; }
+.stat-label { font-size: var(--t-caption); color: var(--muted); font-weight: 600; }
+.stat-value { font-size: var(--t-h2); font-weight: 700; font-variant-numeric: tabular-nums; }
+.stat-sub { font-size: var(--t-caption); color: var(--muted); font-variant-numeric: tabular-nums; }
+.model-rows { list-style: none; margin: 0; padding: 0; display: grid; }
+.model-rows li { display: grid; grid-template-columns: 1fr auto; column-gap: var(--s3); padding: var(--s2) 0; border-top: 1px solid var(--border); }
+.model-rows li:first-child { border-top: 0; }
+.model-name { font-weight: 600; }
+.model-cost { font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }
+.model-what { grid-column: 1 / -1; font-size: var(--t-caption); color: var(--muted); font-variant-numeric: tabular-nums; }
 /* section head with a source label on the right (Cloudflare · 12:03 / This device) */
 .sec-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s3); flex-wrap: wrap; margin-bottom: var(--s3); }
 .sec-head h3 { margin: 0; }
+.group .sec-head { margin-bottom: 0; }
 .source-badge { font-size: var(--t-caption); color: var(--muted); font-variant-numeric: tabular-nums; }
 .source-badge.live::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: var(--ok); vertical-align: 1px; }
 /* an optional task inside a section: framed so it reads as one unit */

@@ -4,7 +4,7 @@
   "type": "commonjs",
   "scripts": {
     "test": "npm run test:web && npm run test:extension",
-    "test:web": "node fetcher.test.mjs",
+    "test:web": "node fetcher.test.mjs && node usage.test.mjs",
     "test:extension": "node engine.test.mjs && node segment.test.mjs && node ort-trap.test.mjs && node gpu.test.mjs && node concurrency.test.mjs",
     "test:browser": "npm run test:browser:extension && npm run test:browser:web",
     "test:browser:extension": "node browser/run.mjs --out /tmp/gyt-browser/good && node browser/run.mjs --bad-boxes --out /tmp/gyt-browser/bad-boxes && node browser/run.mjs --segmenter /tmp/gyt-fake-seg.onnx --out /tmp/gyt-browser/segmented && node browser/run.mjs --gpu --require-gpu --out /tmp/gyt-browser/gpu",

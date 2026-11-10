@@ -25,6 +25,9 @@ export const DEFAULT_SETTINGS = {
   excludedSites: "",
   debugOverlay: false, // draw detection boxes and log results (for diagnosing placement)
   useGpu: true, // run the page models on the GPU (WebGPU) when the browser offers one; CPU otherwise
+  creditPlan: "none", // a Max or Team plan's monthly Claude API credit (usage.js CREDIT_PLANS)
+  creditCustom: 0, // USD a month, for creditPlan "custom"
+  creditRenews: "", // YYYY-MM-DD, from the Console's Billing page
   peekOnHover: false, // hovering a translated bubble shows the original lettering (off by default: it flickers while reading)
   // Image prep
   maxLongEdge: 1600, // px sent to Claude for a normal page

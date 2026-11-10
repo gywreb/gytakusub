@@ -1,5 +1,6 @@
 // Gytakusub – shared prompt + response parsing (extension background + web app).
 // ES module.
+import { explainApiError, limitsOf } from "./usage.js";
 
 export const MODELS = [
   { id: "claude-haiku-5-5", label: "Claude Haiku 5.5 — fastest, cheapest" },
@@ -143,7 +144,10 @@ export function answerSchema(includeSource) {
 // later calls in this worker send the plain request, whose JSON is parsed leniently.
 let structuredRejected = false;
 
-/** One Claude call for one prepared slice. Returns {items(raw), terms, usage}. */
+/**
+ * One Claude call for one prepared slice. Returns {items(raw), terms, usage, model, limits}: the
+ * answer's token usage, the model that answered and the rate-limit headers (for usage.js).
+ */
 export async function callClaude(settings, slice, ctx, fetchFn = fetch) {
   const body = {
     model: settings.model,
@@ -160,15 +164,15 @@ export async function callClaude(settings, slice, ctx, fetchFn = fetch) {
   if (structured) body.output_config = { format: { type: "json_schema", schema: answerSchema(!!settings.includeSource) } };
   const res = await fetchFn(API_URL, { method: "POST", headers: apiHeaders(settings.apiKey), body: JSON.stringify(body) });
   if (!res.ok) {
-    let detail = "";
-    try { const j = await res.json(); detail = j?.error?.message || JSON.stringify(j); }
-    catch { detail = await res.text(); }
+    let detail = "", hint = "";
+    try { const j = await res.json(); detail = j?.error?.message || JSON.stringify(j); hint = explainApiError(res.status, j); }
+    catch { detail = await res.text().catch(() => ""); hint = explainApiError(res.status); }
     if (structured && res.status === 400 && /output_config|json_schema|schema|structured/i.test(detail)) {
       console.warn("Gytakusub: structured output not accepted, using a plain request:", detail);
       structuredRejected = true;
       return callClaude(settings, slice, ctx, fetchFn);
     }
-    throw new Error(`Claude API ${res.status}: ${detail}`);
+    throw new Error(`Claude API ${res.status}: ${detail}${hint ? " " + hint : ""}`);
   }
   const data = await res.json();
   const text = (data.content || []).filter((c) => c.type === "text").map((c) => c.text).join("\n");
@@ -186,6 +190,8 @@ export async function callClaude(settings, slice, ctx, fetchFn = fetch) {
     items: Array.isArray(parsed.items) ? parsed.items : [],
     terms: Array.isArray(parsed.terms) ? parsed.terms : [],
     usage: data.usage || null,
+    model: data.model || settings.model,
+    limits: limitsOf(res.headers),
   };
 }
 

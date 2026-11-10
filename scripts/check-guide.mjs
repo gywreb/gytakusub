@@ -1,9 +1,11 @@
-// Checks that what the chapter-link setup guide relies on outside this repository
-// is unchanged: Cloudflare's docs pages (their dateModified), the Deploy to
-// Cloudflare link, and MangaDex's chapter API. Prints a Markdown report; exits 1
+// Checks that what the app relies on outside this repository is unchanged: the
+// Cloudflare docs pages the chapter-link setup guide follows (their dateModified),
+// the repository people fork, MangaDex's chapter API, and Anthropic's prices behind
+// the Claude usage estimates (scripts/price-check.mjs). Prints a Markdown report; exits 1
 // when something changed or broke, so the weekly workflow opens an issue.
 //   node scripts/check-guide.mjs [fetcher/guide-sources.json]
 import fs from "node:fs";
+import { PRICE_PAGE, priceRowsProblems } from "./price-check.mjs";
 
 const file = process.argv[2] || new URL("../fetcher/guide-sources.json", import.meta.url);
 const src = JSON.parse(fs.readFileSync(file, "utf8"));
@@ -37,6 +39,14 @@ for (const p of src.probes) {
     else problems.push(`- **${p.url}** did not answer as expected (HTTP ${status}; check: ${p.expect}). Used for: ${p.uses}.`);
   } catch (e) { problems.push(`- **${p.url}**: could not be fetched (${e.message}). Used for: ${p.uses}.`); }
 }
+
+// Claude prices: every row extension/usage.js uses must still be on the pricing page, with the same numbers
+try {
+  const { status, text } = await get(PRICE_PAGE);
+  const found = status === 200 ? priceRowsProblems(text) : [`answered HTTP ${status}`];
+  if (found.length) problems.push(`- **${PRICE_PAGE}**: ${found.join(" ")} Update \`PRICES\` and \`PRICES_CHECKED\` in \`extension/usage.js\` (the usage estimates use them).`);
+  else fine.push(`- ${PRICE_PAGE}: the Claude prices in extension/usage.js match`);
+} catch (e) { problems.push(`- **${PRICE_PAGE}**: could not be fetched (${e.message}).`); }
 
 const report = [
   problems.length ? `## Chapter-link setup guide: ${problems.length} thing(s) to review` : "## Chapter-link setup guide: nothing changed",

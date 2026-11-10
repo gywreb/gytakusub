@@ -2,6 +2,11 @@
 // stamps, erase, layout) runs in engine-worker.js; this module calls Claude
 // and draws the text, mirroring the extension's service worker + content script.
 import { callClaude, mergeContext, apiHeaders, API_URL } from "./prompt.js";
+import { limitsOf, explainApiError } from "./usage.js";
+import { recordClaudeUsage } from "./claude-usage.js";
+
+// every answer is logged as it arrives, so a page whose other slice fails still counts what it cost
+const callAndRecord = (settings, slice, ctx) => callClaude(settings, slice, ctx).then((r) => { recordClaudeUsage(r); return r; });
 
 const GyText = globalThis.GyText;
 
@@ -28,6 +33,9 @@ export const DEFAULT_SETTINGS = {
   uppercase: false,
   fontFamily: "",
   rtlSpreads: true,
+  creditPlan: "none", // a Max or Team plan's monthly Claude API credit (usage.js CREDIT_PLANS)
+  creditCustom: 0, // USD a month, for creditPlan "custom"
+  creditRenews: "", // YYYY-MM-DD, from the Console's Billing page
   fetcherUrl: "", // your chapter fetcher (fetcher/worker.js on Cloudflare), e.g. https://gytakusub.<you>.workers.dev
   fetcherKey: "", // its access key (the Worker's GYT_KEY secret)
   maxLongEdge: 1600,
@@ -64,7 +72,7 @@ export async function translateImage(img, settings, ctx = { terms: [], recent: [
   const bitmap = await createImageBitmap(img);
   const prep = await rpc({ type: "prepare", bitmap, settings: { maxLongEdge: settings.maxLongEdge, stripWidth: settings.stripWidth, sliceHeight: settings.sliceHeight } }, [bitmap]);
   let results;
-  try { results = await Promise.all(prep.slices.map((s) => callClaude(settings, s, ctx))); }
+  try { results = await Promise.all(prep.slices.map((s) => callAndRecord(settings, s, ctx))); }
   catch (e) { rpc({ type: "drop", jobId: prep.jobId }).catch(() => {}); throw e; }
   const terms = [];
   const usage = { input_tokens: 0, output_tokens: 0 };
@@ -93,6 +101,8 @@ export async function testKey(settings) {
     method: "POST", headers: apiHeaders(settings.apiKey),
     body: JSON.stringify({ model: settings.model, max_tokens: 8, messages: [{ role: "user", content: "Reply with OK" }] }),
   });
-  if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(`${res.status}: ${j?.error?.message || res.statusText}`); }
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) { const hint = explainApiError(res.status, j); throw new Error(`${res.status}: ${j?.error?.message || res.statusText}${hint ? " " + hint : ""}`); }
+  recordClaudeUsage({ usage: j.usage, model: j.model || settings.model, limits: limitsOf(res.headers) }); // the test costs a few tokens too
   return true;
 }

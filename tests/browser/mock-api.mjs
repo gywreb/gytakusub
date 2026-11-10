@@ -82,8 +82,15 @@ export function startMock(port, pageImage, opts = {}) {
         };
       });
       calls.push({ w: img.width, h: img.height, n: items.length });
-      res.writeHead(200, { "Content-Type": "application/json", ...cors });
-      return res.end(JSON.stringify({ content: [{ type: "text", text: JSON.stringify({ items, terms: [] }) }], usage: { input_tokens: 1000, output_tokens: 200 } }));
+      // like the real API: the model that answered, its token usage and the rate-limit headers
+      // (exposed to pages here, so the web app's rate-limit line can be tested)
+      const limits = {
+        "anthropic-ratelimit-requests-limit": "50", "anthropic-ratelimit-requests-remaining": String(50 - calls.length), "anthropic-ratelimit-requests-reset": new Date(Date.now() + 60e3).toISOString(),
+        "anthropic-ratelimit-input-tokens-limit": "40000", "anthropic-ratelimit-input-tokens-remaining": "39000", "anthropic-ratelimit-input-tokens-reset": new Date(Date.now() + 60e3).toISOString(),
+        "anthropic-ratelimit-output-tokens-limit": "8000", "anthropic-ratelimit-output-tokens-remaining": "7800", "anthropic-ratelimit-output-tokens-reset": new Date(Date.now() + 60e3).toISOString(),
+      };
+      res.writeHead(200, { "Content-Type": "application/json", ...cors, ...limits, "Access-Control-Expose-Headers": Object.keys(limits).join(", ") });
+      return res.end(JSON.stringify({ model: j.model, content: [{ type: "text", text: JSON.stringify({ items, terms: [] }) }], usage: { input_tokens: 1000, output_tokens: 200 } }));
     }
     res.writeHead(404); res.end();
   });

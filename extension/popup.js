@@ -2,6 +2,7 @@
 // service worker may be busy analysing a page for seconds (see settings.js), and
 // the popup must show the real settings the moment it opens.
 import { getSettings, ensureContentScript } from "./settings.js";
+import { summary, fmtUsd, creditStatus } from "./usage.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -107,6 +108,22 @@ $("auto").onchange = async (e) => {
 };
 $("openOptions").onclick = () => chrome.runtime.openOptionsPage();
 $("openOptions2").onclick = (e) => { e.preventDefault(); chrome.runtime.openOptionsPage(); };
+
+/** Today's Claude cost on this browser and the monthly credit left, next to the model (details: Options → Claude usage). */
+let usageLog = null, creditPrefs = {};
+function showUsage(log = usageLog) {
+  usageLog = log;
+  const today = summary(log?.v === 1 ? log : null).today, credit = creditStatus(log?.v === 1 ? log : null, creditPrefs);
+  const parts = [today.requests && `≈${fmtUsd(today.cost)} today`, credit && `≈${fmtUsd(credit.left)} left`].filter(Boolean);
+  $("usageToday").hidden = !parts.length;
+  $("usageToday").textContent = parts.join(" · ");
+  const spoken = [today.requests && `about ${fmtUsd(today.cost)} today`, credit && `about ${fmtUsd(credit.left)} of the monthly API credit left`].filter(Boolean);
+  $("usageToday").setAttribute("aria-label", spoken.length ? `Claude usage: ${spoken.join(", ")}. Open details.` : "");
+}
+getSettings().then((s) => { creditPrefs = s; showUsage(); });
+chrome.storage.local.get({ claudeUsage: null }).then(({ claudeUsage }) => showUsage(claudeUsage));
+chrome.storage.onChanged.addListener((changes, area) => { if (area === "local" && changes.claudeUsage) showUsage(changes.claudeUsage.newValue); });
+$("usageToday").onclick = () => chrome.tabs.create({ url: chrome.runtime.getURL("options.html#sec-usage") });
 
 showShortcuts();
 init().finally(() => document.body.classList.add("ready"));

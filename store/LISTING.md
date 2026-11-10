@@ -29,6 +29,7 @@ YOU STAY IN CONTROL
 • Master switch, per-site enable, per-site auto-translate.
 • Glossary for names and terms; custom instructions; model choice (Haiku for speed, Sonnet/Opus for difficult pages).
 • Results are cached for the browser session so re-reading costs nothing.
+• See what it costs: today's and this month's Claude tokens and estimated cost per model, and how much of a plan's monthly API credit is left, from this browser's own records (Options → Claude usage).
 • Double-click a translated bubble to correct a line or add a term to the glossary; an option lets you peek at the original by hovering.
 
 REQUIREMENTS
@@ -65,7 +66,7 @@ Translates the text inside comic and manga page images that the user is viewing,
 
 | Permission | Justification to paste |
 |---|---|
-| `storage` | Stores the user's settings, glossary, list of enabled sites and (locally) their API key. No data is sent to the developer. |
+| `storage` | Stores the user's settings, glossary, list of enabled sites, (locally) their API key, and a local log of the token counts Claude reports for each translation, used to show the user what translating costs. No data is sent to the developer. |
 | `activeTab` | Lets the user invoke the translator on the current tab from the toolbar button or keyboard shortcut without the extension running on every page. |
 | `scripting` | Injects the translator only into the current tab on user request, and registers it for the specific sites the user has enabled in the popup/options. |
 | Host permission `<all_urls>` | Comic pages are served from many image CDNs that differ from the page's own domain and block cross-origin reads. The background worker needs host access to fetch the image the user asked to translate so its pixels can be analysed. The extension does not read or modify any other page content and does not run on sites the user has not enabled or explicitly invoked it on. |

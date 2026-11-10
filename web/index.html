@@ -260,6 +260,33 @@
         <div class="row"><button type="button" id="sTest" class="btn small">Test the key</button></div>
         <p id="sMsg" class="hint" role="status"></p>
       </section>
+      <section class="group" aria-labelledby="sgUsage">
+        <div class="sec-head"><h3 id="sgUsage">Claude usage</h3><span class="source-badge">This browser</span></div>
+        <div id="cuCredit" class="credit" hidden>
+          <p class="credit-figure"><span id="cuCreditFigure"></span> <span id="cuCreditState" class="state-badge" hidden></span></p>
+          <div id="cuCreditMeter" class="meter" role="meter" aria-label="Monthly API credit used" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="meter-fill"></span></div>
+          <p id="cuCreditLeft" class="credit-left"></p>
+          <p id="cuCreditPace" class="hint"></p>
+        </div>
+        <div class="stats">
+          <div class="stat"><span class="stat-label">Today</span><span class="stat-value" id="cuTodayCost">$0</span><span class="stat-sub" id="cuTodaySub">No requests yet</span></div>
+          <div class="stat"><span class="stat-label" id="cuMonthLabel">This month</span><span class="stat-value" id="cuMonthCost">$0</span><span class="stat-sub" id="cuMonthSub">No requests yet</span></div>
+        </div>
+        <ul id="cuModels" class="model-rows" aria-label="This month by model"></ul>
+        <p id="cuLimits" class="hint" hidden></p>
+        <ul class="usage-facts small">
+          <li><b>Estimate:</b> tokens are exact for what this browser sent; the cost uses <a id="cuPriceLink" href="https://platform.claude.com/docs/en/about-claude/pricing" target="_blank" rel="noopener">Anthropic's prices ↗</a> (checked <span id="cuChecked"></span>). The extension and your other devices keep their own counts.</li>
+          <li><b>Exact bill:</b> the Claude Console's <a href="https://platform.claude.com/usage" target="_blank" rel="noopener">Usage ↗</a> and <a href="https://platform.claude.com/cost" target="_blank" rel="noopener">Cost ↗</a> pages.</li>
+          <li><b>Days</b> start at <span id="cuDayStart">midnight UTC</span> your time (midnight UTC), like Anthropic's usage reports.</li>
+        </ul>
+        <div class="credit-fields">
+          <label class="field">Monthly API credit <select id="sCreditPlan" name="credit-plan"></select></label>
+          <label class="field" id="sCreditCustomField" hidden>Amount, USD a month <input id="sCreditCustom" name="credit-amount" type="number" min="0" step="1" inputmode="decimal" /></label>
+          <label class="field">Renews on <input id="sCreditRenews" name="credit-renews" type="date" /></label>
+        </div>
+        <p class="hint">Claude Max and Team plans include API credit each month (<a href="https://platform.claude.com/docs/en/about-claude/api-credits-for-subscribers" target="_blank" rel="noopener">Anthropic ↗</a>). The Claude Console's <a href="https://platform.claude.com/settings/billing" target="_blank" rel="noopener">Billing page ↗</a> shows it under Promotional credits with its expiry date: that's the renewal date to put here.</p>
+        <div class="row"><button type="button" id="cuClear" class="btn small danger">Clear usage history</button></div>
+      </section>
       <section class="group" aria-labelledby="sgTranslate">
         <h3 id="sgTranslate">Translation</h3>
         <label class="field">Target language <input id="sTargetLang" name="target-language" type="text" placeholder="English" autocomplete="off" /></label>
