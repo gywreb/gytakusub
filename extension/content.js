@@ -265,30 +265,93 @@
     return out;
   }
 
-  // ---------- queue (nearest-to-viewport first, limited parallelism) ----------
+  // ---------- queue: the page you're looking at first ----------
+  // Pages wait here and run MAX_PARALLEL at a time, nearest to the middle of the screen
+  // first; a page on screen starts even when every slot is busy. Auto-translate starts
+  // pages only once scrolling has settled: a page flashing past while you fling is not
+  // one you're looking at, and starting it would hold a slot. The worker analyses one
+  // page at a time in the same order, from the distances reported below while you scroll.
+  // A page auto-translate picked up is put back when you scroll far past it before Claude
+  // was asked; auto-translate picks it up again when you come back. So the page you stop
+  // at doesn't wait behind pages you skipped, and skipped pages cost no tokens. Pages you
+  // asked for yourself (Translate visible, the button on an image) are never put back.
 
   const queue = [];
-  let running = 0;
+  const running = new Map(); // job id → job
+  let nextJobId = 1, lastScroll = 0;
+  const SETTLE_MS = 250;
 
-  function enqueue(img, force = false) {
+  /** On screen or within auto-translate's look-ahead (the IntersectionObserver's 200% margin). */
+  function nearScreen(img, screens = 2) {
+    const r = img.getBoundingClientRect(), vh = window.innerHeight, vw = window.innerWidth;
+    return r.bottom >= -vh * screens && r.top <= vh * (1 + screens) && r.right >= 0 && r.left <= vw;
+  }
+  const onScreen = (img) => nearScreen(img, 0);
+  // a hidden tab's pages wait for the visible tab's
+  const priorityOf = (img) => viewportDistance(img) + (document.hidden ? 1e7 : 0);
+
+  function enqueue(img, force = false, auto = false) {
     if (!active()) { toast("Gytakusub is off on this site"); return; }
     const e = entries.get(img);
     if (e && (e.status === "working" || e.status === "queued")) return;
     entries.set(img, { ...(e || { hidden: false }), status: "queued", src: srcOf(img), error: undefined, failures: e && e.src === srcOf(img) ? e.failures : 0 });
-    queue.push({ img, force });
+    queue.push({ id: nextJobId++, img, force, auto });
     refreshBar();
     pump();
   }
 
-  function pump() {
-    while (running < MAX_PARALLEL && queue.length) {
-      queue.sort((a, b) => viewportDistance(a.img) - viewportDistance(b.img));
-      const job = queue.shift();
-      if (!job.img.isConnected) { entries.delete(job.img); continue; }
-      running++;
-      translateImage(job.img, job.force).finally(() => { running--; pump(); });
-    }
+  /** A page that was waiting or cancelled goes back to untranslated, keeping its overlay settings. */
+  function putBack(img) {
+    const e = entries.get(img);
+    if (!e) return;
+    if (!e.result && !e.canvas && !e.hidden) entries.delete(img); else e.status = "idle";
   }
+
+  function pump() {
+    for (let i = queue.length - 1; i >= 0; i--) {
+      const job = queue[i];
+      if (!job.img.isConnected) { queue.splice(i, 1); entries.delete(job.img); }
+      else if (job.auto && !nearScreen(job.img)) { queue.splice(i, 1); putBack(job.img); }
+    }
+    queue.sort((a, b) => priorityOf(a.img) - priorityOf(b.img));
+    const settled = performance.now() - lastScroll >= SETTLE_MS;
+    for (let i = 0; i < queue.length;) {
+      const job = queue[i];
+      const room = running.size < MAX_PARALLEL || onScreen(job.img);
+      if (!room || (job.auto && !settled)) { i++; continue; }
+      queue.splice(i, 1);
+      running.set(job.id, job);
+      translateImage(job).finally(() => { running.delete(job.id); pump(); });
+    }
+    refreshBar();
+  }
+
+  // While you scroll: new distances for the pages in progress, cancel the auto-translated
+  // ones you left far behind (the worker ignores that once Claude has been asked), and let
+  // a page that came on screen start.
+  let jobsTimer = null, settleTimer = null;
+  function reportJobs() {
+    jobsTimer = null;
+    if (running.size) {
+      const update = [], cancel = [];
+      for (const job of running.values()) {
+        update.push({ id: job.id, distance: priorityOf(job.img), onScreen: !document.hidden && onScreen(job.img) });
+        if (job.auto && (!job.img.isConnected || !nearScreen(job.img))) cancel.push(job.id);
+      }
+      chrome.runtime.sendMessage({ type: "JOBS", update, cancel }).catch(() => {});
+    }
+    if (queue.length) pump();
+  }
+  function scheduleReport() { if (!jobsTimer && (running.size || queue.length)) jobsTimer = setTimeout(reportJobs, 150); }
+  function onScroll() {
+    lastScroll = performance.now();
+    scheduleReport();
+    clearTimeout(settleTimer);
+    if (queue.length) settleTimer = setTimeout(pump, SETTLE_MS + 10); // the page you stopped at may now skip the queue
+  }
+  window.addEventListener("scroll", onScroll, { capture: true, passive: true });
+  window.addEventListener("resize", scheduleReport, { passive: true });
+  document.addEventListener("visibilitychange", scheduleReport);
 
   // ---------- translation ----------
 
@@ -313,14 +376,14 @@
   const blobToDataUrl = (blob) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(blob); });
   const loadImage = (dataUrl) => new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error("Could not decode image")); im.src = dataUrl; });
 
-  async function translateImage(img, force = false) {
+  async function translateImage({ id, img, force = false }) {
     const entry = entries.get(img) || { status: "idle", hidden: false };
     entry.status = "working"; entry.error = undefined; entry.src = srcOf(img);
     entries.set(img, entry);
     refreshBar();
     try {
       const src = entry.src;
-      const msg = { type: "TRANSLATE", force };
+      const msg = { type: "TRANSLATE", force, jobId: id, distance: priorityOf(img), onScreen: !document.hidden && onScreen(img) };
       if (/^(blob|data):/i.test(src)) {
         const blob = await (await fetch(src)).blob(); // only the page can read its own blob: URLs
         msg.dataUrl = await blobToDataUrl(blob);
@@ -336,10 +399,11 @@
         try {
           const blob = await (await fetch(src)).blob();
           if (!blob.type.startsWith("image/")) throw new Error("not an image");
-          res = await chrome.runtime.sendMessage({ type: "TRANSLATE", force, dataUrl: await blobToDataUrl(blob) });
+          res = await chrome.runtime.sendMessage({ type: "TRANSLATE", force, jobId: id, distance: priorityOf(img), onScreen: !document.hidden && onScreen(img), dataUrl: await blobToDataUrl(blob) });
           if (!res) throw new Error("No response from background worker");
         } catch (e2) { console.info("Gytakusub: page-side fetch did not help either", e2?.message || e2); }
       }
+      if (res.cancelled) { putBack(img); refreshBar(); return; } // scrolled far past before Claude was asked
       if (res.error) throw new Error(res.error);
       if (srcOf(img) !== src) { entries.delete(img); return; } // image changed while we worked
       entry.result = res;
@@ -584,7 +648,7 @@
           if (!r.isIntersecting || !isEligible(r.target)) continue;
           const e = entries.get(r.target);
           // an image that failed twice is left alone (a site that refuses the download will refuse again)
-          if (!e || (e.status === "done" && srcOf(r.target) !== e.src) || (e.status === "error" && (e.failures || 0) < 2)) enqueue(r.target);
+          if (!e || e.status === "idle" || (e.status === "done" && srcOf(r.target) !== e.src) || (e.status === "error" && (e.failures || 0) < 2)) enqueue(r.target, false, true);
         }
       }, { rootMargin: "200% 0px" });
       const observeAll = () => { for (const img of document.images) if (isEligible(img)) io.observe(img); };
