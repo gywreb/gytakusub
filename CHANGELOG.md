@@ -4,6 +4,32 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
 
 ## [Unreleased]
 
+## [2.6.0] — 2026-11-16
+
+### Extension
+- **The page you're looking at is translated first.** When you scroll fast through a chapter with auto-translate on, the page you stop at no longer waits behind pages you flung past.
+  - Auto-translate starts pages once scrolling settles, nearest to the middle of the screen first. A page on screen starts even when all three slots are busy.
+  - The worker analyses one page at a time, most wanted first, from distances the page reports while you scroll (`extension/lane.js`). A page's analysis pauses between its model runs when a more urgent page is waiting.
+  - While a page on screen is in progress, pages off screen wait (at most 20 s), because their model runs would block the worker's one thread while the page on screen waits for Claude's reply.
+  - Pages you scroll far past before Claude is asked are put back and done when you return, so **they cost no tokens**. A page Claude was already asked about finishes and is cached. Pages you ask for yourself (Translate visible, the button on an image) are never put back.
+  - Measured with a new browser test (14 pages, fast scroll to the end, a model taking 2.5 s per answer, CPU only): the page on screen was ready about **12 s** after the stop instead of 30 s, and Claude was asked about **3** pages instead of 8.
+- **Options: the side nav stays on screen** while the page scrolls, and marks the section you're reading (or the one you picked in it). It was meant to stick already, but as a grid item it stretched to the full page height, so it scrolled away. The browser test now checks both.
+
+### Store listing
+- **Five screenshots instead of three** (`store/assets/`, upload them in the dashboard):
+  - 1–3 re-rendered with the current engine;
+  - 4 is new: a Japanese page with vertical and horizontal lettering, a dark bubble and screentone, before and after;
+  - 5 is new: the real popup and the Claude usage panel (`tests/browser/store-shot.mjs`, demo data, a site named `reader.example`).
+- **Screenshot 3 said something no longer true:** "found by pixels, not by a model". Since 2.0.0, bubbles and text are found by open-source models running in the browser. Its top line now says no other server sees your pages, instead of "nothing is stored". Screenshot 1 no longer says the artwork is untouched: narration on screentone can be smudged where it was erased.
+- **The screenshot script tags each line with the bubble around its original text,** as Claude does, not by matching the bubble's outline. Two overlapping bubbles had been left untranslated in screenshot 1.
+- **Screenshot 4 uses real translations of its Japanese text.** The generated test page pairs Japanese and English lines at random, which the tests don't mind.
+- The close-up no longer has an empty strip at its right edge.
+
+### Releases
+- **Store uploads use the Chrome Web Store API V2.** Google planned to support the old v1.1 API, which `scripts/cws-publish.mjs` used, only until 15 October 2026. The script now uploads, waits while the store processes the package, checks its version, and submits for review, with V2's endpoints and fields. A test runs it against a fake API.
+- **No stored key for the upload.** The release workflow signs in to Google with Workload Identity Federation: GitHub vouches for the release run, and Google gives a 15-minute token to a service account that only this repo's release workflow (from `main` or a version tag) may use. One-time setup: `scripts/cws-google-setup.sh` in Google Cloud Shell, then three GitHub variables (store/RELEASE-CHECKLIST.md § Automating updates). The refresh-token way remains as a fallback.
+- Fixed in the checklist: it said to leave the Google app in "Testing", where Google expires refresh tokens after 7 days. The fallback now says to publish it ("In production").
+
 ## [2.5.0] — 2026-11-10
 
 ### Extension and web app

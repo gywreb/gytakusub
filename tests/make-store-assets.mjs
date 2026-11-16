@@ -18,23 +18,40 @@ import { layout } from "../extension/engine/layout.js";
 import { erase } from "../extension/engine/erase.js";
 new Function(fs.readFileSync("../extension/vendor/hyphen-en.js", "utf8"))();
 new Function(fs.readFileSync("../extension/text.js", "utf8"))();
-const page = await loadImage("fixtures/demo-page.png");
-const truth = JSON.parse(fs.readFileSync("fixtures/demo-truth.json", "utf8"));
-const demoItems = JSON.parse(fs.readFileSync("fixtures/demo-items.json", "utf8"));
-const scale = 1600 / Math.max(page.width, page.height);
-const W = Math.round(page.width * scale), H = Math.round(page.height * scale);
-const original = createCanvas(W, H); original.getContext("2d").drawImage(page, 0, 0, W, H);
-const pixels = original.getContext("2d").getImageData(0, 0, W, H);
-const an = await analyzePage(pixels);
 const iou = (a, b) => { const ix = Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)), iy = Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y)); const i = ix * iy; return i / (a.w * a.h + b.w * b.h - i); };
-const regionFor = (t) => an.regions.find((r) => iou(r.box, { x: t.box[0] * scale, y: t.box[1] * scale, w: t.box[2] * scale, h: t.box[3] * scale }) >= 0.6);
-const items = demoItems.map((it, i) => ({ tag: regionFor(truth.find((t) => t.items.includes(i)))?.id ?? null, box: null, text: it.text, size: it.size, kind: it.kind }));
-const { placements, regionIds } = layout(an, items);
-const translated = createCanvas(W, H); const tctx = translated.getContext("2d");
-tctx.putImageData(erase(cv, pixels, an, regionIds).image, 0, 0);
-const drawn = globalThis.GyText.draw(tctx, placements, {});
-an.dispose();
-console.log("items", items.length, "drawn", drawn);
+/**
+ * A test page through the engine: analysis, layout, erase, lettering. The model's answer is
+ * mocked by the fixture's translations. Each line is tagged, as Claude would tag it, with the
+ * region the engine found around that line's original text (its box in the items file), or
+ * else the region matching the line's bubble in the truth file.
+ */
+async function render(name, texts = null) {
+  const page = await loadImage(`fixtures/${name}.png`);
+  const truth = JSON.parse(fs.readFileSync(`fixtures/${name === "demo-page" ? "demo-truth" : name + ".truth"}.json`, "utf8"));
+  const lines = JSON.parse(fs.readFileSync(`fixtures/${name === "demo-page" ? "demo-items" : name + ".items"}.json`, "utf8"));
+  const scale = 1600 / Math.max(page.width, page.height);
+  const W = Math.round(page.width * scale), H = Math.round(page.height * scale);
+  const original = createCanvas(W, H); original.getContext("2d").drawImage(page, 0, 0, W, H);
+  const pixels = original.getContext("2d").getImageData(0, 0, W, H);
+  const an = await analyzePage(pixels);
+  const scaled = (b) => ({ x: b[0] * scale, y: b[1] * scale, w: b[2] * scale, h: b[3] * scale });
+  const around = (b) => { const cx = b.x + b.w / 2, cy = b.y + b.h / 2; return an.regions.find((r) => cx >= r.box.x && cx <= r.box.x + r.box.w && cy >= r.box.y && cy <= r.box.y + r.box.h); };
+  const matching = (t) => t && an.regions.find((r) => iou(r.box, scaled(t.box)) >= 0.6);
+  const regionFor = (it, i) => (it.box && around(scaled(it.box))) || matching(truth.find((t) => t.items.includes(i)));
+  const items = lines.map((it, i) => ({ tag: regionFor(it, i)?.id ?? null, box: null, text: texts?.[i] ?? it.text, size: it.size, kind: it.kind }));
+  const { placements, regionIds } = layout(an, items);
+  const translated = createCanvas(W, H); const tctx = translated.getContext("2d");
+  tctx.putImageData(erase(cv, pixels, an, regionIds).image, 0, 0);
+  const drawn = globalThis.GyText.draw(tctx, placements, {});
+  an.dispose();
+  console.log(`${name}: ${items.length} lines, ${items.filter((i) => i.tag != null).length} matched to a region, ${drawn} drawn`);
+  return { original, translated };
+}
+const { original, translated } = await render("demo-page");
+// gen-03's lettering and its English lines were picked independently by the page generator (the
+// tests only score layout), so the store picture gets real translations of what the page says:
+// 待ってくれ, 誰だお前は, そんなはずはない, 三時間後, 誰だお前は, そんなはずはない, 待ってくれ
+const ja = await render("gen-03", ["Wait!", "Who are you?", "That can't be!", "Three hours later...", "Who are you?", "That can't be!", "Wait!"]);
 
 // --- Screenshot 1: before / after (1280x800) ---
 function frame(w, h, title, subtitle) {
@@ -54,7 +71,7 @@ function fitInto(ctx, img, x, y, w, h) {
   return { dx, dy, dw, dh };
 }
 {
-  const { c, x } = frame(1280, 800, "Translate manga pages in place", "Original on the left — Gytakusub's overlay on the right. Bubbles are refilled and re-lettered; artwork is untouched.");
+  const { c, x } = frame(1280, 800, "Translate manga pages in place", "Original on the left, Gytakusub's overlay on the right: each bubble is cleaned and lettered in English.");
   const a = fitInto(x, original, 40, 115, 580, 620);
   const b = fitInto(x, translated, 660, 115, 580, 620);
   x.fillStyle = "#e5e7eb"; x.font = "bold 18px DemoSans"; x.fillText("BEFORE", a.dx, a.dy + a.dh + 28); x.fillText("AFTER", b.dx, b.dy + b.dh + 28);
@@ -63,17 +80,19 @@ function fitInto(ctx, img, x, y, w, h) {
 // --- Screenshot 2: close-up of the typesetting (1280x800) ---
 {
   const { c, x } = frame(1280, 800, "Text sized from the original lettering", "Bubbles are detected locally; the model only says which numbered bubble each line belongs to.");
-  const crop = createCanvas(1200, 640); const cx = crop.getContext("2d");
-  cx.drawImage(translated, 0, 20, 1200, 640, 0, 0, 1200, 640);
+  // the page's full width (it is narrower than 1200 px), in the frame's 1200:640 proportion
+  const cw = translated.width, ch = Math.round(cw * 640 / 1200);
+  const crop = createCanvas(cw, ch); const cx = crop.getContext("2d");
+  cx.drawImage(translated, 0, 20, cw, ch, 0, 0, cw, ch);
   fitInto(x, crop, 40, 120, 1200, 640);
   fs.writeFileSync(path.join(OUT, "screenshot-2-closeup.png"), c.toBuffer("image/png"));
 }
 // --- Screenshot 3: how it works (1280x800) ---
 {
-  const { c, x } = frame(1280, 800, "Your key, your browser, no server", "Pages go straight from your browser to the Claude API with your own key. Nothing is stored or sent anywhere else.");
+  const { c, x } = frame(1280, 800, "Your key, your browser, no server", "Pages go straight from your browser to the Claude API with your own key. No other server sees them.");
   const steps = [
     ["1", "Hover a page, or press Alt+T", "Works on sites you enable; stays dormant elsewhere."],
-    ["2", "Bubbles detected locally", "Closed, flat regions with text — found by pixels, not by a model."],
+    ["2", "Bubbles and text found on your device", "Open-source detection models run in your browser."],
     ["3", "Claude reads and translates", "Names and recent lines are carried across pages for consistency."],
     ["4", "Overlay painted in place", "Original lettering erased inside the bubble; English typeset to fit."],
   ];
@@ -87,6 +106,17 @@ function fitInto(ctx, img, x, y, w, h) {
   const t = fitInto(x, translated, 820, 120, 420, 640);
   fs.writeFileSync(path.join(OUT, "screenshot-3-how-it-works.png"), c.toBuffer("image/png"));
 }
+// --- Screenshot 4: Japanese, vertical lettering (1280x800) ---
+{
+  const { c, x } = frame(1280, 800, "Japanese raws too, vertical lettering included", "Vertical and horizontal text, dark bubbles, captions and screentone, lettered in English where the original was.");
+  // the top two rows of panels, large enough to read
+  const crop = (src) => { const h = Math.round(src.height * 0.64); const k = createCanvas(src.width, h); k.getContext("2d").drawImage(src, 0, 0, src.width, h, 0, 0, src.width, h); return k; };
+  const a = fitInto(x, crop(ja.original), 40, 115, 580, 620);
+  const b = fitInto(x, crop(ja.translated), 660, 115, 580, 620);
+  x.fillStyle = "#e5e7eb"; x.font = "bold 18px DemoSans"; x.fillText("BEFORE", a.dx, a.dy + a.dh + 28); x.fillText("AFTER", b.dx, b.dy + b.dh + 28);
+  fs.writeFileSync(path.join(OUT, "screenshot-4-japanese.png"), c.toBuffer("image/png"));
+}
+// (screenshot 5, the popup and the Claude usage panel, is taken from the real extension: browser/store-shot.mjs)
 // --- Small promo tile 440x280 ---
 {
   const c = createCanvas(440, 280); const x = c.getContext("2d");

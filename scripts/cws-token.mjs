@@ -1,5 +1,8 @@
 #!/usr/bin/env node
-// One-time helper: obtain a Chrome Web Store API refresh token for CI.
+// One-time helper for the fallback way of letting CI upload to the Chrome Web Store: a refresh
+// token stored as a GitHub secret. The recommended way stores nothing (scripts/cws-google-setup.sh).
+// Set the Google app's publishing status to "In production" first: in "Testing", Google expires
+// the refresh token after 7 days.
 // Usage: node scripts/cws-token.mjs <client_id> <client_secret>
 // Opens a Google sign-in URL; after you approve, prints the refresh token to paste into GitHub secrets.
 import http from "node:http";
@@ -24,7 +27,7 @@ const server = http.createServer(async (req, res) => {
   const j = await r.json();
   if (j.refresh_token) {
     res.end("Done — go back to the terminal.");
-    console.log("\nCWS_REFRESH_TOKEN=" + j.refresh_token + "\n\nAdd this (and CWS_CLIENT_ID, CWS_CLIENT_SECRET, CWS_EXTENSION_ID) to GitHub → Settings → Secrets and variables → Actions.");
+    console.log("\nCWS_REFRESH_TOKEN=" + j.refresh_token + "\n\nGitHub → Settings → Secrets and variables → Actions: add it and CWS_CLIENT_ID, CWS_CLIENT_SECRET as secrets, and CWS_PUBLISHER_ID (Developer Dashboard → Publisher → Settings) as a variable.");
   } else {
     res.end("Token exchange failed; see terminal.");
     console.error(j);

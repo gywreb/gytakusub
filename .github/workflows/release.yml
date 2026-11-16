@@ -4,7 +4,8 @@ name: Release
 # `gh workflow run release.yml -f tag=v2.0.0`). Runs the full Tests workflow on
 # the tagged commit first — the same environment as every push, so the two
 # cannot drift apart — then builds the store zip, publishes a GitHub Release,
-# and uploads + submits to the Chrome Web Store when the CWS_* secrets exist.
+# and uploads + submits to the Chrome Web Store once that is set up
+# (store/RELEASE-CHECKLIST.md § Automating updates: three repository variables, no secret).
 on:
   push:
     tags: ["v*"]
@@ -23,10 +24,13 @@ jobs:
   release:
     needs: test
     runs-on: ubuntu-latest
-    permissions: { contents: write }
+    # id-token: lets this job ask GitHub for a short-lived identity token, which Google
+    # exchanges for a store upload token (Workload Identity Federation): no key is stored
+    permissions: { contents: write, id-token: write }
     env:
       TAG: ${{ inputs.tag || github.ref_name }}
-      HAS_CWS: ${{ secrets.CWS_REFRESH_TOKEN != '' }}
+      KEYLESS: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && vars.GCP_SERVICE_ACCOUNT != '' }}
+      HAS_CWS: ${{ vars.CWS_PUBLISHER_ID != '' && ((vars.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && vars.GCP_SERVICE_ACCOUNT != '') || secrets.CWS_REFRESH_TOKEN != '') }}
     steps:
       - uses: actions/checkout@v4
         with: { ref: "refs/tags/${{ env.TAG }}" }
@@ -49,14 +53,29 @@ jobs:
           tag_name: ${{ env.TAG }}
           files: ${{ env.PACKAGE }}
           generate_release_notes: true
+      - name: Google sign-in for the store upload (keyless)
+        id: google
+        if: env.HAS_CWS == 'true' && env.KEYLESS == 'true'
+        # pinned to the commit of v3.0.0: this step mints the token that can publish the extension
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/chromewebstore
+          access_token_lifetime: 900s
+          create_credentials_file: false
       - name: Upload to Chrome Web Store and submit for review
         if: env.HAS_CWS == 'true'
         env:
-          CWS_EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
+          CWS_PUBLISHER_ID: ${{ vars.CWS_PUBLISHER_ID }}
+          CWS_EXTENSION_ID: ${{ vars.CWS_EXTENSION_ID || 'anmnhodgeaojlhlinobnaakmgkdaoekk' }}
+          CWS_ACCESS_TOKEN: ${{ steps.google.outputs.access_token }}
+          # fallback when the keyless sign-in isn't set up (scripts/cws-token.mjs)
           CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
           CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
           CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
         run: node scripts/cws-publish.mjs "$PACKAGE"
       - name: Skipped store upload
         if: env.HAS_CWS != 'true'
-        run: echo "::notice::CWS secrets not set — zip attached to the GitHub Release only. See store/RELEASE-CHECKLIST.md § Automating updates."
+        run: echo "::notice::Store upload not set up, so the zip is on the GitHub Release only. See store/RELEASE-CHECKLIST.md § Automating updates."

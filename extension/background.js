@@ -8,6 +8,7 @@ import { callClaude, mergeContext } from "./prompt.js";
 import { addCall, emptyLog } from "./usage.js";
 import { preparePage, finishPage } from "./engine/page.js";
 import { DEFAULT_SETTINGS, getSettings, CS_FILES, ensureContentScript } from "./settings.js";
+import { createLane, Cancelled } from "./lane.js";
 
 // Claude usage log (usage.js) in chrome.storage.local, read by the popup and Options. This worker is
 // its only writer; a page's slices answer in parallel, so the writes queue up instead of racing.
@@ -98,9 +99,9 @@ async function sha1(str) {
 
 // Returns slices with the image bytes Claude will see (bubbles stamped with
 // numbered marks) plus the detected bubble candidates in full-image fractions.
-async function decode(blob) {
+async function decode(blob, checkpoint) {
   const bitmap = await createImageBitmap(blob);
-  try { return await preparePage(bitmap, await getSettings()); } finally { bitmap.close(); }
+  try { return await preparePage(bitmap, await getSettings(), { checkpoint }); } finally { bitmap.close(); }
 }
 
 // ---------- per-tab chapter context (names + recent dialogue) ----------
@@ -119,7 +120,7 @@ async function updateTabCtx(tabId, newTerms, newLines) {
 // ---------- image bytes (only http(s) URLs or inline data from our own content script) ----------
 
 const MAX_BYTES = 25 * 1024 * 1024;
-async function fetchImageBlob({ url, dataUrl }) {
+async function fetchImageBlob({ url, dataUrl }, signal = undefined) {
   let blob;
   if (dataUrl) {
     if (!/^data:image\//i.test(dataUrl)) throw new Error("Unsupported image data");
@@ -128,7 +129,7 @@ async function fetchImageBlob({ url, dataUrl }) {
     let u;
     try { u = new URL(url); } catch { throw new Error("Invalid image URL"); }
     if (!/^https?:$/.test(u.protocol)) throw new Error("Only http(s) images are supported");
-    const res = await fetch(u.href, { credentials: "omit" });
+    const res = await fetch(u.href, { credentials: "omit", signal });
     if (!res.ok) throw new Error(`Could not fetch image (${res.status})`);
     blob = await res.blob();
   }
@@ -136,6 +137,36 @@ async function fetchImageBlob({ url, dataUrl }) {
   if (!blob.type.startsWith("image/")) blob = new Blob([await blob.arrayBuffer()], { type: "image/jpeg" });
   return blob;
 }
+
+// ---------- page order: the page on screen first ----------
+// The content script numbers its pages and reports how far each is from the middle of the
+// screen and whether it is on screen (TRANSLATE carries the first values, JOBS updates them
+// while the user scrolls). The engine work of all tabs goes through one lane (lane.js),
+// nearest page first. While a page on screen is in progress, pages off screen are held:
+// their model runs would block this worker's one thread for seconds at a time, and the page
+// on screen would wait for its own reply from Claude in between. A page that auto-translate
+// picked up and the user then scrolled far past is cancelled, but only until Claude is
+// asked: after that its tokens are spent, so it finishes and is cached.
+// The hold lasts at most HOLD_MS from when the page on screen started, so a slow or stuck
+// answer from Claude doesn't stop the pages around it for long.
+const HOLD_MS = 20000;
+const lane = createLane();
+const jobs = new Map(); // "tabId:jobId" → { distance, onScreen, since, ctl: AbortController, asked: boolean }
+const heldFor = (work) => () => !work.onScreen && [...jobs.values()].some((j) => j !== work && j.onScreen && Date.now() - j.since < HOLD_MS);
+
+function updateJobs(tabId, { update = [], cancel = [] } = {}) {
+  for (const u of update) {
+    const j = jobs.get(`${tabId}:${u?.id}`);
+    if (!j) continue;
+    if (Number.isFinite(u.distance)) j.distance = u.distance;
+    if (typeof u.onScreen === "boolean") j.onScreen = u.onScreen;
+  }
+  for (const id of cancel) { const j = jobs.get(`${tabId}:${id}`); if (j && !j.asked) j.ctl.abort(); }
+  lane.wake();
+  return { ok: true };
+}
+
+const disposeJob = (prepared) => { for (const s of prepared?.slices || []) { try { s.analysis?.dispose?.(); } catch { /* already freed */ } } };
 
 // ---------- main handler ----------
 
@@ -145,6 +176,21 @@ async function handleTranslate(msg, sender) {
   if (!settings.apiKey) throw new Error("No API key set. Open Gytakusub options and paste your Claude API key.");
 
   const tabId = sender.tab?.id ?? -1;
+  const jobKey = msg.jobId != null ? `${tabId}:${msg.jobId}` : null;
+  const work = { distance: Number.isFinite(msg.distance) ? msg.distance : 0, onScreen: msg.onScreen === true, since: Date.now(), ctl: new AbortController(), asked: false };
+  let holdEnds = null;
+  if (jobKey) { jobs.set(jobKey, work); lane.wake(); holdEnds = setTimeout(() => lane.wake(), HOLD_MS + 50); }
+  try { return await translatePage(msg, settings, tabId, work); }
+  finally {
+    clearTimeout(holdEnds);
+    if (jobKey && jobs.get(jobKey) === work) { jobs.delete(jobKey); lane.wake(); } // held pages may go on now
+  }
+}
+
+async function translatePage(msg, settings, tabId, work) {
+  const { signal } = work.ctl;
+  const priority = () => work.distance;
+  const held = heldFor(work);
   const cacheKey = "cache:" + (await sha1(`${PROMPT_VERSION}|${settings.model}|${settings.targetLang}|${settings.includeSource}|${settings.useContext}|${msg.url || msg.dataUrl?.slice(0, 512) + msg.dataUrl?.length}`));
   const cached = (await chrome.storage.session.get(cacheKey))[cacheKey];
   const timing = {}; let t = performance.now();
@@ -152,12 +198,14 @@ async function handleTranslate(msg, sender) {
 
   // Cache holds the model's answer only (not image bytes, which would exhaust
   // storage.session after a few pages); the page is re-analysed on a hit.
-  const blob = await fetchImageBlob(msg); lap("fetch");
-  const job = await decode(blob); lap("analyze");
+  const blob = await fetchImageBlob(msg, signal); lap("fetch");
+  const job = await lane.run((checkpoint) => decode(blob, checkpoint), priority, signal, held); lap("analyze");
   let results, usage, newTerms = [];
   if (cached && !msg.force) {
     results = cached.results; usage = cached.usage;
   } else {
+    if (signal.aborted) { disposeJob(job); throw new Cancelled(); }
+    work.asked = true; // from here the page is paid for: it finishes even if the user scrolls away
     const ctx = await getTabCtx(tabId);
     const call = (slice) => callClaude(settings, slice, ctx).then((r) => { recordUsage(r); return r; });
     const withRetry = async (slice) => {
@@ -177,27 +225,34 @@ async function handleTranslate(msg, sender) {
   }
   lap("model");
 
-  const page = await finishPage(job, results); lap("layout");
-  // The user's own corrections to this page's lines live beside the cached answer
-  // (a Redo asks the model again and drops them).
-  const editsKey = "edits:" + cacheKey;
-  if (msg.force) await chrome.storage.session.remove(editsKey).catch(() => {});
-  const edits = msg.force ? {} : (await chrome.storage.session.get(editsKey))[editsKey] || {};
-  for (const [i, text] of Object.entries(edits)) {
-    if (page.items[i]) page.items[i].text = text;
-    for (const p of page.placements) if (p.item === +i) p.text = text;
-  }
-  if (tabId >= 0 && newTerms.length) await updateTabCtx(tabId, newTerms, page.items.map((i) => i.text));
-  else if (tabId >= 0 && !cached) await updateTabCtx(tabId, [], page.items.map((i) => i.text));
-  // Only the erased areas travel to the page (patches); the whole cleaned page
-  // is encoded only when asked for (diagnostic export).
-  const patches = await Promise.all(page.patches.map(async (p) => ({ x: p.x, y: p.y, w: p.w, h: p.h, dataUrl: await blobToDataUrl(await p.canvas.convertToBlob({ type: "image/png" })) })));
-  let cleanDataUrl = null;
-  if (msg.wantClean) {
-    const big = page.work.W * page.work.H > 2.6e6;
-    cleanDataUrl = await blobToDataUrl(await page.canvas.convertToBlob(big ? { type: "image/jpeg", quality: 0.92 } : { type: "image/png" }));
-  }
-  lap("encode");
+  // Everything from here to the answer takes the lane too, at the page's priority. A page on
+  // screen then waits at most for one model run of another page's analysis (that one hands
+  // over at its next checkpoint), and nothing of it is left to wait behind the next page's
+  // analysis, whose model runs hold the worker's one thread for seconds at a time.
+  const { page, patches, cleanDataUrl } = await lane.run(async () => {
+    const page = await finishPage(job, results);
+    // The user's own corrections to this page's lines live beside the cached answer
+    // (a Redo asks the model again and drops them).
+    const editsKey = "edits:" + cacheKey;
+    if (msg.force) await chrome.storage.session.remove(editsKey).catch(() => {});
+    const edits = msg.force ? {} : (await chrome.storage.session.get(editsKey))[editsKey] || {};
+    for (const [i, text] of Object.entries(edits)) {
+      if (page.items[i]) page.items[i].text = text;
+      for (const p of page.placements) if (p.item === +i) p.text = text;
+    }
+    if (tabId >= 0 && newTerms.length) await updateTabCtx(tabId, newTerms, page.items.map((i) => i.text));
+    else if (tabId >= 0 && !cached) await updateTabCtx(tabId, [], page.items.map((i) => i.text));
+    // Only the erased areas travel to the page (patches); the whole cleaned page
+    // is encoded only when asked for (diagnostic export).
+    const patches = await Promise.all(page.patches.map(async (p) => ({ x: p.x, y: p.y, w: p.w, h: p.h, dataUrl: await blobToDataUrl(await p.canvas.convertToBlob({ type: "image/png" })) })));
+    let cleanDataUrl = null;
+    if (msg.wantClean) {
+      const big = page.work.W * page.work.H > 2.6e6;
+      cleanDataUrl = await blobToDataUrl(await page.canvas.convertToBlob(big ? { type: "image/jpeg", quality: 0.92 } : { type: "image/png" }));
+    }
+    return { page, patches, cleanDataUrl };
+  }, priority, undefined, held);
+  lap("finish"); // layout, erase, the user's edits, encode
   timing.patchBytes = patches.reduce((s, p) => s + p.dataUrl.length, 0);
   if (page.detectMs) timing.detect = page.detectMs; // parts of "analyze": the text detector's and the bubble model's shares
   if (page.segmentMs) timing.segment = page.segmentMs;
@@ -237,7 +292,8 @@ async function addGlossary({ from, to }) {
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   const reply = (p) => p.then((r) => sendResponse(r)).catch((e) => sendResponse({ error: e.message || String(e) }));
   switch (msg?.type) {
-    case "TRANSLATE": reply(handleTranslate(msg, sender)); return true;
+    case "TRANSLATE": handleTranslate(msg, sender).then(sendResponse, (e) => sendResponse(e instanceof Cancelled || e?.name === "AbortError" ? { cancelled: true } : { error: e.message || String(e) })); return true;
+    case "JOBS": sendResponse(updateJobs(sender.tab?.id ?? -1, msg)); return false;
     case "GET_SETTINGS": reply(getSettings()); return true;
     case "EDIT_ITEM": reply(editItem(msg)); return true;
     case "FETCH_IMAGE": reply(fetchImageBlob(msg).then(async (b) => ({ dataUrl: await blobToDataUrl(b), type: b.type }))); return true; // diagnostic export needs the original bytes

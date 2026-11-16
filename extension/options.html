@@ -29,9 +29,13 @@
   @media (min-width: 900px) {
     .layout { grid-template-columns: 200px minmax(0, 1fr); column-gap: var(--s6); }
     .opt-head { grid-column: 1 / -1; }
-    .toc { display: grid; gap: 2px; align-content: start; position: sticky; top: var(--s5); }
+    /* align-self: a grid item stretches to the row's height, and a sticky box as tall as its
+       container has nowhere to stick; max-height keeps every link above the save bar */
+    .toc { display: grid; gap: 2px; align-content: start; align-self: start; position: sticky; top: var(--s5);
+      max-height: calc(100vh - var(--s5) - 76px); overflow-y: auto; }
     .toc a { padding: 6px var(--s3); border-radius: var(--r1); color: var(--muted); text-decoration: none; font-weight: 600; }
     .toc a:hover { background: var(--surface-2); color: var(--fg); }
+    .toc a[aria-current] { background: var(--surface-2); color: var(--fg); box-shadow: inset 3px 0 0 var(--accent); }
     .savebar-inner { padding-left: calc(var(--s4) + 200px + var(--s6)); }
   }
   @media (max-width: 520px) {

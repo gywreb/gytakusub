@@ -33,7 +33,7 @@ function findStamps(px) {
 }
 
 export function startMock(port, pageImage, opts = {}) {
-  const calls = [];
+  const calls = [], fetches = [];
   const srv = http.createServer(async (req, res) => {
     const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "*", "Access-Control-Allow-Methods": "*" };
     if (req.method === "OPTIONS") { res.writeHead(204, cors); return res.end(); }
@@ -44,7 +44,19 @@ export function startMock(port, pageImage, opts = {}) {
         <div style="display:flex;justify-content:center"><img id="p1" src="/page.png" style="width:720px;display:block"></div>
         <div style="height:1200px">footer</div></body>`);
     }
-    if (req.url === "/page.png") { res.writeHead(200, { "Content-Type": "image/png" }); return res.end(fs.readFileSync(pageImage)); }
+    // a long chapter (queue test): n copies of the page, each its own address
+    if (req.url.startsWith("/chapter")) {
+      const n = Math.min(60, Number(new URL(req.url, "http://x").searchParams.get("n")) || 12);
+      res.writeHead(200, { "Content-Type": "text/html" });
+      return res.end(`<!doctype html><title>Chapter</title><body style="margin:0;background:#111">
+        ${Array.from({ length: n }, (_, k) => `<div style="display:flex;justify-content:center"><img id="p${k + 1}" src="/page.png?i=${k + 1}" style="width:720px;height:1020px;display:block;margin-bottom:12px"></div>`).join("\n")}
+        </body>`);
+    }
+    if (req.url === "/page.png" || req.url.startsWith("/page.png?")) {
+      // who asked: the page showing it (Sec-Fetch-Dest: image) or the extension's worker downloading it to translate
+      fetches.push({ url: req.url, t: Date.now(), dest: req.headers["sec-fetch-dest"] || "" });
+      res.writeHead(200, { "Content-Type": "image/png" }); return res.end(fs.readFileSync(pageImage));
+    }
     if (req.url === "/v1/messages" && req.method === "POST") {
       let body = ""; for await (const c of req) body += c;
       const j = JSON.parse(body);
@@ -81,7 +93,8 @@ export function startMock(port, pageImage, opts = {}) {
             : [Math.round(box.x + box.w * 0.2), Math.round(box.y + box.h * 0.25), Math.round(box.w * 0.6), Math.round(box.h * 0.5)],
         };
       });
-      calls.push({ w: img.width, h: img.height, n: items.length });
+      if (opts.delayMs) await new Promise((r) => setTimeout(r, opts.delayMs)); // a real model takes seconds
+      calls.push({ w: img.width, h: img.height, n: items.length, t: Date.now() });
       // like the real API: the model that answered, its token usage and the rate-limit headers
       // (exposed to pages here, so the web app's rate-limit line can be tested)
       const limits = {
@@ -94,5 +107,5 @@ export function startMock(port, pageImage, opts = {}) {
     }
     res.writeHead(404); res.end();
   });
-  return new Promise((ok) => srv.listen(port, "127.0.0.1", () => ok({ srv, calls, url: `http://127.0.0.1:${port}` })));
+  return new Promise((ok) => srv.listen(port, "127.0.0.1", () => ok({ srv, calls, fetches, url: `http://127.0.0.1:${port}` })));
 }

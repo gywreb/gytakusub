@@ -48,7 +48,7 @@ One request per page: the page image (at most about 1,600 input tokens on most m
 - Only `<img>` elements are handled. Readers that draw pages into a `<canvas>` or a CSS `background-image` are not supported.
 - Overlays follow the image's on-screen rectangle; if the image sits inside a scrolling sub-panel the overlay can spill past the panel edge.
 - Translations are set horizontally (no vertical typesetting); hyphenation is English-only.
-- On the CPU (no WebGPU) a page takes about 3 s to analyse before the model call; pages translated while scrolling fast queue behind each other.
+- On the CPU (no WebGPU) a page takes about 3–5 s to analyse before the model call. The page you stop at goes first, but it can still wait for the model run another page is in the middle of (a few seconds on the CPU), because the engine shares the service worker's one thread.
 - Sound effects and signs the model leaves untranslated still get numbered stamps, which costs a few prompt tokens.
 - Inpainting smooths screentone and hatching behind narration set on the art (a visible smudge where the letters were). Bubbles are unaffected.
 - The package is large (about 115 MB unpacked, 78 MB to download) because the models and runtimes are bundled; nothing is downloaded at run time.

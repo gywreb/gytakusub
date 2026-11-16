@@ -20,7 +20,7 @@ Everything below is a one-time account step or a copy-paste from `store/LISTING.
 - [ ] Paste **Name**, **Summary**, **Description** from `LISTING.md`.
 - [ ] Category: Productivity. Language: English.
 - [ ] Upload icon `extension/icons/icon128.png`.
-- [ ] Upload the three screenshots from `store/assets/` (1280×800) and the small promo tile (440×280).
+- [ ] Upload the five screenshots from `store/assets/` (1280×800, numbered in order) and the small promo tile (440×280).
 - [ ] Homepage URL: `https://github.com/gywreb/gytakusub`. Support URL: `https://github.com/gywreb/gytakusub/issues`.
 
 ## 4. Privacy practices tab (10 min) — this is where most rejections happen
@@ -56,20 +56,32 @@ Paste the rejection email to me verbatim. The two likely reasons and what we'd d
 5. **Save draft** → **Submit for review**.
 
 ## Updating later
-Versions come with pull requests (each one raises `extension/manifest.json` and adds its `CHANGELOG.md` section). To release what is on main, run `node scripts/release.mjs` from the repo folder (any OS). It tags the version main is at. CI tests, zips, creates the GitHub Release and — once the secrets below exist — uploads to the store and submits for review. Listing text only needs changing when behaviour changes.
+Versions come with pull requests (each one raises `extension/manifest.json` and adds its `CHANGELOG.md` section). To release what is on main, run `node scripts/release.mjs` from the repo folder (any OS). It tags the version main is at. CI tests, zips, creates the GitHub Release and — once the setup below is done — uploads to the store and submits for review. Listing text only needs changing when behaviour changes.
 
 ## Automating updates (one-time, ~15 min) — after the first version is approved
 
-Later versions are then one command from the repo folder — Windows PowerShell, macOS or Linux: `node scripts/release.mjs` (`./scripts/release.sh` is the same thing for Unix shells) → CI tests, zips, creates the GitHub Release, uploads to the store and submits for review. Listing text and screenshots stay as they are.
+Later versions are then one command from the repo folder (Windows PowerShell, macOS or Linux): `node scripts/release.mjs`. CI tests, zips, creates the GitHub Release, uploads to the store and submits for review. The API doesn't touch the listing: when the listing text or `store/assets/` change, update them in the dashboard (**Store listing** tab) yourself.
 
-1. **Google Cloud project**: https://console.cloud.google.com → New project (e.g. `gytakusub-ci`).
-2. **Enable the API**: APIs & Services → Library → search **Chrome Web Store API** → Enable.
-3. **OAuth consent screen**: APIs & Services → OAuth consent screen → External → app name `Gytakusub CI`, your email → Save. Under *Test users* add your own Google account (the one that owns the Web Store listing). Leave it in "Testing" — that's fine for a single-user tool.
-4. **OAuth client**: Credentials → Create credentials → OAuth client ID → Application type **Desktop app** → Create. Copy the **Client ID** and **Client secret**.
-5. **Refresh token**: on your MacBook, in the repo:
-   `node scripts/cws-token.mjs <CLIENT_ID> <CLIENT_SECRET>` → open the printed URL, sign in with the store-owner account, approve → the terminal prints `CWS_REFRESH_TOKEN=...`.
-6. **GitHub secrets**: repo → Settings → Secrets and variables → Actions → New repository secret, four times:
-   `CWS_EXTENSION_ID` = `anmnhodgeaojlhlinobnaakmgkdaoekk` (from the dashboard URL), `CWS_CLIENT_ID`, `CWS_CLIENT_SECRET`, `CWS_REFRESH_TOKEN`.
-7. Done. Note: the Web Store API can only *update* an item that already exists and was published once through the dashboard — which is why this comes after approval.
+The upload uses the Chrome Web Store API V2 (Google planned to support the old v1.1 API only until 15 October 2026), and signs in **without any stored key**: GitHub vouches for the release run, and Google swaps that for a 15-minute token of a service account (Workload Identity Federation, which `google-github-actions/auth` recommends over keys). Only this repo's release workflow, run from `main` or a version tag, is let in.
+
+1. **Google Cloud project**: https://console.cloud.google.com → New project (e.g. `gytakusub-release`). Note its **project ID**.
+2. **Run the setup** in Google Cloud Shell (https://shell.cloud.google.com, the same Google account):
+   ```
+   bash <(curl -fsSL https://raw.githubusercontent.com/gywreb/gytakusub/main/scripts/cws-google-setup.sh) YOUR_PROJECT_ID
+   ```
+   It turns on the APIs, creates the service account `gytakusub-release@…` and the GitHub sign-in, and prints what to paste next. If Google asks for a billing account, stop and use the fallback below.
+3. **Developer Dashboard → Account**: add the service account's email it printed. (One service account per publisher.)
+4. **Publisher ID**: Developer Dashboard → **Publisher → Settings**.
+5. **GitHub variables** (not secrets; none of these is secret): repo → Settings → Secrets and variables → Actions → **Variables** tab → New repository variable, three times: `GCP_WORKLOAD_IDENTITY_PROVIDER` and `GCP_SERVICE_ACCOUNT` (both printed by the setup), `CWS_PUBLISHER_ID`.
+6. Done. The next `node scripts/release.mjs` uploads and submits by itself. The item keeps the visibility set in the dashboard (Unlisted).
+
+**Fallback: a refresh token** (a long-lived secret in GitHub, so the way above is better):
+1. In the Cloud project: APIs & Services → Library → **Chrome Web Store API** → Enable.
+2. **Google Auth Platform → Audience** (older console: OAuth consent screen): External, add yourself as a test user, then **Publish app** so the status is **In production**. In "Testing", Google expires the refresh token after 7 days ([Google: publishing status](https://support.google.com/cloud/answer/15549945)). Google will show "this app isn't verified" when you sign in: that is expected for an app only you use.
+3. **Clients** (older console: Credentials → Create credentials → OAuth client ID) → **Desktop app**. Copy the client ID and secret.
+4. `node scripts/cws-token.mjs <CLIENT_ID> <CLIENT_SECRET>` → open the URL, sign in with the store-owner account → it prints `CWS_REFRESH_TOKEN=…`.
+5. GitHub **secrets** `CWS_CLIENT_ID`, `CWS_CLIENT_SECRET`, `CWS_REFRESH_TOKEN`, and the **variable** `CWS_PUBLISHER_ID`.
+
+Note: the Web Store API can only *update* an item that already exists and was published once through the dashboard, which is why this comes after approval.
 
 If a run fails at the upload step, the message from Google is printed verbatim in the Actions log; paste it to me.
