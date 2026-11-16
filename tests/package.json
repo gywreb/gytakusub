@@ -12,7 +12,7 @@
     "e2e": "node engine-e2e.mjs fixtures/demo-page.png fixtures/demo-items.json /tmp/gyt-e2e.png",
     "viz": "node engine-viz.mjs",
     "demo": "python3 make-demo-page.py fixtures && python3 make-pages.py fixtures 12",
-    "assets": "node make-store-assets.mjs ../store/assets",
+    "assets": "node make-store-assets.mjs ../store/assets && node browser/store-shot.mjs ../store/assets",
     "vendor": "node ../scripts/vendor-opencv.mjs && node ../scripts/vendor-hyphen.mjs && node ../scripts/vendor-ort.mjs",
     "replay": "node replay-report.mjs",
     "score": "node score-reports.mjs",

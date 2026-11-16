@@ -20,7 +20,7 @@ Everything below is a one-time account step or a copy-paste from `store/LISTING.
 - [ ] Paste **Name**, **Summary**, **Description** from `LISTING.md`.
 - [ ] Category: Productivity. Language: English.
 - [ ] Upload icon `extension/icons/icon128.png`.
-- [ ] Upload the three screenshots from `store/assets/` (1280×800) and the small promo tile (440×280).
+- [ ] Upload the five screenshots from `store/assets/` (1280×800, numbered in order) and the small promo tile (440×280).
 - [ ] Homepage URL: `https://github.com/gywreb/gytakusub`. Support URL: `https://github.com/gywreb/gytakusub/issues`.
 
 ## 4. Privacy practices tab (10 min) — this is where most rejections happen
@@ -60,7 +60,7 @@ Versions come with pull requests (each one raises `extension/manifest.json` and 
 
 ## Automating updates (one-time, ~15 min) — after the first version is approved
 
-Later versions are then one command from the repo folder (Windows PowerShell, macOS or Linux): `node scripts/release.mjs`. CI tests, zips, creates the GitHub Release, uploads to the store and submits for review. Listing text and screenshots stay as they are.
+Later versions are then one command from the repo folder (Windows PowerShell, macOS or Linux): `node scripts/release.mjs`. CI tests, zips, creates the GitHub Release, uploads to the store and submits for review. The API doesn't touch the listing: when the listing text or `store/assets/` change, update them in the dashboard (**Store listing** tab) yourself.
 
 The upload uses the Chrome Web Store API V2 (Google planned to support the old v1.1 API only until 15 October 2026), and signs in **without any stored key**: GitHub vouches for the release run, and Google swaps that for a 15-minute token of a service account (Workload Identity Federation, which `google-github-actions/auth` recommends over keys). Only this repo's release workflow, run from `main` or a version tag, is let in.
 

@@ -46,7 +46,7 @@ Gytakusub is an independent, open-source reading aid (GNU AGPL v3, source on Git
 
 **Graphic assets** (in `store/assets/`)
 - Icon 128×128: `extension/icons/icon128.png`
-- Screenshots 1280×800: `screenshot-1-before-after.png`, `screenshot-2-closeup.png`, `screenshot-3-how-it-works.png`
+- Screenshots 1280×800, in this order: `screenshot-1-before-after.png`, `screenshot-2-closeup.png`, `screenshot-3-how-it-works.png`, `screenshot-4-japanese.png`, `screenshot-5-controls.png` (made by `npm run assets` in `tests/`: 1–4 render test pages through the engine, 5 is the real popup and Options page with demo data)
 - Small promo tile 440×280: `promo-small-440x280.png`
 - Marquee 1400×560: optional, not provided
 
