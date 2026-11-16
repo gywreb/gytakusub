@@ -13,6 +13,7 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
   - While a page on screen is in progress, pages off screen wait (at most 20 s), because their model runs would block the worker's one thread while the page on screen waits for Claude's reply.
   - Pages you scroll far past before Claude is asked are put back and done when you return, so **they cost no tokens**. A page Claude was already asked about finishes and is cached. Pages you ask for yourself (Translate visible, the button on an image) are never put back.
   - Measured with a new browser test (14 pages, fast scroll to the end, a model taking 2.5 s per answer, CPU only): the page on screen was ready about **12 s** after the stop instead of 30 s, and Claude was asked about **3** pages instead of 8.
+- **Options: the side nav stays on screen** while the page scrolls, and marks the section you're reading (or the one you picked in it). It was meant to stick already, but as a grid item it stretched to the full page height, so it scrolled away. The browser test now checks both.
 
 ### Releases
 - **Store uploads use the Chrome Web Store API V2.** Google planned to support the old v1.1 API, which `scripts/cws-publish.mjs` used, only until 15 October 2026. The script now uploads, waits while the store processes the package, checks its version, and submits for review, with V2's endpoints and fields. A test runs it against a fake API.

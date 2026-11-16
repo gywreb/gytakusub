@@ -70,7 +70,7 @@ const r = await translate(false); if (!r?.ok) throw new Error("content script di
 // ---- the extension's own pages, opened while the worker analyses that page ----
 // They must show the stored settings at once: a page that waited for the busy
 // worker showed its HTML defaults, and an options page saved then wiped settings.
-let pages = null;
+let pages = null, tocOk = null;
 if (!process.argv.includes("--bad-boxes")) {
   const extId = new URL(sw.url()).host, open = async (file, ready) => {
     const t0 = Date.now(), p = await context.newPage();
@@ -103,7 +103,21 @@ if (!process.argv.includes("--bad-boxes")) {
   const opt = await context.newPage(); await opt.goto(`chrome-extension://${extId}/options.html`);
   await opt.waitForFunction(() => /request/.test(document.getElementById("cuTodaySub").textContent), null, { timeout: 5000 }).catch(() => {});
   const optText = await opt.evaluate(() => [document.getElementById("cuTodayCost").textContent, document.getElementById("cuTodaySub").textContent, document.getElementById("cuModels").textContent, document.getElementById("cuLimits").textContent]);
-  await opt.screenshot({ path: path.join(out, "options-usage.png"), fullPage: true }); await opt.close();
+  await opt.screenshot({ path: path.join(out, "options-usage.png"), fullPage: true });
+  // the side nav stays on screen while the page scrolls, and marks the section in view
+  await opt.setViewportSize({ width: 1280, height: 720 });
+  const navAt = (y) => opt.evaluate((y) => { scrollTo(0, y); return new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => {
+    const t = document.querySelector(".toc").getBoundingClientRect();
+    r({ top: Math.round(t.top), bottom: Math.round(t.bottom), current: document.querySelector('.toc a[aria-current]')?.textContent || null });
+  }))); }, y);
+  const navTop = await navAt(0), navEnd = await navAt(1e6);
+  await opt.screenshot({ path: path.join(out, "options-nav-scrolled.png") });
+  await opt.click('.toc a[href="#sec-usage"]'); await opt.waitForTimeout(100);
+  const navPicked = await opt.evaluate(() => document.querySelector('.toc a[aria-current]')?.textContent || null);
+  // at the top it sits under the header; scrolled to the end it sticks 24 px from the top (--s5), whole
+  tocOk = navTop.current === "Claude API" && Math.abs(navEnd.top - 24) <= 1 && navEnd.bottom <= 720 && navEnd.current === "About" && navPicked === "Claude usage";
+  console.log(`options nav: top ${JSON.stringify(navTop)}, scrolled to the end ${JSON.stringify(navEnd)}, after a click "${navPicked}"`);
+  await opt.close();
   await page.bringToFront();
   // 1000 input + 200 output tokens per answer on Sonnet 5.5 ($2 / $10 per million) = $0.004
   usageOk = m.requests === calls.length && Math.abs(m.cost - 0.004 * calls.length) < 1e-9 && log?.limits?.requests?.limit === 50
@@ -206,6 +220,7 @@ if (debugLogs.length) console.log(`engine: ${debugLogs[0].engine}, timing: ${JSO
 if (process.argv.includes("--require-gpu") && !debugLogs.every((d) => /detect:webgpu/.test(d.timing?.backend || "") && /segment:webgpu/.test(d.timing?.backend || ""))) { failures++; console.log(`FAIL: --require-gpu but the models ran on ${debugLogs.map((d) => d.timing?.backend).join(" | ")}`); }
 if (!reportOk) { failures++; console.log("FAIL: diagnostic report incomplete: " + JSON.stringify(rep).slice(0, 200)); }
 if (!zipOk) { failures++; console.log("FAIL: export zip missing files or corrupt: " + JSON.stringify(exp).slice(0, 200)); }
+if (tocOk === false) { failures++; console.log("FAIL: the Options side nav did not stay on screen or mark the section in view"); }
 if (usageOk === false) { failures++; console.log("FAIL: the Claude usage log, popup or Options did not match the API calls"); }
 if (peekChanged === false) { failures++; console.log("FAIL: hovering a bubble did not reveal the original"); }
 if (editOk === false) { failures++; console.log("FAIL: editing a line did not change the overlay"); }

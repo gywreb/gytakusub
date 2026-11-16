@@ -157,6 +157,28 @@ addEventListener("keydown", (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); $("save").click(); }
 });
 
+// Side nav (wide windows): it stays on screen while the page scrolls (options.html) and marks
+// the section you're reading: the last one whose top has passed 30% of the window, or the
+// last section at the bottom of the page. A section picked in the nav (or by the link that
+// opened this page) stays marked while it is on screen, even if the page can't scroll it to the top.
+const tocLinks = [...document.querySelectorAll(".toc a")];
+const tocSections = tocLinks.map((a) => document.querySelector(a.getAttribute("href")));
+let pickedSection = tocSections.findIndex((sec) => sec && "#" + sec.id === location.hash);
+function markSection() {
+  const picked = tocSections[pickedSection];
+  if (picked) { const r = picked.getBoundingClientRect(); if (r.bottom <= 0 || r.top >= innerHeight) pickedSection = -1; }
+  let current = 0;
+  if (pickedSection >= 0) current = pickedSection;
+  else if (innerHeight + scrollY >= document.documentElement.scrollHeight - 2) current = tocSections.length - 1;
+  else tocSections.forEach((sec, i) => { if (sec && sec.getBoundingClientRect().top <= innerHeight * 0.3) current = i; });
+  tocLinks.forEach((a, i) => { if (i === current) a.setAttribute("aria-current", "location"); else a.removeAttribute("aria-current"); });
+}
+tocLinks.forEach((a, i) => a.addEventListener("click", () => { pickedSection = i; requestAnimationFrame(markSection); }));
+let tocFrame = 0;
+addEventListener("scroll", () => { if (!tocFrame) tocFrame = requestAnimationFrame(() => { tocFrame = 0; markSection(); }); }, { passive: true });
+addEventListener("resize", markSection);
+markSection();
+
 $("save").title = /Mac|iPhone|iPad/.test(navigator.platform) ? "Save (⌘S)" : "Save (Ctrl+S)";
 for (const id of ["save", "testKey"]) $(id).disabled = true;
-load().catch((e) => show("err", "Could not read the settings: " + e.message));
+load().then(markSection, (e) => show("err", "Could not read the settings: " + e.message)); // the filled-in form changes section heights
