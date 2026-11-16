@@ -50,7 +50,17 @@ Gytakusub is an independent, open-source reading aid (GNU AGPL v3, source on Git
 - Small promo tile 440×280: `promo-small-440x280.png`
 - Marquee 1400×560: optional, not provided
 
-**What's new in 2.0.0** (paste into the version notes if the dashboard asks)
+**What's new in 2.6.0** (paste into the version notes if the dashboard asks)
+```
+When you scroll fast with auto-translate on, the page you stop at is translated first, and pages you flew past are skipped (no tokens spent on them) until you come back.
+```
+
+**What's new in 2.5.0**
+```
+Redesigned popup and Options page, in light and dark. New Claude usage panel: today's and this month's estimated cost per model, how much of your plan's monthly API credit is left and when it renews, and the rate limit in plain words. Clearer Claude error messages (spend limit, rate limit, credit balance).
+```
+
+**What's new in 2.0.0**
 ```
 New page engine. Text and speech bubbles are found by open-source models running locally in your browser (on the graphics card when available), original lettering is removed by inpainting with artwork and outlines untouched, and translations are placed over the lettering they replace. Japanese raw manga is supported: vertical text and furigana are erased and the English is set at a readable size. Double-click a bubble to edit a line or teach the glossary. Now open source under the GNU AGPL v3.
 ```
