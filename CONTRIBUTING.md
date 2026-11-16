@@ -24,4 +24,4 @@ CI checks these on every pull request, and a pull request that fails one is not 
 
 ## Releasing (maintainer)
 
-On an up-to-date `main`: `node scripts/release.mjs`. It tests and tags the version main is at, and CI builds the GitHub Release. See `store/RELEASE-CHECKLIST.md` for the Chrome Web Store.
+On an up-to-date `main`: `node scripts/release.mjs`. It makes sure GitHub's tests passed for that commit, then tags the version main is at, and CI builds the GitHub Release. See `store/RELEASE-CHECKLIST.md` for the Chrome Web Store.

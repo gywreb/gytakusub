@@ -1,11 +1,14 @@
 #!/usr/bin/env node
-// Release what is on main (cross-platform): checks, tests, then tags the version that main's
-// pull requests already set and pushes the tag. CI does the rest (zip, GitHub Release, and the
-// Chrome Web Store upload when its secrets exist).
+// Release what is on main (cross-platform): quick checks, then makes sure GitHub's tests passed
+// for this exact commit, then tags the version that main's pull requests already set and pushes
+// the tag. CI does the rest: it tests the tag again, zips, creates the GitHub Release and, once
+// set up, uploads to the Chrome Web Store. The tests run on CI, not here: the full suite needs
+// tools CI installs (Python with numpy/onnx/Pillow, a software GPU, downloaded models).
 // Versions are not bumped here: every pull request carries its own (scripts/check-version.mjs).
 // Usage:  node scripts/release.mjs            releases the version in extension/manifest.json
 //         node scripts/release.mjs 2.2.0      the same, after checking that it is that version
 import { execSync } from "node:child_process";
+import { repoFromRemote, testsFor } from "./ci-status.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -30,17 +33,26 @@ if (out(`git tag --list v${v}`)) stop(`v${v} is already tagged. Merge a pull req
 run("node scripts/sync-shared.mjs");
 if (out("git status --porcelain")) stop("The web app's copies of shared files differ from extension/. Fix that in a pull request first:\n" + out("git status --short"));
 
-// 2. checks + tests
+// 2. quick checks
 const check = (file) => {
   try { execSync("node --input-type=module --check", { input: fs.readFileSync(file), stdio: ["pipe", "inherit", "inherit"] }); }
   catch { stop(`Syntax error in ${file}`); }
 };
 for (const dir of ["extension", "web"]) for (const f of fs.readdirSync(dir)) if (f.endsWith(".js")) check(`${dir}/${f}`);
 run(`node scripts/check-version.mjs --release ${v}`);
-if (!fs.existsSync("tests/node_modules")) run("npm install --no-audit --no-fund", { cwd: "tests" });
-run("npm test", { cwd: "tests" });
 
-// 3. tag and push
+// 3. GitHub's tests passed for this commit (they ran when it was merged into main)
+const repo = repoFromRemote(out("git remote get-url origin"));
+if (!repo) stop("The origin remote is not a GitHub repository.");
+const sha = out("git rev-parse HEAD");
+let ci;
+try { ci = await testsFor(repo, sha); } catch (e) { stop(`Could not read the tests' result from GitHub: ${e.message}`); }
+if (ci.state === "running") stop(`The tests for this commit are still running: ${ci.url}\nRun this again when they're done (about 25 minutes after the merge).`);
+if (ci.state === "failed") stop(`The tests failed for this commit (${ci.detail}): ${ci.url}\nFix main in a pull request first.`);
+if (ci.state === "missing") stop(`GitHub has no test result for this commit (${sha.slice(0, 7)}): ${ci.url}`);
+console.log(`Tests passed on GitHub for ${sha.slice(0, 7)}.`);
+
+// 4. tag and push
 run(`git tag v${v}`);
 run(`git push origin v${v}`);
 console.log(`\nPushed v${v} — watch https://github.com/gywreb/gytakusub/actions`);
