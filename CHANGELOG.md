@@ -4,6 +4,15 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
 
 ## [Unreleased]
 
+## [2.6.1] — 2026-11-16
+
+### Releases
+- **`node scripts/release.mjs` no longer runs the test suite on your computer.** The full suite needs tools only CI installs (Python with numpy, onnx and Pillow for a stand-in model, a software GPU, downloaded models), so releasing 2.6.0 on a Mac stopped at the first test that needed them.
+  - It now asks GitHub whether the tests passed for this exact commit on main, and tags only then. If they're still running, it says so; if they failed, it stops.
+  - Its quick checks stay: on main, up to date, clean, version and changelog, shared files, syntax.
+  - CI still tests the tag again before building the release.
+  - The check reads the public check-runs API (no login; `GH_TOKEN` is used when set) in `scripts/ci-status.mjs`, with a test.
+
 ## [2.6.0] — 2026-11-16
 
 ### Extension

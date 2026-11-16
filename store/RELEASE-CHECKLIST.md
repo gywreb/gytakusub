@@ -56,7 +56,7 @@ Paste the rejection email to me verbatim. The two likely reasons and what we'd d
 5. **Save draft** → **Submit for review**.
 
 ## Updating later
-Versions come with pull requests (each one raises `extension/manifest.json` and adds its `CHANGELOG.md` section). To release what is on main, run `node scripts/release.mjs` from the repo folder (any OS). It tags the version main is at. CI tests, zips, creates the GitHub Release and — once the setup below is done — uploads to the store and submits for review. Listing text only needs changing when behaviour changes.
+Versions come with pull requests (each one raises `extension/manifest.json` and adds its `CHANGELOG.md` section). To release what is on main, run `node scripts/release.mjs` from the repo folder (any OS). It checks that GitHub's tests passed for that commit (wait for them after a merge, about 25 minutes), then tags the version main is at. CI tests again, zips, creates the GitHub Release and — once the setup below is done — uploads to the store and submits for review. Listing text only needs changing when behaviour changes.
 
 ## Automating updates (one-time, ~15 min) — after the first version is approved
 
