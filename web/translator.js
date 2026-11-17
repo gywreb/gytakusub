@@ -115,14 +115,17 @@ export async function prepareLettering(settings) {
 const MAX_CANVAS_PIXELS = 16e6;
 
 /**
- * Render original + translated canvases at the page's own size (so a saved page, or one zoomed
- * on a phone, is as sharp as the original): the original, the erased areas over it, then the text,
- * scaled from the engine's working pixels.
+ * Render original + translated canvases at the page's own size or the screen's, whichever is
+ * larger (so a saved page, or one zoomed on a phone, is as sharp as the original, and the text
+ * is as sharp as the screen on a tablet or an unfolded foldable): the original, the erased areas
+ * over it, then the text, scaled from the engine's working pixels.
  * `look`: prepareLettering()'s answer (the target language's rules).
+ * @param {{minWidth?: number}} [opts] minWidth: the page's width on screen in device pixels
  * @returns {{original:HTMLCanvasElement, translated:HTMLCanvasElement, drawn:number}}
  */
-export function renderPage(img, result, settings, look = {}) {
-  const k = Math.min(1, Math.sqrt(MAX_CANVAS_PIXELS / (result.width * result.height)));
+export function renderPage(img, result, settings, look = {}, opts = {}) {
+  const grow = Math.max(1, (opts.minWidth || 0) / result.width);
+  const k = Math.min(grow, Math.sqrt(MAX_CANVAS_PIXELS / (result.width * result.height)));
   const W = Math.max(1, Math.round(result.width * k)), H = Math.max(1, Math.round(result.height * k));
   const original = document.createElement("canvas"); original.width = W; original.height = H;
   original.getContext("2d").drawImage(img, 0, 0, W, H);

@@ -221,6 +221,9 @@
       work: res.work, letter: res.letter, fromCache: res.fromCache, timing: res.timing, engine: res.engine,
       // how the overlay was drawn: the screen's pixel ratio, its pixels, and each line's size on screen (CSS px)
       overlay: { dpr: window.devicePixelRatio || 1, backing: [e.canvas?.width || 0, e.canvas?.height || 0],
+        // where the overlay sits on screen and where the image's picture is (CSS px): they must match
+        rect: e.canvas ? ["left", "top", "width", "height"].map((k) => +parseFloat(e.canvas.style[k] || "0").toFixed(2)) : null,
+        image: (() => { const r = contentRect(img, e.objectFit); return [r.left, r.top, r.width, r.height].map((v) => +v.toFixed(2)); })(),
         lineSizes: (e.sizes || []).map((v) => +(v * img.getBoundingClientRect().width / res.work.W).toFixed(1)) },
       settings: { model: settings.model, targetLang: settings.targetLang, fontFamily: settings.fontFamily, uppercase: settings.uppercase, useContext: settings.useContext },
       // how the page was lettered: the font chosen for its translations, and the language's rules

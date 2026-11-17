@@ -17,10 +17,13 @@ Sharp on every screen. First step of the 3.0 plan: a robust core before new feat
 - The erasing itself is unchanged: white smudges on toned bubbles and art are still there, just sharper. That is 2.12.0.
 
 ### Web app
-- **Translated pages are as big as the original** (they were 1600 px at most), so a saved page, or one you zoom into, is as sharp as the source. Very long strips are capped at 16 million pixels, iOS Safari's canvas limit.
+- **Translated pages are drawn with the original's pixels or the screen's, whichever is more.** They used to be 1600 px at most. A saved page, or one you zoom into, is as sharp as the source, and on a tablet or an unfolded foldable the text is as sharp as the screen. Very long strips are capped at 16 million pixels, iOS Safari's canvas limit.
+- **Unfolding a foldable, turning the phone or widening the window redraws pages** that now need more pixels.
+- The translation is part of the page image, so it stays exactly where the original lettering was at every size. Checked on a folded phone, a phone sideways, an open foldable and an iPad in both orientations.
 
 ### Development
-- `tests/browser/screens.mjs`: every size and density in the real extension (30 checks); it also takes `--page` (any image), `--ext` (another build) and `--measure-only`.
+- `tests/browser/screens.mjs`: every size and density in the real extension (47 checks: the overlay's pixels, that it sits exactly on the picture, that each line keeps its size relative to the page, the readable view, releasing far pages); it also takes `--page` (any image), `--ext` (another build) and `--measure-only`.
+- `tests/browser/web-screens.mjs`: the web app on phone, foldable and tablet screens (26 checks, unfolding included).
 - `tests/fullsize.test.mjs`: full-size erasing lines up with the original and leaves everything outside the mask alone.
 - `npm run audit -- report.zip outdir`: the core audit used for the 3.0 plan (erased bubbles with marks left, lines drawn over unerased text, renders and a crop sheet of the worst bubbles).
 - The debug report records the overlay's pixel ratio, its pixels and each line's size on screen.
