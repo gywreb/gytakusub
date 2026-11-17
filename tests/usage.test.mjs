@@ -1,6 +1,6 @@
 // Claude usage accounting (extension/usage.js, shared with the web app): prices, costs,
 // the day-by-day log, rate-limit headers, and what API errors mean for the reader.
-import { PRICES, priceOf, tokensOf, costOf, limitsOf, addCall, totals, summary, modelKey, emptyLog, utcDay, KEEP_DAYS, fmtUsd, fmtTokens, explainApiError, limitWords } from "../extension/usage.js";
+import { PRICES, priceOf, tokensOf, costOf, limitsOf, addCall, totals, summary, modelKey, emptyLog, utcDay, KEEP_DAYS, fmtUsd, fmtTokens, explainApiError, limitWords, addPage, usageView } from "../extension/usage.js";
 
 let passes = 0, failures = 0;
 const ok = (cond, name, extra = "") => { if (cond) { passes++; console.log("ok -", name); } else { failures++; console.log("not ok -", name, extra); } };
@@ -79,6 +79,34 @@ const page = `| Claude Opus 5.5 | $4 / MTok | $5 / MTok | $8 / MTok | $0.20 / MT
 ok(priceRowsProblems(page).length === 0, "the price list matches the pricing page's rows", JSON.stringify(priceRowsProblems(page)));
 ok(priceRowsProblems(page.replace("| $10 / MTok |", "| $12 / MTok |")).length === 1, "a changed price is reported");
 ok(priceRowsProblems(page.replace(/^\| Claude Opus 5\.5 .*$/m, "")).length === 1, "a missing row is reported");
+
+// ---- pages: measured cost per page (a long page is several answers, one per slice) ----
+{
+  const at = Date.parse("2026-11-17T10:00:00Z");
+  const a = { input_tokens: 3000, output_tokens: 400 }, b = { input_tokens: 2500, output_tokens: 300 }, c = { input_tokens: 2000, output_tokens: 100 };
+  let l = emptyLog();
+  for (const u of [a, b]) l = addCall(l, { model: "claude-haiku-5-5", usage: u, at }); // a long page: two slices
+  l = addPage(l, { model: "claude-haiku-5-5", usages: [a, b], at });
+  l = addCall(l, { model: "claude-haiku-5-5", usage: c, at }); // a short page: one slice
+  l = addPage(l, { model: "claude-haiku-5-5", usages: [c], at });
+  l = addCall(l, { model: "claude-haiku-5-5", usage: c, at }); // a slice of a page that then failed: real spend, no page
+  const t = summary(l, at).today;
+  ok(t.requests === 4 && t.pages === 2 && near(t.pageCost, (5500 + 2000) * 0.1e-6 + (700 + 100) * 0.5e-6), "pages: counted once all slices answered, with their exact cost", JSON.stringify(t));
+  ok(near(t.cost - t.pageCost, 2000 * 0.1e-6 + 100 * 0.5e-6), "a failed page's answer is still spend, but not a page");
+  const v = usageView(l, at);
+  ok(v.today.sub === "2 pages" && v.today.tokens === "4 requests · 9.5k in · 900 out" && v.month.label === "November", "usageView: pages up front, requests and tokens as details", JSON.stringify(v.today));
+  ok(v.models[0].sub === `≈${fmtUsd(t.pageCost / 2)} a page · 2 pages` && v.models[0].cost === `≈${fmtUsd(t.cost)}`, "usageView: the measured cost per page", JSON.stringify(v.models[0]));
+  // a log from before pages were counted: requests only, no made-up per-page figure
+  let old = addCall(emptyLog(), { model: "claude-sonnet-5-5", usage: a, at });
+  const vo = usageView(old, at);
+  ok(vo.today.sub === "1 request" && vo.models[0].sub === "1 request" && !/a page/.test(vo.models[0].sub), "older logs: no per-page cost is guessed", JSON.stringify(vo.models[0]));
+  // an unknown model: pages without a price give no per-page figure
+  let un = addCall(emptyLog(), { model: "claude-future-9", usage: a, at });
+  un = addPage(un, { model: "claude-future-9", usages: [a], at });
+  const vu = usageView(un, at);
+  ok(vu.models[0].sub === "1 page" && vu.models[0].cost === "price unknown", "unpriced pages: counted, never priced", JSON.stringify(vu.models[0]));
+  ok(usageView(emptyLog(), at).today.sub === "Nothing yet" && usageView(emptyLog(), at).models.length === 0, "an empty log says so");
+}
 
 console.log(failures ? `USAGE TESTS FAILED (${failures} of ${failures + passes})` : `USAGE TESTS PASSED (${passes})`);
 process.exitCode = failures ? 1 : 0;

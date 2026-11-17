@@ -100,8 +100,8 @@ if (!process.argv.includes("--bad-boxes")) {
   await pop.waitForFunction(() => !document.getElementById("usageToday").hidden, null, { timeout: 5000 }).catch(() => {});
   const popupText = await pop.textContent("#usageToday"); await pop.close();
   const opt = await context.newPage(); await opt.goto(`chrome-extension://${extId}/options.html`);
-  await opt.waitForFunction(() => /request/.test(document.getElementById("cuTodaySub").textContent), null, { timeout: 5000 }).catch(() => {});
-  const optText = await opt.evaluate(() => [document.getElementById("cuTodayCost").textContent, document.getElementById("cuTodaySub").textContent, document.getElementById("cuModels").textContent, document.getElementById("cuLimits").textContent]);
+  await opt.waitForFunction(() => /page/.test(document.getElementById("cuTodaySub").textContent), null, { timeout: 5000 }).catch(() => {});
+  const optText = await opt.evaluate(() => [document.getElementById("cuTodayCost").textContent, document.getElementById("cuTodaySub").textContent, document.getElementById("cuModels").textContent, document.getElementById("cuLimits").textContent, document.getElementById("cuTodayTokens").textContent]);
   await opt.screenshot({ path: path.join(out, "options-usage.png"), fullPage: true });
   // the side nav stays on screen while the page scrolls, and marks the section in view
   await opt.setViewportSize({ width: 1280, height: 720 });
@@ -114,13 +114,16 @@ if (!process.argv.includes("--bad-boxes")) {
   await opt.click('.toc a[href="#sec-usage"]'); await opt.waitForTimeout(100);
   const navPicked = await opt.evaluate(() => document.querySelector('.toc a[aria-current]')?.textContent || null);
   // at the top it sits under the header; scrolled to the end it sticks 24 px from the top (--s5), whole
-  tocOk = navTop.current === "Claude API" && Math.abs(navEnd.top - 24) <= 1 && navEnd.bottom <= 720 && navEnd.current === "About" && navPicked === "Claude usage";
+  tocOk = navTop.current === "Claude API" && Math.abs(navEnd.top - 24) <= 1 && navEnd.bottom <= 720 && navEnd.current === "About" && navPicked === "Costs";
   console.log(`options nav: top ${JSON.stringify(navTop)}, scrolled to the end ${JSON.stringify(navEnd)}, after a click "${navPicked}"`);
   await opt.close();
   await page.bringToFront();
   // 1000 input + 200 output tokens per answer on Sonnet 5.5 ($2 / $10 per million) = $0.004
+  // every page here is one slice, so each page's measured cost is one answer's: $0.004 a page
   usageOk = m.requests === calls.length && Math.abs(m.cost - 0.004 * calls.length) < 1e-9 && log?.limits?.requests?.limit === 50
-    && popupText === `≈${fmtUsd(0.004 * calls.length)} today` && /Claude Sonnet 5\.5/.test(optText[2]) && /requests/.test(optText[3]);
+    && m.pages === calls.length && Math.abs(m.pageCost - 0.004 * calls.length) < 1e-9
+    && popupText === `≈${fmtUsd(0.004 * calls.length)} today` && /Claude Sonnet 5\.5/.test(optText[2]) && optText[2].includes(`≈${fmtUsd(0.004)} a page · ${calls.length} page`)
+    && optText[1] === `${calls.length} page${calls.length === 1 ? "" : "s"}` && optText[4].startsWith(`${calls.length} request`) && /requests/.test(optText[3]);
   console.log(`usage: ${m.requests} logged of ${calls.length} API calls, ≈$${m.cost}; popup "${popupText}"; options ${JSON.stringify(optText)}`);
 }
 

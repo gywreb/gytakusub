@@ -2,7 +2,7 @@
 import { loadSettings, saveSettings, loadImage, blobToDataUrl, translateImage, renderPage, testKey } from "./translator.js";
 import { isConnected, connectFetcher, loadChapter, fetchPageImage, generateKey, connectionLink, readConnectionLink, fetcherBase, usageToday, onUsage, resetTime, FREE_DAILY, loadCloudUsage } from "./fetcher-client.js";
 import { MODELS } from "./prompt.js";
-import { summary, fmtUsd, fmtTokens, dayStart, PRICES_CHECKED, PRICE_SOURCE, limitWords } from "./usage.js";
+import { summary, usageView, fmtUsd, dayStart, PRICES_CHECKED, PRICE_SOURCE } from "./usage.js";
 import { readClaudeUsage, onClaudeUsage, clearClaudeUsage } from "./claude-usage.js";
 import qrcode from "./lib/qrcode.mjs";
 
@@ -64,33 +64,39 @@ function showUsage() {
   const n = (x) => x.toLocaleString(), time = (iso) => new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
   const device = usageToday(fetcherBase(settings.fetcherUrl));
   const cloud = live.data, isLive = !!cloud;
-  const requests = isLive ? cloud.requests : device.requests, limit = (isLive && cloud.limit) || FREE_DAILY;
-  const share = Math.min(1, requests / limit), warn = share >= 0.8;
-  // the state in words too, not only in red
-  const state = share >= 1 ? `used up until ${resetTime()}` : warn ? "almost used up" : "";
-  const figure = `${isLive ? "" : "≈"}${n(requests)} / ${n(limit)}`;
-  $("fetcherUsage").textContent = share >= 1 ? `free requests ${state}` : (state ? `${figure} · ${state}` : `${figure} free today`);
-  $("btnFetcherManage").classList.toggle("warn", warn);
-  $("btnFetcherManage").title = isLive ? `Cloudflare's count, ${time(cloud.asOf)}` : "Estimated from this device";
   $("usageSource").textContent = isLive ? `Cloudflare · ${time(cloud.asOf)}` : "This device";
   $("usageSource").classList.toggle("live", isLive);
-  $("usageState").textContent = state ? state[0].toUpperCase() + state.slice(1) : "";
-  $("usageState").hidden = !state;
-  $("usageCount").textContent = n(requests);
-  $("usageMax").textContent = n(limit);
-  const meter = $("usageMeter");
-  meter.setAttribute("aria-valuemax", limit);
-  meter.setAttribute("aria-valuenow", Math.min(requests, limit));
-  meter.setAttribute("aria-valuetext", `${n(requests)} of ${n(limit)} requests used today${isLive ? "" : ", estimated from this device"}`);
-  meter.classList.toggle("warn", warn);
-  meter.classList.toggle("used", requests > 0);
-  meter.firstElementChild.style.width = `${share * 100}%`;
   if (isLive) {
+    // Cloudflare's own count for the account: the only number that can sit against the allowance
+    const requests = cloud.requests, limit = cloud.limit || FREE_DAILY;
+    const share = Math.min(1, requests / limit), warn = share >= 0.8;
+    const state = share >= 1 ? `used up until ${resetTime()}` : warn ? "almost used up" : ""; // the state in words too, not only in red
+    $("fetcherUsage").textContent = share >= 1 ? `free requests ${state}` : (state ? `${n(requests)} / ${n(limit)} · ${state}` : `${n(requests)} / ${n(limit)} free today`);
+    $("btnFetcherManage").classList.toggle("warn", warn);
+    $("btnFetcherManage").title = `Cloudflare's count, ${time(cloud.asOf)}`;
+    $("usageState").textContent = state ? state[0].toUpperCase() + state.slice(1) : "";
+    $("usageState").hidden = !state;
+    $("usageCount").textContent = n(requests);
+    $("usageMax").textContent = n(limit);
+    const meter = $("usageMeter");
+    meter.setAttribute("aria-valuemax", limit);
+    meter.setAttribute("aria-valuenow", Math.min(requests, limit));
+    meter.setAttribute("aria-valuetext", `${n(requests)} of ${n(limit)} requests used today`);
+    meter.classList.toggle("warn", warn);
+    meter.classList.toggle("used", requests > 0);
+    meter.firstElementChild.style.width = `${share * 100}%`;
     const others = cloud.workers.slice(1).reduce((t, w) => t + w.requests, 0);
     const split = cloud.workers.length > 1 ? `${cloud.workers[0].name} ${n(cloud.workers[0].requests)}, other Workers ${n(others)} · ` : "";
     $("usageNote").textContent = `${split}All your devices · starts again at ${resetTime()}`;
   } else {
-    $("usageNote").textContent = `Sent from this device · ${n(device.chapters)} chapter${device.chapters === 1 ? "" : "s"} (about 2 requests a page) · starts again at ${resetTime()}`;
+    // only what this device sent: the account's total (other devices, the browser's permission
+    // checks) isn't visible from here, so no share of the allowance and no warning are made up
+    $("fetcherUsage").textContent = "";
+    $("btnFetcherManage").classList.remove("warn");
+    $("btnFetcherManage").title = "";
+    $("usageState").hidden = true;
+    $("usageCount").textContent = n(device.requests);
+    $("usageNote").textContent = `${n(device.chapters)} chapter${device.chapters === 1 ? "" : "s"} opened · the allowance starts again at ${resetTime()}`;
   }
   document.querySelectorAll("[data-usage=device]").forEach((el) => (el.hidden = isLive));
   document.querySelectorAll("[data-usage=live]").forEach((el) => (el.hidden = !isLive));
@@ -111,26 +117,22 @@ async function checkLive(button) {
 
 // ---------- Claude usage (usage.js): what this browser's translations cost ----------
 function showClaudeUsage(log = readClaudeUsage()) {
-  const { today, month, limits } = summary(log);
-  const line = (t) => (t.requests ? `${t.requests.toLocaleString()} request${t.requests === 1 ? "" : "s"} · ${fmtTokens(t.input + t.read + t.write)} in · ${fmtTokens(t.output)} out` : "No requests yet");
-  const usd = (t) => (t.unpriced && !t.cost ? "—" : `${t.cost ? "≈" : ""}${fmtUsd(t.cost)}`);
-  $("cuTodayCost").textContent = usd(today);
-  $("cuTodaySub").textContent = line(today);
-  $("cuMonthLabel").textContent = new Date().toLocaleDateString([], { month: "long", timeZone: "UTC" });
-  $("cuMonthCost").textContent = usd(month);
-  $("cuMonthSub").textContent = line(month);
-  $("cuModels").replaceChildren(...month.models.map((m) => {
+  const v = usageView(log);
+  $("cuTodayCost").textContent = v.today.cost; $("cuTodaySub").textContent = v.today.sub;
+  $("cuMonthLabel").textContent = v.month.label;
+  $("cuMonthCost").textContent = v.month.cost; $("cuMonthSub").textContent = v.month.sub;
+  $("cuModels").replaceChildren(...v.models.map((m) => {
     const li = document.createElement("li");
     const name = document.createElement("span"); name.className = "model-name"; name.textContent = m.label;
-    const what = document.createElement("span"); what.className = "model-what"; what.textContent = line(m);
-    const cost = document.createElement("span"); cost.className = "model-cost"; cost.textContent = m.unpriced && !m.cost ? "price unknown" : `≈${fmtUsd(m.cost)}`;
+    const what = document.createElement("span"); what.className = "model-what"; what.textContent = m.sub;
+    const cost = document.createElement("span"); cost.className = "model-cost"; cost.textContent = m.cost;
     li.append(name, cost, what);
     return li;
   }));
-  $("cuModels").hidden = !month.models.length;
-  const speed = limitWords(limits);
-  $("cuLimits").hidden = !speed;
-  $("cuLimits").textContent = speed;
+  $("cuModels").hidden = !v.models.length;
+  $("cuTodayTokens").textContent = v.today.tokens; $("cuMonthTokens").textContent = v.month.tokens;
+  $("cuLimits").hidden = !v.limits;
+  $("cuLimits").textContent = v.limits;
   $("cuChecked").textContent = new Date(PRICES_CHECKED + "T00:00:00Z").toLocaleDateString([], { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
   $("cuPriceLink").href = PRICE_SOURCE;
   $("cuDayStart").textContent = dayStart();

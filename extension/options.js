@@ -5,7 +5,7 @@
 import { getSettings } from "./settings.js";
 import { apiHeaders, API_URL } from "./prompt.js";
 import { consentGiven, withdrawConsent, hasAccess, requestAccess, ALL_SITES, openWelcome } from "./access.js";
-import { addCall, emptyLog, limitsOf, explainApiError, summary, fmtUsd, fmtTokens, dayStart, PRICES_CHECKED, PRICE_SOURCE, limitWords } from "./usage.js";
+import { addCall, emptyLog, limitsOf, explainApiError, usageView, dayStart, PRICES_CHECKED, PRICE_SOURCE } from "./usage.js";
 
 const $ = (id) => document.getElementById(id);
 const FIELDS = ["model", "targetLang", "glossary", "customPrompt", "fontFamily", "excludedSites"];
@@ -63,26 +63,22 @@ async function save() {
 
 // ---------- Claude usage (usage.js), written by the service worker as pages are translated ----------
 function showUsage(log) {
-  const { today, month, limits } = summary(log?.v === 1 ? log : emptyLog());
-  const line = (t) => (t.requests ? `${t.requests.toLocaleString()} request${t.requests === 1 ? "" : "s"} · ${fmtTokens(t.input + t.read + t.write)} in · ${fmtTokens(t.output)} out` : "No requests yet");
-  const usd = (t) => (t.unpriced && !t.cost ? "—" : `${t.cost ? "≈" : ""}${fmtUsd(t.cost)}`);
-  $("cuTodayCost").textContent = usd(today);
-  $("cuTodaySub").textContent = line(today);
-  $("cuMonthLabel").textContent = new Date().toLocaleDateString([], { month: "long", timeZone: "UTC" });
-  $("cuMonthCost").textContent = usd(month);
-  $("cuMonthSub").textContent = line(month);
-  $("cuModels").replaceChildren(...month.models.map((m) => {
+  const v = usageView(log?.v === 1 ? log : emptyLog());
+  $("cuTodayCost").textContent = v.today.cost; $("cuTodaySub").textContent = v.today.sub;
+  $("cuMonthLabel").textContent = v.month.label;
+  $("cuMonthCost").textContent = v.month.cost; $("cuMonthSub").textContent = v.month.sub;
+  $("cuModels").replaceChildren(...v.models.map((m) => {
     const li = document.createElement("li");
     const name = document.createElement("span"); name.className = "model-name"; name.textContent = m.label;
-    const cost = document.createElement("span"); cost.className = "model-cost"; cost.textContent = m.unpriced && !m.cost ? "price unknown" : `≈${fmtUsd(m.cost)}`;
-    const what = document.createElement("span"); what.className = "model-what"; what.textContent = line(m);
+    const cost = document.createElement("span"); cost.className = "model-cost"; cost.textContent = m.cost;
+    const what = document.createElement("span"); what.className = "model-what"; what.textContent = m.sub;
     li.append(name, cost, what);
     return li;
   }));
-  $("cuModels").hidden = !month.models.length;
-  const speed = limitWords(limits);
-  $("cuLimits").hidden = !speed;
-  $("cuLimits").textContent = speed;
+  $("cuModels").hidden = !v.models.length;
+  $("cuTodayTokens").textContent = v.today.tokens; $("cuMonthTokens").textContent = v.month.tokens;
+  $("cuLimits").hidden = !v.limits;
+  $("cuLimits").textContent = v.limits;
   lastLog = log;
   $("cuChecked").textContent = new Date(PRICES_CHECKED + "T00:00:00Z").toLocaleDateString([], { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
   $("cuPriceLink").href = PRICE_SOURCE;

@@ -5,7 +5,7 @@
 // cache translations, keep per-tab glossary context, relay keyboard commands.
 
 import { callClaude, mergeContext } from "./prompt.js";
-import { addCall, emptyLog } from "./usage.js";
+import { addCall, addPage, emptyLog } from "./usage.js";
 import { preparePage, finishPage } from "./engine/page.js";
 import { DEFAULT_SETTINGS, getSettings, CS_FILES, ensureContentScript } from "./settings.js";
 import { createLane, Cancelled } from "./lane.js";
@@ -20,6 +20,14 @@ function recordUsage(r) {
   usageWrites = usageWrites.then(async () => {
     const { claudeUsage } = await chrome.storage.local.get({ claudeUsage: null });
     await chrome.storage.local.set({ claudeUsage: addCall(claudeUsage?.v === 1 ? claudeUsage : emptyLog(), { model: r.model, usage: r.usage, limits: r.limits }) });
+  }).catch((e) => console.warn("Gytakusub: usage log write failed", e));
+}
+/** One page translated by Claude: all its slices answered (their requests are already counted). */
+function recordPage(raw) {
+  if (!raw.length || !raw.every((r) => r?.usage)) return;
+  usageWrites = usageWrites.then(async () => {
+    const { claudeUsage } = await chrome.storage.local.get({ claudeUsage: null });
+    await chrome.storage.local.set({ claudeUsage: addPage(claudeUsage?.v === 1 ? claudeUsage : emptyLog(), { model: raw[0].model, usages: raw.map((r) => r.usage) }) });
   }).catch((e) => console.warn("Gytakusub: usage log write failed", e));
 }
 
@@ -260,6 +268,7 @@ async function translatePage(msg, settings, tabId, work) {
       }
     };
     const raw = await Promise.all(job.slices.map(withRetry));
+    recordPage(raw);
     results = raw.map((r) => ({ items: r.items }));
     usage = { input_tokens: 0, output_tokens: 0 };
     for (const r of raw) { newTerms.push(...r.terms); if (r.usage) { usage.input_tokens += r.usage.input_tokens || 0; usage.output_tokens += r.usage.output_tokens || 0; } }

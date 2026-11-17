@@ -207,6 +207,13 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline-offs
 .meter.warn .meter-fill { background: var(--danger); }
 .usage-facts { margin: 0; padding-left: 1.2em; display: grid; gap: var(--s2); color: var(--muted); }
 .usage-facts b { color: var(--fg); }
+/* the spend-limit pointer and the collapsed details of "What translating costs" */
+.usage-cap { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s3); padding: var(--s3); border: 1px solid var(--border); border-radius: var(--r2); background: var(--bg); }
+.usage-cap p { margin: 0; flex: 1 1 240px; font-size: var(--t-caption); color: var(--muted); }
+.usage-cap b { color: var(--fg); }
+.usage-cap .btn { flex: none; text-decoration: none; }
+.usage-details summary { cursor: pointer; min-height: 32px; display: list-item; font-weight: 600; font-size: var(--t-caption); }
+.usage-details .usage-facts { margin-top: var(--s2); }
 /* Claude usage: two stat tiles (today, this month), then one row per model */
 .stats { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s3); }
 .stat { display: grid; gap: 2px; padding: var(--s3); border: 1px solid var(--border); border-radius: var(--r2); background: var(--bg); min-width: 0; }

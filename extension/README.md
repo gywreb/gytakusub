@@ -33,7 +33,7 @@ Settings, glossary and (optionally) the API key sync through your browser's sync
 | Redo a page (e.g. after editing the glossary) | Hover → **↻ Redo** |
 | Correct a line / teach the glossary | Double-click a translated bubble → edit → **Ctrl+Enter**; or fill "original term = translation" → *Add* |
 | Peek at the original lettering | Options → *Peek at the original while hovering* (off by default), then rest the pointer on a translated bubble |
-| See what translating costs | Popup → "≈$… today" next to the model; Options → **Claude usage** (today, this month, per model, rate-limit headroom; this browser only). Your balance: the Console's Billing page |
+| See what translating costs | Popup → "≈$… today" next to the model; Options → **What translating costs**: your cost per page for each model, today and this month (this browser only; tokens and rate limits under Details). Balance and spend limit: the Console's Billing page |
 | Report a bad page | Options → *Debug overlay*, then popup → **Export debug report** (one `.zip` for every translated page on the tab). It contains the page images, so don't attach it to a public GitHub issue. |
 | Withdraw the agreement or remove site access | Options → **About** |
 | Auto-translate paused with a Continue button | A spending guard: after 100 pages Claude translated in 10 minutes on one tab, auto-translate waits for you (a page swapping images could otherwise keep sending them). Click **Continue**; Translate visible works meanwhile. |

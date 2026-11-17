@@ -24,6 +24,11 @@ Ready for the public Chrome Web Store listing. Everything stays free: each perso
 - The setup page opens on an update only for someone who never saw it (coming from before 2.7.0) or agreed to an older version, not after a deliberate Withdraw. Asking for it again brings the open one forward instead of opening another tab.
 - **Settings → About**: version, help (GitHub Issues), privacy policy, setup guide, and "not made by or affiliated with Anthropic". Allow access there waits for the agreement, as on the setup page.
 - The popup shows one notice at a time (key first, then access), so it stays within the browser's 600 px popup height.
+- **"What translating costs"** (was "Claude usage"), in Settings and in the web app. Only numbers that are measured: what Claude's answers to this browser said they used, at Anthropic's prices.
+  - Leads with **your cost per page for each model**. A long page can be several requests (one per slice); a page now counts once all its slices are answered, with their exact cost. Older history has no pages, so no per-page figure is guessed for it.
+  - Today and this month show pages; requests, tokens and the rate-limit headroom moved under Details.
+  - Points to the Console's monthly spend limit (Billing → Spend limits), the one cap that covers every device.
+- **The web app's fetcher allowance** shows a meter against the 100,000 free requests only with Cloudflare's own count. Without it, it shows the requests this device sent, counted as they're sent. It used to add the browser's permission checks by guessing and set this device's number against the whole account's allowance, which other devices also use.
 - **Removed: the monthly API credit meter** (plan, amount, renewal date), here and in the web app. It subtracted only this browser's spending from an amount you typed, so with the web app or another browser in use, "left" was always too high, and nothing can correct it: Anthropic has no way for apps to read a balance or a plan's credit. Claude usage still shows this browser's exact tokens and their cost, and now links the Console's Billing page for the balance. Old values are cleaned up.
 
 ### Store and support

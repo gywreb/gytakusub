@@ -30,7 +30,7 @@ YOU STAY IN CONTROL
 • Master switch, per-site enable, per-site auto-translate.
 • Glossary for names and terms; custom instructions; model choice (Haiku for speed, Sonnet/Opus for difficult pages).
 • Results are cached for the browser session so re-reading costs nothing.
-• See what it costs: today's and this month's Claude tokens and estimated cost per model, from this browser's own records (Settings → Claude usage).
+• See what it costs: your real cost per page for each model, and today's and this month's spend, counted from Claude's own answers to this browser (Settings → What translating costs). To cap spending on every device, it points you to the Console's spend limit.
 • Double-click a translated bubble to correct a line or add a term to the glossary; an option lets you peek at the original by hovering.
 
 REQUIREMENTS
@@ -66,7 +66,7 @@ https://github.com/gywreb/gytakusub/issues
 
 **What's new in 2.7.0** (paste into the version notes if the dashboard asks)
 ```
-A setup page now opens on install: it shows what is sent to Claude and where, and asks you to agree before anything is sent. Access to websites is asked the first time you use it instead of at install, and both can be withdrawn in Settings → About. Safer image downloads (only real images, size-capped); the API key is no longer readable by the page-side script; auto-translate pauses after 100 pages in 10 minutes until you choose Continue, so a page that keeps swapping images can't run up your bill. Help link: GitHub Issues.
+A setup page now opens on install: it shows what is sent to Claude and where, and asks you to agree before anything is sent. Access to websites is asked the first time you use it instead of at install, and both can be withdrawn in Settings → About. Safer image downloads (only real images, size-capped); the API key is no longer readable by the page-side script; auto-translate pauses after 100 pages in 10 minutes until you choose Continue, so a page that keeps swapping images can't run up your bill. Help link: GitHub Issues. "What translating costs" now shows your real cost per page for each model and points to the Console's spend limit; the monthly-credit meter is gone (no app can read your balance, so it could only guess).
 ```
 
 **What's new in 2.6.0**

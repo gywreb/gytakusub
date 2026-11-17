@@ -90,6 +90,14 @@ div.option { cursor: default; }
 .model-what { grid-column: 1 / -1; font-size: var(--t-caption); color: var(--muted); font-variant-numeric: tabular-nums; }
 .facts { margin: var(--s3) 0; padding-left: 1.2em; display: grid; gap: var(--s2); color: var(--muted); font-size: var(--t-caption); }
 .facts b { color: var(--fg); }
+/* the spend-limit pointer and the collapsed details of the usage panel */
+.usage-cap { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s3); margin: var(--s3) 0; padding: var(--s3); border: 1px solid var(--border); border-radius: var(--r2); background: var(--bg); }
+.usage-cap p { margin: 0; flex: 1 1 260px; font-size: var(--t-caption); color: var(--muted); }
+.usage-cap b { color: var(--fg); }
+.usage-cap .btn { flex: none; text-decoration: none; }
+.usage-details { margin: var(--s2) 0; }
+.usage-details summary { cursor: pointer; min-height: 32px; display: list-item; font-weight: 600; font-size: var(--t-caption); }
+.usage-details .facts { margin-top: var(--s2); }
 .row-end { display: flex; justify-content: flex-end; gap: var(--s2); }
 .btn.danger { color: var(--danger); }
 

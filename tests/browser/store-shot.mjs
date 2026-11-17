@@ -16,13 +16,15 @@ const extSrc = path.resolve(here, "../../extension");
 const ext = extensionCopy(extSrc); // with site access, so the popup shows its normal state
 const out = path.resolve(process.argv[2] || path.join(here, "../../store/assets"));
 const PORT = 8823, HOST = "reader.example";
-const { addCall, emptyLog } = await import(path.join(extSrc, "usage.js"));
+const { addCall, addPage, emptyLog } = await import(path.join(extSrc, "usage.js"));
 
 const now = Date.now();
 let log = emptyLog();
-for (let i = 0; i < 34; i++) log = addCall(log, { model: "claude-sonnet-5-5", usage: { input_tokens: 2400, output_tokens: 520 }, at: now - i * 60e3 });
-for (let i = 0; i < 120; i++) log = addCall(log, { model: "claude-haiku-5-5", usage: { input_tokens: 2300, output_tokens: 480 }, at: now - 3 * 864e5 - i * 60e3 });
-log = addCall(log, { model: "claude-sonnet-5-5", usage: { input_tokens: 2400, output_tokens: 500 }, at: now, limits: { requests: { limit: 50, remaining: 47 }, inputTokens: { limit: 40000, remaining: 36000 }, outputTokens: { limit: 8000, remaining: 7400 } } });
+// one answer per page, as for a normal manga page (a long strip would be several)
+const page = (l, model, usage, at) => addPage(addCall(l, { model, usage, at }), { model, usages: [usage], at });
+for (let i = 0; i < 34; i++) log = page(log, "claude-sonnet-5-5", { input_tokens: 2400, output_tokens: 520 }, now - i * 60e3);
+for (let i = 0; i < 120; i++) log = page(log, "claude-haiku-5-5", { input_tokens: 2300, output_tokens: 480 }, now - 3 * 864e5 - i * 60e3);
+log = addPage(addCall(log, { model: "claude-sonnet-5-5", usage: { input_tokens: 2400, output_tokens: 500 }, at: now, limits: { requests: { limit: 50, remaining: 47 }, inputTokens: { limit: 40000, remaining: 36000 }, outputTokens: { limit: 8000, remaining: 7400 } } }), { model: "claude-sonnet-5-5", usages: [{ input_tokens: 2400, output_tokens: 500 }], at: now });
 
 const srv = http.createServer((q, r) => { r.writeHead(200, { "Content-Type": "text/html" }); r.end("<title>Chapter 12</title><h1>Chapter 12</h1>"); });
 await new Promise((r) => srv.listen(PORT, "127.0.0.1", r));
@@ -48,8 +50,8 @@ const popPng = await pop.screenshot({ clip: { x: 0, y: 0, width: 340, height: Ma
 // Options → Claude usage
 const op = await ctx.newPage(); await op.setViewportSize({ width: 1100, height: 1000 });
 await op.goto(`chrome-extension://${id}/options.html#sec-usage`); await op.waitForTimeout(800);
-// the card without its last line (days) and the Clear button, so the rest stays big enough to read in 1280x800
-await op.addStyleTag({ content: "#sec-usage .facts li:last-child, #sec-usage .row-end { display: none !important; }" });
+// the card without its Clear button (the details stay folded, as they open)
+await op.addStyleTag({ content: "#sec-usage .row-end { display: none !important; }" });
 const usagePng = await op.locator("#sec-usage").screenshot();
 
 // compose, in the frame the other screenshots use
@@ -63,9 +65,9 @@ await frame.setContent(`<!doctype html><style>
   .cap { position: absolute; font-weight: bold; font-size: 18px; color: #e5e7eb; }
 </style>
 <h1>Your switches, your costs</h1>
-<p>On or off per site, one-click translation, and an estimate of what Claude costs you.</p>
+<p>On or off per site, one-click translation, and what each page really costs you.</p>
 <img class="shot" id="pop" src="${img(popPng)}"><img class="shot" id="use" src="${img(usagePng)}">
-<div class="cap" id="popCap">POPUP</div><div class="cap" id="useCap">SETTINGS → CLAUDE USAGE</div>`);
+<div class="cap" id="popCap">POPUP</div><div class="cap" id="useCap">SETTINGS → COSTS</div>`);
 await frame.evaluate(() => {
   // fit both into the area under the title, side by side, at the same scale
   // (captured at 2x, so up to 1.25x larger still looks sharp); centred under the title, captions included

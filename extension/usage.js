@@ -75,8 +75,12 @@ export function limitsOf(headers) {
 }
 
 // ---------- the log ----------
-// {v: 1, days: {"2026-11-10": {"claude-sonnet-5-5": {requests, input, output, read, write5m, write1h, cost, unpriced}}},
+// {v: 1, days: {"2026-11-10": {"claude-sonnet-5-5": {requests, input, output, read, write5m, write1h, cost, unpriced,
+//                                                    pages, pageCost, pagesUnpriced}}},
 //  limits: {at, model, requests, inputTokens, outputTokens} | null}
+// A request is one Claude answer; a long page can take several (one per slice). A page is
+// counted once all its slices are answered, with the exact cost of those answers (addPage), so
+// "per page" is measured, not guessed. Logs from before 2.7.0 have requests but no pages.
 // Days are UTC, like Anthropic's usage reports and the Console. 62 days are kept: this month and last.
 export const KEEP_DAYS = 62;
 export const utcDay = (t = Date.now()) => new Date(t).toISOString().slice(0, 10);
@@ -107,18 +111,38 @@ export function addCall(log, { model: reported, usage, limits = null, at = Date.
   return out;
 }
 
-/** Totals over a set of days: {requests, input, output, read, write, cost, unpriced, models:[{model,label,...}]} */
+/**
+ * A copy of `log` with one translated page added (pure): `usages` are the `usage` objects of all
+ * its slices' answers, which addCall has already counted as requests and cost. Pages served from
+ * the cache cost nothing and aren't counted.
+ */
+export function addPage(log, { model: reported, usages = [], at = Date.now() }) {
+  const model = modelKey(reported);
+  const out = { v: 1, days: { ...(log?.days || {}) }, limits: log?.limits || null };
+  const day = utcDay(at), d = { ...(out.days[day] || {}) };
+  const m = { requests: 0, input: 0, output: 0, read: 0, write5m: 0, write1h: 0, cost: 0, unpriced: 0, ...(d[model] || {}) };
+  const costs = usages.map((u) => costOf(model, u || {}));
+  m.pages = (m.pages || 0) + 1;
+  if (costs.some((c) => c == null)) m.pagesUnpriced = (m.pagesUnpriced || 0) + 1;
+  else m.pageCost = (m.pageCost || 0) + costs.reduce((a, b) => a + b, 0);
+  d[model] = m;
+  out.days[day] = d;
+  return out;
+}
+
+/** Totals over a set of days: {requests, input, output, read, write, cost, unpriced, pages, pageCost, pagesPriced, models:[{model,label,...}]} */
 export function totals(log, days) {
   const by = new Map();
   for (const day of days) for (const [model, m] of Object.entries(log?.days?.[day] || {})) {
-    const t = by.get(model) || { model, label: priceOf(model)?.label || model, requests: 0, input: 0, output: 0, read: 0, write: 0, cost: 0, unpriced: 0 };
+    const t = by.get(model) || { model, label: priceOf(model)?.label || model, requests: 0, input: 0, output: 0, read: 0, write: 0, cost: 0, unpriced: 0, pages: 0, pageCost: 0, pagesPriced: 0 };
     t.requests += m.requests; t.input += m.input; t.output += m.output; t.read += m.read; t.write += m.write5m + m.write1h;
     t.cost += m.cost; t.unpriced += m.unpriced;
+    t.pages += m.pages || 0; t.pageCost += m.pageCost || 0; t.pagesPriced += (m.pages || 0) - (m.pagesUnpriced || 0);
     by.set(model, t);
   }
   const models = [...by.values()].sort((a, b) => b.cost - a.cost || b.requests - a.requests);
   const sum = (k) => models.reduce((n, m) => n + m[k], 0);
-  return { requests: sum("requests"), input: sum("input"), output: sum("output"), read: sum("read"), write: sum("write"), cost: sum("cost"), unpriced: sum("unpriced"), models };
+  return { requests: sum("requests"), input: sum("input"), output: sum("output"), read: sum("read"), write: sum("write"), cost: sum("cost"), unpriced: sum("unpriced"), pages: sum("pages"), pageCost: sum("pageCost"), pagesPriced: sum("pagesPriced"), models };
 }
 
 /** Today (UTC) and this calendar month (UTC) so far. */
@@ -153,6 +177,33 @@ export function limitWords(limits, fmtTime = (t) => new Date(t).toLocaleTimeStri
 // ---------- formatting ----------
 export const fmtTokens = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(n >= 1e7 ? 0 : 1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(n >= 1e4 ? 0 : 1)}k` : String(n));
 /** "$0.0042", "$0.12", "$3.40", "$100": small amounts keep two significant digits, so a cheap page doesn't read as $0.00. */
+/**
+ * What the usage panels show, in words, from this browser's log. Only measured numbers: what
+ * Claude's answers said they used, priced with PRICES; nothing about other devices, the balance
+ * or a plan (no app can read those).
+ * {today, month: {label, cost, sub, tokens}, models: [{label, cost, sub}], limits}
+ */
+export function usageView(log, at = Date.now()) {
+  const { today, month, limits } = summary(log, at);
+  const plural = (n, word) => `${n.toLocaleString()} ${word}${n === 1 ? "" : "s"}`;
+  const usd = (t) => (t.unpriced && !t.cost ? "—" : `${t.cost ? "≈" : ""}${fmtUsd(t.cost)}`);
+  const sub = (t) => (t.pages ? plural(t.pages, "page") : t.requests ? plural(t.requests, "request") : "Nothing yet");
+  const tokens = (t) => (t.requests ? `${plural(t.requests, "request")} · ${fmtTokens(t.input + t.read + t.write)} in · ${fmtTokens(t.output)} out` : "No requests yet");
+  const period = (t, label) => ({ label, cost: usd(t), sub: sub(t), tokens: tokens(t) });
+  return {
+    today: period(today, "Today"),
+    month: period(month, new Date(at).toLocaleDateString([], { month: "long", timeZone: "UTC" })),
+    models: month.models.map((m) => ({
+      label: m.label,
+      cost: m.unpriced && !m.cost ? "price unknown" : `≈${fmtUsd(m.cost)}`,
+      // per page only from pages whose every answer was priced; otherwise just what was sent
+      sub: m.pagesPriced ? `≈${fmtUsd(m.pageCost / m.pagesPriced)} a page · ${plural(m.pages, "page")}` : m.pages ? plural(m.pages, "page") : plural(m.requests, "request"),
+      tokens: `${m.label}: ${tokens(m)}`,
+    })),
+    limits: limitWords(limits),
+  };
+}
+
 export function fmtUsd(x) {
   if (!x) return "$0";
   if (Number.isInteger(x)) return `$${x}`;

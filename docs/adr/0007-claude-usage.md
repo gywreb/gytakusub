@@ -69,3 +69,11 @@ The meter subtracted this browser's spending from an amount the user typed. With
 - An Admin key can do everything in the organization; it must never sit in a browser extension or web page.
 
 So the panels keep what they can measure exactly (this browser's tokens from Claude's answers, priced with Anthropic's prices), say "this browser", and link the Console's Billing page for the balance. The low-balance error is still explained when Claude returns it. Old `creditPlan`, `creditCustom` and `creditRenews` values are deleted on update (extension) or ignored on load (web app).
+
+## Update, 2.7.0: measured numbers only
+
+Rule from here on, for every usage figure in the extension and the web app: show only what is measured, say where it was measured ("this browser", "this device", "Cloudflare"), and never set a partial count against a whole-account limit or balance.
+- **Cost per page** comes from `addPage`: a page is counted once all its slices are answered, with the exact cost of those answers. Requests and tokens stay, under Details. Logs from before 2.7.0 have no pages, and no per-page figure is guessed for them.
+- **The cap that covers every device** is the Console's monthly spend limit; the panels point there instead of keeping a budget of their own.
+- **The web app's fetcher allowance** shows a meter only with Cloudflare's count (the live count). Without it, the requests this device sent, with no share of the allowance: the browser's CORS permission checks and other devices aren't visible from the page. (Before, the device count added a guessed permission check per new address.)
+

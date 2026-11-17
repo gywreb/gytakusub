@@ -77,26 +77,14 @@ export class FetcherError extends Error {
 // A Worker can't read its account's usage without an extra Cloudflare API token, so the app counts
 // the requests *this device* sends. Other devices, and people given the connection link, use the
 // same allowance but are not in this count; Cloudflare's own count is in its dashboard.
-// Every call carries the key in an Authorization header, so before a new address the browser asks
-// the fetcher for permission (a CORS preflight, an OPTIONS request), and Cloudflare counts that too:
-// a chapter page costs two requests. The browser keeps that permission per address for a while
-// (Chromium up to 2 hours, Firefox up to 24); the count assumes 10 minutes, and counts again what the
-// browser serves from its own cache, so it errs high, never low.
+// This device's own count: the requests this browser or app sent to the fetcher today, counted
+// as they're sent. Only that is measured here. Cloudflare's count for the account is higher: it
+// adds the browser's permission check before a new address (a CORS preflight, which the page
+// can't see), other devices and other Workers. That total comes from Cloudflare (loadCloudUsage).
 export const FREE_DAILY = 100_000;
 const USAGE_KEY = "gytakusub.fetcherUsage";
 const utcDay = () => new Date().toISOString().slice(0, 10);
 const listeners = new Set();
-const PREFLIGHT_KEEP = 10 * 60e3;
-const preflightAt = new Map(); // address → when a permission check was last counted for it
-
-/** Whether the browser (probably) asked permission before calling `url`; erring towards yes. */
-function preflightCounted(url, now = Date.now()) {
-  const at = preflightAt.get(url);
-  if (at !== undefined && now - at < PREFLIGHT_KEEP) return false;
-  if (preflightAt.size > 2000) for (const [u, t] of preflightAt) if (now - t >= PREFLIGHT_KEEP) preflightAt.delete(u);
-  preflightAt.set(url, now);
-  return true;
-}
 
 /** Today's count for the fetcher at `base`: {requests, chapters}. */
 export function usageToday(base) {
@@ -126,9 +114,9 @@ export async function loadCloudUsage(s) {
 /** Calls fn() whenever the count changes. */
 export function onUsage(fn) { listeners.add(fn); }
 
-function countRequest(base, path, ok, url) {
+function countRequest(base, path, ok) {
   const u = usageToday(base);
-  u.requests += preflightCounted(url) ? 2 : 1;
+  u.requests += 1;
   if (path === "/chapter" && ok) u.chapters++;
   try { localStorage.setItem(USAGE_KEY, JSON.stringify({ day: utcDay(), base, ...u })); } catch { /* not counted */ }
   for (const fn of listeners) fn();
@@ -153,7 +141,7 @@ async function call(path, params, base, key, inUse = false) {
       ? `No answer from your fetcher. Check that you're online. Otherwise, either today's ${FREE_DAILY.toLocaleString()} free requests are used up (it works again at ${resetTime()}, and nothing is charged), or this page needed more work than Cloudflare's free plan allows per request (10 ms). Screenshot mode still works.`
       : `No answer from ${base}. Check the address (copy it from the Worker's page in Cloudflare) and that the deploy finished.`);
   }
-  countRequest(base, path, res.ok, url);
+  countRequest(base, path, res.ok);
   if (res.ok) return res;
   const text = await res.text().catch(() => "");
   let body = {};
