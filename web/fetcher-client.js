@@ -5,6 +5,7 @@
 
 // The fetcher code this app was built with (copied in by scripts/sync-shared.mjs).
 import { VERSION } from "./fetcher-worker.js";
+import { t, langTag } from "./i18n.js";
 
 export const FETCHER_VERSION = VERSION; // the newest fetcher: what "Sync fork" brings
 // The oldest fetcher the app works with. Raise it only when chapters can't work otherwise:
@@ -58,13 +59,13 @@ export async function isConnected(s) {
 
 // What each error code from the fetcher means for the reader, and what to do instead.
 const ADVICE = {
-  challenge: "This site puts a “checking your browser” wall in front of servers, so the fetcher can't open it. Use screenshot mode here, or the browser extension on a computer.",
-  blocked: "This site refuses the fetcher (it may need a login, or it blocks servers). Use screenshot mode here, or the browser extension on a computer.",
-  "no-images": "No chapter pages were found on that page. If the site needs a login or builds its pages with a script, use screenshot mode.",
-  "not-found": "The site says that page does not exist. Check the link.",
-  unauthorized: "Your fetcher refused the access key: the key here is not the GYT_KEY on your Worker.",
-  setup: "Your fetcher has no key yet (or one shorter than 24 characters). Do step 4: in Cloudflare open the Worker → Settings → Variables and Secrets, add the Secret GYT_KEY with your key, Deploy, then Connect again.",
-  "bad-url": "That doesn't look like a web address of a chapter.",
+  challenge: "web_fx_challenge",
+  blocked: "web_fx_blocked",
+  "no-images": "web_fx_no_images",
+  "not-found": "web_fx_not_found",
+  unauthorized: "web_fx_unauthorized",
+  setup: "web_fx_setup",
+  "bad-url": "web_fx_bad_url",
 };
 
 export class FetcherError extends Error {
@@ -106,7 +107,7 @@ export async function loadCloudUsage(s) {
   try {
     return await (await call("/usage", {}, base, s.fetcherKey, true)).json();
   } catch (e) {
-    if (e.code === "not-found") throw new FetcherError("usage-old", `Update your fetcher to ${USAGE_VERSION} or newer for Cloudflare's count.`);
+    if (e.code === "not-found") throw new FetcherError("usage-old", t("web_fx_usage_old", { version: USAGE_VERSION }));
     throw e;
   }
 }
@@ -125,10 +126,10 @@ function countRequest(base, path, ok) {
 /** When the free allowance starts again, in the reader's own time: midnight UTC, e.g. "7:00 AM". */
 export function resetTime() {
   const d = new Date();
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1)).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1)).toLocaleTimeString(langTag(), { hour: "numeric", minute: "2-digit" });
 }
 
-const LIMIT_REACHED = () => `Your fetcher has used today's ${FREE_DAILY.toLocaleString()} free requests on Cloudflare. It works again at ${resetTime()}, and nothing is charged. Screenshot mode still works.`;
+const LIMIT_REACHED = () => t("web_fx_limit", { limit: FREE_DAILY.toLocaleString(langTag()), time: resetTime() });
 
 // `inUse`: the fetcher was connected before, so a silent failure is about this request, not the address.
 async function call(path, params, base, key, inUse = false) {
@@ -138,8 +139,8 @@ async function call(path, params, base, key, inUse = false) {
     res = await fetch(url, { headers: { Authorization: `Bearer ${key}` }, credentials: "omit" });
   } catch {
     throw new FetcherError("unreachable", inUse
-      ? `No answer from your fetcher. Check that you're online. Otherwise, either today's ${FREE_DAILY.toLocaleString()} free requests are used up (it works again at ${resetTime()}, and nothing is charged), or this page needed more work than Cloudflare's free plan allows per request (10 ms). Screenshot mode still works.`
-      : `No answer from ${base}. Check the address (copy it from the Worker's page in Cloudflare) and that the deploy finished.`);
+      ? t("web_fx_silent", { limit: FREE_DAILY.toLocaleString(langTag()), time: resetTime() })
+      : t("web_fx_no_answer", { address: base }));
   }
   countRequest(base, path, res.ok);
   if (res.ok) return res;
@@ -149,10 +150,10 @@ async function call(path, params, base, key, inUse = false) {
   const code = body.error || `http-${res.status}`;
   // Cloudflare's own error pages, when the browser may read them
   if (!body.error && /\b1027\b/.test(text)) throw new FetcherError("daily-limit", LIMIT_REACHED());
-  if (!body.error && /\b1102\b/.test(text)) throw new FetcherError("cpu", "This page needed more work than Cloudflare's free plan allows per request (10 ms). Try again; if it keeps failing, use screenshot mode for this chapter.");
-  if (!body.error) throw new FetcherError(code, `${base} answered HTTP ${res.status}, not like a Gytakusub fetcher. Check the address.`);
+  if (!body.error && /\b1102\b/.test(text)) throw new FetcherError("cpu", t("web_fx_cpu"));
+  if (!body.error) throw new FetcherError(code, t("web_fx_not_fetcher_http", { address: base, status: res.status }));
   const extra = body.message && !["unauthorized", "setup"].includes(code) ? ` (${body.message})` : "";
-  const err = new FetcherError(code, ADVICE[code] ? ADVICE[code] + extra : body.message || `The fetcher answered HTTP ${res.status}.`);
+  const err = new FetcherError(code, ADVICE[code] ? t(ADVICE[code]) + extra : body.message || t("web_fx_http", { status: res.status }));
   if (body.version) err.version = body.version;
   throw err;
 }
@@ -163,11 +164,11 @@ async function call(path, params, base, key, inUse = false) {
  */
 export async function connectFetcher(url, key) {
   const base = fetcherBase(url);
-  if (!base) throw new FetcherError("no-address", "Enter your fetcher's address: https://….workers.dev");
-  if ((key || "").length < MIN_KEY) throw new FetcherError("short-key", `The access key must be at least ${MIN_KEY} characters (generate one in step 1).`);
+  if (!base) throw new FetcherError("no-address", t("web_fx_no_address"));
+  if ((key || "").length < MIN_KEY) throw new FetcherError("short-key", t("web_fx_short_key", { n: MIN_KEY }));
   const j = await (await call("/ping", {}, base, key)).json();
-  if (!j.ok || !j.version) throw new FetcherError("not-fetcher", `${base} answered, but not like a Gytakusub fetcher.`);
-  if (!atLeast(j.version, MIN_FETCHER_VERSION)) throw new FetcherError("outdated", `Your fetcher is version ${j.version}; this app needs ${MIN_FETCHER_VERSION} or newer. On GitHub, open your gytakusub copy → Sync fork → Update branch; wait a minute, then Connect again.`);
+  if (!j.ok || !j.version) throw new FetcherError("not-fetcher", t("web_fx_not_fetcher", { address: base }));
+  if (!atLeast(j.version, MIN_FETCHER_VERSION)) throw new FetcherError("outdated", t("web_fx_outdated", { version: j.version, needed: MIN_FETCHER_VERSION }));
   return { fetcherUrl: base, fetcherKey: key, fetcherCheck: { sig: await signature(base, key), version: j.version, at: Date.now() } };
 }
 

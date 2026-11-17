@@ -51,10 +51,13 @@ export function tn(key, n, vars = {}) {
   return t(k, { n: Number(n).toLocaleString(langTag()), ...vars });
 }
 
-const INLINE = new Set(["B", "I", "EM", "STRONG", "KBD", "CODE", "BR", "A", "SPAN"]);
+const INLINE = new Set(["B", "I", "EM", "STRONG", "KBD", "CODE", "BR", "A", "SPAN", "BUTTON"]); // BUTTON: the web app's copy chips inside its setup steps
 const SAFE_HREF = /^(https:\/\/[^\s"<>]+|[\w-]+(\.\w+)?(#[\w-]+)?|#[\w-]+)$/; // https, or the extension's or app's own files ("options.html#sec-api", "LICENSE")
 
-/** A message with markup as DOM nodes: only INLINE tags, https or local links, plain ids and classes. */
+/**
+ * A message with markup as DOM nodes: only INLINE tags, https or local links, plain ids and classes,
+ * aria-hidden, and on buttons a title and a data-copy value (always type="button": no form submits).
+ */
 export function safeFragment(markup, doc = document) {
   const parsed = new DOMParser().parseFromString(`<body>${markup}</body>`, "text/html");
   const frag = doc.createDocumentFragment();
@@ -65,6 +68,13 @@ export function safeFragment(markup, doc = document) {
       if (!INLINE.has(n.tagName)) { copy(n, into); continue; } // anything else: just its text
       const el = doc.createElement(n.tagName.toLowerCase());
       for (const attr of ["id", "class"]) { const v = n.getAttribute(attr); if (v && /^[\w -]+$/.test(v)) el.setAttribute(attr, v); }
+      if (n.getAttribute("aria-hidden") === "true") el.setAttribute("aria-hidden", "true");
+      if (n.tagName === "BUTTON") {
+        el.type = "button";
+        const copyValue = n.getAttribute("data-copy"), title = n.getAttribute("title");
+        if (copyValue && /^[\w .:/-]+$/.test(copyValue)) el.dataset.copy = copyValue;
+        if (title) el.title = title;
+      }
       if (n.tagName === "A") {
         const href = n.getAttribute("href") || "";
         if (SAFE_HREF.test(href)) el.setAttribute("href", href);

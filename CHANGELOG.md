@@ -4,6 +4,25 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
 
 ## [Unreleased]
 
+## [2.10.0] — 2026-11-17
+
+The web app's own screens in the reader's language.
+
+### Web app
+- **The web app follows the target language**, like the extension, in the same ten languages: the install steps, screenshot mode, the chapter-link setup, the fetcher page, Settings, and its messages and errors. Other target languages keep it in English.
+  - Saving another target language in Settings switches it at once, without a reload.
+  - On a first visit it guesses from the phone's language, as before.
+- GitHub's and Cloudflare's button names stay in English in the setup steps, with a note saying so, because those sites are what the reader has to find them on.
+- iPhone and Android menu names are written as the system shows them in each language, as far as I know (not checked on real devices).
+- The model menu shows just the names, with what the chosen one is good for underneath, as in the extension's popup.
+- Japanese wraps between phrases and Korean between words, as in the extension.
+- Two fetcher messages pointed at the wrong setup step ("step 4" for the key, "step 1" to generate it). They now say steps 5 and 2.
+
+### Development
+- `web/locales/<locale>/messages.json`: the web app's 181 messages, checked by `scripts/check-i18n.mjs` (now also part of the web test suite).
+- `tests/browser/web-i18n.mjs` (83 checks).
+- ADR 0010 has a 2.10.0 section.
+
 ## [2.9.0] — 2026-11-17
 
 Lettering that works in every listed language, in the extension and the web app.
@@ -47,7 +66,7 @@ Languages: pick the target from a list, and Gytakusub's own pages speak it.
 - The translations were written with AI (Claude) and checked by machine, not yet by native speakers. A **Translation fix** issue form takes corrections.
 
 ### Web app
-- The target language is the same dropdown, with Other…. Until you save settings, it guesses from the phone's language. The web app's own interface stays English for now (2.9.0).
+- The target language is the same dropdown, with Other…. Until you save settings, it guesses from the phone's language. The web app's own interface stays English for now (translated in 2.10.0).
 
 ### Development
 - `scripts/check-i18n.mjs` (in CI): every language has every English message, with the same placeholders, markup and links, no stray `$`, and a description within the manifest's 132 characters.

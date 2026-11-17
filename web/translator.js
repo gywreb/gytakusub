@@ -5,6 +5,7 @@ import { callClaude, mergeContext, apiHeaders, API_URL } from "./prompt.js";
 import { limitsOf, explainApiError } from "./usage.js";
 import { recordClaudeUsage, recordClaudePage } from "./claude-usage.js";
 import { letteringFor } from "./languages.js";
+import { t } from "./i18n.js";
 
 // every answer is logged as it arrives, so a page whose other slice fails still counts what it cost
 const callAndRecord = (settings, slice, ctx) => callClaude(settings, slice, ctx).then((r) => { recordClaudeUsage(r); return r; });
@@ -59,7 +60,7 @@ export function blobToDataUrl(blob) {
 }
 
 export function loadImage(src) {
-  return new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error("Could not decode image")); im.src = src; });
+  return new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error(t("web_cannot_decode"))); im.src = src; });
 }
 
 /**
@@ -70,7 +71,7 @@ export function loadImage(src) {
  * @returns {{items, placements, regions, work, letter, clean:ImageBitmap, width, height, usage, ctx}}
  */
 export async function translateImage(img, settings, ctx = { terms: [], recent: [] }) {
-  if (!settings.apiKey) throw new Error("No API key set — open Settings (⚙) and paste your Claude API key.");
+  if (!settings.apiKey) throw new Error(t("web_no_key"));
   const bitmap = await createImageBitmap(img);
   const prep = await rpc({ type: "prepare", bitmap, settings: { maxLongEdge: settings.maxLongEdge, stripWidth: settings.stripWidth, sliceHeight: settings.sliceHeight } }, [bitmap]);
   let results;
