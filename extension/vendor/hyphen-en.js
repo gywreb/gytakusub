@@ -4540,5 +4540,6 @@ const patternsEnUs = ((module) => {
 return module.exports;
 })({ exports: {} });
 /** Soft-hyphen (U+00AD) insertion at TeX break points; sync. */
-root.GyHyphen = { hyphenateEn: createHyphenator(patternsEnUs, { hyphenChar: "\u00AD", minWordLength: 6 }), SOFT_HYPHEN: "\u00AD" };
+const create = (patterns) => createHyphenator(patterns, { hyphenChar: "\u00AD", minWordLength: 6 });
+root.GyHyphen = { hyphenateEn: create(patternsEnUs), create, SOFT_HYPHEN: "\u00AD" };
 })(typeof globalThis !== "undefined" ? globalThis : this);

@@ -115,6 +115,7 @@
       if (s && !s.error) settings = s;
     } catch { /* background not ready yet */ }
     labelControls();
+    ensureHyphenation(); // the target language may have changed
     applyAutoMode();
     if (!settings.enabled) { bar.classList.remove("visible"); hoverImg = null; }
   }
@@ -216,6 +217,8 @@
       natural: [img.naturalWidth, img.naturalHeight], displayed: [Math.round(img.getBoundingClientRect().width), Math.round(img.getBoundingClientRect().height)], objectFit: e.objectFit,
       work: res.work, letter: res.letter, fromCache: res.fromCache, timing: res.timing, engine: res.engine,
       settings: { model: settings.model, targetLang: settings.targetLang, fontFamily: settings.fontFamily, uppercase: settings.uppercase, useContext: settings.useContext },
+      // how the page was lettered: the font chosen for its translations, and the language's rules
+      lettering: { ...settings.lettering, hyphenation: !!hyphenation.fn, family: GyText.lettering(res.placements.map((p) => p.text), lettering(res)).family },
       regions: res.regions, items: res.items, placements: res.placements,
     };
   }
@@ -242,7 +245,8 @@
           const c = document.createElement("canvas"); c.width = res.work.W; c.height = res.work.H;
           const ctx = c.getContext("2d");
           ctx.drawImage(clean, 0, 0, res.work.W, res.work.H); drawDebug(ctx, res);
-          GyText.draw(ctx, res.placements, { fontFamily: settings.fontFamily, uppercase: settings.uppercase });
+          await Promise.all([ensureFont(), ensureHyphenation()]);
+          GyText.draw(ctx, res.placements, lettering(res));
           const png = await new Promise((r) => c.toBlob(r, "image/png"));
           files.push({ name: `page-${id}.debug.png`, data: new Uint8Array(await png.arrayBuffer()) });
         }
@@ -420,23 +424,52 @@
 
   // ---------- translation ----------
 
-  // Bundled lettering font (fonts/ComicNeue-Bold.ttf, declared web-accessible).
-  // Loaded once per page; render waits for it so the first page isn't typeset
-  // in a fallback face. Failure is non-fatal: the fallback stack is used.
+  // Bundled lettering fonts (fonts/*, declared web-accessible; vendor/lettering-fonts.js lists
+  // them). Loaded once per page; render waits for them so the first page isn't typeset in a
+  // fallback face. Failure is non-fatal: the fallback stack is used.
   let fontReady = null;
   function ensureFont() {
     if (fontReady) return fontReady;
     fontReady = (async () => {
       if (typeof FontFace === "undefined" || !document.fonts) return false;
-      try {
-        const face = new FontFace("Gytakusub Comic", `url(${chrome.runtime.getURL("fonts/ComicNeue-Bold.ttf")})`, { weight: "700", style: "normal" });
-        await face.load();
-        document.fonts.add(face);
-        return true;
-      } catch (e) { console.warn("Gytakusub: bundled font unavailable, using fallback", e); return false; }
+      const loaded = await Promise.all((globalThis.GyFonts || []).map(async (f) => {
+        try {
+          const face = new FontFace(f.family, `url(${chrome.runtime.getURL(f.file)})`, { weight: String(f.weight), style: "normal" });
+          await face.load();
+          document.fonts.add(face);
+          return true;
+        } catch (e) { console.warn(`Gytakusub: lettering font ${f.file} unavailable, using fallback`, e); return false; }
+      }));
+      return loaded.every(Boolean);
     })();
     return fontReady;
   }
+
+  // Hyphenation for the target language (settings.lettering.hyphen): English's patterns come with
+  // this script; others come from the worker, which reads vendor/hyphen/<name>.json. Languages
+  // without patterns (and ones typed under Other) are never hyphenated.
+  let hyphenation = { name: undefined, fn: null, ready: Promise.resolve() };
+  function ensureHyphenation() {
+    const name = settings.lettering?.hyphen || null;
+    if (name === hyphenation.name) return hyphenation.ready;
+    const h = { name, fn: null, ready: null };
+    hyphenation = h;
+    h.ready = (async () => {
+      if (!name) return;
+      if (name === "en-us") { h.fn = globalThis.GyHyphen?.hyphenateEn || null; return; }
+      try {
+        const res = await chrome.runtime.sendMessage({ type: "GET_HYPHENATION", name });
+        if (res?.patterns && globalThis.GyHyphen?.create) h.fn = GyHyphen.create(res.patterns);
+      } catch (e) { console.warn("Gytakusub: no hyphenation for", name, e); }
+    })();
+    return h.ready;
+  }
+  /** How GyText letters this page: the target language's rules, one font for all its lines. */
+  const lettering = (res) => ({
+    fontFamily: settings.fontFamily, uppercase: settings.uppercase,
+    lang: settings.lettering?.lang || null, hyphenator: hyphenation.fn,
+    pageTexts: res.placements.map((p) => p.text),
+  });
 
   const blobToDataUrl = (blob) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(blob); });
   const loadImage = (dataUrl) => new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error("Could not decode image")); im.src = dataUrl; });
@@ -487,7 +520,7 @@
   }
 
   async function render(img, entry) {
-    await ensureFont();
+    await Promise.all([ensureFont(), ensureHyphenation()]);
     const res = entry.result;
     // the erased areas only; the page's own image shows through everywhere else
     entry.patches = await Promise.all(res.patches.map(async (p) => ({ ...p, img: await loadImage(p.dataUrl) })));
@@ -511,7 +544,7 @@
     for (const p of entry.patches) ctx.drawImage(p.img, p.x, p.y, p.w, p.h);
     if (settings.debugOverlay) drawDebug(ctx, res);
     const peek = res.placements[entry.peek];
-    GyText.draw(ctx, peek ? res.placements.filter((p) => p !== peek) : res.placements, { fontFamily: settings.fontFamily, uppercase: settings.uppercase });
+    GyText.draw(ctx, peek ? res.placements.filter((p) => p !== peek) : res.placements, lettering(res));
     if (peek) { const r = peekRect(peek, res); ctx.clearRect(r.x, r.y, r.w, r.h); }
   }
   // The area a peek reveals: the bubble when the line sits in one, else the text's footprint.

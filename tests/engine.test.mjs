@@ -8,10 +8,9 @@ import { analyze } from "../extension/engine/analyze.js";
 import { layout } from "../extension/engine/layout.js";
 import { erase } from "../extension/engine/erase.js";
 import * as prompt from "../extension/prompt.js";
+import { loadLettering } from "./lettering-setup.mjs";
 
-registerFont("../extension/fonts/ComicNeue-Bold.ttf", { family: "Gytakusub Comic", weight: "bold" });
-new Function(fs.readFileSync("../extension/vendor/hyphen-en.js", "utf8"))();
-new Function(fs.readFileSync("../extension/text.js", "utf8"))();
+loadLettering();
 const GyText = globalThis.GyText;
 let passed = 0;
 const failures = [];

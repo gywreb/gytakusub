@@ -7,9 +7,8 @@ import { cv, detector, analyzePage } from "./cv-node.mjs";
 import { analyze } from "../extension/engine/analyze.js";
 import { layout } from "../extension/engine/layout.js";
 import { erase } from "../extension/engine/erase.js";
-registerFont("../extension/fonts/ComicNeue-Bold.ttf", { family: "Gytakusub Comic", weight: "bold" });
-new Function(fs.readFileSync("../extension/vendor/hyphen-en.js", "utf8"))();
-new Function(fs.readFileSync("../extension/text.js", "utf8"))();
+import { loadLettering } from "./lettering-setup.mjs";
+loadLettering();
 const GyText = globalThis.GyText;
 
 const [,, pagePath, itemsPath, outPath] = process.argv;

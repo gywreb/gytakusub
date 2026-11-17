@@ -55,7 +55,8 @@ One request per page: the page image (at most about 1,600 input tokens on most m
 
 - Only `<img>` elements are handled. Readers that draw pages into a `<canvas>` or a CSS `background-image` are not supported.
 - Overlays follow the image's on-screen rectangle; if the image sits inside a scrolling sub-panel the overlay can spill past the panel edge.
-- Translations are set horizontally (no vertical typesetting); hyphenation is English-only.
+- Translations are set horizontally, also into Japanese and Chinese (no vertical typesetting yet). Hyphenation covers English, German, French, Spanish, Portuguese, Italian, Dutch, Polish and Ukrainian; other languages break at spaces only (Chinese, Japanese and Thai between words).
+- Right-to-left languages (Arabic, Hebrew, Persian) aren't lettered right yet.
 - On the CPU (no WebGPU) a page takes about 3–5 s to analyse before the model call. The page you stop at goes first, but it can still wait for the model run another page is in the middle of (a few seconds on the CPU), because the engine shares the service worker's one thread.
 - Sound effects and signs the model leaves untranslated still get numbered stamps, which costs a few prompt tokens.
 - Inpainting smooths screentone and hatching behind narration set on the art (a visible smudge where the letters were). Bubbles are unaffected.
@@ -76,7 +77,7 @@ locale.js         i18n.js for extension pages (reads the extension's own files)
 _locales/         interface text in 10 languages (Chrome's messages.json format; English is the reference)
 prompt.js         Claude prompt, structured-output schema, API call, response parsing
 content.js        image discovery, hover bar, overlay rendering & positioning, auto mode, debug report
-text.js           text fitting and drawing on the page side
+text.js           text fitting and drawing on the page side: font per page, line breaking per language
 engine/           page engine (runs in the worker):
   page.js           prepare a page for the model, then place, erase and return it
   detect.js         PP-OCRv6 text detector (ONNX Runtime; OpenCV dnn fallback)
@@ -88,7 +89,9 @@ engine/           page engine (runs in the worker):
   layout.js         where each translation goes
   erase.js          inpainting of the original lettering
 vendor/           OpenCV.js, ONNX Runtime Web, the two models, hyphenation patterns (licences beside them)
-fonts/            Comic Neue Bold (SIL OFL)
+  hyphen-en.js      the hyphenation library + English patterns; hyphen/*.json: other languages' patterns
+  lettering-fonts.js  the lettering fonts and the characters each has (scripts/vendor-fonts.mjs)
+fonts/            Comic Neue Bold, Comic Relief Bold (Latin Extended, Cyrillic), Mali Bold (Vietnamese, Thai); SIL OFL
 popup.*           quick actions, model, site toggles, debug report
 options.*         API key, model, glossary, prompt, sites, lettering, GPU, debug
 ui.css            shared look of the popup and Options (same tokens as the web app)
