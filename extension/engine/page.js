@@ -8,7 +8,7 @@ import { analyze } from "./analyze.js";
 import { segment } from "./segment.js";
 import { detectText, detectInEmptyBubbles, detectInDarkShapes } from "./detect.js";
 import { layout } from "./layout.js";
-import { erase } from "./erase.js";
+import { erase, eraseFullSize } from "./erase.js";
 import { sliceGeometry, normalizeItems } from "../prompt.js";
 
 /**
@@ -94,12 +94,17 @@ export async function preparePage(bitmap, settings, opts = {}) {
 /**
  * @param {Job} job from preparePage (its analyses are consumed and disposed here)
  * @param {Array<{items:any[]}>} results model output per slice, same order
- * @param {{wantClean?: boolean}} [opts]
+ * @param {{natural?: ImageBitmap}} [opts] natural: the page at its own size again; when the page was
+ *   downscaled for the analysis, the erased areas are then inpainted again at full size (patches
+ *   with the page's own resolution). The caller keeps and closes the bitmap.
+ * @returns patches in PAGE pixels ({x, y, w, h} of the full-size page, canvas at that size or, without
+ *   `natural`, at the work size), placements and regions in work pixels.
  */
 export async function finishPage(job, results, opts = {}) {
   const cv = await getCV();
-  const { width, height, work } = job;
-  const items = [], placements = [], regions = [], rois = [];
+  const { width, height, work, scale } = job;
+  const full = !!opts.natural && scale < 0.999;
+  const items = [], placements = [], regions = [], rois = [], patches = [];
   const canvas = new OffscreenCanvas(work.W, work.H);
   const ctx = canvas.getContext("2d");
   job.slices.forEach((s, idx) => {
@@ -112,9 +117,14 @@ export async function finishPage(job, results, opts = {}) {
     const { placements: pl, regionIds } = layout(an, local);
     for (const p of pl) placements.push({ ...p, rect: { x: p.rect.x + s.ox, y: p.rect.y + s.oy, w: p.rect.w, h: p.rect.h } });
     for (const r of an.regions) regions.push({ id: r.id, kind: r.kind, letter: r.letter, box: { x: r.box.x + s.ox, y: r.box.y + s.oy, w: r.box.w, h: r.box.h } });
-    const clean = regionIds.size ? erase(cv, s.imageData, an, regionIds) : { image: s.imageData, rois: [] };
+    const clean = regionIds.size ? erase(cv, s.imageData, an, regionIds, { keepMask: full }) : { image: s.imageData, rois: [] };
     ctx.putImageData(clean.image, s.ox, s.oy);
-    for (const r of clean.rois) rois.push({ x: r.x + s.ox, y: r.y + s.oy, w: r.w, h: r.h });
+    if (full && clean.mask) {
+      for (const r of clean.rois) { const p = fullSizePatch(cv, opts.natural, s, scale, clean.mask, r); if (p) patches.push(p); }
+      clean.mask.delete();
+    } else {
+      for (const r of clean.rois) rois.push({ x: r.x + s.ox, y: r.y + s.oy, w: r.w, h: r.h });
+    }
     an.dispose();
   });
   const letter = job.slices.length ? job.slices[0].analysis.letter : 0;
@@ -125,13 +135,31 @@ export async function finishPage(job, results, opts = {}) {
   // Patches: just the areas the eraser changed, cut from the cleaned page. The
   // extension ships these (a few KB each) instead of the whole page; the content
   // script draws them over the image it already shows.
-  const patches = rois.map((r) => {
+  // (work-size patches, when the page was analysed at its own size or no full-size page was given)
+  for (const r of rois) {
     const c = new OffscreenCanvas(r.w, r.h);
     c.getContext("2d").drawImage(canvas, r.x, r.y, r.w, r.h, 0, 0, r.w, r.h);
-    return { x: r.x, y: r.y, w: r.w, h: r.h, canvas: c };
-  });
+    patches.push({ x: r.x / scale, y: r.y / scale, w: r.w / scale, h: r.h / scale, canvas: c });
+  }
   const backend = job.slices[0]?.analysis.backend || null;
-  return { items, placements, regions, work, letter, canvas, patches, engine, segmentMs, detectMs, backend };
+  return { items, placements, regions, work, letter, canvas, patches, fullSize: full, engine, segmentMs, detectMs, backend };
+}
+
+/**
+ * One erased area again at the page's own size: the work-resolution area `r` (slice coordinates)
+ * widened to whole page pixels, cut from the full-size page, inpainted with the work mask resampled.
+ */
+function fullSizePatch(cv, natural, s, scale, mask, r) {
+  const nx = s.x + Math.floor(r.x / scale), ny = s.y + Math.floor(r.y / scale);
+  const nx1 = Math.min(s.x + s.w, s.x + Math.ceil((r.x + r.w) / scale)), ny1 = Math.min(s.y + s.h, s.y + Math.ceil((r.y + r.h) / scale));
+  const nw = nx1 - nx, nh = ny1 - ny;
+  if (nw < 1 || nh < 1) return null;
+  const c = new OffscreenCanvas(nw, nh), cctx = c.getContext("2d", { willReadFrequently: true });
+  cctx.drawImage(natural, nx, ny, nw, nh, 0, 0, nw, nh);
+  const done = eraseFullSize(cv, cctx.getImageData(0, 0, nw, nh), nx, ny, mask, scale, s.x, s.y, r.radius || 3);
+  if (!done) return null;
+  cctx.putImageData(done, 0, 0);
+  return { x: nx, y: ny, w: nw, h: nh, canvas: c };
 }
 
 /** Red numbered stamps at the top-left of each text region. */

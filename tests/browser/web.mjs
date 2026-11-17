@@ -63,8 +63,18 @@ const inked = await page.$eval(".page canvas.translated", (c) => {
   return dark;
 });
 
+// 2.11.0: the page is rendered at its own size (the fixture is 1200 × 1700, analysed at 1129 × 1600),
+// and the erased areas are inpainted at that size: around a translated bubble the canvas matches
+// the original's own pixels, not a stretched working-size copy
+const sizes = await page.$eval(".page", (el) => {
+  const t = el.querySelector("canvas.translated"), o = el.querySelector("canvas.original");
+  return { t: [t.width, t.height], o: [o.width, o.height] };
+});
+
 let failures = 0;
 const fail = (m) => { failures++; console.log("FAIL:", m); };
+if (sizes.t[0] !== 1200 || sizes.t[1] !== 1700) fail("translated page not at the original's size: " + sizes.t.join("×"));
+if (sizes.o[0] !== 1200 || sizes.o[1] !== 1700) fail("original page not at its own size: " + sizes.o.join("×"));
 if (!calls.length) fail("no API call reached the mock");
 if (/error/.test(status.cls)) fail("page status is an error: " + status.text);
 if (errors.length) fail("console/page errors: " + errors.slice(0, 3).join(" | "));

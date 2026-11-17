@@ -9,9 +9,11 @@
  * @param {ImageData} img working-resolution page (same one analyze() saw)
  * @param {import("./analyze.js").Analysis} analysis
  * @param {Set<number>} regionIds regions that have translations to place
- * @returns {{image: ImageData, rois: Array<{x:number,y:number,w:number,h:number}>}} cleaned page and the areas that changed
+ * @param {{keepMask?: boolean}} [opts] keepMask: also return the inpainting mask (a cv.Mat the caller
+ *   deletes) and each area's radius, so the same areas can be inpainted again at the page's full size
+ * @returns {{image: ImageData, rois: Array<{x:number,y:number,w:number,h:number,radius?:number}>, mask?: any}} cleaned page and the areas that changed
  */
-export function erase(cv, img, analysis, regionIds) {
+export function erase(cv, img, analysis, regionIds, opts = {}) {
   const { W, H } = analysis;
   const src = cv.matFromImageData(img);
   const rgb = new cv.Mat(); cv.cvtColor(src, rgb, cv.COLOR_RGBA2RGB);
@@ -155,6 +157,37 @@ export function erase(cv, img, analysis, regionIds) {
 
   const out = new cv.Mat(); cv.cvtColor(rgb, out, cv.COLOR_RGB2RGBA);
   const result = new ImageData(new Uint8ClampedArray(out.data), W, H);
-  src.delete(); rgb.delete(); mask.delete(); out.delete();
+  src.delete(); rgb.delete(); out.delete();
+  if (opts.keepMask) return { image: result, rois: rois.map((r) => ({ x: r.x, y: r.y, w: r.w, h: r.h, radius: r.radius })), mask };
+  mask.delete();
   return { image: result, rois: rois.map((r) => ({ x: r.x, y: r.y, w: r.w, h: r.h })) };
+}
+
+/**
+ * Inpaints one changed area again at the page's full size, so the patch drawn over the
+ * reader's image has that image's own pixels around the erased lettering (the work-resolution
+ * patch, stretched, is softer than the page it covers). `natural`: that area of the full-size
+ * page as ImageData, whose top-left is (nx, ny) in page pixels. `mask`: the slice's
+ * work-resolution mask from erase(..., {keepMask: true}); `scale`: work pixels per page pixel;
+ * (ox, oy): the slice's origin in page pixels. The mask is resampled onto the full-size pixel
+ * grid by the exact affine map (pixel centres), not by resizing a rounded rectangle, so the
+ * patch lines up with the original to a fraction of a pixel.
+ * @returns {ImageData|null} the inpainted area, or null when no mask pixel falls inside it
+ */
+export function eraseFullSize(cv, natural, nx, ny, mask, scale, ox, oy, radius) {
+  const W = natural.width, H = natural.height;
+  const M = cv.matFromArray(2, 3, cv.CV_64F, [scale, 0, (nx - ox + 0.5) * scale - 0.5, 0, scale, (ny - oy + 0.5) * scale - 0.5]);
+  const m = new cv.Mat();
+  cv.warpAffine(mask, m, M, new cv.Size(W, H), cv.INTER_LINEAR | cv.WARP_INVERSE_MAP, cv.BORDER_CONSTANT, new cv.Scalar(0));
+  M.delete();
+  // a quarter of a work pixel's coverage counts: the work mask was already grown over each stroke's fringe
+  cv.threshold(m, m, 63, 255, cv.THRESH_BINARY);
+  if (!cv.countNonZero(m)) { m.delete(); return null; }
+  const src = cv.matFromImageData(natural), rgb = new cv.Mat(), dst = new cv.Mat(), out = new cv.Mat();
+  cv.cvtColor(src, rgb, cv.COLOR_RGBA2RGB);
+  cv.inpaint(rgb, m, dst, Math.max(3, Math.round(radius / scale)), cv.INPAINT_TELEA);
+  cv.cvtColor(dst, out, cv.COLOR_RGB2RGBA);
+  const result = new ImageData(new Uint8ClampedArray(out.data), W, H);
+  src.delete(); rgb.delete(); dst.delete(); out.delete(); m.delete();
+  return result;
 }

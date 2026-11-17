@@ -261,6 +261,7 @@
       const inBubble = p.tag != null && !p.halo;
       const fit = fitText(text, p.rect, setFont, measure, { maxSize: inBubble ? target * 1.3 : target, minSize: Math.max(7, target * 0.35), lang, hyphenator });
       drawLines(ctx, fit, p.rect, p.color, family, p.halo);
+      if (opts.sizes) opts.sizes[i] = fit.size; // the size each line was drawn at, for callers that need it
       n++;
     });
     return n;

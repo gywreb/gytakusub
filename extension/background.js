@@ -294,7 +294,10 @@ async function translatePage(msg, settings, tabId, work) {
   // over at its next checkpoint), and nothing of it is left to wait behind the next page's
   // analysis, whose model runs hold the worker's one thread for seconds at a time.
   const { page, patches, cleanDataUrl } = await lane.run(async () => {
-    const page = await finishPage(job, results);
+    // the page at its own size again, so the erased areas come back with its own resolution
+    const natural = job.scale < 0.999 ? await createImageBitmap(blob).catch(() => null) : null;
+    let page;
+    try { page = await finishPage(job, results, { natural }); } finally { natural?.close(); }
     // The user's own corrections to this page's lines live beside the cached answer
     // (a Redo asks the model again and drops them).
     const editsKey = "edits:" + cacheKey;

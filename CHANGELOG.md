@@ -4,6 +4,28 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
 
 ## [Unreleased]
 
+## [2.11.0] — 2026-11-17
+
+Sharp on every screen. First step of the 3.0 plan: a robust core before new features.
+
+### Pages
+- **The translation is drawn at your screen's own pixels.** It used to be drawn once at the engine's working size (at most 1600 px) and stretched: 2.4× on a 2× laptop screen, 3.6× on a 3× one, so the text looked soft. Now the overlay has one pixel per screen pixel, measured from 390 to 2560 px wide on 1×, 2× and 3× screens.
+- **It is drawn again when the window, the zoom or the screen changes**, once the resize settles.
+- **The erased areas have the page's own resolution.** Pages bigger than 1600 px used to get softer patches cut from the smaller working copy.
+- **Lines too small to read can be read.** In a narrow window, a line drawn under 9 px shows at a readable size beside its bubble while the pointer rests on it.
+- Pages far from the screen give their memory back and are drawn again when you scroll back.
+- The erasing itself is unchanged: white smudges on toned bubbles and art are still there, just sharper. That is 2.12.0.
+
+### Web app
+- **Translated pages are as big as the original** (they were 1600 px at most), so a saved page, or one you zoom into, is as sharp as the source. Very long strips are capped at 16 million pixels, iOS Safari's canvas limit.
+
+### Development
+- `tests/browser/screens.mjs`: every size and density in the real extension (30 checks); it also takes `--page` (any image), `--ext` (another build) and `--measure-only`.
+- `tests/fullsize.test.mjs`: full-size erasing lines up with the original and leaves everything outside the mask alone.
+- `npm run audit -- report.zip outdir`: the core audit used for the 3.0 plan (erased bubbles with marks left, lines drawn over unerased text, renders and a crop sheet of the worst bubbles).
+- The debug report records the overlay's pixel ratio, its pixels and each line's size on screen.
+- ADR 0012.
+
 ## [2.10.0] — 2026-11-17
 
 The web app's own screens in the reader's language.

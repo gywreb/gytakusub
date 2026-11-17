@@ -68,7 +68,8 @@ export function loadImage(src) {
  * @param {HTMLImageElement} img  decoded page
  * @param {object} settings
  * @param {{terms:Array, recent:Array}} ctx  chapter context (mutated via return)
- * @returns {{items, placements, regions, work, letter, clean:ImageBitmap, width, height, usage, ctx}}
+ * @returns {{items, placements, regions, work, letter, patches:Array<{x,y,w,h,bitmap:ImageBitmap}>, width, height, usage, ctx}}
+ *   patches: the erased areas in page pixels, at the page's own resolution
  */
 export async function translateImage(img, settings, ctx = { terms: [], recent: [] }) {
   if (!settings.apiKey) throw new Error(t("web_no_key"));
@@ -81,8 +82,10 @@ export async function translateImage(img, settings, ctx = { terms: [], recent: [
   const terms = [];
   const usage = { input_tokens: 0, output_tokens: 0 };
   for (const r of results) { terms.push(...r.terms); if (r.usage) { usage.input_tokens += r.usage.input_tokens || 0; usage.output_tokens += r.usage.output_tokens || 0; } }
-  const fin = await rpc({ type: "finish", jobId: prep.jobId, results: results.map((r) => ({ items: r.items })) });
-  return { items: fin.items, placements: fin.placements, regions: fin.regions, work: fin.work, letter: fin.letter, clean: fin.clean, width: prep.width, height: prep.height, usage, ctx: mergeContext(ctx, terms, fin.items.map((i) => i.text)) };
+  const downscaled = prep.work.W < prep.width;
+  const natural = downscaled ? await createImageBitmap(img) : null;
+  const fin = await rpc({ type: "finish", jobId: prep.jobId, results: results.map((r) => ({ items: r.items })), natural }, natural ? [natural] : []);
+  return { items: fin.items, placements: fin.placements, regions: fin.regions, work: fin.work, letter: fin.letter, patches: fin.patches, width: prep.width, height: prep.height, usage, ctx: mergeContext(ctx, terms, fin.items.map((i) => i.text)) };
 }
 
 // Hyphenation for the target language: English's patterns load with the page
@@ -108,19 +111,29 @@ export async function prepareLettering(settings) {
   return { lang: letteringFor(settings.targetLang).lang, hyphenator };
 }
 
+// iOS Safari refuses a canvas over ~16.7 million pixels; a page that big (a long strip) is drawn smaller.
+const MAX_CANVAS_PIXELS = 16e6;
+
 /**
- * Render original + translated canvases at the engine's working resolution.
+ * Render original + translated canvases at the page's own size (so a saved page, or one zoomed
+ * on a phone, is as sharp as the original): the original, the erased areas over it, then the text,
+ * scaled from the engine's working pixels.
  * `look`: prepareLettering()'s answer (the target language's rules).
  * @returns {{original:HTMLCanvasElement, translated:HTMLCanvasElement, drawn:number}}
  */
 export function renderPage(img, result, settings, look = {}) {
-  const { W, H } = result.work;
+  const k = Math.min(1, Math.sqrt(MAX_CANVAS_PIXELS / (result.width * result.height)));
+  const W = Math.max(1, Math.round(result.width * k)), H = Math.max(1, Math.round(result.height * k));
   const original = document.createElement("canvas"); original.width = W; original.height = H;
   original.getContext("2d").drawImage(img, 0, 0, W, H);
   const translated = document.createElement("canvas"); translated.width = W; translated.height = H;
   const tctx = translated.getContext("2d");
-  tctx.drawImage(result.clean, 0, 0);
+  tctx.drawImage(img, 0, 0, W, H);
+  tctx.setTransform(W / result.width, 0, 0, H / result.height, 0, 0);
+  for (const p of result.patches || []) tctx.drawImage(p.bitmap, p.x, p.y, p.w, p.h);
+  tctx.setTransform(W / result.work.W, 0, 0, H / result.work.H, 0, 0);
   const drawn = GyText.draw(tctx, result.placements, { fontFamily: settings.fontFamily, uppercase: settings.uppercase, lang: look.lang ?? null, hyphenator: look.hyphenator ?? null });
+  tctx.setTransform(1, 0, 0, 1, 0, 0);
   return { original, translated, drawn };
 }
 
