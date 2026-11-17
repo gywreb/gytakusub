@@ -4,6 +4,30 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
 
 ## [Unreleased]
 
+## [2.12.0] — 2026-11-18
+
+Clean bubbles. Second step of the 3.0 plan: a robust core before new features.
+
+### Pages
+- **No more white clouds on toned bubbles.** The eraser now covers the white outline round lettering, which it used to leave behind and smear over the tone.
+- **Screentone is continued dot for dot.** Where a bubble or a panel is screentone, the eraser measures its pattern and copies it into the hole in step with the dots around it. It only does this when the pattern really predicts the surrounding tone; otherwise the next fill takes over.
+- **Art and irregular tone are filled by a manga-trained inpainting model** (AOT-GAN), on the graphics card when there is one. On 150 stretches of real pages with lettering drawn over them, the fill came out closer to what was really there in 142 (SSIM 0.45 → 0.62).
+- **Narration over art no longer takes the art with it.** Free text is erased line by line. On a cover page where lines of text and strokes of the drawing were read as one block, the faces under it used to be erased too.
+- White bubbles are filled with their own white, as before.
+- Without a graphics card the inpainting model works at a smaller size (it costs seconds per area on a CPU). The model is loaded only when an area needs it.
+- The extension is about 23 MB larger (the inpainting model).
+
+### Web app
+- The same eraser. The model is downloaded the first time a page needs it (white bubbles and screentone don't), then cached.
+
+### Development
+- `tests/fill-truth.mjs`: the eraser's fill against known backgrounds on real pages (they stay local).
+- `tests/lattice.test.mjs` (the screentone fill), `tests/inpaint.test.mjs` (the learned fill), `tests/tone.test.mjs` (a synthetic page with toned and gradient bubbles and narration on screentone, 2.11 vs 2.12). Added to `test:extension` with a check of the vendored model against its record.
+- `tests/residue.mjs`, the marks-left measure behind `npm run audit`: four faults fixed, and areas on a textured surround counted apart, since there it misjudges both ways. See ADR 0013.
+- The debug report's timing has `fill`: areas by how they were filled, and the time the texture fills took.
+- README rewritten for visitors; how it works moved to `docs/ARCHITECTURE.md`, development to `CONTRIBUTING.md`.
+- ADR 0013.
+
 ## [2.11.1] — 2026-11-17
 
 ### Pages

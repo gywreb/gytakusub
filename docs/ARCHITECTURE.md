@@ -1,0 +1,46 @@
+# How Gytakusub works
+
+| | `extension/` | `web/` |
+|---|---|---|
+| Where | Brave / Chrome / Edge on desktop | Any browser, installable as a home-screen app on iPhone/Android |
+| Input | Images on sites you enable; hover → Translate, `Alt+T`, or per-site auto-translate | Screenshots (paste / Photos), or a chapter link from any site that needs no login, through your own free [chapter fetcher](../fetcher/README.md) |
+| Output | Transparent overlay on the page | Translated page images you can save or share |
+
+## One page, start to finish
+
+1. The page is downscaled (≤1600 px; tall webtoon strips are sliced) and **text and bubbles are found locally** by two open-source models (on the graphics card when there is one). Lines are snapped to the ink, merged into paragraphs and assigned to the bubble they sit in. Each region gets a numbered red stamp.
+2. Claude (vision) is asked, per piece of text, *which numbered region it is in* (set-of-mark prompting, far more reliable than asking a language model for coordinates), and answers in a fixed JSON schema. The tag decides placement; the model's pixel box only corrects a misread stamp and orders speakers in a joined bubble.
+3. The original lettering is erased and the translation is typeset into the largest rectangle inside the bubble, sized from the original lettering. Free text over artwork is erased in place and drawn with a halo.
+   - The eraser's mask is the lettering and its outline (a white stroke round black letters), never the bubble's own outline.
+   - Each area is filled with the simplest model that explains its surface: its own colour when it is flat (most white bubbles); the screentone continued in phase when the surface is a lattice of dots or lines and that lattice predicts the surround; a manga-trained inpainting model (AOT-GAN) otherwise. See [ADR 0013](adr/0013-learned-eraser.md).
+   - When the page was downscaled, the erased areas are redone at the page's own resolution.
+4. The overlay is drawn at the screen's own pixels and redrawn when the window or zoom changes. A line too small to read shows at a readable size while the pointer rests on it ([ADR 0012](adr/0012-screen-pixels.md)).
+5. Names and the last ~40 translated lines are carried across pages for consistent translation. Double-click a bubble to edit the line or teach the glossary.
+
+## Modules
+
+Both apps share the same engine, which runs locally in a worker (the extension's service worker, a Web Worker in the web app):
+
+| Module | Role |
+|---|---|
+| `extension/engine/detect.js` | Text lines from PaddleOCR's PP-OCRv6 (small) detector (Apache-2.0), run by ONNX Runtime; OpenCV's dnn module is the fallback. Latin rows and vertical Japanese columns. |
+| `extension/engine/segment.js` | Speech-bubble masks from a YOLOv8-seg model (kitsumed, int8; GPL-3.0/AGPL-3.0), run by ONNX Runtime. The masks are the bubble interiors. |
+| `extension/engine/ort.js` | Loads ONNX Runtime Web once per worker: on the graphics card (WebGPU) when the browser offers one, on the CPU (wasm) otherwise; calls into it are serialised. |
+| `extension/engine/analyze.js` | Page analysis on [OpenCV.js](https://docs.opencv.org/4.x/d5/d10/tutorial_js_root.html): detected lines snapped to the ink → paragraphs → assigned to the model's bubbles; lettering outside any bubble mask falls back to the light/dark-shape rules or becomes loose text. Vertical Japanese with furigana, dark bubbles, captions, free narration. `analyze-heuristic.js` is the rule-based fallback when no detector loads. |
+| `extension/engine/layout.js` | Where each translation goes: the largest rectangle of the bubble around the lettering it replaces; joined bubbles cut at the waist; free text keeps its footprint. A model tag is authoritative. |
+| `extension/engine/erase.js` | The eraser: the mask (lettering, its fringe and outline, never the bubble's outline), the choice of fill per area, and erasing again at full size. |
+| `extension/engine/tone.js` | The screentone fill: measures the surface's lattice from its autocorrelation, checks it predicts the surround, and copies the tone in phase. |
+| `extension/engine/inpaint.js` | The learned fill: AOT-GAN inpainting trained on manga (GPL-3.0), run by ONNX Runtime. |
+| `extension/engine/page.js` | One page in the worker: downscale, analyse, stamp the regions for the model; then place, erase and return the cleaned areas with text placements. |
+| `extension/text.js` | Fits and draws the text: one font per page, the first bundled one with every letter of its translations (system fonts for Chinese, Japanese, Korean); sizes from the original letter size; line breaks at spaces, or between words for Chinese, Japanese and Thai, with their line-start rules; the target language's TeX hyphenation patterns only when an un-hyphenated layout does not fit; halo over artwork. |
+| `extension/prompt.js` | Claude prompt (set-of-mark), API call with a JSON-schema structured answer, response parsing, chapter context. |
+| `extension/languages.js` | The target languages in the dropdown (English name for the prompt, own name for the list) and which have a translated interface. Shared with the web app. |
+| `extension/i18n.js`, `extension/_locales/` | The interface in ten languages, following the target language: our own loader for Chrome-format `messages.json`, because `chrome.i18n` can't switch at run time. English underneath, so nothing ever shows a key. |
+| `extension/settings.js` | Settings defaults and storage, shared by the service worker, the popup and Options (the pages read storage directly, never through the busy worker). |
+| `extension/vendor/` | OpenCV.js 4.5.5 (wasm + loader), ONNX Runtime Web 1.31.1 (`ort/`), the PP-OCRv6 detector, the bubble model (`segment.onnx` for the CPU, `segment-gpu.onnx` for WebGPU), the inpainting model (`inpaint.onnx`), `hyphen` with English patterns (other languages' patterns in `hyphen/`), and the lettering fonts' character table. Generated by `scripts/vendor-*.mjs`; CI regenerates OpenCV, ONNX Runtime, hyphen and the font table from the pinned npm packages and the font files and the detector from PaddlePaddle's pinned Hugging Face revision, and fails if anything differs. The bubble and inpainting models are vendored by their scripts with the source and checksum recorded beside them (`segment.json`, `inpaint.json`); the tests check the inpainting model against its record. |
+
+The copies under `extension/` are canonical; `node scripts/sync-shared.mjs` copies them into `web/` (CI does this on deploy; the copies are git-ignored).
+
+## Why these choices
+
+[`docs/adr/`](adr/): 0001 (dependencies), 0002 and 0005 (text detector), 0003 (layout), 0004 (bubble model, GPU), 0006 (chapter fetcher), 0007 (what translating costs), 0008 (the page on screen first), 0009 (agreement and site access), 0010 (language list and interface language), 0011 (lettering fonts, line breaking and hyphenation per language), 0012 (the overlay at the screen's own pixels, erased areas at full size), 0013 (the eraser: outline, flat, screentone and learned fills).
