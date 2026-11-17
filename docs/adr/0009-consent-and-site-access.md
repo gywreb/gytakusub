@@ -23,7 +23,7 @@ Until 2.6.x, Gytakusub was Unlisted: installable by link, used by its developer.
 **Agreement (`access.js`, `welcome.html`):**
 - On install, the worker opens a setup page. Step 1 says what is read (only pages you translate, and when), what is sent (the image in slices, glossary and custom instructions, the chapter's names, recent lines with Chapter context on), to whom (Anthropic's Claude API, with your key), and what never happens (no server, no account, no analytics). "I agree" stores `{ consent: { version, at } }` in local storage.
 - Until then the worker refuses to translate, with an error that says how to set up. The popup shows only "Set up". A shortcut opens the setup page instead of reading the page.
-- `CONSENT_VERSION` goes up when what is sent changes. An update that finds the agreement missing or older opens the setup page again ("Gytakusub now asks before it reads any page…").
+- `CONSENT_VERSION` goes up when what is sent changes. An update opens the setup page again for someone who agreed to an older version, or who comes from before 2.7.0 and never saw it ("Gytakusub now asks before it reads any page…"). Not for someone who withdrew on purpose.
 - Options → About shows when you agreed and has Withdraw. Withdrawing deletes the record; nothing more is sent.
 
 **Site access (`optional_host_permissions`):**
@@ -33,7 +33,10 @@ Until 2.6.x, Gytakusub was Unlisted: installable by link, used by its developer.
 - Without access, a download fails with "Gytakusub needs your permission to read images from *host*. Open the Gytakusub popup and choose Allow access." The popup shows an Allow access note. Options → About can remove access.
 
 **Worker boundaries:**
-- `GET_SETTINGS` returns the settings without `apiKey`, plus `hasKey`.
+- `storage.local` and `storage.sync` are set to `TRUSTED_CONTEXTS` (the worker, at start), so the content script can't read the key from storage. Chrome exposes both to content scripts by default. The content script gets its settings from the worker (`GET_SETTINGS`, without `apiKey`, plus `hasKey`) and hears about changes from it (`SETTINGS_CHANGED`).
+- Messages are answered only when they come from this extension.
+- `FETCH_IMAGE` (the debug report's original image, which goes back into the page's process) answers only with the debug overlay on, only to a tab, and only for something that decodes as an image. The report's download link is clicked without being put in the page, so page scripts can't read the zip.
+- Auto-translate has a spending guard: after 100 pages Claude answered in 10 minutes on a tab, it pauses until a real click on Continue (page scripts, ads included, can add or swap images). Pages you ask for yourself are never held.
 - Every download goes through `imagecheck.js`: a `Content-Length` over 25 MB stops before reading, a stream stops as soon as it passes 25 MB, and the bytes must start like JPEG, PNG, GIF, WebP, AVIF/HEIF or BMP. The blob's type comes from those bytes, not the server's header. Anything else (a login page, JSON, SVG, video) is refused: "That address did not return an image."
 
 ## Alternatives considered
@@ -46,5 +49,5 @@ Until 2.6.x, Gytakusub was Unlisted: installable by link, used by its developer.
 
 - One more step for new users (agree, then allow access when first used). The setup page shows all three steps with their state.
 - Browser tests run with access granted at install in a test copy of the extension (`tests/browser/ext-copy.mjs`), because a headless browser can't click a permission prompt. `tests/browser/setup.mjs` covers the path without access.
-- Unknown: whether people who installed 2.6.x keep their granted `<all_urls>` after the update moves it to optional. I couldn't find a documented answer. Either way works: the popup and setup page check access at run time and ask when it's missing.
+- People updating from 2.6.x: in an independent QA run (2.6.1 → 2.7.0 as an unpacked extension, same folder), `<all_urls>` and the site registrations were kept, and the setup page opened once with `#update`. I couldn't find this documented for Chrome Web Store updates, and didn't test that path. Either way works: the popup and setup page check access at run time and ask when it's missing.
 - Rolling back to 2.6.x from the dashboard would bring back install-time access that 2.7 users never granted; the browser may disable the extension for them until they approve. Prefer fixing forward (see the release checklist).

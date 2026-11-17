@@ -11,12 +11,19 @@ Ready for the public Chrome Web Store listing. Everything stays free: each perso
 ### Extension
 - **A setup page opens on install.** It says what is read (only pages you translate), what is sent (the page image in slices, your glossary and custom instructions, the chapter's names, and recent lines with Chapter context on), and where (Anthropic's Claude API, with your key, nothing else). Then: "I agree", add your key, allow access.
   - Nothing is translated until you agree; the popup shows only "Set up", and the shortcut opens the setup page.
-  - Options → About shows when you agreed, and Withdraw. After withdrawing, nothing more is sent.
-- **Access to websites is asked when you first use it, not at install.** The setup page asks, and so does the popup the first time you turn on Enable here or Auto-translate, or press Translate. You can remove it in Options → About.
+  - Settings → About shows when you agreed, and Withdraw. After withdrawing, nothing more is sent.
+- **Access to websites is asked when you first use it, not at install.** The setup page asks, and so does the popup the first time you turn on Enable here or Auto-translate, or press Translate. You can remove it in Settings → About.
   - Without it, nothing runs on sites, and the popup and any error say how to allow it.
 - **Safer image downloads.** Only real images are used (checked by their first bytes: JPEG, PNG, GIF, WebP, AVIF/HEIF, BMP); a login page or anything else is refused. Downloads stop as soon as they pass 25 MB instead of after reading the whole thing.
-- **The API key no longer reaches the script that runs inside web pages.** It never used it, but now it can't.
-- **Options → About**: version, help (GitHub Issues), privacy policy, setup guide, and "not made by or affiliated with Anthropic".
+- **The script that runs inside web pages can no longer get the API key.** It never used it, but it could read it from extension storage, which Chrome opens to it by default. Extension storage is now limited to the extension's own pages and worker, and the page script gets its settings, without the key, from the worker.
+- **Auto-translate's spending guard.** On a site with auto-translate on, a page's own scripts (ads included) can add or swap images, and each new one is a Claude request. After 100 pages Claude answered in 10 minutes on one tab, auto-translate pauses with a Continue button that only a real click releases. Pages you ask for yourself are never held. Reading a chapter doesn't get near it.
+- **The debug report** downloads the original images only with the debug overlay on, only for a tab, and only when they decode as images, and the page can no longer read the report while it downloads.
+- **Fixed: with auto-translate on, the first screen of a chapter stayed untranslated until you scrolled** (2.6.0–2.6.1). Chrome fires a scroll event while a page loads; the pages found right after it waited for scrolling to settle, and nothing checked again until the next scroll. Found while testing the spending guard; `tests/browser/budget.mjs` now waits at the top of a chapter without scrolling.
+- Translate visible (and the button on an image) now starts a page auto-translate is holding, instead of skipping it as already queued.
+- Without site access, an image the page itself can read (same site) is still translated, through the page.
+- The setup page opens on an update only for someone who never saw it (coming from before 2.7.0) or agreed to an older version, not after a deliberate Withdraw. Asking for it again brings the open one forward instead of opening another tab.
+- **Settings → About**: version, help (GitHub Issues), privacy policy, setup guide, and "not made by or affiliated with Anthropic". Allow access there waits for the agreement, as on the setup page.
+- The popup shows one notice at a time (key first, then access), so it stays within the browser's 600 px popup height.
 
 ### Store and support
 - Listing text for the public release: setup and access in the description, Homepage and Support URLs, the optional-access justification, what's new, reviewer notes for the setup page (`store/LISTING.md`).
@@ -30,6 +37,7 @@ Ready for the public Chrome Web Store listing. Everything stays free: each perso
 ### Tests
 - `tests/browser/setup.mjs`: a new install without access, from the setup page through "I agree" and Withdraw, plus the worker's limits (no key in `GET_SETTINGS`, images only, the no-access message).
 - `tests/imagecheck.test.mjs`: image types by their bytes, and the size cap.
+- `tests/browser/budget.mjs`: the spending guard (a budget of 3 in the test copy), that a page script can't release it, that Translate visible still works while paused, and that the content script can't read the key from storage.
 - The other browser tests use a test copy with access granted at install (`tests/browser/ext-copy.mjs`): a headless browser can't click a permission prompt.
 
 ## [2.6.1] — 2026-11-16

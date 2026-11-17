@@ -114,7 +114,10 @@ for (const scheme of ["light", "dark"]) { await welcome.emulateMedia({ colorSche
 const agreedPopup = await popup("no-access");
 check("popup after agreeing, without access: the normal popup and an Allow access note", !agreedPopup.setup && agreedPopup.bodyShown && agreedPopup.accessShown, JSON.stringify(agreedPopup));
 
-// 7. the image downloader
+// 7. the image downloader, as the debug report uses it (FETCH_IMAGE answers only with the debug overlay on)
+const offReport = await send({ type: "FETCH_IMAGE", url: `${BASE}/cors-page.png` });
+check("without the debug overlay, no image comes back", /debug overlay/.test(offReport?.error || ""), offReport?.error);
+await sw.evaluate(() => chrome.storage.sync.set({ debugOverlay: true }));
 const noAccess = await send({ type: "FETCH_IMAGE", url: `${BASE}/page.png` });
 check("without access, a download says how to allow it", /needs your permission.*Allow access/.test(noAccess?.error || ""), noAccess?.error);
 const login = await send({ type: "FETCH_IMAGE", url: `${BASE}/cors-login.png` });

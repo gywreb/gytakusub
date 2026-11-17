@@ -195,6 +195,8 @@ async function showPrivacy() {
     ? "Allowed: Gytakusub can read images on websites, only when you translate or on sites with auto-translate on."
     : "Not allowed: Gytakusub can't read manga images until you allow it.";
   $("accessBtn").textContent = access ? "Remove access" : "Allow access";
+  $("accessBtn").disabled = !access && !agreed; // as on the setup page: agree first
+  $("accessBtn").title = $("accessBtn").disabled ? "Agree to what is sent first" : "";
   $("accessBtn").hidden = false;
 }
 $("consentBtn").onclick = async () => { if (await consentGiven()) { await withdrawConsent(); showPrivacy(); } else openWelcome(); };

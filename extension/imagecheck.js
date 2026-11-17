@@ -15,7 +15,8 @@ export function sniffImageType(bytes) {
   if (ascii(0, "GIF87a") || ascii(0, "GIF89a")) return "image/gif";
   if (ascii(0, "RIFF") && ascii(8, "WEBP")) return "image/webp";
   if (ascii(4, "ftyp") && ["avif", "avis", "heic", "heix", "mif1", "msf1"].some((brand) => ascii(8, brand))) return ascii(8, "avi") ? "image/avif" : "image/heif";
-  if (ascii(0, "BM") && b.length > 14) return "image/bmp";
+  // "BM" alone is too easy to match by chance: the info header that follows must have one of its known sizes
+  if (ascii(0, "BM") && b.length >= 18 && [12, 40, 52, 56, 64, 108, 124].includes(b[14] | (b[15] << 8) | (b[16] << 16) | (b[17] << 24))) return "image/bmp";
   return null;
 }
 

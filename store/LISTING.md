@@ -6,10 +6,7 @@ Copy each block into the matching field of the Developer Dashboard. Keep the wor
 
 ## Store listing tab
 
-**Name** (≤45 chars)
-```
-Gytakusub – Manga translator (your Claude key)
-```
+**Name**: comes from `extension/manifest.json`, "Gytakusub". Keep "Claude" out of the name: the name is the brand, and a third party's mark there can read as endorsement (the store's policy against implying endorsement, and Anthropic's trademark guidelines). Saying it works with your own Claude API key, in the summary and description next to the "not made by or affiliated with Anthropic" note, is the safer way to say it.
 
 **Summary** (≤132 chars)
 ```
@@ -33,7 +30,7 @@ YOU STAY IN CONTROL
 • Master switch, per-site enable, per-site auto-translate.
 • Glossary for names and terms; custom instructions; model choice (Haiku for speed, Sonnet/Opus for difficult pages).
 • Results are cached for the browser session so re-reading costs nothing.
-• See what it costs: today's and this month's Claude tokens and estimated cost per model, and how much of a plan's monthly API credit is left, from this browser's own records (Options → Claude usage).
+• See what it costs: today's and this month's Claude tokens and estimated cost per model, and how much of a plan's monthly API credit is left, from this browser's own records (Settings → Claude usage).
 • Double-click a translated bubble to correct a line or add a term to the glossary; an option lets you peek at the original by hovering.
 
 REQUIREMENTS
@@ -69,7 +66,7 @@ https://github.com/gywreb/gytakusub/issues
 
 **What's new in 2.7.0** (paste into the version notes if the dashboard asks)
 ```
-A setup page now opens on install: it shows what is sent to Claude and where, and asks you to agree before anything is sent. Access to websites is asked the first time you use it instead of at install, and both can be withdrawn in Options → About. Safer image downloads (only real images, size-capped), and the API key no longer reaches the page-side script. Help link: GitHub Issues.
+A setup page now opens on install: it shows what is sent to Claude and where, and asks you to agree before anything is sent. Access to websites is asked the first time you use it instead of at install, and both can be withdrawn in Settings → About. Safer image downloads (only real images, size-capped); the API key is no longer readable by the page-side script; auto-translate pauses after 100 pages in 10 minutes until you choose Continue, so a page that keeps swapping images can't run up your bill. Help link: GitHub Issues.
 ```
 
 **What's new in 2.6.0**
@@ -101,7 +98,7 @@ Translates the text inside comic and manga page images that the user is viewing,
 | `storage` | Stores the user's settings, glossary, list of enabled sites, (locally) their API key, and a local log of the token counts Claude reports for each translation, used to show the user what translating costs. No data is sent to the developer. |
 | `activeTab` | Lets the user invoke the translator on the current tab from the toolbar button or keyboard shortcut without the extension running on every page. |
 | `scripting` | Injects the translator only into the current tab on user request, and registers it for the specific sites the user has enabled in the popup/options. |
-| Optional host permission `<all_urls>` (`optional_host_permissions`; not granted at install) | Requested at runtime, in a click, the first time the user enables a site, starts auto-translate or translates, after a setup page explains why. Comic pages are served from many image CDNs that differ from the page's own domain and block cross-origin reads, so the background worker needs host access to fetch the image the user asked to translate so its pixels can be analysed. It downloads only images (checked by their bytes, capped at 25 MB). The extension does not read or modify any other page content and does not run on sites the user has not enabled or explicitly invoked it on. The user can remove the access in Options → About. |
+| Optional host permission `<all_urls>` (`optional_host_permissions`; not granted at install) | Requested at runtime, in a click, the first time the user enables a site, starts auto-translate or translates, after a setup page explains why. Comic pages are served from many image CDNs that differ from the page's own domain and block cross-origin reads, so the background worker needs host access to fetch the image the user asked to translate so its pixels can be analysed. It downloads only images (checked by their bytes, capped at 25 MB). The extension does not read or modify any other page content and does not run on sites the user has not enabled or explicitly invoked it on. The user can remove the access in Settings → About. |
 | Remote code | Not used. All code and models are packaged in the extension: OpenCV and ONNX Runtime (WebAssembly), the text-detection model and the speech-bubble model (ONNX files), all loaded from the extension package. The CSP allows `wasm-unsafe-eval`, not `unsafe-eval`. The only network calls are to api.anthropic.com (user's key) and to fetch the image being translated. |
 
 **Data usage disclosures** — tick these, and only these:
@@ -124,6 +121,12 @@ https://gywreb.github.io/gytakusub/privacy.html
 - Visibility: **Public** from 2.7.0 (it was Unlisted until then). See "Going public" in RELEASE-CHECKLIST.md.
 - Regions: all.
 - Pricing: free. Everything is free: each user pays Anthropic for their own key, and nothing costs the developer per user.
+
+## Test instructions tab (private to reviewers)
+The dashboard's *Test instructions* tab is for items that need a paid account or credentials. Translating needs a Claude API key, which costs money, so give the reviewers one there:
+1. In the Claude Console, create a **separate** API key named e.g. "CWS review", in a workspace with a low spend limit (a few dollars is plenty).
+2. Paste it in the Test instructions tab with the steps below. Never put it in the repo, the listing or an issue.
+3. Revoke the key once the review is done (approved or not).
 
 ## Notes for the reviewer (optional field)
 ```

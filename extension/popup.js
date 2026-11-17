@@ -28,7 +28,7 @@ let access = false; // site access (access.js), read on open so a click can ask 
  */
 function ensureAccess() {
   if (access) return Promise.resolve(true);
-  return requestAccess().then((ok) => { access = ok; $("access").hidden = ok; return ok; }, () => false);
+  return requestAccess().then((ok) => { access = ok; if (ok) $("access").hidden = true; return ok; }, () => false);
 }
 const NO_ACCESS = "Not allowed, so Gytakusub can't read the images here. Choose Allow access when you're ready.";
 
@@ -36,8 +36,8 @@ async function init() {
   const [s, [active], agreed, acc] = await Promise.all([getSettings(), chrome.tabs.query({ active: true, currentWindow: true }), consentGiven(), hasAccess()]);
   access = acc;
   document.body.classList.toggle("setup", !agreed);
-  $("access").hidden = access;
   $("nokey").hidden = !!s.apiKey;
+  $("access").hidden = access || !s.apiKey; // one notice at a time (the popup can't grow past 600 px): the key first
   $("enabled").checked = !!s.enabled;
   showEnabled(!!s.enabled);
   $("model").value = s.model;

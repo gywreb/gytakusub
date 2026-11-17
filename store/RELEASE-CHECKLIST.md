@@ -31,7 +31,7 @@ Everything below is a one-time account step or a copy-paste from `store/LISTING.
 - [ ] Privacy policy URL: `https://gywreb.github.io/gytakusub/privacy.html` (confirm the page loads first — Pages must be enabled, see repo README).
 
 ## 5. Distribution tab (1 min)
-- [ ] Visibility **Unlisted**. Free. All regions.
+- [ ] Visibility: **Public** from 2.7.0 (it was Unlisted before; see "Going public"). Free. All regions.
 
 ## 6. Submit (1 min, then wait)
 - [ ] **Submit for review**. Leave "publish automatically after review" ON.
@@ -52,6 +52,7 @@ Paste the rejection email to me verbatim. The two likely reasons and what we'd d
 What 2.7.0 adds for strangers: a setup page that shows what is sent and asks for agreement before anything is sent (Chrome Web Store user-data policy: disclosure and consent inside the extension, not only in the privacy policy), site access asked at first use, Help (GitHub Issues), "not affiliated with Anthropic", safer image downloads.
 - [ ] **Account → Trader status.** Every publisher must declare Trader or Non-Trader (EU Digital Services Act). It's your own call; Google won't decide it for you. A free hobby project with no business behind it is usually Non-Trader. If you choose Trader, your legal name, address and phone number are shown publicly on the listing.
 - [ ] **Store listing**: paste the new Description, the Homepage URL and the Support URL from `LISTING.md`.
+- [ ] **Test instructions** tab: a separate, spend-limited review key and the steps (`LISTING.md` → Test instructions). Revoke the key after the review.
 - [ ] **Privacy practices**: replace the host-permission justification with the *optional host permission* row; re-check the Website content wording.
 - [ ] **Distribution → Visibility: Public.** Free, all regions. Then Submit for review. (If 2.7.0 is already live as Unlisted, change the visibility and submit; the dashboard says whether it goes through review again. The policies are the same for every visibility.)
 - [ ] Before you go to bed on release day: install from the public listing in a fresh browser profile and walk through the setup page (agree → key → Allow access → translate one page). That's the path every new user takes.

@@ -17,7 +17,7 @@ ok(sniffImageType(pad(bytes("GIF89a"))) === "image/gif", "GIF");
 ok(sniffImageType(pad(bytes("RIFF", [0x24, 0, 0, 0], "WEBPVP8 "))) === "image/webp", "WebP");
 ok(sniffImageType(pad(bytes([0, 0, 0, 0x1c], "ftypavif"))) === "image/avif", "AVIF");
 ok(sniffImageType(pad(bytes([0, 0, 0, 0x18], "ftypheic"))) === "image/heif", "HEIF");
-ok(sniffImageType(pad(bytes("BM", [0x36, 0, 0, 0]))) === "image/bmp", "BMP");
+ok(sniffImageType(pad(bytes("BM", [0x36, 0x10, 0, 0], [0, 0, 0, 0], [0x36, 0, 0, 0], [40, 0, 0, 0]))) === "image/bmp", "BMP");
 ok(sniffImageType(png.buffer.slice(png.byteOffset, png.byteOffset + png.length)) === "image/png", "an ArrayBuffer works too");
 
 // 2. what isn't an image, whatever the server says it is
@@ -28,6 +28,7 @@ ok(sniffImageType(pad(bytes("RIFF", [0, 0, 0, 0], "WAVEfmt "))) === null, "a RIF
 ok(sniffImageType(pad(bytes([0, 0, 0, 0x18], "ftypisom"))) === null, "an MP4 video");
 ok(sniffImageType(new Uint8Array(0)) === null, "an empty answer");
 ok(sniffImageType(bytes("BM")) === null, "two bytes that only look like BMP");
+ok(sniffImageType(bytes("BM-internal-config: secret=1234567890")) === null, "text that happens to start with BM");
 
 // 3. the size cap
 const stream = (chunks, onCancel) => new ReadableStream({

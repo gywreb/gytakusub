@@ -44,15 +44,15 @@
       </div>
     </header>
 
-    <p id="allSet" class="done-banner" role="status" hidden>You're all set. Open a manga chapter and click the Gytakusub icon in the toolbar.</p>
+    <p id="allSet" class="done-banner" role="status" tabindex="-1" hidden>You're all set. Open a manga chapter and click the Gytakusub icon in the toolbar.</p>
 
     <ol class="steps">
       <li class="card step" id="stepConsent" aria-labelledby="h-consent">
         <div class="step-head"><span class="step-num" aria-hidden="true">1</span><h2 id="h-consent">What Gytakusub sends, and where</h2><span class="step-state" id="consentState"></span></div>
         <ul class="list">
           <li><b>Only the pages you translate.</b> A page is read when you click its Translate button, press <kbd class="kbdTranslate">Alt+T</kbd>, or turn on auto-translate for that site. Other pages are never read.</li>
-          <li><b>Sent to Anthropic's Claude API, with your key:</b> the page image (cut into slices), your glossary and custom instructions, and the names already translated in the same chapter. With <i>Chapter context</i> on, also the last lines of dialogue.</li>
-          <li><b>Nowhere else.</b> Gytakusub has no server, no account and no analytics. Your key and settings stay in this browser.</li>
+          <li><b>Sent to Anthropic's Claude API, with your key:</b> the page image (cut into slices), your glossary and custom instructions, and the names already translated in the same chapter. With <i>Chapter context</i> (on unless you turn it off), also the last lines of dialogue.</li>
+          <li><b>Nowhere else.</b> Gytakusub has no server, no account and no analytics. Your key stays in this browser. Your settings and glossary go with your browser's own sync, if you use it (the key too, only if you choose that in Settings).</li>
           <li>Anthropic handles what you send under its <a href="https://www.anthropic.com/legal/commercial-terms" target="_blank" rel="noopener">commercial terms</a> and <a href="https://www.anthropic.com/legal/privacy" target="_blank" rel="noopener">privacy policy</a>. Gytakusub's <a href="https://gywreb.github.io/gytakusub/privacy.html" target="_blank" rel="noopener">privacy policy</a> has the details.</li>
         </ul>
         <div class="step-actions">
@@ -71,7 +71,7 @@
 
       <li class="card step" id="stepAccess" aria-labelledby="h-access">
         <div class="step-head"><span class="step-num" aria-hidden="true">3</span><h2 id="h-access">Let Gytakusub read manga images</h2><span class="step-state" id="accessState"></span></div>
-        <p>Manga sites usually load their pages from other image servers, so Gytakusub asks to read images on any website. It still reads a page only when you translate it, and runs by itself only on sites where you turn on auto-translate. Your browser will ask you to confirm.</p>
+        <p>Manga sites usually load their pages from other image servers, so Gytakusub asks for access to all websites. Your browser will ask you to confirm with its standard wording, <i>"Read and change all your data on all websites"</i>. Gytakusub uses it only to download the images you translate: it reads a page only when you translate it, runs by itself only on sites where you turn on auto-translate, and never changes anything on a page except drawing the translation over the image.</p>
         <div class="step-actions">
           <button id="allow" class="primary" type="button">Allow access</button>
           <p id="accessHint" class="hint"></p>

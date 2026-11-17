@@ -40,13 +40,22 @@ async function refresh() {
   $("allSet").hidden = !(agreed && s.apiKey && access);
 }
 
-$("agree").onclick = async () => { await giveConsent(); refresh(); };
+// The button you pressed hides itself; move focus to the next thing to do, so keyboard and
+// screen-reader users aren't left on nothing.
+async function focusNext() {
+  if (!$("allSet").hidden) $("allSet").focus();
+  else if (!$("allow").hidden && !$("allow").disabled && $("stepKey").classList.contains("done")) $("allow").focus();
+  else $("openKey").focus();
+}
+$("agree").onclick = async () => { await giveConsent(); await refresh(); focusNext(); };
 $("openKey").onclick = () => chrome.tabs.create({ url: chrome.runtime.getURL("options.html#sec-api") });
 // requestAccess must be the first call in the click: the browser shows its prompt only during one
 $("allow").onclick = () => {
   requestAccess().then((ok) => {
-    if (!ok) $("accessHint").textContent = "Not allowed. Gytakusub can't read manga images until you allow it.";
-    refresh();
+    refresh().then(() => {
+      if (ok) focusNext();
+      else $("accessHint").textContent = "Not allowed. Gytakusub can't read manga images until you allow it.";
+    });
   }, (e) => { $("accessHint").textContent = e.message; });
 };
 

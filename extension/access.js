@@ -37,4 +37,14 @@ export const hasAccess = () => chrome.permissions.contains(ALL_SITES);
  */
 export const requestAccess = () => chrome.permissions.request(ALL_SITES);
 
-export const openWelcome = (hash = "") => chrome.tabs.create({ url: chrome.runtime.getURL(WELCOME_PAGE + hash) });
+/** Opens the setup page, or brings forward the one already open (no pile of tabs). */
+export async function openWelcome(hash = "") {
+  const url = chrome.runtime.getURL(WELCOME_PAGE);
+  const open = (await chrome.runtime.getContexts?.({ contextTypes: ["TAB"] }).catch(() => []) || []).find((c) => c.documentUrl?.startsWith(url) && c.tabId >= 0);
+  if (open) {
+    await chrome.tabs.update(open.tabId, { active: true });
+    if (open.windowId >= 0) await chrome.windows.update(open.windowId, { focused: true }).catch(() => {});
+    return;
+  }
+  await chrome.tabs.create({ url: url + hash });
+}

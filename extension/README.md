@@ -36,6 +36,7 @@ Settings, glossary and (optionally) the API key sync through your browser's sync
 | See what translating costs | Popup → "≈$… today" next to the model; Options → **Claude usage** (today, this month, per model, rate-limit headroom, monthly API credit left and when it renews) |
 | Report a bad page | Options → *Debug overlay*, then popup → **Export debug report** (one `.zip` for every translated page on the tab). It contains the page images, so don't attach it to a public GitHub issue. |
 | Withdraw the agreement or remove site access | Options → **About** |
+| Auto-translate paused with a Continue button | A spending guard: after 100 pages Claude translated in 10 minutes on one tab, auto-translate waits for you (a page swapping images could otherwise keep sending them). Click **Continue**; Translate visible works meanwhile. |
 
 ## How it works
 
