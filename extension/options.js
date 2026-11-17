@@ -5,10 +5,10 @@
 import { getSettings } from "./settings.js";
 import { apiHeaders, API_URL } from "./prompt.js";
 import { consentGiven, withdrawConsent, hasAccess, requestAccess, ALL_SITES, openWelcome } from "./access.js";
-import { addCall, emptyLog, limitsOf, explainApiError, summary, fmtUsd, fmtTokens, dayStart, PRICES_CHECKED, PRICE_SOURCE, CREDIT_PLANS, creditStatus, creditWords, limitWords } from "./usage.js";
+import { addCall, emptyLog, limitsOf, explainApiError, summary, fmtUsd, fmtTokens, dayStart, PRICES_CHECKED, PRICE_SOURCE, limitWords } from "./usage.js";
 
 const $ = (id) => document.getElementById(id);
-const FIELDS = ["model", "targetLang", "glossary", "customPrompt", "fontFamily", "excludedSites", "creditPlan", "creditCustom", "creditRenews"];
+const FIELDS = ["model", "targetLang", "glossary", "customPrompt", "fontFamily", "excludedSites"];
 const CHECKS = ["useContext", "includeSource", "uppercase", "syncApiKey", "debugOverlay", "peekOnHover", "useGpu"];
 
 function show(kind, text) {
@@ -36,7 +36,6 @@ async function load() {
   loaded = true;
   for (const id of ["save", "testKey"]) $(id).disabled = false;
   markDirty(false);
-  showCredit();
 }
 
 async function save() {
@@ -85,31 +84,11 @@ function showUsage(log) {
   $("cuLimits").hidden = !speed;
   $("cuLimits").textContent = speed;
   lastLog = log;
-  showCredit();
   $("cuChecked").textContent = new Date(PRICES_CHECKED + "T00:00:00Z").toLocaleDateString([], { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
   $("cuPriceLink").href = PRICE_SOURCE;
   $("cuDayStart").textContent = dayStart();
 }
 let lastLog = null;
-// The monthly API credit, from the form (so a change shows before Save).
-function showCredit() {
-  const c = creditStatus(lastLog?.v === 1 ? lastLog : emptyLog(), { creditPlan: $("creditPlan").value, creditCustom: $("creditCustom").value, creditRenews: $("creditRenews").value });
-  $("creditCustomField").hidden = $("creditPlan").value !== "custom";
-  $("cuCredit").hidden = !c;
-  if (!c) return;
-  const w = creditWords(c);
-  $("cuCreditFigure").textContent = w.headline;
-  $("cuCreditState").textContent = w.state; $("cuCreditState").hidden = !w.state;
-  $("cuCreditLeft").textContent = w.left;
-  $("cuCreditPace").textContent = w.pace;
-  const m = $("cuCreditMeter");
-  m.setAttribute("aria-valuenow", Math.round(c.share * 100));
-  m.setAttribute("aria-valuetext", `${w.headline}. ${w.left}.`);
-  m.classList.toggle("warn", !!w.state); m.classList.toggle("used", c.used > 0);
-  m.firstElementChild.style.width = `${c.share * 100}%`;
-}
-$("creditPlan").innerHTML = CREDIT_PLANS.map((p) => `<option value="${p.id}">${p.label}</option>`).join("");
-for (const id of ["creditPlan", "creditCustom", "creditRenews"]) $(id).addEventListener("input", showCredit);
 chrome.storage.local.get({ claudeUsage: null }).then(({ claudeUsage }) => showUsage(claudeUsage));
 // the rate-limit line goes stale after five minutes without an answer
 setInterval(() => chrome.storage.local.get({ claudeUsage: null }).then(({ claudeUsage }) => showUsage(claudeUsage)), 60e3);

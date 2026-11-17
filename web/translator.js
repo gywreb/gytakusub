@@ -33,9 +33,6 @@ export const DEFAULT_SETTINGS = {
   uppercase: false,
   fontFamily: "",
   rtlSpreads: true,
-  creditPlan: "none", // a Max or Team plan's monthly Claude API credit (usage.js CREDIT_PLANS)
-  creditCustom: 0, // USD a month, for creditPlan "custom"
-  creditRenews: "", // YYYY-MM-DD, from the Console's Billing page
   fetcherUrl: "", // your chapter fetcher (fetcher/worker.js on Cloudflare), e.g. https://gytakusub.<you>.workers.dev
   fetcherKey: "", // its access key (the Worker's GYT_KEY secret)
   maxLongEdge: 1600,
@@ -45,7 +42,11 @@ export const DEFAULT_SETTINGS = {
 
 const SETTINGS_KEY = "gytakusub.settings";
 export function loadSettings() {
-  try { return { ...DEFAULT_SETTINGS, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}") }; }
+  try {
+    // creditPlan/creditCustom/creditRenews: the monthly-credit fields removed in 2.7.0 (see usage.js)
+    const { creditPlan, creditCustom, creditRenews, ...saved } = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}");
+    return { ...DEFAULT_SETTINGS, ...saved };
+  }
   catch { return { ...DEFAULT_SETTINGS }; }
 }
 export function saveSettings(s) {

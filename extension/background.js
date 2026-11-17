@@ -71,6 +71,7 @@ chrome.runtime.onInstalled.addListener(async ({ reason, previousVersion }) => {
   // A new user sees what is sent where, and agrees, first. On an update, only someone who never
   // saw this page (coming from before 2.7.0) or who agreed to an older version of it; not someone
   // who withdrew on purpose.
+  if (reason === "update") chrome.storage.sync.remove(["creditPlan", "creditCustom", "creditRenews"]).catch(() => {}); // the monthly-credit fields removed in 2.7.0
   const { consent } = await chrome.storage.local.get("consent");
   if (reason === "install" && !consent) openWelcome();
   if (reason === "update" && (consent ? (consent.version || 0) < CONSENT_VERSION : olderThan(previousVersion, "2.7.0"))) openWelcome("#update");

@@ -35,7 +35,7 @@ const id = new URL(sw.url()).host;
 await agree(sw);
 await sw.evaluate(async ({ log, host }) => {
   await chrome.storage.local.set({ apiKey: "sk-ant-demo", claudeUsage: log });
-  await chrome.storage.sync.set({ enabled: true, enabledSites: [host], autoSites: [host], model: "claude-sonnet-5-5", creditPlan: "max5x", creditRenews: new Date(Date.now() + 23 * 864e5).toISOString().slice(0, 10) });
+  await chrome.storage.sync.set({ enabled: true, enabledSites: [host], autoSites: [host], model: "claude-sonnet-5-5" });
 }, { log, host: HOST });
 const site = await ctx.newPage(); await site.goto(`http://${HOST}:${PORT}/`);
 
@@ -48,8 +48,8 @@ const popPng = await pop.screenshot({ clip: { x: 0, y: 0, width: 340, height: Ma
 // Options → Claude usage
 const op = await ctx.newPage(); await op.setViewportSize({ width: 1100, height: 1000 });
 await op.goto(`chrome-extension://${id}/options.html#sec-usage`); await op.waitForTimeout(800);
-// the top of the card (credit, today, this month, per model): the notes and fields below would be too small to read in 1280x800
-await op.addStyleTag({ content: "#cuModels ~ * { display: none !important; }" });
+// the card without its last line (days) and the Clear button, so the rest stays big enough to read in 1280x800
+await op.addStyleTag({ content: "#sec-usage .facts li:last-child, #sec-usage .row-end { display: none !important; }" });
 const usagePng = await op.locator("#sec-usage").screenshot();
 
 // compose, in the frame the other screenshots use
@@ -63,9 +63,9 @@ await frame.setContent(`<!doctype html><style>
   .cap { position: absolute; font-weight: bold; font-size: 18px; color: #e5e7eb; }
 </style>
 <h1>Your switches, your costs</h1>
-<p>On or off per site, one-click translation, and an estimate of what Claude costs you, with your plan's credit left.</p>
+<p>On or off per site, one-click translation, and an estimate of what Claude costs you.</p>
 <img class="shot" id="pop" src="${img(popPng)}"><img class="shot" id="use" src="${img(usagePng)}">
-<div class="cap" id="popCap">POPUP</div><div class="cap" id="useCap">OPTIONS → CLAUDE USAGE</div>`);
+<div class="cap" id="popCap">POPUP</div><div class="cap" id="useCap">SETTINGS → CLAUDE USAGE</div>`);
 await frame.evaluate(() => {
   // fit both into the area under the title, side by side, at the same scale
   // (captured at 2x, so up to 1.25x larger still looks sharp); centred under the title, captions included

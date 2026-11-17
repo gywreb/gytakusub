@@ -38,7 +38,7 @@ The copies under `extension/` are canonical; `node scripts/sync-shared.mjs` copi
 - **Extension**: install from the Chrome Web Store, or load unpacked (see [`extension/README.md`](extension/README.md)). A setup page opens: agree to what is sent, add your API key, allow access to websites. Then enable the sites you read from the popup. Why it asks in that order: [`docs/adr/0009-consent-and-site-access.md`](docs/adr/0009-consent-and-site-access.md).
 - **Web app**: see [`web/README.md`](web/README.md). The `main` branch deploys `web/` to GitHub Pages automatically via `.github/workflows/pages.yml` (enable *Settings → Pages → Source: GitHub Actions* once).
 - **Chapter fetcher** (only for the web app's chapter links): a free Cloudflare Worker on your own account. The web app's Chapter link tab walks you through it and stays locked until it works; details in [`fetcher/README.md`](fetcher/README.md).
-- **API key**: platform.claude.com → Settings → API keys. Max/Team plans include monthly API credits that cover this.
+- **API key**: platform.claude.com → Settings → API keys. Max/Team plans include monthly API credits that cover this; your balance is on the Console's Billing page.
 
 ## Releasing
 

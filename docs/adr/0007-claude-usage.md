@@ -1,6 +1,6 @@
 # ADR 0007: Claude usage monitor
 
-Status: accepted (2.5.0). Date: 2026-11-10.
+Status: accepted (2.5.0). Date: 2026-11-10. The monthly API credit part was removed in 2.7.0 (see "Update, 2.7.0" at the end).
 
 ## Context
 
@@ -61,3 +61,11 @@ Anthropic also returns `anthropic-ratelimit-*` headers (requests, input and outp
   - The figures are derived from the user's own API answers, kept locally and never transmitted. Our reading is that this is not "collected" user data for the store's disclosure boxes. That is our reading, not legal advice.
 - **The cost is an estimate:** labelled as such, with the source and the date it was checked, and the Console named as the bill.
 - **Credit settings stay local too:** the plan, amount and renewal date are stored with the other settings and never sent anywhere. The app doesn't read the Billing page; the user copies the date.
+
+## Update, 2.7.0: the monthly credit meter is gone
+
+The meter subtracted this browser's spending from an amount the user typed. With the web app on a phone, a second browser, or another app on the same Console account, "left" was always better than the truth, and nothing could correct it:
+- No Anthropic API returns a balance, promotional credits or a plan. The Usage & Cost API reports usage and cost only, needs an Admin key, and isn't available to individual Console accounts (platform.claude.com/docs/en/manage-claude/usage-cost-api, read 2026-11-17).
+- An Admin key can do everything in the organization; it must never sit in a browser extension or web page.
+
+So the panels keep what they can measure exactly (this browser's tokens from Claude's answers, priced with Anthropic's prices), say "this browser", and link the Console's Billing page for the balance. The low-balance error is still explained when Claude returns it. Old `creditPlan`, `creditCustom` and `creditRenews` values are deleted on update (extension) or ignored on load (web app).
