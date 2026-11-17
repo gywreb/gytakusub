@@ -22,6 +22,10 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--bg); color: var(--fg); }
 body { font: var(--t-body)/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif; }
+/* Line breaks that read naturally: Japanese has no spaces, so break between phrases rather than
+   inside a word; Korean puts spaces between words, so break only there, as in English. */
+:root:lang(ja) { word-break: auto-phrase; }
+:root:lang(ko) { word-break: keep-all; overflow-wrap: anywhere; }
 p { margin: 0; }
 a { color: var(--accent); }
 code, kbd { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .9em; }

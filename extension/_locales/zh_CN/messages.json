@@ -1,0 +1,818 @@
+{
+ "appDescription": {
+  "message": "在任何网站上直接翻译漫画页面，使用你自己的 Claude API 密钥。无需账号，没有服务器。"
+ },
+ "cmdTranslate": {
+  "message": "翻译屏幕上的所有图片"
+ },
+ "cmdToggle": {
+  "message": "显示 / 隐藏此页面上的翻译"
+ },
+ "popup_turn_gytakusub_on_or_off": {
+  "message": "在所有网站上开启或关闭 Gytakusub"
+ },
+ "popup_enabled_arialabel": {
+  "message": "Gytakusub 已开启"
+ },
+ "popup_finish_setting_up_gytakusub_see": {
+  "message": "<b>完成 Gytakusub 的设置。</b>查看它会发送给 Claude 的内容，表示同意，并允许它读取漫画图片。只需一分钟。"
+ },
+ "popup_openSetup": {
+  "message": "设置"
+ },
+ "popup_offNote": {
+  "message": "Gytakusub 已在所有网站上关闭。用上方的开关重新开启；你的设置会保留。"
+ },
+ "popup_no_claude_api_key_yet": {
+  "message": "还没有 Claude API 密钥。"
+ },
+ "popup_openOptions2": {
+  "message": "添加密钥"
+ },
+ "popup_allow_gytakusub_to_read_manga": {
+  "message": "允许 Gytakusub 读取网站上的漫画图片。"
+ },
+ "popup_allowAccess": {
+  "message": "允许访问"
+ },
+ "popup_translate": {
+  "message": "<span>翻译可见的图片</span><kbd id=\"kbdTranslate\">Alt+T</kbd>"
+ },
+ "popup_toggle_title": {
+  "message": "隐藏 / 显示翻译（Alt+Shift+T）"
+ },
+ "popup_toggle_arialabel": {
+  "message": "隐藏或显示翻译"
+ },
+ "popup_siteHead": {
+  "message": "在<span id=\"host\">此网站</span>上"
+ },
+ "popup_enable_here": {
+  "message": "在此启用"
+ },
+ "popup_hover_button_and_keyboard_shortcuts": {
+  "message": "悬停按钮和键盘快捷键"
+ },
+ "popup_auto_translate_while_scrolling": {
+  "message": "滚动时自动翻译"
+ },
+ "popup_sends_pages_to_claude_as": {
+  "message": "在你滚动时把页面发送给 Claude"
+ },
+ "popup_trHead": {
+  "message": "翻译"
+ },
+ "popup_usageToday_title": {
+  "message": "今天翻译的花费，在此浏览器中统计（详情见设置）"
+ },
+ "popup_model": {
+  "message": "模型"
+ },
+ "popup_haiku_5_5_fastest_cheapest": {
+  "message": "Haiku 5.5 — 最快、最便宜"
+ },
+ "popup_sonnet_5_5_for_dense": {
+  "message": "Sonnet 5.5 — 适合文字密集的页面"
+ },
+ "popup_opus_5_5_best_most": {
+  "message": "Opus 5.5 — 最好、最贵"
+ },
+ "popup_chapter_context": {
+  "message": "章节上下文"
+ },
+ "popup_names_recent_lines_for_continuity": {
+  "message": "人名 + 最近的台词，保持前后连贯"
+ },
+ "popup_openOptions": {
+  "message": "所有设置"
+ },
+ "popup_exportReport_title": {
+  "message": "一个 .zip，包含此标签页中每个已翻译的页面：原图、调试渲染图和 JSON"
+ },
+ "popup_exportReport": {
+  "message": "导出调试报告"
+ },
+ "popup_not_web_page": {
+  "message": "这不是网页。"
+ },
+ "popup_no_access": {
+  "message": "没有你的许可，Gytakusub 无法读取这里的图片。准备好后请选择\"允许访问\"。"
+ },
+ "popup_this_page": {
+  "message": "此页面"
+ },
+ "popup_state_excluded": {
+  "message": "{host} 在你的已停用网站列表中。"
+ },
+ "popup_state_translated_one": {
+  "message": "已翻译 {n} 张"
+ },
+ "popup_state_translated_other": {
+  "message": "已翻译 {n} 张"
+ },
+ "popup_state_in_progress_one": {
+  "message": "{n} 张进行中"
+ },
+ "popup_state_in_progress_other": {
+  "message": "{n} 张进行中"
+ },
+ "popup_list_sep": {
+  "message": "，"
+ },
+ "popup_state_hidden": {
+  "message": "（已隐藏）"
+ },
+ "popup_not_active": {
+  "message": "尚未在此页面启用。\"翻译\"仍然可用。"
+ },
+ "popup_reload_tab": {
+  "message": "重新加载标签页以在此启用 Gytakusub。"
+ },
+ "popup_allow_above": {
+  "message": "在上方允许访问后，即可在此使用 Gytakusub。"
+ },
+ "popup_on": {
+  "message": "开"
+ },
+ "popup_off": {
+  "message": "关"
+ },
+ "popup_toggle_title_key": {
+  "message": "隐藏 / 显示翻译（{key}）"
+ },
+ "popup_preparing": {
+  "message": "正在准备…"
+ },
+ "popup_export_failed": {
+  "message": "导出失败：{error}"
+ },
+ "popup_report_downloaded_one": {
+  "message": "报告已下载：{n} 页"
+ },
+ "popup_report_downloaded_other": {
+  "message": "报告已下载：{n} 页"
+ },
+ "popup_usage_today": {
+  "message": "今天 ≈{cost}"
+ },
+ "popup_usage_today_aria": {
+  "message": "今天翻译的花费：约 {cost}。打开详情。"
+ },
+ "welcome_set_up_gytakusub": {
+  "message": "设置 Gytakusub"
+ },
+ "welcome_allSet": {
+  "message": "一切就绪。打开一话漫画，然后点击工具栏中的 Gytakusub 图标。"
+ },
+ "welcome_h_consent": {
+  "message": "Gytakusub 会发送什么，发送到哪里"
+ },
+ "welcome_only_the_pages_you_translate": {
+  "message": "<b>只有你翻译的页面。</b>当你点击页面的\"翻译\"按钮、按下 <kbd class=\"kbdTranslate\">Alt+T</kbd>，或为该网站开启自动翻译时，才会读取这个页面。其他页面从不读取。"
+ },
+ "welcome_sent_to_anthropic_s_claude": {
+  "message": "<b>使用你的密钥发送到 Anthropic 的 Claude API：</b>页面图片（切成几块）、你的术语表和自定义指令，以及同一话中已经翻译过的人名。开启<i>章节上下文</i>时（默认开启，除非你关闭），还会发送最近几句台词。"
+ },
+ "welcome_nowhere_else_gytakusub_has_no": {
+  "message": "<b>不会发送到其他任何地方。</b>Gytakusub 没有服务器、没有账号，也没有统计分析。你的密钥保存在此浏览器中。如果你使用浏览器同步，你的设置和术语表会随之同步（密钥只有在你于设置中选择后才会同步）。"
+ },
+ "welcome_anthropic_handles_what_you_send": {
+  "message": "Anthropic 按照其<a href=\"https://www.anthropic.com/legal/commercial-terms\" target=\"_blank\" rel=\"noopener\">商业条款</a>和<a href=\"https://www.anthropic.com/legal/privacy\" target=\"_blank\" rel=\"noopener\">隐私政策</a>处理你发送的内容。Gytakusub 的<a href=\"https://gywreb.github.io/gytakusub/privacy.html\" target=\"_blank\" rel=\"noopener\">隐私政策</a>有详细说明。"
+ },
+ "welcome_agree": {
+  "message": "我同意"
+ },
+ "welcome_h_key": {
+  "message": "添加你的 Claude API 密钥"
+ },
+ "welcome_create_a_key_in_the": {
+  "message": "在 <a href=\"https://platform.claude.com/\" target=\"_blank\" rel=\"noopener\">Claude Console</a>（API keys）中创建一个密钥，然后粘贴到 Gytakusub 的设置中。密钥保存在此浏览器中，只会发送给 Anthropic。"
+ },
+ "welcome_h_access": {
+  "message": "允许 Gytakusub 读取漫画图片"
+ },
+ "welcome_manga_sites_usually_load_their": {
+  "message": "漫画网站通常从其他图片服务器加载页面，所以 Gytakusub 会请求访问所有网站。浏览器会用它的标准措辞请你确认：此扩展程序可以<i>读取和更改你在所有网站上的所有数据</i>。Gytakusub 只用它来下载你要翻译的图片：只在你翻译时读取页面，只在你开启了自动翻译的网站上自行工作，除了在图片上绘制翻译之外，绝不改动页面上的任何内容。"
+ },
+ "welcome_allow": {
+  "message": "允许访问"
+ },
+ "welcome_h_use": {
+  "message": "如何翻译"
+ },
+ "welcome_open_a_chapter_on_a": {
+  "message": "在漫画网站上打开一话。"
+ },
+ "welcome_click_the_gytakusub_icon_in": {
+  "message": "点击工具栏中的 Gytakusub 图标。如果看不到，请打开拼图形状的菜单并固定 Gytakusub。"
+ },
+ "welcome_turn_on_enable_here_for": {
+  "message": "开启<b>在此启用</b>，每页都会有一个\"翻译\"按钮；或开启<b>滚动时自动翻译</b>。也可以直接按 <kbd class=\"kbdTranslate\">Alt+T</kbd> 翻译屏幕上的内容。"
+ },
+ "welcome_h_cost": {
+  "message": "费用"
+ },
+ "welcome_you_pay_anthropic_for_what": {
+  "message": "你按用量向 Anthropic 付费，从你的 Claude Console 余额中扣除。默认模型 Haiku 5.5 的价格是 Sonnet 5.5 的 1/20（<a href=\"https://platform.claude.com/docs/en/about-claude/pricing\" target=\"_blank\" rel=\"noopener\">Anthropic 的价格</a>）。翻译几页之后，<b>设置 → 翻译的花费</b>会显示每页花了你多少钱，依据 Claude 返回给此浏览器的答复统计。"
+ },
+ "welcome_to_cap_your_spending_on": {
+  "message": "要限制你在所有设备上的花费，请在 Console 的 <a href=\"https://platform.claude.com/settings/billing\" target=\"_blank\" rel=\"noopener\">Billing 页面</a>（Spend limits）设置每月上限。到达上限时 Claude 会停止。"
+ },
+ "welcome_h_help": {
+  "message": "帮助"
+ },
+ "welcome_found_a_problem_or_have": {
+  "message": "发现问题或有想法？<a href=\"https://github.com/gywreb/gytakusub/issues\" target=\"_blank\" rel=\"noopener\">在 GitHub 上提交 issue</a>。Issue 是公开的，所以不要在里面附上漫画页面或调试报告。"
+ },
+ "welcome_gytakusub_is_an_independent_open": {
+  "message": "Gytakusub 是一个独立的开源项目，并非由 Anthropic 制作或认可，也与其没有关联。<br /><a href=\"https://github.com/gywreb/gytakusub\" target=\"_blank\" rel=\"noopener\">源代码</a> · <a href=\"https://gywreb.github.io/gytakusub/privacy.html\" target=\"_blank\" rel=\"noopener\">隐私政策</a>"
+ },
+ "welcome_lede": {
+  "message": "Gytakusub 在你选择的网站上翻译日漫、韩漫和美漫，使用你自己的 Claude API 密钥。三个步骤即可开始。"
+ },
+ "welcome_lede_update": {
+  "message": "Gytakusub 现在会在读取任何页面前先征求你的同意。查看会发送的内容并同意，即可继续翻译。"
+ },
+ "welcome_state_agreed": {
+  "message": "已同意"
+ },
+ "welcome_state_key": {
+  "message": "密钥已保存"
+ },
+ "welcome_state_allowed": {
+  "message": "已允许"
+ },
+ "welcome_hint_agreed": {
+  "message": "你于 {date} 表示同意。你可以随时在 设置 → 关于 中撤回。"
+ },
+ "welcome_hint_not_agreed": {
+  "message": "在你同意之前，不会发送任何内容。你可以随时在 设置 → 关于 中撤回。"
+ },
+ "welcome_change_key": {
+  "message": "更换密钥"
+ },
+ "welcome_open_settings": {
+  "message": "打开设置"
+ },
+ "welcome_hint_access_remove": {
+  "message": "你可以随时在 设置 → 关于 中，或在浏览器的扩展程序页面中移除此权限。"
+ },
+ "welcome_hint_agree_first": {
+  "message": "请先同意第 1 步。"
+ },
+ "welcome_not_allowed": {
+  "message": "未允许。在你允许之前，Gytakusub 无法读取漫画图片。"
+ },
+ "welcome_translate_shortcut": {
+  "message": "\"翻译\"快捷键"
+ },
+ "welcome_translate_into": {
+  "message": "翻译成"
+ },
+ "welcome_language_hint": {
+  "message": "Gytakusub 自己的页面也会使用这种语言（如果已有该语言的翻译）。更多语言：设置 → 翻译。"
+ },
+ "opt_gytakusub_settings": {
+  "message": "Gytakusub 设置"
+ },
+ "opt_changes_apply_after_you_save": {
+  "message": "更改在保存后生效。"
+ },
+ "opt_sections": {
+  "message": "分区"
+ },
+ "opt_claude_api": {
+  "message": "Claude API"
+ },
+ "opt_costs": {
+  "message": "费用"
+ },
+ "opt_translation": {
+  "message": "翻译"
+ },
+ "opt_sites": {
+  "message": "网站"
+ },
+ "opt_lettering_speed": {
+  "message": "字体与速度"
+ },
+ "opt_troubleshooting": {
+  "message": "故障排除"
+ },
+ "opt_about": {
+  "message": "关于"
+ },
+ "opt_h_api": {
+  "message": "Claude API"
+ },
+ "opt_gytakusub_sends_pages_to_claude": {
+  "message": "Gytakusub 使用你自己的密钥把页面发送给 Claude。"
+ },
+ "opt_api_key": {
+  "message": "API 密钥"
+ },
+ "opt_testKey": {
+  "message": "保存并测试"
+ },
+ "opt_apiKeyHint": {
+  "message": "在 <a href=\"https://platform.claude.com/\" target=\"_blank\" rel=\"noopener\">platform.claude.com</a> → Settings → API keys 创建。用量计入该 Console 账户，与 Claude 订阅分开计费（Max、Ultra 和 Team 套餐包含每月的 API 额度）。"
+ },
+ "opt_sync_the_key_to_my": {
+  "message": "把密钥同步到我的其他浏览器"
+ },
+ "opt_keeps_it_in_browser_sync": {
+  "message": "把密钥保存在浏览器同步中，而不是只保存在此设备上"
+ },
+ "opt_model": {
+  "message": "模型"
+ },
+ "opt_claude_haiku_5_5_fastest": {
+  "message": "Claude Haiku 5.5 — 最快、最便宜"
+ },
+ "opt_claude_sonnet_5_5_better": {
+  "message": "Claude Sonnet 5.5 — 更适合文字密集 / 风格化的页面"
+ },
+ "opt_claude_opus_5_5_best": {
+  "message": "Claude Opus 5.5 — 质量最好、最贵"
+ },
+ "opt_h_usage": {
+  "message": "翻译的花费"
+ },
+ "opt_this_browser": {
+  "message": "此浏览器"
+ },
+ "opt_counted_from_claude_s_own": {
+  "message": "依据 Claude 返回给此浏览器的答复统计。你的手机和其他浏览器各自单独统计。"
+ },
+ "opt_today": {
+  "message": "今天"
+ },
+ "opt_cuModels_arialabel": {
+  "message": "本月按模型统计，含每页费用"
+ },
+ "opt_cap_your_spending_on_every": {
+  "message": "<b>限制你在所有设备上的花费。</b>在 Claude Console 中设置每月上限（Billing → Spend limits）。它适用于所有使用你密钥的地方，到达上限时 Claude 会停止。"
+ },
+ "opt_open_billing": {
+  "message": "打开 Billing"
+ },
+ "opt_details": {
+  "message": "详情"
+ },
+ "opt_today_2": {
+  "message": "<b>今天：</b><span id=\"cuTodayTokens\"></span>"
+ },
+ "opt_this_month": {
+  "message": "<b>本月：</b><span id=\"cuMonthTokens\"></span>"
+ },
+ "opt_estimate_tokens_are_exact_the": {
+  "message": "<b>估算：</b>token 数是准确的；费用按照 <a id=\"cuPriceLink\" href=\"https://platform.claude.com/docs/en/about-claude/pricing\" target=\"_blank\" rel=\"noopener\">Anthropic 的价格</a>计算（核对于 <span id=\"cuChecked\"></span>）。从缓存中取出的页面不花钱，也不计入。"
+ },
+ "opt_exact_bill_the_claude_console": {
+  "message": "<b>准确账单：</b>Claude Console 的 <a href=\"https://platform.claude.com/usage\" target=\"_blank\" rel=\"noopener\">Usage</a> 和 <a href=\"https://platform.claude.com/cost\" target=\"_blank\" rel=\"noopener\">Cost</a> 页面。"
+ },
+ "opt_balance_and_credits_including_a": {
+  "message": "<b>余额和额度</b>（包括套餐的每月 API 额度）：Console 的 <a href=\"https://platform.claude.com/settings/billing\" target=\"_blank\" rel=\"noopener\">Billing 页面</a>。Anthropic 没有提供让应用读取这些信息的方式。"
+ },
+ "opt_days_start_at_midnight_utc": {
+  "message": "<b>每天</b>从你当地时间 <span id=\"cuDayStart\">UTC 午夜</span>开始（即 UTC 午夜），与 Anthropic 的用量报告一致。"
+ },
+ "opt_cuClear": {
+  "message": "清除用量记录"
+ },
+ "opt_h_translation": {
+  "message": "翻译"
+ },
+ "opt_target_language": {
+  "message": "目标语言"
+ },
+ "opt_glossary": {
+  "message": "术语表"
+ },
+ "opt_glossary_placeholder": {
+  "message": "每行一条，例如\nGojo Satoru = 五条悟\n呪術 = 咒术"
+ },
+ "opt_glossaryHint": {
+  "message": "模型必须原样使用的人名和术语。它自己发现的人名会按标签页自动记住。"
+ },
+ "opt_extra_instructions": {
+  "message": "额外指令"
+ },
+ "opt_chapter_context": {
+  "message": "章节上下文"
+ },
+ "opt_sends_names_and_the_last": {
+  "message": "每页都附带此标签页中的人名和最近约 40 句已翻译的台词：更连贯，约多 400 个输入 token"
+ },
+ "opt_also_transcribe_the_original_text": {
+  "message": "同时转写原文"
+ },
+ "opt_slower_slightly_more_careful_reading": {
+  "message": "更慢，阅读稍微更仔细；便于调试"
+ },
+ "opt_uppercase_lettering": {
+  "message": "大写字母（拉丁字母）"
+ },
+ "opt_comic_book_style": {
+  "message": "漫画风格"
+ },
+ "opt_h_sites": {
+  "message": "网站"
+ },
+ "opt_one_hostname_per_line_the": {
+  "message": "每行一个主机名。添加网站最简单的方法：打开该网站，使用工具栏弹窗中的开关。"
+ },
+ "opt_enabled_sites": {
+  "message": "已启用的网站"
+ },
+ "opt_enabledSitesHint": {
+  "message": "悬停按钮和键盘快捷键只在这里有效。在其他网站上，Gytakusub 保持静默，直到你使用工具栏按钮或快捷键。"
+ },
+ "opt_auto_translate_while_scrolling": {
+  "message": "滚动时自动翻译"
+ },
+ "opt_autoSitesHint": {
+  "message": "每个进入屏幕的页面都会自动发送给 Claude，所以只添加你愿意花费 token 的网站。它们也算作已启用。"
+ },
+ "opt_disabled_sites": {
+  "message": "已停用的网站"
+ },
+ "opt_excludedSitesHint": {
+  "message": "Gytakusub 在这些网站及其子域名上保持关闭。"
+ },
+ "opt_h_look": {
+  "message": "字体与速度"
+ },
+ "opt_font_family": {
+  "message": "字体"
+ },
+ "opt_fontHint": {
+  "message": "留空则使用内置的漫画字体（Comic Neue Bold），或填写此设备上已安装的任意字体名称，例如 <code>\"Bangers\"</code>。"
+ },
+ "opt_use_the_graphics_card_webgpu": {
+  "message": "使用显卡（WebGPU）"
+ },
+ "opt_finds_text_and_bubbles_much": {
+  "message": "查找文字和对话框快得多。只有当页面显示错误或浏览器运行异常时才关闭。"
+ },
+ "opt_peek_at_the_original_while": {
+  "message": "悬停时查看原文"
+ },
+ "opt_hovering_a_translated_bubble_shows": {
+  "message": "把鼠标悬停在已翻译的对话框上会显示原来的文字。要修改某句台词，双击它的对话框。"
+ },
+ "opt_h_debug": {
+  "message": "故障排除"
+ },
+ "opt_debug_overlay": {
+  "message": "调试叠加层"
+ },
+ "opt_draws_the_detected_regions_and": {
+  "message": "在已翻译的页面上绘制检测到的区域和文字框，并在浮动栏中添加\"报告\"按钮，用于下载该页面的原图、调试渲染图和 JSON。工具栏弹窗中的\"导出调试报告\"会对标签页中所有已翻译的页面执行同样操作。"
+ },
+ "opt_translation_cache": {
+  "message": "翻译缓存"
+ },
+ "opt_translated_pages_the_names_found": {
+  "message": "已翻译的页面、每个标签页中找到的人名以及你修改过的台词会保留到你关闭浏览器为止。清除后可重新从头翻译页面。"
+ },
+ "opt_clearCache": {
+  "message": "清除缓存"
+ },
+ "opt_h_about": {
+  "message": "关于"
+ },
+ "opt_what_is_sent_to_claude": {
+  "message": "发送给 Claude 的内容"
+ },
+ "opt_access_to_websites": {
+  "message": "网站访问权限"
+ },
+ "opt_help": {
+  "message": "帮助"
+ },
+ "opt_report_a_problem_or_ask": {
+  "message": "在 <a href=\"https://github.com/gywreb/gytakusub/issues\" target=\"_blank\" rel=\"noopener\">GitHub Issues</a> 报告问题或提问。Issue 是公开的，所以不要在里面附上漫画页面或调试报告。"
+ },
+ "opt_gytakusub_is_an_independent_project": {
+  "message": "Gytakusub 是一个独立项目，并非由 Anthropic 制作，也与其没有关联。<a href=\"https://gywreb.github.io/gytakusub/privacy.html\" target=\"_blank\" rel=\"noopener\">隐私政策</a> · <a href=\"welcome.html\" target=\"_blank\">设置指南</a>"
+ },
+ "opt_gytakusub_is_free_software_under": {
+  "message": "Gytakusub <span id=\"version\"></span> 是基于 <a href=\"LICENSE\" target=\"_blank\">GNU AGPL v3</a> 的自由软件 · <a href=\"https://github.com/gywreb/gytakusub\" target=\"_blank\" rel=\"noopener\">源代码</a> · <a href=\"THIRD_PARTY.md\" target=\"_blank\">第三方组件</a>"
+ },
+ "opt_save": {
+  "message": "保存"
+ },
+ "opt_unsaved": {
+  "message": "有未保存的更改"
+ },
+ "opt_loading": {
+  "message": "设置仍在加载中。"
+ },
+ "opt_saved": {
+  "message": "已保存。"
+ },
+ "opt_confirm_clear_usage": {
+  "message": "清除此浏览器的用量记录？Claude Console 会保留它自己的记录。"
+ },
+ "opt_usage_cleared": {
+  "message": "用量记录已清除。"
+ },
+ "opt_show": {
+  "message": "显示"
+ },
+ "opt_hide": {
+  "message": "隐藏"
+ },
+ "opt_testing": {
+  "message": "正在测试…"
+ },
+ "opt_no_key_saved": {
+  "message": "还没有保存 API 密钥。"
+ },
+ "opt_key_works": {
+  "message": "密钥可用。模型 {model} 已回复。"
+ },
+ "opt_key_failed": {
+  "message": "密钥测试失败：{error}"
+ },
+ "opt_confirm_clear_cache": {
+  "message": "清除已翻译的页面、每个标签页中找到的人名以及你修改过的台词？"
+ },
+ "opt_cache_cleared_unsaved": {
+  "message": "缓存已清除。你的其他更改尚未保存。"
+ },
+ "opt_cache_cleared": {
+  "message": "缓存已清除。"
+ },
+ "opt_save_title": {
+  "message": "保存（{key}）"
+ },
+ "opt_consent_agreed": {
+  "message": "你于 {date} 表示同意。如果撤回，在你再次同意之前不会再发送任何内容。"
+ },
+ "opt_consent_none": {
+  "message": "尚未同意，因此不会发送任何内容。打开设置页面，查看会发送的内容并表示同意。"
+ },
+ "opt_withdraw": {
+  "message": "撤回"
+ },
+ "opt_review_agree": {
+  "message": "查看并同意"
+ },
+ "opt_access_allowed": {
+  "message": "已允许：Gytakusub 可以读取网站上的图片，但只在你翻译时或在开启了自动翻译的网站上。"
+ },
+ "opt_access_none": {
+  "message": "未允许：在你允许之前，Gytakusub 无法读取漫画图片。"
+ },
+ "opt_remove_access": {
+  "message": "移除访问权限"
+ },
+ "opt_allow_access": {
+  "message": "允许访问"
+ },
+ "opt_agree_first": {
+  "message": "请先同意发送的内容"
+ },
+ "opt_cannot_read": {
+  "message": "无法读取设置：{error}"
+ },
+ "opt_other_language": {
+  "message": "其他…"
+ },
+ "opt_other_language_label": {
+  "message": "其他语言"
+ },
+ "opt_other_language_placeholder": {
+  "message": "输入一种语言"
+ },
+ "opt_target_language_hint": {
+  "message": "Gytakusub 自己的页面也会使用这种语言（如果已有该语言的翻译，否则为英语）。"
+ },
+ "opt_customPrompt_placeholder": {
+  "message": "例如：保持口语化的语气。把拟声词（SFX）翻译成中文拟声词。"
+ },
+ "content_translate_image": {
+  "message": "翻译这张图片"
+ },
+ "content_toggle_image": {
+  "message": "显示或隐藏翻译"
+ },
+ "content_report": {
+  "message": "报告"
+ },
+ "content_report_title": {
+  "message": "下载此页面的诊断报告（原图、调试渲染图、JSON）"
+ },
+ "content_report_aria": {
+  "message": "下载诊断报告"
+ },
+ "content_continue": {
+  "message": "继续"
+ },
+ "content_btn_translating": {
+  "message": "正在翻译…"
+ },
+ "content_btn_queued": {
+  "message": "排队中…"
+ },
+ "content_btn_redo": {
+  "message": "↻ 重新翻译"
+ },
+ "content_btn_translate": {
+  "message": "翻译"
+ },
+ "content_btn_show": {
+  "message": "显示"
+ },
+ "content_btn_hide": {
+  "message": "隐藏"
+ },
+ "content_lines_one": {
+  "message": "{n} 句"
+ },
+ "content_lines_other": {
+  "message": "{n} 句"
+ },
+ "content_nothing_translated": {
+  "message": "此页面还没有翻译任何内容"
+ },
+ "content_preparing_report_one": {
+  "message": "正在准备 {n} 页的报告…"
+ },
+ "content_preparing_report_other": {
+  "message": "正在准备 {n} 页的报告…"
+ },
+ "content_report_done_one": {
+  "message": "报告已下载（{n} 页，{size} MB）。其中包含页面图片：请私下分享，切勿发到公开的 issue 中。"
+ },
+ "content_report_done_other": {
+  "message": "报告已下载（{n} 页，{size} MB）。其中包含页面图片：请私下分享，切勿发到公开的 issue 中。"
+ },
+ "content_paused_one": {
+  "message": "10 分钟内已翻译 {n} 页，自动翻译已暂停，以控制你在 Claude 上的花费。"
+ },
+ "content_paused_other": {
+  "message": "10 分钟内已翻译 {n} 页，自动翻译已暂停，以控制你在 Claude 上的花费。"
+ },
+ "content_error": {
+  "message": "Gytakusub：{error}"
+ },
+ "content_edit_dialog": {
+  "message": "编辑翻译"
+ },
+ "content_translated_line": {
+  "message": "已翻译的台词"
+ },
+ "content_save": {
+  "message": "保存"
+ },
+ "content_cancel": {
+  "message": "取消"
+ },
+ "content_teach": {
+  "message": "加入术语表（用于之后的页面）"
+ },
+ "content_original_term_ph": {
+  "message": "原文术语"
+ },
+ "content_original_term": {
+  "message": "原文术语"
+ },
+ "content_translation_ph": {
+  "message": "译文"
+ },
+ "content_translation": {
+  "message": "译文"
+ },
+ "content_add": {
+  "message": "添加"
+ },
+ "content_fill_both": {
+  "message": "请填写原文术语和它的译文"
+ },
+ "content_glossary_updated": {
+  "message": "术语表已更新：{from} = {to}"
+ },
+ "content_glossary_added": {
+  "message": "已加入术语表：{from} = {to}"
+ },
+ "content_off_here": {
+  "message": "Gytakusub 在此网站上已关闭"
+ },
+ "content_no_untranslated": {
+  "message": "屏幕上没有未翻译的图片"
+ },
+ "content_translating_n_one": {
+  "message": "正在翻译 {n} 张图片…"
+ },
+ "content_translating_n_other": {
+  "message": "正在翻译 {n} 张图片…"
+ },
+ "bg_bad_data": {
+  "message": "不支持的图片数据"
+ },
+ "bg_too_large": {
+  "message": "图片太大（超过 {mb} MB）"
+ },
+ "bg_bad_url": {
+  "message": "无效的图片地址"
+ },
+ "bg_http_only": {
+  "message": "只支持 http(s) 图片"
+ },
+ "bg_no_access": {
+  "message": "Gytakusub 需要你的许可才能读取来自 {host} 的图片。打开工具栏中的 Gytakusub 弹窗，选择\"允许访问\"。"
+ },
+ "bg_download_failed": {
+  "message": "无法从 {host} 下载图片（{error}）"
+ },
+ "bg_fetch_status": {
+  "message": "无法获取图片（{status}）"
+ },
+ "bg_not_image": {
+  "message": "该地址返回的不是图片"
+ },
+ "bg_off": {
+  "message": "Gytakusub 已关闭（工具栏弹窗）。"
+ },
+ "bg_not_set_up": {
+  "message": "Gytakusub 尚未设置：打开工具栏中的 Gytakusub 弹窗并选择\"设置\"，查看会发送给 Claude 的内容并表示同意。"
+ },
+ "bg_no_key": {
+  "message": "没有 API 密钥。打开 Gytakusub 设置，粘贴你的 Claude API 密钥。"
+ },
+ "bg_gloss_both": {
+  "message": "原文和译文都需要填写"
+ },
+ "bg_report_needs_debug": {
+  "message": "在设置中开启调试叠加层才能导出报告"
+ },
+ "usage_pages_one": {
+  "message": "{n} 页"
+ },
+ "usage_pages_other": {
+  "message": "{n} 页"
+ },
+ "usage_requests_one": {
+  "message": "{n} 次请求"
+ },
+ "usage_requests_other": {
+  "message": "{n} 次请求"
+ },
+ "usage_nothing_yet": {
+  "message": "暂无"
+ },
+ "usage_tokens": {
+  "message": "{requests} · 输入 {in} · 输出 {out}"
+ },
+ "usage_no_requests": {
+  "message": "暂无请求"
+ },
+ "usage_today": {
+  "message": "今天"
+ },
+ "usage_price_unknown": {
+  "message": "价格未知"
+ },
+ "usage_per_page": {
+  "message": "每页 ≈{cost} · {pages}"
+ },
+ "usage_limit_requests": {
+  "message": "{left} / {limit} 次请求"
+ },
+ "usage_limit_input": {
+  "message": "{left} / {limit} 个输入 token"
+ },
+ "usage_limit_output": {
+  "message": "{left} / {limit} 个输出 token"
+ },
+ "usage_list_sep": {
+  "message": "，"
+ },
+ "usage_limits": {
+  "message": "速率限制（一分钟的额度，会随时间回补）：{time} 时还剩 {parts}。"
+ },
+ "usage_limits_full": {
+  "message": "最晚 {time} 会再次补满。"
+ },
+ "api_err_spend_cap": {
+  "message": "你的 Claude 账户已达到每月的消费上限。API 会停止到 1 日 00:00 UTC，除非你在 Claude Console 中申请更高的上限。"
+ },
+ "api_err_rate_limit": {
+  "message": "你的账户暂时达到了 Claude 的速率限制。等一分钟后再翻译；一次少翻译几页也有帮助。"
+ },
+ "api_err_credit": {
+  "message": "你的 Claude 额度余额太低。请在 Claude Console 的 Billing 中充值（或查看你套餐的每月 API 额度）。"
+ },
+ "api_err_spend_limit": {
+  "message": "你的 Claude 账户已达到你设置的消费上限。请在 Claude Console 的 Billing → Spend limits 中调高。"
+ },
+ "api_err_key": {
+  "message": "Claude 拒绝了这个 API 密钥。请在设置中检查，或在 Claude Console 中创建一个新密钥。"
+ },
+ "api_err_overloaded": {
+  "message": "Claude 目前负载过高。请一分钟后再试。"
+ }
+}

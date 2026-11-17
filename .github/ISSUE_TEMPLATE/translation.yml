@@ -1,0 +1,41 @@
+name: Translation fix
+description: Wording in Gytakusub's own pages that is wrong, odd or unclear in your language.
+labels: ["translation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Gytakusub's pages were translated with AI and checked by machine, not yet by native speakers, so corrections are very welcome.
+        This form is for Gytakusub's own words (setup page, Settings, the toolbar popup, buttons on a page). For a manga page Claude translated badly, use **Bug report** instead.
+  - type: dropdown
+    id: language
+    attributes:
+      label: Language
+      options:
+        - Tiếng Việt (Vietnamese)
+        - Español (Spanish)
+        - Português do Brasil (Portuguese)
+        - Bahasa Indonesia (Indonesian)
+        - Français (French)
+        - Deutsch (German)
+        - 简体中文 (Chinese, Simplified)
+        - 日本語 (Japanese)
+        - 한국어 (Korean)
+        - English
+        - Another language (please translate Gytakusub into it)
+    validations:
+      required: true
+  - type: textarea
+    id: now
+    attributes:
+      label: What it says now
+      description: Copy the text, and say where it is (for example "Settings → Translation").
+    validations:
+      required: true
+  - type: textarea
+    id: better
+    attributes:
+      label: What it should say
+      description: Your wording, and why if it isn't obvious (wrong meaning, too formal, cut off…).
+    validations:
+      required: true

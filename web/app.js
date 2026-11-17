@@ -2,13 +2,23 @@
 import { loadSettings, saveSettings, loadImage, blobToDataUrl, translateImage, renderPage, testKey } from "./translator.js";
 import { isConnected, connectFetcher, loadChapter, fetchPageImage, generateKey, connectionLink, readConnectionLink, fetcherBase, usageToday, onUsage, resetTime, FREE_DAILY, loadCloudUsage } from "./fetcher-client.js";
 import { MODELS } from "./prompt.js";
+import { loadLocale } from "./i18n.js";
+import { languageOptions, findLanguage, languageForLocale } from "./languages.js";
 import { summary, usageView, fmtUsd, dayStart, PRICES_CHECKED, PRICE_SOURCE } from "./usage.js";
 import { readClaudeUsage, onClaudeUsage, clearClaudeUsage } from "./claude-usage.js";
 import qrcode from "./lib/qrcode.mjs";
 
 const $ = (id) => document.getElementById(id);
 
+// Words shared with the extension (usage.js) come from _locales/; the web app's own screens are in
+// English for now, so it loads English. (The extension's interface follows the target language.)
+await loadLocale("en", async (path) => (await fetch(`./${path}`)).json());
 let settings = loadSettings();
+if (!localStorage.getItem("gytakusub.settings")) { // nothing saved yet
+  // a first guess at the language to translate into: the device's own (Settings → Translation changes it)
+  const guess = languageForLocale(navigator.language);
+  if (guess) settings = { ...settings, targetLang: guess.name };
+}
 
 // "Chapter link" mode works only through a fetcher the user deployed and connected (verified with /ping).
 // Until then the tab shows the setup steps instead of the chapter form.
@@ -386,15 +396,26 @@ $("showOriginal").onchange = (e) => modePages().forEach((p) => p.showOriginal(e.
 
 const dlg = $("settings");
 $("sModel").innerHTML = MODELS.map((m) => `<option value="${m.id}">${m.label}</option>`).join("");
+// Target language: the list (languages.js) or "Other…" with a name typed in
+const OTHER_LANG = "__other";
+$("sTargetLang").replaceChildren(...languageOptions().map(({ value, label }) => new Option(label, value)), new Option("Other…", OTHER_LANG));
+$("sTargetLang").addEventListener("change", () => {
+  $("sTargetOtherField").hidden = $("sTargetLang").value !== OTHER_LANG;
+  if (!$("sTargetOtherField").hidden) $("sTargetOther").focus();
+});
 function fillSettings() {
   showClaudeUsage();
-  $("sApiKey").value = settings.apiKey; $("sModel").value = settings.model; $("sTargetLang").value = settings.targetLang;
+  $("sApiKey").value = settings.apiKey; $("sModel").value = settings.model;
+  const listed = findLanguage(settings.targetLang);
+  $("sTargetLang").value = listed ? listed.name : OTHER_LANG;
+  $("sTargetOther").value = listed ? "" : settings.targetLang;
+  $("sTargetOtherField").hidden = !!listed;
   $("sGlossary").value = settings.glossary; $("sCustomPrompt").value = settings.customPrompt;
   $("sUseContext").checked = settings.useContext; $("sUppercase").checked = settings.uppercase; $("sRtl").checked = settings.rtlSpreads;
   $("sMsg").textContent = "";
 }
 function readSettings() {
-  return { ...settings, apiKey: $("sApiKey").value.trim(), model: $("sModel").value, targetLang: $("sTargetLang").value.trim() || "English",
+  return { ...settings, apiKey: $("sApiKey").value.trim(), model: $("sModel").value, targetLang: $("sTargetLang").value === OTHER_LANG ? $("sTargetOther").value.trim() || "English" : $("sTargetLang").value,
     glossary: $("sGlossary").value, customPrompt: $("sCustomPrompt").value, useContext: $("sUseContext").checked,
     uppercase: $("sUppercase").checked, rtlSpreads: $("sRtl").checked };
 }

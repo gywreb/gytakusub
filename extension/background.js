@@ -11,6 +11,9 @@ import { DEFAULT_SETTINGS, getSettings, CS_FILES, ensureContentScript } from "./
 import { createLane, Cancelled } from "./lane.js";
 import { consentGiven, hasAccess, openWelcome, CONSENT_VERSION } from "./access.js";
 import { sniffImageType, readCapped } from "./imagecheck.js";
+import { t, langTag, messagesWithPrefix } from "./i18n.js";
+import { useLanguageOf } from "./locale.js";
+import { uiLocaleFor, languageForLocale } from "./languages.js";
 
 // Claude usage log (usage.js) in chrome.storage.local, read by the popup and Options. This worker is
 // its only writer; a page's slices answer in parallel, so the writes queue up instead of racing.
@@ -81,6 +84,12 @@ chrome.runtime.onInstalled.addListener(async ({ reason, previousVersion }) => {
   // who withdrew on purpose.
   if (reason === "update") chrome.storage.sync.remove(["creditPlan", "creditCustom", "creditRenews"]).catch(() => {}); // the monthly-credit fields removed in 2.7.0
   const { consent } = await chrome.storage.local.get("consent");
+  if (reason === "install") {
+    // a first guess at the language to translate into, and so of the interface: the browser's own (the setup page asks first thing)
+    const guess = languageForLocale(chrome.i18n.getUILanguage());
+    const { targetLang } = await chrome.storage.sync.get("targetLang");
+    if (guess && !targetLang) await chrome.storage.sync.set({ targetLang: guess.name });
+  }
   if (reason === "install" && !consent) openWelcome();
   if (reason === "update" && (consent ? (consent.version || 0) < CONSENT_VERSION : olderThan(previousVersion, "2.7.0"))) openWelcome("#update");
 });
@@ -96,7 +105,9 @@ chrome.runtime.onStartup.addListener(() => { updateBadge(); syncRegistration(); 
 chrome.storage.onChanged.addListener((changes, area) => {
   if (changes.enabled) updateBadge();
   if (changes.enabled || changes.enabledSites || changes.autoSites) syncRegistration();
-  if (area === "sync" || (area === "local" && changes.apiKey)) tellTabsSettingsChanged();
+  // a new target language: load its words first, so the pages that ask again get them
+  if (area === "sync" && changes.targetLang) speak(changes.targetLang.newValue).finally(tellTabsSettingsChanged);
+  else if (area === "sync" || (area === "local" && changes.apiKey)) tellTabsSettingsChanged();
 });
 
 // The content script runs inside other people's pages. Chrome lets it read storage.local and
@@ -166,26 +177,26 @@ const MAX_BYTES = 25 * 1024 * 1024;
 async function fetchImageBlob({ url, dataUrl }, signal = undefined) {
   let bytes;
   if (dataUrl) {
-    if (!/^data:image\//i.test(dataUrl)) throw new Error("Unsupported image data");
+    if (!/^data:image\//i.test(dataUrl)) throw new Error(t("bg_bad_data"));
     const blob = dataUrlToBlob(dataUrl);
-    if (blob.size > MAX_BYTES) throw new Error("Image is too large (over 25 MB)");
+    if (blob.size > MAX_BYTES) throw new Error(t("bg_too_large", { mb: 25 }));
     bytes = new Uint8Array(await blob.arrayBuffer());
   } else {
     let u;
-    try { u = new URL(url); } catch { throw new Error("Invalid image URL"); }
-    if (!/^https?:$/.test(u.protocol)) throw new Error("Only http(s) images are supported");
+    try { u = new URL(url); } catch { throw new Error(t("bg_bad_url")); }
+    if (!/^https?:$/.test(u.protocol)) throw new Error(t("bg_http_only"));
     let res;
     try { res = await fetch(u.href, { credentials: "omit", signal }); }
     catch (e) {
       if (e?.name === "AbortError") throw e;
-      if (!(await hasAccess())) throw new Error(`Gytakusub needs your permission to read images from ${u.hostname}. Open the Gytakusub popup and choose Allow access.`);
-      throw new Error(`Could not download the image from ${u.hostname} (${e.message || "network error"})`);
+      if (!(await hasAccess())) throw coded(t("bg_no_access", { host: u.hostname }), "no-access");
+      throw coded(t("bg_download_failed", { host: u.hostname, error: e.message || "network error" }), "network");
     }
-    if (!res.ok) throw new Error(`Could not fetch image (${res.status})`);
+    if (!res.ok) throw coded(t("bg_fetch_status", { status: res.status }), `http-${res.status}`);
     bytes = await readCapped(res, MAX_BYTES);
   }
   const type = sniffImageType(bytes);
-  if (!type) throw new Error("That address did not return an image");
+  if (!type) throw new Error(t("bg_not_image"));
   return new Blob([bytes], { type });
 }
 
@@ -223,9 +234,10 @@ const disposeJob = (prepared) => { for (const s of prepared?.slices || []) { try
 
 async function handleTranslate(msg, sender) {
   const settings = await getSettings();
-  if (!settings.enabled) throw new Error("Gytakusub is switched off (toolbar popup).");
-  if (!(await consentGiven())) throw new Error("Gytakusub isn't set up yet: open the Gytakusub popup and choose Set up, to see what is sent to Claude and agree.");
-  if (!settings.apiKey) throw new Error("No API key set. Open Gytakusub's settings and paste your Claude API key.");
+  await speak(settings.targetLang);
+  if (!settings.enabled) throw new Error(t("bg_off"));
+  if (!(await consentGiven())) throw new Error(t("bg_not_set_up"));
+  if (!settings.apiKey) throw new Error(t("bg_no_key"));
   const tabId = sender.tab?.id ?? -1;
   const jobKey = msg.jobId != null ? `${tabId}:${msg.jobId}` : null;
   const work = { distance: Number.isFinite(msg.distance) ? msg.distance : 0, onScreen: msg.onScreen === true, since: Date.now(), ctl: new AbortController(), asked: false };
@@ -330,7 +342,7 @@ async function editItem({ cacheKey, item, text }) {
 /** Append "from = to" to the glossary unless an equivalent line exists. */
 async function addGlossary({ from, to }) {
   from = String(from ?? "").trim().slice(0, 200); to = String(to ?? "").trim().slice(0, 200);
-  if (!from || !to) throw new Error("Both the original and the translation are needed");
+  if (!from || !to) { await speak((await getSettings()).targetLang); throw new Error(t("bg_gloss_both")); }
   const s = await getSettings();
   const lines = s.glossary.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   const dup = lines.some((l) => l.split("=")[0].trim().toLowerCase() === from.toLowerCase());
@@ -346,11 +358,23 @@ async function addGlossary({ from, to }) {
  */
 async function fetchForReport(msg, sender) {
   if (!sender.tab) throw new Error("Not from a tab");
-  if (!(await getSettings()).debugOverlay) throw new Error("Turn on the debug overlay in Options to export reports");
+  const settings = await getSettings();
+  await speak(settings.targetLang);
+  if (!settings.debugOverlay) throw new Error(t("bg_report_needs_debug"));
   const blob = await fetchImageBlob(msg);
-  try { (await createImageBitmap(blob)).close(); } catch { throw new Error("That address did not return an image"); }
+  try { (await createImageBitmap(blob)).close(); } catch { throw new Error(t("bg_not_image")); }
   return { dataUrl: await blobToDataUrl(blob), type: blob.type };
 }
+
+// The worker's own words (errors the page shows, the content script's labels) follow the target
+// language like every page does; the messages are loaded again only when that language changes.
+let workerLocale = null;
+async function speak(targetLang) {
+  if (uiLocaleFor(targetLang) !== workerLocale) workerLocale = await useLanguageOf(targetLang);
+  return workerLocale;
+}
+/** An Error the content script can act on by its code, whatever language the message is in. */
+const coded = (message, code) => Object.assign(new Error(message), { code });
 
 // ---------- messaging ----------
 
@@ -358,10 +382,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (sender.id !== chrome.runtime.id) return false; // only this extension's own pages and content scripts
   const reply = (p) => p.then((r) => sendResponse(r)).catch((e) => sendResponse({ error: e.message || String(e) }));
   switch (msg?.type) {
-    case "TRANSLATE": handleTranslate(msg, sender).then(sendResponse, (e) => sendResponse(e instanceof Cancelled || e?.name === "AbortError" ? { cancelled: true } : { error: e.message || String(e) })); return true;
+    case "TRANSLATE": handleTranslate(msg, sender).then(sendResponse, (e) => sendResponse(e instanceof Cancelled || e?.name === "AbortError" ? { cancelled: true } : { error: e.message || String(e), code: e.code })); return true;
     case "JOBS": sendResponse(updateJobs(sender.tab?.id ?? -1, msg)); return false;
     // the content script runs inside other people's pages: it gets the settings, but not the API key
-    case "GET_SETTINGS": reply(getSettings().then(({ apiKey, ...rest }) => ({ ...rest, hasKey: !!apiKey }))); return true;
+    // with the words it shows on the page, in the reader's language (it can't read our files itself)
+    case "GET_SETTINGS": reply(getSettings().then(async ({ apiKey, ...rest }) => ({ ...rest, hasKey: !!apiKey, uiLang: langTag(await speak(rest.targetLang)), ui: messagesWithPrefix("content_") }))); return true;
     case "EDIT_ITEM": reply(editItem(msg)); return true;
     case "FETCH_IMAGE": reply(fetchForReport(msg, sender)); return true;
     case "ADD_GLOSSARY": reply(addGlossary(msg)); return true;

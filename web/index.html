@@ -288,7 +288,8 @@
       </section>
       <section class="group" aria-labelledby="sgTranslate">
         <h3 id="sgTranslate">Translation</h3>
-        <label class="field">Target language <input id="sTargetLang" name="target-language" type="text" placeholder="English" autocomplete="off" /></label>
+        <label class="field">Target language <select id="sTargetLang" name="target-language"></select></label>
+        <label class="field" id="sTargetOtherField" hidden>Other language <input id="sTargetOther" name="target-language-other" type="text" placeholder="Type a language" autocomplete="off" /></label>
         <label class="field">Glossary <textarea id="sGlossary" name="glossary" rows="3" placeholder="Gojo Satoru = Satoru Gojo" spellcheck="false"></textarea></label>
         <label class="field">Extra instructions <textarea id="sCustomPrompt" name="instructions" rows="2" placeholder="Keep the tone casual."></textarea></label>
         <label class="check"><input type="checkbox" id="sUseContext" name="context" /> Chapter context (names and recent lines)</label>

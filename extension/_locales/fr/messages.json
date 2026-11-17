@@ -1,0 +1,818 @@
+{
+ "appDescription": {
+  "message": "Traduisez les pages de manga et de BD sur n'importe quel site, avec votre propre clé API Claude. Sans compte, sans serveur."
+ },
+ "cmdTranslate": {
+  "message": "Traduire toutes les images à l'écran"
+ },
+ "cmdToggle": {
+  "message": "Afficher / masquer les traductions sur cette page"
+ },
+ "popup_turn_gytakusub_on_or_off": {
+  "message": "Activer ou désactiver Gytakusub sur tous les sites"
+ },
+ "popup_enabled_arialabel": {
+  "message": "Gytakusub activé"
+ },
+ "popup_finish_setting_up_gytakusub_see": {
+  "message": "<b>Terminez la configuration de Gytakusub.</b> Voyez ce qu'il envoie à Claude, acceptez, et autorisez-le à lire les images de manga. Cela prend une minute."
+ },
+ "popup_openSetup": {
+  "message": "Configurer"
+ },
+ "popup_offNote": {
+  "message": "Gytakusub est désactivé sur tous les sites. Réactivez-le avec l'interrupteur ci-dessus ; vos réglages sont conservés."
+ },
+ "popup_no_claude_api_key_yet": {
+  "message": "Pas encore de clé API Claude."
+ },
+ "popup_openOptions2": {
+  "message": "Ajouter une clé"
+ },
+ "popup_allow_gytakusub_to_read_manga": {
+  "message": "Autorisez Gytakusub à lire les images de manga sur les sites web."
+ },
+ "popup_allowAccess": {
+  "message": "Autoriser l'accès"
+ },
+ "popup_translate": {
+  "message": "<span>Traduire les images visibles</span><kbd id=\"kbdTranslate\">Alt+T</kbd>"
+ },
+ "popup_toggle_title": {
+  "message": "Masquer / afficher les traductions (Alt+Shift+T)"
+ },
+ "popup_toggle_arialabel": {
+  "message": "Masquer ou afficher les traductions"
+ },
+ "popup_siteHead": {
+  "message": "Sur <span id=\"host\">ce site</span>"
+ },
+ "popup_enable_here": {
+  "message": "Activer ici"
+ },
+ "popup_hover_button_and_keyboard_shortcuts": {
+  "message": "Bouton au survol et raccourcis clavier"
+ },
+ "popup_auto_translate_while_scrolling": {
+  "message": "Traduire automatiquement pendant le défilement"
+ },
+ "popup_sends_pages_to_claude_as": {
+  "message": "Envoie les pages à Claude au fil du défilement"
+ },
+ "popup_trHead": {
+  "message": "Traduction"
+ },
+ "popup_usageToday_title": {
+  "message": "Ce que la traduction a coûté aujourd'hui, compté dans ce navigateur (détails dans les Réglages)"
+ },
+ "popup_model": {
+  "message": "Modèle"
+ },
+ "popup_haiku_5_5_fastest_cheapest": {
+  "message": "Haiku 5.5 — rapide, économique"
+ },
+ "popup_sonnet_5_5_for_dense": {
+  "message": "Sonnet 5.5 — pages denses"
+ },
+ "popup_opus_5_5_best_most": {
+  "message": "Opus 5.5 — le meilleur, cher"
+ },
+ "popup_chapter_context": {
+  "message": "Contexte du chapitre"
+ },
+ "popup_names_recent_lines_for_continuity": {
+  "message": "Noms + répliques récentes, pour la continuité"
+ },
+ "popup_openOptions": {
+  "message": "Tous les réglages"
+ },
+ "popup_exportReport_title": {
+  "message": "Un .zip de chaque page traduite dans cet onglet : image d'origine, rendu de débogage et JSON"
+ },
+ "popup_exportReport": {
+  "message": "Exporter un rapport de débogage"
+ },
+ "popup_not_web_page": {
+  "message": "Ce n'est pas une page web."
+ },
+ "popup_no_access": {
+  "message": "Sans votre autorisation, Gytakusub ne peut pas lire les images ici. Choisissez Autoriser l'accès quand vous êtes prêt."
+ },
+ "popup_this_page": {
+  "message": "cette page"
+ },
+ "popup_state_excluded": {
+  "message": "{host} figure dans votre liste de sites désactivés."
+ },
+ "popup_state_translated_one": {
+  "message": "{n} traduite"
+ },
+ "popup_state_translated_other": {
+  "message": "{n} traduites"
+ },
+ "popup_state_in_progress_one": {
+  "message": "{n} en cours"
+ },
+ "popup_state_in_progress_other": {
+  "message": "{n} en cours"
+ },
+ "popup_list_sep": {
+  "message": ","
+ },
+ "popup_state_hidden": {
+  "message": "(masquées)"
+ },
+ "popup_not_active": {
+  "message": "Pas encore actif sur cette page. Traduire fonctionne quand même."
+ },
+ "popup_reload_tab": {
+  "message": "Rechargez l'onglet pour activer Gytakusub ici."
+ },
+ "popup_allow_above": {
+  "message": "Autorisez l'accès (ci-dessus) pour utiliser Gytakusub ici."
+ },
+ "popup_on": {
+  "message": "Activé"
+ },
+ "popup_off": {
+  "message": "Désactivé"
+ },
+ "popup_toggle_title_key": {
+  "message": "Masquer / afficher les traductions ({key})"
+ },
+ "popup_preparing": {
+  "message": "Préparation…"
+ },
+ "popup_export_failed": {
+  "message": "Échec de l'export : {error}"
+ },
+ "popup_report_downloaded_one": {
+  "message": "Rapport téléchargé : {n} page"
+ },
+ "popup_report_downloaded_other": {
+  "message": "Rapport téléchargé : {n} pages"
+ },
+ "popup_usage_today": {
+  "message": "≈{cost} aujourd'hui"
+ },
+ "popup_usage_today_aria": {
+  "message": "Ce que la traduction a coûté aujourd'hui : environ {cost}. Ouvrir les détails."
+ },
+ "welcome_set_up_gytakusub": {
+  "message": "Configurer Gytakusub"
+ },
+ "welcome_allSet": {
+  "message": "Tout est prêt. Ouvrez un chapitre de manga et cliquez sur l'icône Gytakusub dans la barre d'outils."
+ },
+ "welcome_h_consent": {
+  "message": "Ce que Gytakusub envoie, et où"
+ },
+ "welcome_only_the_pages_you_translate": {
+  "message": "<b>Seulement les pages que vous traduisez.</b> Une page est lue quand vous cliquez sur son bouton Traduire, appuyez sur <kbd class=\"kbdTranslate\">Alt+T</kbd> ou activez la traduction automatique pour ce site. Les autres pages ne sont jamais lues."
+ },
+ "welcome_sent_to_anthropic_s_claude": {
+  "message": "<b>Envoyé à l'API Claude d'Anthropic, avec votre clé :</b> l'image de la page (découpée en morceaux), votre glossaire et vos instructions personnalisées, et les noms déjà traduits dans le même chapitre. Avec <i>Contexte du chapitre</i> (activé sauf si vous le désactivez), aussi les dernières répliques."
+ },
+ "welcome_nowhere_else_gytakusub_has_no": {
+  "message": "<b>Nulle part ailleurs.</b> Gytakusub n'a ni serveur, ni compte, ni statistiques d'usage. Votre clé reste dans ce navigateur. Vos réglages et votre glossaire suivent la synchronisation de votre navigateur si vous l'utilisez (la clé aussi, seulement si vous le choisissez dans les Réglages)."
+ },
+ "welcome_anthropic_handles_what_you_send": {
+  "message": "Anthropic traite ce que vous envoyez selon ses <a href=\"https://www.anthropic.com/legal/commercial-terms\" target=\"_blank\" rel=\"noopener\">conditions commerciales</a> et sa <a href=\"https://www.anthropic.com/legal/privacy\" target=\"_blank\" rel=\"noopener\">politique de confidentialité</a>. La <a href=\"https://gywreb.github.io/gytakusub/privacy.html\" target=\"_blank\" rel=\"noopener\">politique de confidentialité</a> de Gytakusub donne les détails."
+ },
+ "welcome_agree": {
+  "message": "J'accepte"
+ },
+ "welcome_h_key": {
+  "message": "Ajoutez votre clé API Claude"
+ },
+ "welcome_create_a_key_in_the": {
+  "message": "Créez une clé dans la <a href=\"https://platform.claude.com/\" target=\"_blank\" rel=\"noopener\">Claude Console</a> (API keys), puis collez-la dans les réglages de Gytakusub. Elle reste dans ce navigateur et n'est envoyée qu'à Anthropic."
+ },
+ "welcome_h_access": {
+  "message": "Autorisez Gytakusub à lire les images de manga"
+ },
+ "welcome_manga_sites_usually_load_their": {
+  "message": "Les sites de manga chargent souvent leurs pages depuis d'autres serveurs d'images, c'est pourquoi Gytakusub demande l'accès à tous les sites. Votre navigateur vous demandera de confirmer avec sa formule habituelle : l'extension pourrait <i>lire et modifier toutes vos données sur tous les sites</i>. Gytakusub ne s'en sert que pour télécharger les images que vous traduisez : il ne lit une page que lorsque vous la traduisez, n'agit de lui-même que sur les sites où vous activez la traduction automatique, et ne modifie jamais rien sur une page à part dessiner la traduction sur l'image."
+ },
+ "welcome_allow": {
+  "message": "Autoriser l'accès"
+ },
+ "welcome_h_use": {
+  "message": "Comment traduire"
+ },
+ "welcome_open_a_chapter_on_a": {
+  "message": "Ouvrez un chapitre sur un site de manga."
+ },
+ "welcome_click_the_gytakusub_icon_in": {
+  "message": "Cliquez sur l'icône Gytakusub dans la barre d'outils. Si vous ne la voyez pas, ouvrez le menu en forme de pièce de puzzle et épinglez Gytakusub."
+ },
+ "welcome_turn_on_enable_here_for": {
+  "message": "Activez <b>Activer ici</b> pour avoir un bouton Traduire sur chaque page, ou <b>Traduire automatiquement pendant le défilement</b>. Ou appuyez simplement sur <kbd class=\"kbdTranslate\">Alt+T</kbd> pour traduire ce qui est à l'écran."
+ },
+ "welcome_h_cost": {
+  "message": "Ce que ça coûte"
+ },
+ "welcome_you_pay_anthropic_for_what": {
+  "message": "Vous payez Anthropic pour ce que vous utilisez, sur le solde de votre Claude Console. Le modèle par défaut, Haiku 5.5, coûte 1/20 de Sonnet 5.5 (<a href=\"https://platform.claude.com/docs/en/about-claude/pricing\" target=\"_blank\" rel=\"noopener\">tarifs d'Anthropic</a>). Après quelques pages traduites, <b>Réglages → Ce que coûte la traduction</b> indique ce que chaque page vous coûte, compté à partir des réponses de Claude à ce navigateur."
+ },
+ "welcome_to_cap_your_spending_on": {
+  "message": "Pour plafonner vos dépenses sur tous vos appareils, fixez une limite mensuelle sur la <a href=\"https://platform.claude.com/settings/billing\" target=\"_blank\" rel=\"noopener\">page Billing</a> de la Console (Spend limits). Claude s'arrête à cette limite."
+ },
+ "welcome_h_help": {
+  "message": "Aide"
+ },
+ "welcome_found_a_problem_or_have": {
+  "message": "Un problème ou une idée ? <a href=\"https://github.com/gywreb/gytakusub/issues\" target=\"_blank\" rel=\"noopener\">Ouvrez une issue sur GitHub</a>. Les issues sont publiques : n'y joignez ni pages de manga ni rapports de débogage."
+ },
+ "welcome_gytakusub_is_an_independent_open": {
+  "message": "Gytakusub est un projet indépendant et open source. Il n'est ni créé, ni approuvé par Anthropic, ni affilié à elle.<br /><a href=\"https://github.com/gywreb/gytakusub\" target=\"_blank\" rel=\"noopener\">Code source</a> · <a href=\"https://gywreb.github.io/gytakusub/privacy.html\" target=\"_blank\" rel=\"noopener\">Politique de confidentialité</a>"
+ },
+ "welcome_lede": {
+  "message": "Gytakusub traduit mangas, manhwas et BD sur les sites de votre choix, avec votre propre clé API Claude. Trois étapes et c'est prêt."
+ },
+ "welcome_lede_update": {
+  "message": "Gytakusub demande maintenant votre accord avant de lire une page. Voyez ce qui est envoyé et acceptez pour continuer à traduire."
+ },
+ "welcome_state_agreed": {
+  "message": "Accepté"
+ },
+ "welcome_state_key": {
+  "message": "Clé enregistrée"
+ },
+ "welcome_state_allowed": {
+  "message": "Autorisé"
+ },
+ "welcome_hint_agreed": {
+  "message": "Vous avez accepté le {date}. Vous pouvez retirer votre accord à tout moment dans Réglages → À propos."
+ },
+ "welcome_hint_not_agreed": {
+  "message": "Rien n'est envoyé tant que vous n'avez pas accepté. Vous pouvez retirer votre accord à tout moment dans Réglages → À propos."
+ },
+ "welcome_change_key": {
+  "message": "Changer de clé"
+ },
+ "welcome_open_settings": {
+  "message": "Ouvrir les réglages"
+ },
+ "welcome_hint_access_remove": {
+  "message": "Vous pouvez le retirer à tout moment dans Réglages → À propos, ou sur la page des extensions du navigateur."
+ },
+ "welcome_hint_agree_first": {
+  "message": "Acceptez d'abord l'étape 1."
+ },
+ "welcome_not_allowed": {
+  "message": "Non autorisé. Gytakusub ne peut pas lire les images de manga tant que vous ne l'autorisez pas."
+ },
+ "welcome_translate_shortcut": {
+  "message": "le raccourci Traduire"
+ },
+ "welcome_translate_into": {
+  "message": "Traduire en"
+ },
+ "welcome_language_hint": {
+  "message": "Les pages de Gytakusub suivent aussi cette langue, quand elles sont traduites. Autres langues : Réglages → Traduction."
+ },
+ "opt_gytakusub_settings": {
+  "message": "Réglages de Gytakusub"
+ },
+ "opt_changes_apply_after_you_save": {
+  "message": "Les modifications s'appliquent après l'enregistrement."
+ },
+ "opt_sections": {
+  "message": "Sections"
+ },
+ "opt_claude_api": {
+  "message": "API Claude"
+ },
+ "opt_costs": {
+  "message": "Coûts"
+ },
+ "opt_translation": {
+  "message": "Traduction"
+ },
+ "opt_sites": {
+  "message": "Sites"
+ },
+ "opt_lettering_speed": {
+  "message": "Lettrage et vitesse"
+ },
+ "opt_troubleshooting": {
+  "message": "Dépannage"
+ },
+ "opt_about": {
+  "message": "À propos"
+ },
+ "opt_h_api": {
+  "message": "API Claude"
+ },
+ "opt_gytakusub_sends_pages_to_claude": {
+  "message": "Gytakusub envoie les pages à Claude avec votre propre clé."
+ },
+ "opt_api_key": {
+  "message": "Clé API"
+ },
+ "opt_testKey": {
+  "message": "Enregistrer et tester"
+ },
+ "opt_apiKeyHint": {
+  "message": "Créez-en une sur <a href=\"https://platform.claude.com/\" target=\"_blank\" rel=\"noopener\">platform.claude.com</a> → Settings → API keys. L'utilisation est facturée à ce compte Console, séparément d'un abonnement Claude (les forfaits Max, Ultra et Team incluent des crédits API mensuels)."
+ },
+ "opt_sync_the_key_to_my": {
+  "message": "Synchroniser la clé avec mes autres navigateurs"
+ },
+ "opt_keeps_it_in_browser_sync": {
+  "message": "La conserve dans la synchronisation du navigateur au lieu de ce seul appareil"
+ },
+ "opt_model": {
+  "message": "Modèle"
+ },
+ "opt_claude_haiku_5_5_fastest": {
+  "message": "Claude Haiku 5.5 — le plus rapide, le moins cher"
+ },
+ "opt_claude_sonnet_5_5_better": {
+  "message": "Claude Sonnet 5.5 — meilleur sur les pages denses / stylisées"
+ },
+ "opt_claude_opus_5_5_best": {
+  "message": "Claude Opus 5.5 — la meilleure qualité, le plus cher"
+ },
+ "opt_h_usage": {
+  "message": "Ce que coûte la traduction"
+ },
+ "opt_this_browser": {
+  "message": "Ce navigateur"
+ },
+ "opt_counted_from_claude_s_own": {
+  "message": "Compté à partir des réponses de Claude à ce navigateur. Votre téléphone et vos autres navigateurs tiennent leur propre compte."
+ },
+ "opt_today": {
+  "message": "Aujourd'hui"
+ },
+ "opt_cuModels_arialabel": {
+  "message": "Ce mois-ci par modèle, avec le coût par page"
+ },
+ "opt_cap_your_spending_on_every": {
+  "message": "<b>Plafonnez vos dépenses sur tous vos appareils.</b> Fixez une limite mensuelle dans la Claude Console (Billing → Spend limits). Elle s'applique à tout ce qui utilise votre clé, et Claude s'arrête à cette limite."
+ },
+ "opt_open_billing": {
+  "message": "Ouvrir Billing"
+ },
+ "opt_details": {
+  "message": "Détails"
+ },
+ "opt_today_2": {
+  "message": "<b>Aujourd'hui :</b> <span id=\"cuTodayTokens\"></span>"
+ },
+ "opt_this_month": {
+  "message": "<b>Ce mois-ci :</b> <span id=\"cuMonthTokens\"></span>"
+ },
+ "opt_estimate_tokens_are_exact_the": {
+  "message": "<b>Estimation :</b> les tokens sont exacts ; le coût utilise les <a id=\"cuPriceLink\" href=\"https://platform.claude.com/docs/en/about-claude/pricing\" target=\"_blank\" rel=\"noopener\">tarifs d'Anthropic</a> (vérifiés le <span id=\"cuChecked\"></span>). Une page servie depuis le cache ne coûte rien et n'est pas comptée."
+ },
+ "opt_exact_bill_the_claude_console": {
+  "message": "<b>Facture exacte :</b> les pages <a href=\"https://platform.claude.com/usage\" target=\"_blank\" rel=\"noopener\">Usage</a> et <a href=\"https://platform.claude.com/cost\" target=\"_blank\" rel=\"noopener\">Cost</a> de la Claude Console."
+ },
+ "opt_balance_and_credits_including_a": {
+  "message": "<b>Solde et crédits</b> (y compris le crédit API mensuel d'un forfait) : la <a href=\"https://platform.claude.com/settings/billing\" target=\"_blank\" rel=\"noopener\">page Billing</a> de la Console. Anthropic ne propose aucun moyen pour les applications de les lire."
+ },
+ "opt_days_start_at_midnight_utc": {
+  "message": "<b>Les journées</b> commencent à <span id=\"cuDayStart\">minuit UTC</span> à votre heure (minuit UTC), comme les rapports d'utilisation d'Anthropic."
+ },
+ "opt_cuClear": {
+  "message": "Effacer l'historique d'utilisation"
+ },
+ "opt_h_translation": {
+  "message": "Traduction"
+ },
+ "opt_target_language": {
+  "message": "Langue cible"
+ },
+ "opt_glossary": {
+  "message": "Glossaire"
+ },
+ "opt_glossary_placeholder": {
+  "message": "Un par ligne, par ex.\nGojo Satoru = Satoru Gojo\n呪術 = jujutsu"
+ },
+ "opt_glossaryHint": {
+  "message": "Noms et termes que le modèle doit utiliser tels quels. Les noms qu'il découvre lui-même sont mémorisés automatiquement pour chaque onglet."
+ },
+ "opt_extra_instructions": {
+  "message": "Instructions supplémentaires"
+ },
+ "opt_chapter_context": {
+  "message": "Contexte du chapitre"
+ },
+ "opt_sends_names_and_the_last": {
+  "message": "Envoie avec chaque page les noms et les ~40 dernières répliques traduites dans cet onglet : meilleure continuité, environ 400 tokens d'entrée en plus"
+ },
+ "opt_also_transcribe_the_original_text": {
+  "message": "Transcrire aussi le texte d'origine"
+ },
+ "opt_slower_slightly_more_careful_reading": {
+  "message": "Plus lent, lecture un peu plus attentive ; utile pour le débogage"
+ },
+ "opt_uppercase_lettering": {
+  "message": "Lettrage en MAJUSCULES"
+ },
+ "opt_comic_book_style": {
+  "message": "Style bande dessinée"
+ },
+ "opt_h_sites": {
+  "message": "Sites"
+ },
+ "opt_one_hostname_per_line_the": {
+  "message": "Un nom d'hôte par ligne. Le plus simple pour ajouter un site : ouvrez-le et utilisez les interrupteurs de la fenêtre de la barre d'outils."
+ },
+ "opt_enabled_sites": {
+  "message": "Sites activés"
+ },
+ "opt_enabledSitesHint": {
+  "message": "Le bouton au survol et les raccourcis clavier ne fonctionnent qu'ici. Ailleurs, Gytakusub reste inactif jusqu'à ce que vous utilisiez le bouton de la barre d'outils ou le raccourci."
+ },
+ "opt_auto_translate_while_scrolling": {
+  "message": "Traduire automatiquement pendant le défilement"
+ },
+ "opt_autoSitesHint": {
+  "message": "Chaque page qui apparaît à l'écran est envoyée automatiquement à Claude : n'ajoutez que les sites où vous acceptez de dépenser des tokens. Ils comptent aussi comme activés."
+ },
+ "opt_disabled_sites": {
+  "message": "Sites désactivés"
+ },
+ "opt_excludedSitesHint": {
+  "message": "Gytakusub reste désactivé sur ces sites et leurs sous-domaines."
+ },
+ "opt_h_look": {
+  "message": "Lettrage et vitesse"
+ },
+ "opt_font_family": {
+  "message": "Police"
+ },
+ "opt_fontHint": {
+  "message": "Laissez vide pour utiliser la police de lettrage incluse (Comic Neue Bold), ou indiquez le nom de n'importe quelle police installée sur cet appareil, par ex. <code>\"Bangers\"</code>."
+ },
+ "opt_use_the_graphics_card_webgpu": {
+  "message": "Utiliser la carte graphique (WebGPU)"
+ },
+ "opt_finds_text_and_bubbles_much": {
+  "message": "Trouve le texte et les bulles bien plus vite. Désactivez-la seulement si les pages s'affichent mal ou si le navigateur se comporte bizarrement."
+ },
+ "opt_peek_at_the_original_while": {
+  "message": "Voir l'original au survol"
+ },
+ "opt_hovering_a_translated_bubble_shows": {
+  "message": "Survoler une bulle traduite affiche le lettrage d'origine. Pour corriger une réplique, double-cliquez sur sa bulle."
+ },
+ "opt_h_debug": {
+  "message": "Dépannage"
+ },
+ "opt_debug_overlay": {
+  "message": "Calque de débogage"
+ },
+ "opt_draws_the_detected_regions_and": {
+  "message": "Dessine les régions et zones de texte détectées sur les pages traduites, et ajoute à la barre flottante un bouton Rapport qui télécharge l'original, le rendu de débogage et le JSON de cette page. « Exporter un rapport de débogage » dans la fenêtre de la barre d'outils fait de même pour toutes les pages traduites de l'onglet."
+ },
+ "opt_translation_cache": {
+  "message": "Cache des traductions"
+ },
+ "opt_translated_pages_the_names_found": {
+  "message": "Les pages traduites, les noms trouvés par onglet et les répliques que vous avez modifiées sont conservés jusqu'à la fermeture du navigateur. Videz-les pour retraduire les pages depuis zéro."
+ },
+ "opt_clearCache": {
+  "message": "Vider le cache"
+ },
+ "opt_h_about": {
+  "message": "À propos"
+ },
+ "opt_what_is_sent_to_claude": {
+  "message": "Ce qui est envoyé à Claude"
+ },
+ "opt_access_to_websites": {
+  "message": "Accès aux sites web"
+ },
+ "opt_help": {
+  "message": "Aide"
+ },
+ "opt_report_a_problem_or_ask": {
+  "message": "Signalez un problème ou posez une question sur <a href=\"https://github.com/gywreb/gytakusub/issues\" target=\"_blank\" rel=\"noopener\">GitHub Issues</a>. Les issues sont publiques : n'y joignez ni pages de manga ni rapports de débogage."
+ },
+ "opt_gytakusub_is_an_independent_project": {
+  "message": "Gytakusub est un projet indépendant, ni créé par Anthropic ni affilié à elle. <a href=\"https://gywreb.github.io/gytakusub/privacy.html\" target=\"_blank\" rel=\"noopener\">Politique de confidentialité</a> · <a href=\"welcome.html\" target=\"_blank\">Guide de configuration</a>"
+ },
+ "opt_gytakusub_is_free_software_under": {
+  "message": "Gytakusub <span id=\"version\"></span> est un logiciel libre sous <a href=\"LICENSE\" target=\"_blank\">GNU AGPL v3</a> · <a href=\"https://github.com/gywreb/gytakusub\" target=\"_blank\" rel=\"noopener\">code source</a> · <a href=\"THIRD_PARTY.md\" target=\"_blank\">composants tiers</a>"
+ },
+ "opt_save": {
+  "message": "Enregistrer"
+ },
+ "opt_unsaved": {
+  "message": "Modifications non enregistrées"
+ },
+ "opt_loading": {
+  "message": "Les réglages sont encore en cours de chargement."
+ },
+ "opt_saved": {
+  "message": "Enregistré."
+ },
+ "opt_confirm_clear_usage": {
+  "message": "Effacer l'historique d'utilisation de ce navigateur ? La Claude Console conserve ses propres enregistrements."
+ },
+ "opt_usage_cleared": {
+  "message": "Historique d'utilisation effacé."
+ },
+ "opt_show": {
+  "message": "Afficher"
+ },
+ "opt_hide": {
+  "message": "Masquer"
+ },
+ "opt_testing": {
+  "message": "Test en cours…"
+ },
+ "opt_no_key_saved": {
+  "message": "Aucune clé API enregistrée pour l'instant."
+ },
+ "opt_key_works": {
+  "message": "La clé fonctionne. Le modèle {model} a répondu."
+ },
+ "opt_key_failed": {
+  "message": "Échec du test de la clé : {error}"
+ },
+ "opt_confirm_clear_cache": {
+  "message": "Effacer les pages traduites, les noms trouvés par onglet et les répliques que vous avez modifiées ?"
+ },
+ "opt_cache_cleared_unsaved": {
+  "message": "Cache vidé. Vos autres modifications ne sont pas encore enregistrées."
+ },
+ "opt_cache_cleared": {
+  "message": "Cache vidé."
+ },
+ "opt_save_title": {
+  "message": "Enregistrer ({key})"
+ },
+ "opt_consent_agreed": {
+  "message": "Vous avez accepté le {date}. Si vous retirez votre accord, plus rien n'est envoyé jusqu'à ce que vous acceptiez de nouveau."
+ },
+ "opt_consent_none": {
+  "message": "Pas encore accepté, donc rien n'est envoyé. Ouvrez la page de configuration pour voir ce qui est envoyé et accepter."
+ },
+ "opt_withdraw": {
+  "message": "Retirer"
+ },
+ "opt_review_agree": {
+  "message": "Consulter et accepter"
+ },
+ "opt_access_allowed": {
+  "message": "Autorisé : Gytakusub peut lire les images sur les sites web, uniquement quand vous traduisez ou sur les sites avec la traduction automatique activée."
+ },
+ "opt_access_none": {
+  "message": "Non autorisé : Gytakusub ne peut pas lire les images de manga tant que vous ne l'autorisez pas."
+ },
+ "opt_remove_access": {
+  "message": "Retirer l'accès"
+ },
+ "opt_allow_access": {
+  "message": "Autoriser l'accès"
+ },
+ "opt_agree_first": {
+  "message": "Acceptez d'abord ce qui est envoyé"
+ },
+ "opt_cannot_read": {
+  "message": "Impossible de lire les réglages : {error}"
+ },
+ "opt_other_language": {
+  "message": "Autre…"
+ },
+ "opt_other_language_label": {
+  "message": "Autre langue"
+ },
+ "opt_other_language_placeholder": {
+  "message": "Saisissez une langue"
+ },
+ "opt_target_language_hint": {
+  "message": "Les pages de Gytakusub suivent aussi cette langue, quand elles sont traduites (sinon, l'anglais)."
+ },
+ "opt_customPrompt_placeholder": {
+  "message": "par ex. Garder un ton familier. Traduire les onomatopées (SFX) par des onomatopées françaises."
+ },
+ "content_translate_image": {
+  "message": "Traduire cette image"
+ },
+ "content_toggle_image": {
+  "message": "Afficher ou masquer la traduction"
+ },
+ "content_report": {
+  "message": "Rapport"
+ },
+ "content_report_title": {
+  "message": "Télécharger un rapport de diagnostic pour cette page (original, rendu de débogage, JSON)"
+ },
+ "content_report_aria": {
+  "message": "Télécharger le rapport de diagnostic"
+ },
+ "content_continue": {
+  "message": "Continuer"
+ },
+ "content_btn_translating": {
+  "message": "Traduction…"
+ },
+ "content_btn_queued": {
+  "message": "En attente…"
+ },
+ "content_btn_redo": {
+  "message": "↻ Refaire"
+ },
+ "content_btn_translate": {
+  "message": "Traduire"
+ },
+ "content_btn_show": {
+  "message": "Afficher"
+ },
+ "content_btn_hide": {
+  "message": "Masquer"
+ },
+ "content_lines_one": {
+  "message": "{n} réplique"
+ },
+ "content_lines_other": {
+  "message": "{n} répliques"
+ },
+ "content_nothing_translated": {
+  "message": "Rien n'a encore été traduit sur cette page"
+ },
+ "content_preparing_report_one": {
+  "message": "Préparation du rapport pour {n} page…"
+ },
+ "content_preparing_report_other": {
+  "message": "Préparation du rapport pour {n} pages…"
+ },
+ "content_report_done_one": {
+  "message": "Rapport téléchargé ({n} page, {size} Mo). Il contient les images des pages : partagez-le en privé, jamais dans une issue publique."
+ },
+ "content_report_done_other": {
+  "message": "Rapport téléchargé ({n} pages, {size} Mo). Il contient les images des pages : partagez-le en privé, jamais dans une issue publique."
+ },
+ "content_paused_one": {
+  "message": "Traduction automatique en pause après {n} page en 10 minutes, pour garder vos dépenses Claude sous contrôle."
+ },
+ "content_paused_other": {
+  "message": "Traduction automatique en pause après {n} pages en 10 minutes, pour garder vos dépenses Claude sous contrôle."
+ },
+ "content_error": {
+  "message": "Gytakusub : {error}"
+ },
+ "content_edit_dialog": {
+  "message": "Modifier la traduction"
+ },
+ "content_translated_line": {
+  "message": "Réplique traduite"
+ },
+ "content_save": {
+  "message": "Enregistrer"
+ },
+ "content_cancel": {
+  "message": "Annuler"
+ },
+ "content_teach": {
+  "message": "Apprendre au glossaire (s'applique aux pages suivantes)"
+ },
+ "content_original_term_ph": {
+  "message": "terme d'origine"
+ },
+ "content_original_term": {
+  "message": "Terme d'origine"
+ },
+ "content_translation_ph": {
+  "message": "traduction"
+ },
+ "content_translation": {
+  "message": "Traduction"
+ },
+ "content_add": {
+  "message": "Ajouter"
+ },
+ "content_fill_both": {
+  "message": "Remplissez le terme d'origine et sa traduction"
+ },
+ "content_glossary_updated": {
+  "message": "Glossaire mis à jour : {from} = {to}"
+ },
+ "content_glossary_added": {
+  "message": "Ajouté au glossaire : {from} = {to}"
+ },
+ "content_off_here": {
+  "message": "Gytakusub est désactivé sur ce site"
+ },
+ "content_no_untranslated": {
+  "message": "Aucune image non traduite à l'écran"
+ },
+ "content_translating_n_one": {
+  "message": "Traduction de {n} image…"
+ },
+ "content_translating_n_other": {
+  "message": "Traduction de {n} images…"
+ },
+ "bg_bad_data": {
+  "message": "Données d'image non prises en charge"
+ },
+ "bg_too_large": {
+  "message": "L'image est trop grande (plus de {mb} Mo)"
+ },
+ "bg_bad_url": {
+  "message": "Adresse d'image invalide"
+ },
+ "bg_http_only": {
+  "message": "Seules les images http(s) sont prises en charge"
+ },
+ "bg_no_access": {
+  "message": "Gytakusub a besoin de votre autorisation pour lire les images de {host}. Ouvrez la fenêtre de Gytakusub dans la barre d'outils et choisissez Autoriser l'accès."
+ },
+ "bg_download_failed": {
+  "message": "Impossible de télécharger l'image depuis {host} ({error})"
+ },
+ "bg_fetch_status": {
+  "message": "Impossible de récupérer l'image ({status})"
+ },
+ "bg_not_image": {
+  "message": "Cette adresse n'a pas renvoyé d'image"
+ },
+ "bg_off": {
+  "message": "Gytakusub est désactivé (fenêtre de la barre d'outils)."
+ },
+ "bg_not_set_up": {
+  "message": "Gytakusub n'est pas encore configuré : ouvrez la fenêtre de Gytakusub dans la barre d'outils et choisissez Configurer, pour voir ce qui est envoyé à Claude et accepter."
+ },
+ "bg_no_key": {
+  "message": "Aucune clé API. Ouvrez les réglages de Gytakusub et collez votre clé API Claude."
+ },
+ "bg_gloss_both": {
+  "message": "Le texte d'origine et la traduction sont tous deux requis"
+ },
+ "bg_report_needs_debug": {
+  "message": "Activez le calque de débogage dans les Réglages pour exporter des rapports"
+ },
+ "usage_pages_one": {
+  "message": "{n} page"
+ },
+ "usage_pages_other": {
+  "message": "{n} pages"
+ },
+ "usage_requests_one": {
+  "message": "{n} requête"
+ },
+ "usage_requests_other": {
+  "message": "{n} requêtes"
+ },
+ "usage_nothing_yet": {
+  "message": "Rien pour l'instant"
+ },
+ "usage_tokens": {
+  "message": "{requests} · {in} en entrée · {out} en sortie"
+ },
+ "usage_no_requests": {
+  "message": "Aucune requête pour l'instant"
+ },
+ "usage_today": {
+  "message": "Aujourd'hui"
+ },
+ "usage_price_unknown": {
+  "message": "prix inconnu"
+ },
+ "usage_per_page": {
+  "message": "≈{cost} par page · {pages}"
+ },
+ "usage_limit_requests": {
+  "message": "{left} sur {limit} requêtes"
+ },
+ "usage_limit_input": {
+  "message": "{left} sur {limit} tokens d'entrée"
+ },
+ "usage_limit_output": {
+  "message": "{left} sur {limit} tokens de sortie"
+ },
+ "usage_list_sep": {
+  "message": ","
+ },
+ "usage_limits": {
+  "message": "Limite de débit (une minute de quota, qui se recharge progressivement) : il restait {parts} à {time}."
+ },
+ "usage_limits_full": {
+  "message": "De nouveau plein au plus tard à {time}."
+ },
+ "api_err_spend_cap": {
+  "message": "Votre compte Claude a atteint son plafond de dépenses mensuel. L'API s'arrête jusqu'au 1er à 00:00 UTC, sauf si vous demandez une limite plus élevée dans la Claude Console."
+ },
+ "api_err_rate_limit": {
+  "message": "Votre compte a atteint pour l'instant la limite de débit de Claude. Attendez une minute et traduisez à nouveau ; traduire moins de pages à la fois aide aussi."
+ },
+ "api_err_credit": {
+  "message": "Votre solde de crédits Claude est trop bas. Ajoutez des crédits (ou vérifiez les crédits API mensuels de votre forfait) dans la Claude Console, rubrique Billing."
+ },
+ "api_err_spend_limit": {
+  "message": "Votre compte Claude a atteint la limite de dépenses que vous avez fixée. Augmentez-la dans la Claude Console, rubrique Billing → Spend limits."
+ },
+ "api_err_key": {
+  "message": "Claude a refusé la clé API. Vérifiez-la dans les Réglages, ou créez-en une nouvelle dans la Claude Console."
+ },
+ "api_err_overloaded": {
+  "message": "Claude est surchargé en ce moment. Réessayez dans une minute."
+ }
+}

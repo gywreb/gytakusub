@@ -44,64 +44,64 @@
   <header class="pop-head">
     <img src="icons/icon32.png" width="22" height="22" alt="" />
     <h1 class="pop-title">Gytakusub</h1>
-    <label class="master" title="Turn Gytakusub on or off on every site"><span id="enabledText">On</span><input type="checkbox" id="enabled" class="switch" aria-label="Gytakusub on" /></label>
+    <label class="master" title="Turn Gytakusub on or off on every site" data-i18n-attr="title=popup_turn_gytakusub_on_or_off"><span id="enabledText">On</span><input type="checkbox" id="enabled" class="switch" aria-label="Gytakusub on" data-i18n-attr="aria-label=popup_enabled_arialabel" /></label>
   </header>
 
   <div id="setupNote">
-    <p><b>Finish setting up Gytakusub.</b> See what it sends to Claude, agree, and allow it to read manga images. It takes a minute.</p>
-    <button id="openSetup" class="primary" type="button">Set up</button>
+    <p data-i18n-html="popup_finish_setting_up_gytakusub_see"><b>Finish setting up Gytakusub.</b> See what it sends to Claude, agree, and allow it to read manga images. It takes a minute.</p>
+    <button id="openSetup" class="primary" type="button" data-i18n="popup_openSetup">Set up</button>
   </div>
 
-  <p id="offNote" class="hint">Gytakusub is off on every site. Turn it on with the switch above; your settings are kept.</p>
+  <p id="offNote" class="hint" data-i18n="popup_offNote">Gytakusub is off on every site. Turn it on with the switch above; your settings are kept.</p>
 
-  <div id="nokey" class="notice" hidden><span>No Claude API key yet.</span><button id="openOptions2" class="btn small" type="button">Add key</button></div>
-  <div id="access" class="notice" hidden><span>Allow Gytakusub to read manga images on websites.</span><button id="allowAccess" class="btn small" type="button">Allow access</button></div>
+  <div id="nokey" class="notice" hidden><span data-i18n="popup_no_claude_api_key_yet">No Claude API key yet.</span><button id="openOptions2" class="btn small" type="button" data-i18n="popup_openOptions2">Add key</button></div>
+  <div id="access" class="notice" hidden><span data-i18n="popup_allow_gytakusub_to_read_manga">Allow Gytakusub to read manga images on websites.</span><button id="allowAccess" class="btn small" type="button" data-i18n="popup_allowAccess">Allow access</button></div>
 
   <main class="pop-body">
 
     <div class="actions">
-      <button id="translate" class="primary block" type="button"><span>Translate visible images</span><kbd id="kbdTranslate">Alt+T</kbd></button>
-      <button id="toggle" class="btn icon-btn" type="button" title="Hide / show translations (Alt+Shift+T)" aria-label="Hide or show translations">
+      <button id="translate" class="primary block" type="button" data-i18n-html="popup_translate"><span>Translate visible images</span><kbd id="kbdTranslate">Alt+T</kbd></button>
+      <button id="toggle" class="btn icon-btn" type="button" title="Hide / show translations (Alt+Shift+T)" aria-label="Hide or show translations" data-i18n-attr="title=popup_toggle_title;aria-label=popup_toggle_arialabel">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
       </button>
     </div>
     <p id="state" class="status" role="status" aria-live="polite"></p>
 
     <section class="group" aria-labelledby="siteHead">
-      <h2 id="siteHead" class="group-title">On <span id="host">this site</span></h2>
+      <h2 id="siteHead" class="group-title" data-i18n-html="popup_siteHead">On <span id="host">this site</span></h2>
       <label class="option">
-        <span class="option-text"><span class="option-title">Enable here</span><span class="option-desc">Hover button and keyboard shortcuts</span></span>
+        <span class="option-text"><span class="option-title" data-i18n="popup_enable_here">Enable here</span><span class="option-desc" data-i18n="popup_hover_button_and_keyboard_shortcuts">Hover button and keyboard shortcuts</span></span>
         <input type="checkbox" id="site" class="switch" />
       </label>
       <label class="option">
-        <span class="option-text"><span class="option-title">Auto-translate while scrolling</span><span class="option-desc">Sends pages to Claude as you scroll</span></span>
+        <span class="option-text"><span class="option-title" data-i18n="popup_auto_translate_while_scrolling">Auto-translate while scrolling</span><span class="option-desc" data-i18n="popup_sends_pages_to_claude_as">Sends pages to Claude as you scroll</span></span>
         <input type="checkbox" id="auto" class="switch" />
       </label>
     </section>
 
     <section class="group" aria-labelledby="trHead">
       <div class="group-head">
-        <h2 id="trHead" class="group-title">Translation</h2>
-        <button id="usageToday" class="usage-link" type="button" hidden title="What translating cost today, counted in this browser (details in Settings)"></button>
+        <h2 id="trHead" class="group-title" data-i18n="popup_trHead">Translation</h2>
+        <button id="usageToday" class="usage-link" type="button" hidden title="What translating cost today, counted in this browser (details in Settings)" data-i18n-attr="title=popup_usageToday_title"></button>
       </div>
       <label class="field">
-        <span>Model</span>
+        <span data-i18n="popup_model">Model</span>
         <select id="model">
-          <option value="claude-haiku-5-5">Haiku 5.5 — fastest, cheapest</option>
-          <option value="claude-sonnet-5-5">Sonnet 5.5 — for dense pages</option>
-          <option value="claude-opus-5-5">Opus 5.5 — best, most expensive</option>
+          <option value="claude-haiku-5-5" data-i18n="popup_haiku_5_5_fastest_cheapest">Haiku 5.5 — fastest, cheapest</option>
+          <option value="claude-sonnet-5-5" data-i18n="popup_sonnet_5_5_for_dense">Sonnet 5.5 — for dense pages</option>
+          <option value="claude-opus-5-5" data-i18n="popup_opus_5_5_best_most">Opus 5.5 — best, most expensive</option>
         </select>
       </label>
       <label class="option">
-        <span class="option-text"><span class="option-title">Chapter context</span><span class="option-desc">Names + recent lines, for continuity</span></span>
+        <span class="option-text"><span class="option-title" data-i18n="popup_chapter_context">Chapter context</span><span class="option-desc" data-i18n="popup_names_recent_lines_for_continuity">Names + recent lines, for continuity</span></span>
         <input type="checkbox" id="useContext" class="switch" />
       </label>
     </section>
   </main>
 
   <footer class="pop-foot">
-    <button id="openOptions" class="btn" type="button">All settings</button>
-    <button id="exportReport" class="btn" type="button" hidden title="One .zip with every translated page on this tab: original image, debug render and JSON">Export debug report</button>
+    <button id="openOptions" class="btn" type="button" data-i18n="popup_openOptions">All settings</button>
+    <button id="exportReport" class="btn" type="button" hidden title="One .zip with every translated page on this tab: original image, debug render and JSON" data-i18n="popup_exportReport" data-i18n-attr="title=popup_exportReport_title">Export debug report</button>
   </footer>
   <script type="module" src="popup.js"></script>
 </body>

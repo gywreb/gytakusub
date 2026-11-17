@@ -50,166 +50,168 @@
   <div class="layout">
     <header class="opt-head">
       <img src="icons/icon48.png" width="36" height="36" alt="" />
-      <div><h1>Gytakusub settings</h1><p class="hint">Changes apply after you save.</p></div>
+      <div><h1 data-i18n="opt_gytakusub_settings">Gytakusub settings</h1><p class="hint" data-i18n="opt_changes_apply_after_you_save">Changes apply after you save.</p></div>
     </header>
 
-    <nav class="toc" aria-label="Sections">
-      <a href="#sec-api">Claude API</a>
-      <a href="#sec-usage">Costs</a>
-      <a href="#sec-translation">Translation</a>
-      <a href="#sec-sites">Sites</a>
-      <a href="#sec-look">Lettering &amp; speed</a>
-      <a href="#sec-debug">Troubleshooting</a>
-      <a href="#sec-about">About</a>
+    <nav class="toc" aria-label="Sections" data-i18n-attr="aria-label=opt_sections">
+      <a href="#sec-api" data-i18n="opt_claude_api">Claude API</a>
+      <a href="#sec-usage" data-i18n="opt_costs">Costs</a>
+      <a href="#sec-translation" data-i18n="opt_translation">Translation</a>
+      <a href="#sec-sites" data-i18n="opt_sites">Sites</a>
+      <a href="#sec-look" data-i18n="opt_lettering_speed">Lettering &amp; speed</a>
+      <a href="#sec-debug" data-i18n="opt_troubleshooting">Troubleshooting</a>
+      <a href="#sec-about" data-i18n="opt_about">About</a>
     </nav>
 
     <main>
       <section class="card" id="sec-api" aria-labelledby="h-api">
-        <h2 id="h-api">Claude API</h2>
-        <p class="lede">Gytakusub sends pages to Claude with your own key.</p>
+        <h2 id="h-api" data-i18n="opt_h_api">Claude API</h2>
+        <p class="lede" data-i18n="opt_gytakusub_sends_pages_to_claude">Gytakusub sends pages to Claude with your own key.</p>
         <div class="field">
-          <label class="field-label" for="apiKey">API key</label>
+          <label class="field-label" for="apiKey" data-i18n="opt_api_key">API key</label>
           <div class="input-row">
             <input id="apiKey" type="password" placeholder="sk-ant-api03-…" autocomplete="off" spellcheck="false" aria-describedby="apiKeyHint" />
             <button id="showKey" class="btn" type="button" aria-controls="apiKey">Show</button>
-            <button id="testKey" class="btn" type="button">Save &amp; test</button>
+            <button id="testKey" class="btn" type="button" data-i18n="opt_testKey">Save &amp; test</button>
           </div>
-          <p class="hint" id="apiKeyHint">Create one at <a href="https://platform.claude.com/" target="_blank" rel="noopener">platform.claude.com</a> → Settings → API keys. Usage is billed to that Console account, separately from a Claude subscription (Max, Ultra and Team plans include monthly API credits).</p>
+          <p class="hint" id="apiKeyHint" data-i18n-html="opt_apiKeyHint">Create one at <a href="https://platform.claude.com/" target="_blank" rel="noopener">platform.claude.com</a> → Settings → API keys. Usage is billed to that Console account, separately from a Claude subscription (Max, Ultra and Team plans include monthly API credits).</p>
         </div>
         <label class="option">
-          <span class="option-text"><span class="option-title">Sync the key to my other browsers</span><span class="option-desc">Keeps it in browser sync instead of only on this device</span></span>
+          <span class="option-text"><span class="option-title" data-i18n="opt_sync_the_key_to_my">Sync the key to my other browsers</span><span class="option-desc" data-i18n="opt_keeps_it_in_browser_sync">Keeps it in browser sync instead of only on this device</span></span>
           <input type="checkbox" id="syncApiKey" class="switch" />
         </label>
         <div class="field">
-          <label class="field-label" for="model">Model</label>
+          <label class="field-label" for="model" data-i18n="opt_model">Model</label>
           <select id="model">
-            <option value="claude-haiku-5-5">Claude Haiku 5.5 — fastest, cheapest</option>
-            <option value="claude-sonnet-5-5">Claude Sonnet 5.5 — better on dense / stylised pages</option>
-            <option value="claude-opus-5-5">Claude Opus 5.5 — best quality, most expensive</option>
+            <option value="claude-haiku-5-5" data-i18n="opt_claude_haiku_5_5_fastest">Claude Haiku 5.5 — fastest, cheapest</option>
+            <option value="claude-sonnet-5-5" data-i18n="opt_claude_sonnet_5_5_better">Claude Sonnet 5.5 — better on dense / stylised pages</option>
+            <option value="claude-opus-5-5" data-i18n="opt_claude_opus_5_5_best">Claude Opus 5.5 — best quality, most expensive</option>
           </select>
         </div>
       </section>
 
       <section class="card" id="sec-usage" aria-labelledby="h-usage">
-        <div class="sec-head"><h2 id="h-usage">What translating costs</h2><span class="source-badge">This browser</span></div>
-        <p class="hint">Counted from Claude's own answers to this browser. Your phone and other browsers keep their own counts.</p>
+        <div class="sec-head"><h2 id="h-usage" data-i18n="opt_h_usage">What translating costs</h2><span class="source-badge" data-i18n="opt_this_browser">This browser</span></div>
+        <p class="hint" data-i18n="opt_counted_from_claude_s_own">Counted from Claude's own answers to this browser. Your phone and other browsers keep their own counts.</p>
         <div class="stats">
-          <div class="stat"><span class="stat-label">Today</span><span class="stat-value" id="cuTodayCost">$0</span><span class="stat-sub" id="cuTodaySub">Nothing yet</span></div>
+          <div class="stat"><span class="stat-label" data-i18n="opt_today">Today</span><span class="stat-value" id="cuTodayCost">$0</span><span class="stat-sub" id="cuTodaySub">Nothing yet</span></div>
           <div class="stat"><span class="stat-label" id="cuMonthLabel">This month</span><span class="stat-value" id="cuMonthCost">$0</span><span class="stat-sub" id="cuMonthSub">Nothing yet</span></div>
         </div>
-        <ul id="cuModels" class="model-rows" aria-label="This month by model, with the cost per page"></ul>
+        <ul id="cuModels" class="model-rows" aria-label="This month by model, with the cost per page" data-i18n-attr="aria-label=opt_cuModels_arialabel"></ul>
         <div class="usage-cap">
-          <p><b>Cap your spending on every device.</b> Set a monthly spend limit in the Claude Console (Billing → Spend limits). It covers everything that uses your key, and Claude stops there.</p>
-          <a class="btn small" href="https://platform.claude.com/settings/billing" target="_blank" rel="noopener">Open Billing</a>
+          <p data-i18n-html="opt_cap_your_spending_on_every"><b>Cap your spending on every device.</b> Set a monthly spend limit in the Claude Console (Billing → Spend limits). It covers everything that uses your key, and Claude stops there.</p>
+          <a class="btn small" href="https://platform.claude.com/settings/billing" target="_blank" rel="noopener" data-i18n="opt_open_billing">Open Billing</a>
         </div>
         <details class="usage-details">
-          <summary>Details</summary>
+          <summary data-i18n="opt_details">Details</summary>
           <ul class="facts">
-            <li><b>Today:</b> <span id="cuTodayTokens"></span></li>
-            <li><b>This month:</b> <span id="cuMonthTokens"></span></li>
+            <li data-i18n-html="opt_today_2"><b>Today:</b> <span id="cuTodayTokens"></span></li>
+            <li data-i18n-html="opt_this_month"><b>This month:</b> <span id="cuMonthTokens"></span></li>
             <li id="cuLimits" hidden></li>
-            <li><b>Estimate:</b> tokens are exact; the cost uses <a id="cuPriceLink" href="https://platform.claude.com/docs/en/about-claude/pricing" target="_blank" rel="noopener">Anthropic's prices</a> (checked <span id="cuChecked"></span>). A page served from the cache costs nothing and isn't counted.</li>
-            <li><b>Exact bill:</b> the Claude Console's <a href="https://platform.claude.com/usage" target="_blank" rel="noopener">Usage</a> and <a href="https://platform.claude.com/cost" target="_blank" rel="noopener">Cost</a> pages.</li>
-            <li><b>Balance and credits</b> (including a plan's monthly API credit): the Console's <a href="https://platform.claude.com/settings/billing" target="_blank" rel="noopener">Billing page</a>. Anthropic has no way for apps to read them.</li>
-            <li><b>Days</b> start at <span id="cuDayStart">midnight UTC</span> your time (midnight UTC), like Anthropic's usage reports.</li>
+            <li data-i18n-html="opt_estimate_tokens_are_exact_the"><b>Estimate:</b> tokens are exact; the cost uses <a id="cuPriceLink" href="https://platform.claude.com/docs/en/about-claude/pricing" target="_blank" rel="noopener">Anthropic's prices</a> (checked <span id="cuChecked"></span>). A page served from the cache costs nothing and isn't counted.</li>
+            <li data-i18n-html="opt_exact_bill_the_claude_console"><b>Exact bill:</b> the Claude Console's <a href="https://platform.claude.com/usage" target="_blank" rel="noopener">Usage</a> and <a href="https://platform.claude.com/cost" target="_blank" rel="noopener">Cost</a> pages.</li>
+            <li data-i18n-html="opt_balance_and_credits_including_a"><b>Balance and credits</b> (including a plan's monthly API credit): the Console's <a href="https://platform.claude.com/settings/billing" target="_blank" rel="noopener">Billing page</a>. Anthropic has no way for apps to read them.</li>
+            <li data-i18n-html="opt_days_start_at_midnight_utc"><b>Days</b> start at <span id="cuDayStart">midnight UTC</span> your time (midnight UTC), like Anthropic's usage reports.</li>
           </ul>
         </details>
-        <div class="row-end"><button id="cuClear" class="btn small danger" type="button">Clear usage history</button></div>
+        <div class="row-end"><button id="cuClear" class="btn small danger" type="button" data-i18n="opt_cuClear">Clear usage history</button></div>
       </section>
 
       <section class="card" id="sec-translation" aria-labelledby="h-translation">
-        <h2 id="h-translation">Translation</h2>
+        <h2 id="h-translation" data-i18n="opt_h_translation">Translation</h2>
         <div class="field">
-          <label class="field-label" for="targetLang">Target language</label>
-          <input id="targetLang" type="text" placeholder="English" />
+          <label class="field-label" for="targetLang" data-i18n="opt_target_language">Target language</label>
+          <select id="targetLang" aria-describedby="targetLangHint"></select>
+          <input id="targetLangOther" type="text" hidden aria-label="Other language" data-i18n-attr="aria-label=opt_other_language_label;placeholder=opt_other_language_placeholder" placeholder="Type a language" spellcheck="false" />
+          <p class="hint" id="targetLangHint" data-i18n="opt_target_language_hint">Gytakusub's own pages follow this language too, where they're translated (otherwise English).</p>
         </div>
         <div class="field">
-          <label class="field-label" for="glossary">Glossary</label>
-          <textarea id="glossary" placeholder="One per line, e.g.&#10;Gojo Satoru = Satoru Gojo&#10;呪術 = jujutsu" aria-describedby="glossaryHint" spellcheck="false"></textarea>
-          <p class="hint" id="glossaryHint">Names and terms the model must use exactly. Names it discovers on its own are remembered per tab automatically.</p>
+          <label class="field-label" for="glossary" data-i18n="opt_glossary">Glossary</label>
+          <textarea id="glossary" placeholder="One per line, e.g.&#10;Gojo Satoru = Satoru Gojo&#10;呪術 = jujutsu" aria-describedby="glossaryHint" spellcheck="false" data-i18n-attr="placeholder=opt_glossary_placeholder"></textarea>
+          <p class="hint" id="glossaryHint" data-i18n="opt_glossaryHint">Names and terms the model must use exactly. Names it discovers on its own are remembered per tab automatically.</p>
         </div>
         <div class="field">
-          <label class="field-label" for="customPrompt">Extra instructions</label>
-          <textarea id="customPrompt" placeholder="e.g. Keep the tone casual. Translate SFX as English onomatopoeia."></textarea>
+          <label class="field-label" for="customPrompt" data-i18n="opt_extra_instructions">Extra instructions</label>
+          <textarea id="customPrompt" data-i18n-attr="placeholder=opt_customPrompt_placeholder" placeholder="e.g. Keep the tone casual. Translate SFX as English onomatopoeia."></textarea>
         </div>
         <label class="option">
-          <span class="option-text"><span class="option-title">Chapter context</span><span class="option-desc">Sends names and the last ~40 translated lines of this tab with each page: better continuity, about 400 extra input tokens</span></span>
+          <span class="option-text"><span class="option-title" data-i18n="opt_chapter_context">Chapter context</span><span class="option-desc" data-i18n="opt_sends_names_and_the_last">Sends names and the last ~40 translated lines of this tab with each page: better continuity, about 400 extra input tokens</span></span>
           <input type="checkbox" id="useContext" class="switch" />
         </label>
         <label class="option">
-          <span class="option-text"><span class="option-title">Also transcribe the original text</span><span class="option-desc">Slower, slightly more careful reading; useful for debugging</span></span>
+          <span class="option-text"><span class="option-title" data-i18n="opt_also_transcribe_the_original_text">Also transcribe the original text</span><span class="option-desc" data-i18n="opt_slower_slightly_more_careful_reading">Slower, slightly more careful reading; useful for debugging</span></span>
           <input type="checkbox" id="includeSource" class="switch" />
         </label>
         <label class="option">
-          <span class="option-text"><span class="option-title">UPPERCASE lettering</span><span class="option-desc">Comic-book style</span></span>
+          <span class="option-text"><span class="option-title" data-i18n="opt_uppercase_lettering">UPPERCASE lettering</span><span class="option-desc" data-i18n="opt_comic_book_style">Comic-book style</span></span>
           <input type="checkbox" id="uppercase" class="switch" />
         </label>
       </section>
 
       <section class="card" id="sec-sites" aria-labelledby="h-sites">
-        <h2 id="h-sites">Sites</h2>
-        <p class="lede">One hostname per line. The easiest way to add a site: open it and use the switches in the toolbar popup.</p>
+        <h2 id="h-sites" data-i18n="opt_h_sites">Sites</h2>
+        <p class="lede" data-i18n="opt_one_hostname_per_line_the">One hostname per line. The easiest way to add a site: open it and use the switches in the toolbar popup.</p>
         <div class="field">
-          <label class="field-label" for="enabledSites">Enabled sites</label>
+          <label class="field-label" for="enabledSites" data-i18n="opt_enabled_sites">Enabled sites</label>
           <textarea id="enabledSites" placeholder="mangadex.org" aria-describedby="enabledSitesHint" spellcheck="false"></textarea>
-          <p class="hint" id="enabledSitesHint">The hover button and keyboard shortcuts work only here. Everywhere else Gytakusub stays dormant until you use the toolbar button or the shortcut.</p>
+          <p class="hint" id="enabledSitesHint" data-i18n="opt_enabledSitesHint">The hover button and keyboard shortcuts work only here. Everywhere else Gytakusub stays dormant until you use the toolbar button or the shortcut.</p>
         </div>
         <div class="field">
-          <label class="field-label" for="autoSites">Auto-translate while scrolling</label>
+          <label class="field-label" for="autoSites" data-i18n="opt_auto_translate_while_scrolling">Auto-translate while scrolling</label>
           <textarea id="autoSites" placeholder="mangadex.org" aria-describedby="autoSitesHint" spellcheck="false"></textarea>
-          <p class="hint" id="autoSitesHint">Each page that scrolls into view is sent to Claude automatically, so only add sites where you want to spend tokens. These count as enabled too.</p>
+          <p class="hint" id="autoSitesHint" data-i18n="opt_autoSitesHint">Each page that scrolls into view is sent to Claude automatically, so only add sites where you want to spend tokens. These count as enabled too.</p>
         </div>
         <div class="field">
-          <label class="field-label" for="excludedSites">Disabled sites</label>
+          <label class="field-label" for="excludedSites" data-i18n="opt_disabled_sites">Disabled sites</label>
           <textarea id="excludedSites" placeholder="mail.google.com&#10;youtube.com" aria-describedby="excludedSitesHint" spellcheck="false"></textarea>
-          <p class="hint" id="excludedSitesHint">Gytakusub stays off on these sites and their subdomains.</p>
+          <p class="hint" id="excludedSitesHint" data-i18n="opt_excludedSitesHint">Gytakusub stays off on these sites and their subdomains.</p>
         </div>
       </section>
 
       <section class="card" id="sec-look" aria-labelledby="h-look">
-        <h2 id="h-look">Lettering &amp; speed</h2>
+        <h2 id="h-look" data-i18n="opt_h_look">Lettering &amp; speed</h2>
         <div class="field">
-          <label class="field-label" for="fontFamily">Font family</label>
+          <label class="field-label" for="fontFamily" data-i18n="opt_font_family">Font family</label>
           <input id="fontFamily" type="text" placeholder='"Comic Neue", "Comic Sans MS", sans-serif' aria-describedby="fontHint" spellcheck="false" />
-          <p class="hint" id="fontHint">Leave empty for the bundled lettering font (Comic Neue Bold), or name any font installed on this device, e.g. <code>"Bangers"</code>.</p>
+          <p class="hint" id="fontHint" data-i18n-html="opt_fontHint">Leave empty for the bundled lettering font (Comic Neue Bold), or name any font installed on this device, e.g. <code>"Bangers"</code>.</p>
         </div>
         <label class="option">
-          <span class="option-text"><span class="option-title">Use the graphics card (WebGPU)</span><span class="option-desc">Finds text and bubbles much faster. Turn off only if pages come out wrong or the browser misbehaves.</span></span>
+          <span class="option-text"><span class="option-title" data-i18n="opt_use_the_graphics_card_webgpu">Use the graphics card (WebGPU)</span><span class="option-desc" data-i18n="opt_finds_text_and_bubbles_much">Finds text and bubbles much faster. Turn off only if pages come out wrong or the browser misbehaves.</span></span>
           <input type="checkbox" id="useGpu" class="switch" />
         </label>
         <label class="option">
-          <span class="option-text"><span class="option-title">Peek at the original while hovering</span><span class="option-desc">Hovering a translated bubble shows the original lettering. To fix a line, double-click its bubble.</span></span>
+          <span class="option-text"><span class="option-title" data-i18n="opt_peek_at_the_original_while">Peek at the original while hovering</span><span class="option-desc" data-i18n="opt_hovering_a_translated_bubble_shows">Hovering a translated bubble shows the original lettering. To fix a line, double-click its bubble.</span></span>
           <input type="checkbox" id="peekOnHover" class="switch" />
         </label>
       </section>
 
       <section class="card" id="sec-debug" aria-labelledby="h-debug">
-        <h2 id="h-debug">Troubleshooting</h2>
+        <h2 id="h-debug" data-i18n="opt_h_debug">Troubleshooting</h2>
         <label class="option">
-          <span class="option-text"><span class="option-title">Debug overlay</span><span class="option-desc">Draws the detected regions and text areas on translated pages, and adds a Report button to the hover bar that downloads that page's original, debug render and JSON. "Export debug report" in the popup does every translated page on the tab.</span></span>
+          <span class="option-text"><span class="option-title" data-i18n="opt_debug_overlay">Debug overlay</span><span class="option-desc" data-i18n="opt_draws_the_detected_regions_and">Draws the detected regions and text areas on translated pages, and adds a Report button to the hover bar that downloads that page's original, debug render and JSON. "Export debug report" in the popup does every translated page on the tab.</span></span>
           <input type="checkbox" id="debugOverlay" class="switch" />
         </label>
         <div class="option">
-          <span class="option-text"><span class="option-title">Translation cache</span><span class="option-desc">Translated pages, the names found per tab and your edited lines are kept until the browser closes. Clear them to translate pages afresh.</span></span>
-          <button id="clearCache" class="btn" type="button">Clear cache</button>
+          <span class="option-text"><span class="option-title" data-i18n="opt_translation_cache">Translation cache</span><span class="option-desc" data-i18n="opt_translated_pages_the_names_found">Translated pages, the names found per tab and your edited lines are kept until the browser closes. Clear them to translate pages afresh.</span></span>
+          <button id="clearCache" class="btn" type="button" data-i18n="opt_clearCache">Clear cache</button>
         </div>
       </section>
 
       <section class="card" id="sec-about" aria-labelledby="h-about">
-        <h2 id="h-about">About</h2>
+        <h2 id="h-about" data-i18n="opt_h_about">About</h2>
         <div class="option">
-          <span class="option-text"><span class="option-title">What is sent to Claude</span><span class="option-desc" id="consentDesc">Checking…</span></span>
+          <span class="option-text"><span class="option-title" data-i18n="opt_what_is_sent_to_claude">What is sent to Claude</span><span class="option-desc" id="consentDesc">Checking…</span></span>
           <button id="consentBtn" class="btn" type="button" hidden></button>
         </div>
         <div class="option">
-          <span class="option-text"><span class="option-title">Access to websites</span><span class="option-desc" id="accessDesc">Checking…</span></span>
+          <span class="option-text"><span class="option-title" data-i18n="opt_access_to_websites">Access to websites</span><span class="option-desc" id="accessDesc">Checking…</span></span>
           <button id="accessBtn" class="btn" type="button" hidden></button>
         </div>
         <div class="option">
-          <span class="option-text"><span class="option-title">Help</span><span class="option-desc">Report a problem or ask on <a href="https://github.com/gywreb/gytakusub/issues" target="_blank" rel="noopener">GitHub Issues</a>. Issues are public, so don't attach manga pages or debug reports there.</span></span>
+          <span class="option-text"><span class="option-title" data-i18n="opt_help">Help</span><span class="option-desc" data-i18n-html="opt_report_a_problem_or_ask">Report a problem or ask on <a href="https://github.com/gywreb/gytakusub/issues" target="_blank" rel="noopener">GitHub Issues</a>. Issues are public, so don't attach manga pages or debug reports there.</span></span>
         </div>
-        <p class="about" style="padding-top: var(--s3); border-top: 1px solid var(--border)">Gytakusub is an independent project, not made by or affiliated with Anthropic. <a href="https://gywreb.github.io/gytakusub/privacy.html" target="_blank" rel="noopener">Privacy policy</a> · <a href="welcome.html" target="_blank">Setup guide</a></p>
-        <p class="about">Gytakusub <span id="version"></span> is free software under the <a href="LICENSE" target="_blank">GNU AGPL v3</a> · <a href="https://github.com/gywreb/gytakusub" target="_blank" rel="noopener">source code</a> · <a href="THIRD_PARTY.md" target="_blank">third-party components</a></p>
+        <p class="about" style="padding-top: var(--s3); border-top: 1px solid var(--border)" data-i18n-html="opt_gytakusub_is_an_independent_project">Gytakusub is an independent project, not made by or affiliated with Anthropic. <a href="https://gywreb.github.io/gytakusub/privacy.html" target="_blank" rel="noopener">Privacy policy</a> · <a href="welcome.html" target="_blank">Setup guide</a></p>
+        <p class="about" data-i18n-html="opt_gytakusub_is_free_software_under">Gytakusub <span id="version"></span> is free software under the <a href="LICENSE" target="_blank">GNU AGPL v3</a> · <a href="https://github.com/gywreb/gytakusub" target="_blank" rel="noopener">source code</a> · <a href="THIRD_PARTY.md" target="_blank">third-party components</a></p>
       </section>
     </main>
   </div>
@@ -217,7 +219,7 @@
   <div class="savebar">
     <div class="savebar-inner">
       <p id="msg" role="status" aria-live="polite"></p>
-      <button id="save" class="primary" type="button">Save</button>
+      <button id="save" class="primary" type="button" data-i18n="opt_save">Save</button>
     </div>
   </div>
 

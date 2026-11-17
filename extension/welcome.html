@@ -26,6 +26,8 @@
   .step-actions .hint { flex: 1 1 220px; }
   .done-banner { display: flex; align-items: center; gap: var(--s3); padding: var(--s3) var(--s4); border-radius: var(--r2); border: 1px solid var(--ok); color: var(--fg); background: var(--surface); font-weight: 600; }
   .done-banner::before { content: ""; flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--ok); }
+  .lang-pick { display: grid; gap: var(--s1); max-width: 420px; }
+  .lang-pick select { min-height: 40px; }
   .small-print { color: var(--muted); font-size: var(--t-caption); text-align: center; padding-top: var(--s2); }
   @media (max-width: 520px) {
     .page { padding-top: var(--s5); }
@@ -39,67 +41,73 @@
     <header class="head">
       <img src="icons/icon48.png" width="44" height="44" alt="" />
       <div>
-        <h1>Set up Gytakusub</h1>
+        <h1 data-i18n="welcome_set_up_gytakusub">Set up Gytakusub</h1>
         <p id="lede">Gytakusub translates manga, manhwa and comics on the websites you choose, with your own Claude API key. Three steps and you're ready.</p>
       </div>
     </header>
 
-    <p id="allSet" class="done-banner" role="status" tabindex="-1" hidden>You're all set. Open a manga chapter and click the Gytakusub icon in the toolbar.</p>
+    <div class="lang-pick">
+      <label class="field-label" for="targetLang" data-i18n="welcome_translate_into">Translate pages into</label>
+      <select id="targetLang"></select>
+      <p class="hint" data-i18n="welcome_language_hint">Gytakusub's own pages follow this language too, where they're translated. More languages: Settings → Translation.</p>
+    </div>
+
+    <p id="allSet" class="done-banner" role="status" tabindex="-1" hidden data-i18n="welcome_allSet">You're all set. Open a manga chapter and click the Gytakusub icon in the toolbar.</p>
 
     <ol class="steps">
       <li class="card step" id="stepConsent" aria-labelledby="h-consent">
-        <div class="step-head"><span class="step-num" aria-hidden="true">1</span><h2 id="h-consent">What Gytakusub sends, and where</h2><span class="step-state" id="consentState"></span></div>
+        <div class="step-head"><span class="step-num" aria-hidden="true">1</span><h2 id="h-consent" data-i18n="welcome_h_consent">What Gytakusub sends, and where</h2><span class="step-state" id="consentState"></span></div>
         <ul class="list">
-          <li><b>Only the pages you translate.</b> A page is read when you click its Translate button, press <kbd class="kbdTranslate">Alt+T</kbd>, or turn on auto-translate for that site. Other pages are never read.</li>
-          <li><b>Sent to Anthropic's Claude API, with your key:</b> the page image (cut into slices), your glossary and custom instructions, and the names already translated in the same chapter. With <i>Chapter context</i> (on unless you turn it off), also the last lines of dialogue.</li>
-          <li><b>Nowhere else.</b> Gytakusub has no server, no account and no analytics. Your key stays in this browser. Your settings and glossary go with your browser's own sync, if you use it (the key too, only if you choose that in Settings).</li>
-          <li>Anthropic handles what you send under its <a href="https://www.anthropic.com/legal/commercial-terms" target="_blank" rel="noopener">commercial terms</a> and <a href="https://www.anthropic.com/legal/privacy" target="_blank" rel="noopener">privacy policy</a>. Gytakusub's <a href="https://gywreb.github.io/gytakusub/privacy.html" target="_blank" rel="noopener">privacy policy</a> has the details.</li>
+          <li data-i18n-html="welcome_only_the_pages_you_translate"><b>Only the pages you translate.</b> A page is read when you click its Translate button, press <kbd class="kbdTranslate">Alt+T</kbd>, or turn on auto-translate for that site. Other pages are never read.</li>
+          <li data-i18n-html="welcome_sent_to_anthropic_s_claude"><b>Sent to Anthropic's Claude API, with your key:</b> the page image (cut into slices), your glossary and custom instructions, and the names already translated in the same chapter. With <i>Chapter context</i> (on unless you turn it off), also the last lines of dialogue.</li>
+          <li data-i18n-html="welcome_nowhere_else_gytakusub_has_no"><b>Nowhere else.</b> Gytakusub has no server, no account and no analytics. Your key stays in this browser. Your settings and glossary go with your browser's own sync, if you use it (the key too, only if you choose that in Settings).</li>
+          <li data-i18n-html="welcome_anthropic_handles_what_you_send">Anthropic handles what you send under its <a href="https://www.anthropic.com/legal/commercial-terms" target="_blank" rel="noopener">commercial terms</a> and <a href="https://www.anthropic.com/legal/privacy" target="_blank" rel="noopener">privacy policy</a>. Gytakusub's <a href="https://gywreb.github.io/gytakusub/privacy.html" target="_blank" rel="noopener">privacy policy</a> has the details.</li>
         </ul>
         <div class="step-actions">
-          <button id="agree" class="primary" type="button">I agree</button>
+          <button id="agree" class="primary" type="button" data-i18n="welcome_agree">I agree</button>
           <p id="consentHint" class="hint">Nothing is sent until you agree. You can withdraw any time in Settings → About.</p>
         </div>
       </li>
 
       <li class="card step" id="stepKey" aria-labelledby="h-key">
-        <div class="step-head"><span class="step-num" aria-hidden="true">2</span><h2 id="h-key">Add your Claude API key</h2><span class="step-state" id="keyState"></span></div>
-        <p>Create a key in the <a href="https://platform.claude.com/" target="_blank" rel="noopener">Claude Console</a> (API keys), then paste it in Gytakusub's settings. The key stays in this browser and is only ever sent to Anthropic.</p>
+        <div class="step-head"><span class="step-num" aria-hidden="true">2</span><h2 id="h-key" data-i18n="welcome_h_key">Add your Claude API key</h2><span class="step-state" id="keyState"></span></div>
+        <p data-i18n-html="welcome_create_a_key_in_the">Create a key in the <a href="https://platform.claude.com/" target="_blank" rel="noopener">Claude Console</a> (API keys), then paste it in Gytakusub's settings. The key stays in this browser and is only ever sent to Anthropic.</p>
         <div class="step-actions">
           <button id="openKey" class="btn" type="button">Open settings</button>
         </div>
       </li>
 
       <li class="card step" id="stepAccess" aria-labelledby="h-access">
-        <div class="step-head"><span class="step-num" aria-hidden="true">3</span><h2 id="h-access">Let Gytakusub read manga images</h2><span class="step-state" id="accessState"></span></div>
-        <p>Manga sites usually load their pages from other image servers, so Gytakusub asks for access to all websites. Your browser will ask you to confirm with its standard wording, <i>"Read and change all your data on all websites"</i>. Gytakusub uses it only to download the images you translate: it reads a page only when you translate it, runs by itself only on sites where you turn on auto-translate, and never changes anything on a page except drawing the translation over the image.</p>
+        <div class="step-head"><span class="step-num" aria-hidden="true">3</span><h2 id="h-access" data-i18n="welcome_h_access">Let Gytakusub read manga images</h2><span class="step-state" id="accessState"></span></div>
+        <p data-i18n-html="welcome_manga_sites_usually_load_their">Manga sites usually load their pages from other image servers, so Gytakusub asks for access to all websites. Your browser will ask you to confirm with its standard wording, <i>"Read and change all your data on all websites"</i>. Gytakusub uses it only to download the images you translate: it reads a page only when you translate it, runs by itself only on sites where you turn on auto-translate, and never changes anything on a page except drawing the translation over the image.</p>
         <div class="step-actions">
-          <button id="allow" class="primary" type="button">Allow access</button>
+          <button id="allow" class="primary" type="button" data-i18n="welcome_allow">Allow access</button>
           <p id="accessHint" class="hint"></p>
         </div>
       </li>
     </ol>
 
     <section class="card" aria-labelledby="h-use">
-      <h2 id="h-use">How to translate</h2>
+      <h2 id="h-use" data-i18n="welcome_h_use">How to translate</h2>
       <ol class="list" style="margin-top: var(--s3)">
-        <li>Open a chapter on a manga site.</li>
-        <li>Click the Gytakusub icon in the toolbar. If you don't see it, open the puzzle-piece menu and pin Gytakusub.</li>
-        <li>Turn on <b>Enable here</b> for a Translate button on each page, or <b>Auto-translate while scrolling</b>. Or just press <kbd class="kbdTranslate">Alt+T</kbd> to translate what's on screen.</li>
+        <li data-i18n="welcome_open_a_chapter_on_a">Open a chapter on a manga site.</li>
+        <li data-i18n="welcome_click_the_gytakusub_icon_in">Click the Gytakusub icon in the toolbar. If you don't see it, open the puzzle-piece menu and pin Gytakusub.</li>
+        <li data-i18n-html="welcome_turn_on_enable_here_for">Turn on <b>Enable here</b> for a Translate button on each page, or <b>Auto-translate while scrolling</b>. Or just press <kbd class="kbdTranslate">Alt+T</kbd> to translate what's on screen.</li>
       </ol>
     </section>
 
     <section class="card" aria-labelledby="h-cost">
-      <h2 id="h-cost">What it costs</h2>
-      <p style="margin-top: var(--s3)">You pay Anthropic for what you use, from your Claude Console balance. The default model, Haiku 5.5, is priced at 1/20 of Sonnet 5.5 (<a href="https://platform.claude.com/docs/en/about-claude/pricing" target="_blank" rel="noopener">Anthropic's prices</a>). Once you've translated a few pages, <b>Settings → What translating costs</b> shows what they cost you per page, counted from Claude's own answers to this browser.</p>
-      <p>To cap your spending on every device, set a monthly spend limit on the Console's <a href="https://platform.claude.com/settings/billing" target="_blank" rel="noopener">Billing page</a> (Spend limits). Claude stops there.</p>
+      <h2 id="h-cost" data-i18n="welcome_h_cost">What it costs</h2>
+      <p style="margin-top: var(--s3)" data-i18n-html="welcome_you_pay_anthropic_for_what">You pay Anthropic for what you use, from your Claude Console balance. The default model, Haiku 5.5, is priced at 1/20 of Sonnet 5.5 (<a href="https://platform.claude.com/docs/en/about-claude/pricing" target="_blank" rel="noopener">Anthropic's prices</a>). Once you've translated a few pages, <b>Settings → What translating costs</b> shows what they cost you per page, counted from Claude's own answers to this browser.</p>
+      <p data-i18n-html="welcome_to_cap_your_spending_on">To cap your spending on every device, set a monthly spend limit on the Console's <a href="https://platform.claude.com/settings/billing" target="_blank" rel="noopener">Billing page</a> (Spend limits). Claude stops there.</p>
     </section>
 
     <section class="card" aria-labelledby="h-help">
-      <h2 id="h-help">Help</h2>
-      <p style="margin-top: var(--s3)">Found a problem or have an idea? <a href="https://github.com/gywreb/gytakusub/issues" target="_blank" rel="noopener">Open an issue on GitHub</a>. Issues are public, so don't attach manga pages or debug reports there.</p>
+      <h2 id="h-help" data-i18n="welcome_h_help">Help</h2>
+      <p style="margin-top: var(--s3)" data-i18n-html="welcome_found_a_problem_or_have">Found a problem or have an idea? <a href="https://github.com/gywreb/gytakusub/issues" target="_blank" rel="noopener">Open an issue on GitHub</a>. Issues are public, so don't attach manga pages or debug reports there.</p>
     </section>
 
-    <p class="small-print">Gytakusub is an independent, open-source project. It is not made by, endorsed by or affiliated with Anthropic.<br /><a href="https://github.com/gywreb/gytakusub" target="_blank" rel="noopener">Source code</a> · <a href="https://gywreb.github.io/gytakusub/privacy.html" target="_blank" rel="noopener">Privacy policy</a></p>
+    <p class="small-print" data-i18n-html="welcome_gytakusub_is_an_independent_open">Gytakusub is an independent, open-source project. It is not made by, endorsed by or affiliated with Anthropic.<br /><a href="https://github.com/gywreb/gytakusub" target="_blank" rel="noopener">Source code</a> · <a href="https://gywreb.github.io/gytakusub/privacy.html" target="_blank" rel="noopener">Privacy policy</a></p>
   </div>
   <script type="module" src="welcome.js"></script>
 </body>
