@@ -277,12 +277,8 @@ async function processPage(page) {
       prepareLettering(settings), // the bundled fonts and the target language's hyphenation
     ]);
     if (settings.useContext) ctx = result.ctx;
-    const { original, translated, drawn } = renderPage(page.img, result, settings, look);
-    original.className = "original"; translated.className = "translated";
-    page.media.querySelectorAll("canvas").forEach((c) => c.remove());
-    page.img.remove();
-    page.media.prepend(original, translated);
-    page.result = result;
+    page.result = result; page.look = look;
+    const drawn = drawPage(page);
     page.status = "done";
     setStatus(page, drawn ? "" : t("web_status_no_text"));
   } catch (e) {
@@ -291,6 +287,32 @@ async function processPage(page) {
     console.error(e);
   }
 }
+
+/** Draws a translated page at its own size or the screen's, whichever is larger. */
+function drawPage(page) {
+  const screenWidth = Math.round(page.media.clientWidth * (window.devicePixelRatio || 1));
+  page.drawnFor = screenWidth;
+  const { original, translated, drawn } = renderPage(page.img, page.result, settings, page.look, { minWidth: screenWidth });
+  original.className = "original"; translated.className = "translated";
+  page.media.querySelectorAll("canvas").forEach((c) => c.remove());
+  page.img.remove();
+  page.media.prepend(original, translated);
+  return drawn;
+}
+
+// Unfolding a foldable, turning a phone or a wider window can need more pixels than a page was
+// drawn with: redraw those once the change settles (fewer pixels than drawn is fine as is).
+let screenTimer = null;
+window.addEventListener("resize", () => {
+  clearTimeout(screenTimer);
+  screenTimer = setTimeout(() => {
+    for (const page of pages) {
+      if (page.status !== "done" || !page.result) continue;
+      const need = Math.round(page.media.clientWidth * (window.devicePixelRatio || 1));
+      if (need > (page.drawnFor || 0) * 1.01) drawPage(page);
+    }
+  }, 250);
+});
 
 async function savePage(page) {
   const c = page.el.querySelector("canvas.translated");

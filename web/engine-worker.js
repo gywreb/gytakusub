@@ -18,9 +18,13 @@ self.onmessage = async (e) => {
     } else if (type === "finish") {
       const job = jobs.get(e.data.jobId); jobs.delete(e.data.jobId);
       if (!job) throw new Error("Page analysis expired; translate again.");
-      const page = await finishPage(job, e.data.results);
-      const clean = page.canvas.transferToImageBitmap();
-      self.postMessage({ id, ok: true, items: page.items, placements: page.placements, regions: page.regions, work: page.work, letter: page.letter, clean }, [clean]);
+      // the page at its own size again (when it was downscaled for the analysis): the erased
+      // areas come back at full resolution, as patches over the original
+      const natural = e.data.natural || null;
+      let page;
+      try { page = await finishPage(job, e.data.results, { natural }); } finally { natural?.close(); }
+      const patches = page.patches.map((p) => ({ x: p.x, y: p.y, w: p.w, h: p.h, bitmap: p.canvas.transferToImageBitmap() }));
+      self.postMessage({ id, ok: true, items: page.items, placements: page.placements, regions: page.regions, work: page.work, letter: page.letter, patches }, patches.map((p) => p.bitmap));
     } else if (type === "drop") {
       const job = jobs.get(e.data.jobId); jobs.delete(e.data.jobId);
       if (job) for (const s of job.slices) s.analysis.dispose();

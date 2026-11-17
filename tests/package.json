@@ -5,10 +5,10 @@
   "scripts": {
     "test": "npm run test:web && npm run test:extension",
     "test:web": "node ../scripts/check-i18n.mjs && node fetcher.test.mjs && node usage.test.mjs",
-    "test:extension": "node ../scripts/check-i18n.mjs && node engine.test.mjs && node segment.test.mjs && node ort-trap.test.mjs && node gpu.test.mjs && node concurrency.test.mjs && node lane.test.mjs && node cws-publish.test.mjs && node ci-status.test.mjs && node imagecheck.test.mjs && node lettering.test.mjs",
+    "test:extension": "node ../scripts/check-i18n.mjs && node engine.test.mjs && node segment.test.mjs && node ort-trap.test.mjs && node gpu.test.mjs && node concurrency.test.mjs && node lane.test.mjs && node cws-publish.test.mjs && node ci-status.test.mjs && node imagecheck.test.mjs && node lettering.test.mjs && node fullsize.test.mjs",
     "test:browser": "npm run test:browser:extension && npm run test:browser:web",
-    "test:browser:extension": "node browser/run.mjs --out /tmp/gyt-browser/good && node browser/run.mjs --bad-boxes --out /tmp/gyt-browser/bad-boxes && node browser/run.mjs --segmenter /tmp/gyt-fake-seg.onnx --out /tmp/gyt-browser/segmented && node browser/run.mjs --gpu --require-gpu --out /tmp/gyt-browser/gpu && node browser/queue.mjs --out /tmp/gyt-browser/queue && node browser/setup.mjs --out /tmp/gyt-browser/setup && node browser/budget.mjs --out /tmp/gyt-browser/budget && node browser/i18n.mjs --out /tmp/gyt-browser/i18n && node browser/lettering.mjs --out /tmp/gyt-browser/lettering",
-    "test:browser:web": "node browser/web.mjs --out /tmp/gyt-browser/web && node browser/web-i18n.mjs --out /tmp/gyt-browser/web-i18n",
+    "test:browser:extension": "node browser/run.mjs --out /tmp/gyt-browser/good && node browser/run.mjs --bad-boxes --out /tmp/gyt-browser/bad-boxes && node browser/run.mjs --segmenter /tmp/gyt-fake-seg.onnx --out /tmp/gyt-browser/segmented && node browser/run.mjs --gpu --require-gpu --out /tmp/gyt-browser/gpu && node browser/queue.mjs --out /tmp/gyt-browser/queue && node browser/setup.mjs --out /tmp/gyt-browser/setup && node browser/budget.mjs --out /tmp/gyt-browser/budget && node browser/i18n.mjs --out /tmp/gyt-browser/i18n && node browser/lettering.mjs --out /tmp/gyt-browser/lettering && node browser/screens.mjs --out /tmp/gyt-browser/screens",
+    "test:browser:web": "node browser/web.mjs --out /tmp/gyt-browser/web && node browser/web-i18n.mjs --out /tmp/gyt-browser/web-i18n && node browser/web-screens.mjs --out /tmp/gyt-browser/web-screens",
     "e2e": "node engine-e2e.mjs fixtures/demo-page.png fixtures/demo-items.json /tmp/gyt-e2e.png",
     "viz": "node engine-viz.mjs",
     "demo": "python3 make-demo-page.py fixtures && python3 make-pages.py fixtures 12",
@@ -16,7 +16,8 @@
     "vendor": "node ../scripts/vendor-opencv.mjs && node ../scripts/vendor-hyphen.mjs && node ../scripts/vendor-fonts.mjs && node ../scripts/vendor-ort.mjs",
     "replay": "node replay-report.mjs",
     "score": "node score-reports.mjs",
-    "score:layout": "node layout-score.mjs"
+    "score:layout": "node layout-score.mjs",
+    "audit": "node audit-core.mjs"
   },
   "devDependencies": {
     "canvas": "^3.1.0",

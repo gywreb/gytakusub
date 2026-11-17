@@ -51,6 +51,9 @@
     .editor button.primary { background: #2563eb; }
     .editor button:hover, .editor button:focus-visible { outline: 2px solid #93c5fd; outline-offset: 1px; }
     .editor .hint { opacity: .6; font-size: 11px; margin-left: auto; }
+    .readable { position: fixed; z-index: 1; max-width: min(320px, calc(100vw - 16px)); padding: 8px 11px; border-radius: 8px; background: rgba(17,24,39,.94);
+      color: #fff; font: 15px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; white-space: pre-wrap; box-shadow: 0 4px 16px rgba(0,0,0,.4); pointer-events: none; }
+    .readable[hidden] { display: none; }
     .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); padding: 8px 14px; border-radius: 8px;
       background: rgba(17,24,39,.92); color: #fff; font: 13px/1.3 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
       box-shadow: 0 2px 10px rgba(0,0,0,.4); pointer-events: none; max-width: 80vw; }
@@ -216,6 +219,12 @@
       gytakusub: chrome.runtime.getManifest().version, when: new Date().toISOString(), page: location.href, image: e.src,
       natural: [img.naturalWidth, img.naturalHeight], displayed: [Math.round(img.getBoundingClientRect().width), Math.round(img.getBoundingClientRect().height)], objectFit: e.objectFit,
       work: res.work, letter: res.letter, fromCache: res.fromCache, timing: res.timing, engine: res.engine,
+      // how the overlay was drawn: the screen's pixel ratio, its pixels, and each line's size on screen (CSS px)
+      overlay: { dpr: window.devicePixelRatio || 1, backing: [e.canvas?.width || 0, e.canvas?.height || 0],
+        // where the overlay sits on screen and where the image's picture is (CSS px): they must match
+        rect: e.canvas ? ["left", "top", "width", "height"].map((k) => +parseFloat(e.canvas.style[k] || "0").toFixed(2)) : null,
+        image: (() => { const r = contentRect(img, e.objectFit); return [r.left, r.top, r.width, r.height].map((v) => +v.toFixed(2)); })(),
+        lineSizes: (e.sizes || []).map((v) => +(v * img.getBoundingClientRect().width / res.work.W).toFixed(1)) },
       settings: { model: settings.model, targetLang: settings.targetLang, fontFamily: settings.fontFamily, uppercase: settings.uppercase, useContext: settings.useContext },
       // how the page was lettered: the font chosen for its translations, and the language's rules
       lettering: { ...settings.lettering, hyphenation: !!hyphenation.fn, family: GyText.lettering(res.placements.map((p) => p.text), lettering(res)).family },
@@ -526,26 +535,48 @@
     entry.patches = await Promise.all(res.patches.map(async (p) => ({ ...p, img: await loadImage(p.dataUrl) })));
     const canvas = entry.canvas || document.createElement("canvas");
     canvas.className = "overlay";
-    canvas.width = res.work.W; canvas.height = res.work.H;
     entry.img = img; entry.peek = -1;
+    entry.objectFit = getComputedStyle(img).objectFit;
     if (!entry.canvas) { entry.canvas = canvas; root.append(canvas); }
+    sizeBacking(entry, backingFor(res, contentRect(img, entry.objectFit)));
     drawOverlay(entry);
     if (settings.debugOverlay) console.info("Gytakusub debug", { src: entry.src, engine: res.engine, work: res.work, natural: [res.width, res.height], timing: res.timing, fromCache: res.fromCache, items: res.items, regions: res.regions, placements: res.placements, letter: res.letter });
-    entry.objectFit = getComputedStyle(img).objectFit;
     layout();
   }
 
   /** Erased patches + translations on a transparent canvas; while peeking, one bubble's patch is cleared so the original shows through. */
+  // The overlay is drawn at the screen's own pixels: its backing store is the image's size on
+  // screen × devicePixelRatio (not the engine's working size, which a 2× or 3× screen would
+  // stretch and blur), and it is drawn again when that size changes (resize, zoom, another
+  // screen). Pages far from the screen give their pixels back and are drawn again on return.
+  const MAX_BACKING = 16e6; // pixels per overlay: a 2× full-HD page is ~8M; long strips are capped here
+  function backingFor(res, r) {
+    const dpr = window.devicePixelRatio || 1;
+    const w = Math.max(1, r.width * dpr), h = Math.max(1, r.height * dpr);
+    const k = Math.min(1, Math.sqrt(MAX_BACKING / (w * h)));
+    return { w: Math.max(1, Math.round(w * k)), h: Math.max(1, Math.round(h * k)), dpr };
+  }
+  function sizeBacking(entry, b) {
+    entry.canvas.width = b.w; entry.canvas.height = b.h; entry.dpr = b.dpr; entry.stale = false;
+  }
   function drawOverlay(entry) {
     const { result: res, canvas } = entry;
-    const W = res.work.W, H = res.work.H;
+    if (!canvas.width || !canvas.height) return; // released while far from the screen
     const ctx = canvas.getContext("2d");
-    ctx.clearRect(0, 0, W, H);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // patches are in the page's own pixels; placements, regions and text in work pixels
+    ctx.setTransform(canvas.width / res.width, 0, 0, canvas.height / res.height, 0, 0);
     for (const p of entry.patches) ctx.drawImage(p.img, p.x, p.y, p.w, p.h);
+    ctx.setTransform(canvas.width / res.work.W, 0, 0, canvas.height / res.work.H, 0, 0);
     if (settings.debugOverlay) drawDebug(ctx, res);
     const peek = res.placements[entry.peek];
-    GyText.draw(ctx, peek ? res.placements.filter((p) => p !== peek) : res.placements, lettering(res));
+    // the size each line was drawn at (work pixels), for the readable view
+    const sizes = [];
+    GyText.draw(ctx, peek ? res.placements.filter((p) => p !== peek) : res.placements, { ...lettering(res), sizes });
+    if (!peek) entry.sizes = sizes;
     if (peek) { const r = peekRect(peek, res); ctx.clearRect(r.x, r.y, r.w, r.h); }
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
   }
   // The area a peek reveals: the bubble when the line sits in one, else the text's footprint.
   function peekRect(p, res) {
@@ -571,6 +602,35 @@
     return null;
   }
 
+  // Readable view: a line drawn smaller than READABLE_PX on screen (a narrow window, a page
+  // shown small) appears at a readable size beside its bubble while the pointer rests on it.
+  // The lettering itself can't grow: it has to fit the bubble the artist drew.
+  const READABLE_PX = 9;
+  const readable = document.createElement("div"); readable.className = "readable"; readable.hidden = true; readable.setAttribute("role", "tooltip");
+  shadow.append(readable);
+  let readTimer = null, readHit = null;
+  /** CSS pixels the hit line was drawn at (Infinity before it was drawn). */
+  function onScreenSize(hit) {
+    const size = hit.entry.sizes?.[hit.idx];
+    return size ? size * hit.rect.width / hit.entry.result.work.W : Infinity;
+  }
+  function showReadable(hit) {
+    const p = hit.entry.result.placements[hit.idx];
+    if (!p) return;
+    readable.textContent = p.text;
+    readable.hidden = false;
+    // under the line, or above it when the screen ends first
+    const r = hit.rect, k = r.width / hit.entry.result.work.W;
+    const box = { left: r.left + p.rect.x * k, top: r.top + p.rect.y * k, width: p.rect.w * k, height: p.rect.h * k };
+    const w = readable.offsetWidth, h = readable.offsetHeight;
+    const x = Math.min(Math.max(8, box.left + box.width / 2 - w / 2), Math.max(8, window.innerWidth - w - 8));
+    let y = box.top + box.height + 6;
+    if (y + h > window.innerHeight - 8) y = Math.max(8, box.top - h - 6);
+    readable.style.left = x + "px"; readable.style.top = y + "px";
+  }
+  function hideReadable() { clearTimeout(readTimer); readable.hidden = true; readHit = null; }
+  window.addEventListener("scroll", () => { if (readHit) hideReadable(); }, { capture: true, passive: true });
+
   let peekTimer = null, lastHit = null;
   function setPeek(entry, idx) {
     if (entry.peek === idx) return;
@@ -578,8 +638,15 @@
     drawOverlay(entry);
   }
   document.addEventListener("mousemove", (ev) => {
-    if (!ev.isTrusted || !settings.peekOnHover || editor.open) return;
+    if (!ev.isTrusted || editor.open) return;
     const hit = hitTest(ev.clientX, ev.clientY);
+    const small = hit && hit.idx >= 0 && onScreenSize(hit) < READABLE_PX;
+    if (!small) { if (readHit) hideReadable(); }
+    else if (!readHit || readHit.entry !== hit.entry || readHit.idx !== hit.idx) {
+      hideReadable(); readHit = hit;
+      readTimer = setTimeout(() => showReadable(hit), 250); // a dwell, as for peeking
+    }
+    if (!settings.peekOnHover) return;
     const same = hit && lastHit && hit.entry === lastHit.entry && hit.idx === lastHit.idx;
     if (same) return;
     clearTimeout(peekTimer);
@@ -588,7 +655,7 @@
     if (!hit || hit.idx < 0) { if (hit) setPeek(hit.entry, -1); return; }
     peekTimer = setTimeout(() => setPeek(hit.entry, hit.idx), 280); // a dwell, so passing over bubbles doesn't flicker
   }, { capture: true, passive: true });
-  document.addEventListener("mouseout", (ev) => { if (ev.relatedTarget) return; clearTimeout(peekTimer); if (lastHit?.entry) setPeek(lastHit.entry, -1); lastHit = null; }, true); // pointer left the window
+  document.addEventListener("mouseout", (ev) => { if (ev.relatedTarget) return; hideReadable(); clearTimeout(peekTimer); if (lastHit?.entry) setPeek(lastHit.entry, -1); lastHit = null; }, true); // pointer left the window
 
   // Editor: double-click a translated line to correct it (and optionally teach the glossary).
   const editor = { el: null, open: false, entry: null, idx: -1 };
@@ -614,6 +681,7 @@
     return el;
   }
   function openEditor(hit, clientX, clientY) {
+    hideReadable();
     editor.el ||= buildEditor();
     const p = hit.entry.result.placements[hit.idx];
     const item = p.item != null ? hit.entry.result.items[p.item] : null;
@@ -704,8 +772,36 @@
       e.canvas.style.top = r.top + "px";
       e.canvas.style.width = r.width + "px";
       e.canvas.style.height = r.height + "px";
+      keepBacking(e, r);
     }
     if (hoverImg && bar.classList.contains("visible")) positionBar();
+  }
+
+  // Near the screen (within one screen-height): pixels at the current size; a page coming
+  // back is drawn at once, a size change after the resize settles (until then CSS stretches
+  // the old pixels, which stay in place). Far away (three screens): released.
+  // Growing by over 1% redraws; shrinking only by over 10% (a smaller window loses nothing).
+  let redrawTimer = null;
+  function keepBacking(e, r) {
+    if (!e.result) return;
+    const vh = window.innerHeight || 800;
+    const near = r.top + r.height > -vh && r.top < 2 * vh;
+    const far = r.top + r.height < -3 * vh || r.top > 4 * vh;
+    if (far) { if (e.canvas.width) { e.canvas.width = 0; e.canvas.height = 0; } return; }
+    if (!near) return;
+    const b = backingFor(e.result, r);
+    if (!e.canvas.width) { sizeBacking(e, b); drawOverlay(e); return; }
+    // never stretched by more than 1% (that is where blur starts); a little too many pixels is fine
+    const off = b.w > e.canvas.width * 1.01 || b.w < e.canvas.width * 0.9 || b.dpr !== e.dpr;
+    if (!off) { e.stale = false; return; }
+    // the timer restarts only when the wanted size moves (a resize still going on), not on
+    // every layout pass (those run each frame while scrolling, and twice a second at rest)
+    if (e.stale && Math.abs(e.stale.w - b.w) <= 1 && e.stale.dpr === b.dpr) return;
+    e.stale = b;
+    clearTimeout(redrawTimer);
+    redrawTimer = setTimeout(() => {
+      for (const x of entries.values()) if (x.stale && x.canvas?.width) { sizeBacking(x, x.stale); drawOverlay(x); }
+    }, 180);
   }
 
   let rafPending = false, activeUntil = 0, watching = false, idleTimer = null;
