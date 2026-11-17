@@ -9,12 +9,14 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
+import { extensionCopy, agree } from "./ext-copy.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const ext = path.resolve(here, "../../extension");
+const extSrc = path.resolve(here, "../../extension");
+const ext = extensionCopy(extSrc); // with site access, so the popup shows its normal state
 const out = path.resolve(process.argv[2] || path.join(here, "../../store/assets"));
 const PORT = 8823, HOST = "reader.example";
-const { addCall, emptyLog } = await import(path.join(ext, "usage.js"));
+const { addCall, emptyLog } = await import(path.join(extSrc, "usage.js"));
 
 const now = Date.now();
 let log = emptyLog();
@@ -30,6 +32,7 @@ const ctx = await chromium.launchPersistentContext(fs.mkdtempSync(path.join(os.t
 });
 const sw = ctx.serviceWorkers()[0] || (await ctx.waitForEvent("serviceworker"));
 const id = new URL(sw.url()).host;
+await agree(sw);
 await sw.evaluate(async ({ log, host }) => {
   await chrome.storage.local.set({ apiKey: "sk-ant-demo", claudeUsage: log });
   await chrome.storage.sync.set({ enabled: true, enabledSites: [host], autoSites: [host], model: "claude-sonnet-5-5", creditPlan: "max5x", creditRenews: new Date(Date.now() + 23 * 864e5).toISOString().slice(0, 10) });

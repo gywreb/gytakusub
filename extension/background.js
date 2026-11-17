@@ -9,6 +9,8 @@ import { addCall, emptyLog } from "./usage.js";
 import { preparePage, finishPage } from "./engine/page.js";
 import { DEFAULT_SETTINGS, getSettings, CS_FILES, ensureContentScript } from "./settings.js";
 import { createLane, Cancelled } from "./lane.js";
+import { consentGiven, hasAccess, openWelcome } from "./access.js";
+import { sniffImageType, readCapped } from "./imagecheck.js";
 
 // Claude usage log (usage.js) in chrome.storage.local, read by the popup and Options. This worker is
 // its only writer; a page's slices answer in parallel, so the writes queue up instead of racing.
@@ -50,7 +52,8 @@ function hostPatterns(hosts) {
 
 async function syncRegistration() {
   const s = await getSettings();
-  const hosts = s.enabled ? [...new Set([...(s.enabledSites || []), ...(s.autoSites || [])])] : [];
+  // without the site access asked for at first use (access.js), nothing is registered
+  const hosts = s.enabled && await hasAccess() ? [...new Set([...(s.enabledSites || []), ...(s.autoSites || [])])] : [];
   const matches = hostPatterns(hosts);
   const existing = await chrome.scripting.getRegisteredContentScripts({ ids: [CS_ID] }).catch(() => []);
   if (!matches.length) {
@@ -63,7 +66,13 @@ async function syncRegistration() {
 }
 
 /** Make sure the content script is present in a tab; inject it if not. */
-chrome.runtime.onInstalled.addListener(() => { updateBadge(); syncRegistration(); });
+chrome.runtime.onInstalled.addListener(async ({ reason }) => {
+  updateBadge(); syncRegistration();
+  // a new user (or one updating to a version that sends something new) sees what is sent where, and agrees, first
+  if ((reason === "install" || reason === "update") && !(await consentGiven())) openWelcome(reason === "update" ? "#update" : "");
+});
+chrome.permissions.onAdded.addListener(() => syncRegistration());
+chrome.permissions.onRemoved.addListener(() => syncRegistration());
 chrome.runtime.onStartup.addListener(() => { updateBadge(); syncRegistration(); });
 chrome.storage.onChanged.addListener((changes) => {
   if (changes.enabled) updateBadge();
@@ -120,22 +129,32 @@ async function updateTabCtx(tabId, newTerms, newLines) {
 // ---------- image bytes (only http(s) URLs or inline data from our own content script) ----------
 
 const MAX_BYTES = 25 * 1024 * 1024;
+// Only what is really an image, and never more than MAX_BYTES (imagecheck.js): the URL comes
+// from a page, and the bytes may go back to the content script (FETCH_IMAGE).
 async function fetchImageBlob({ url, dataUrl }, signal = undefined) {
-  let blob;
+  let bytes;
   if (dataUrl) {
     if (!/^data:image\//i.test(dataUrl)) throw new Error("Unsupported image data");
-    blob = dataUrlToBlob(dataUrl);
+    const blob = dataUrlToBlob(dataUrl);
+    if (blob.size > MAX_BYTES) throw new Error("Image is too large (over 25 MB)");
+    bytes = new Uint8Array(await blob.arrayBuffer());
   } else {
     let u;
     try { u = new URL(url); } catch { throw new Error("Invalid image URL"); }
     if (!/^https?:$/.test(u.protocol)) throw new Error("Only http(s) images are supported");
-    const res = await fetch(u.href, { credentials: "omit", signal });
+    let res;
+    try { res = await fetch(u.href, { credentials: "omit", signal }); }
+    catch (e) {
+      if (e?.name === "AbortError") throw e;
+      if (!(await hasAccess())) throw new Error(`Gytakusub needs your permission to read images from ${u.hostname}. Open the Gytakusub popup and choose Allow access.`);
+      throw new Error(`Could not download the image from ${u.hostname} (${e.message || "network error"})`);
+    }
     if (!res.ok) throw new Error(`Could not fetch image (${res.status})`);
-    blob = await res.blob();
+    bytes = await readCapped(res, MAX_BYTES);
   }
-  if (blob.size > MAX_BYTES) throw new Error("Image is too large (over 25 MB)");
-  if (!blob.type.startsWith("image/")) blob = new Blob([await blob.arrayBuffer()], { type: "image/jpeg" });
-  return blob;
+  const type = sniffImageType(bytes);
+  if (!type) throw new Error("That address did not return an image");
+  return new Blob([bytes], { type });
 }
 
 // ---------- page order: the page on screen first ----------
@@ -173,8 +192,8 @@ const disposeJob = (prepared) => { for (const s of prepared?.slices || []) { try
 async function handleTranslate(msg, sender) {
   const settings = await getSettings();
   if (!settings.enabled) throw new Error("Gytakusub is switched off (toolbar popup).");
+  if (!(await consentGiven())) throw new Error("Gytakusub isn't set up yet: open the Gytakusub popup and choose Set up, to see what is sent to Claude and agree.");
   if (!settings.apiKey) throw new Error("No API key set. Open Gytakusub options and paste your Claude API key.");
-
   const tabId = sender.tab?.id ?? -1;
   const jobKey = msg.jobId != null ? `${tabId}:${msg.jobId}` : null;
   const work = { distance: Number.isFinite(msg.distance) ? msg.distance : 0, onScreen: msg.onScreen === true, since: Date.now(), ctl: new AbortController(), asked: false };
@@ -294,7 +313,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   switch (msg?.type) {
     case "TRANSLATE": handleTranslate(msg, sender).then(sendResponse, (e) => sendResponse(e instanceof Cancelled || e?.name === "AbortError" ? { cancelled: true } : { error: e.message || String(e) })); return true;
     case "JOBS": sendResponse(updateJobs(sender.tab?.id ?? -1, msg)); return false;
-    case "GET_SETTINGS": reply(getSettings()); return true;
+    // the content script runs inside other people's pages: it gets the settings, but not the API key
+    case "GET_SETTINGS": reply(getSettings().then(({ apiKey, ...rest }) => ({ ...rest, hasKey: !!apiKey }))); return true;
     case "EDIT_ITEM": reply(editItem(msg)); return true;
     case "FETCH_IMAGE": reply(fetchImageBlob(msg).then(async (b) => ({ dataUrl: await blobToDataUrl(b), type: b.type }))); return true; // diagnostic export needs the original bytes
     case "ADD_GLOSSARY": reply(addGlossary(msg)); return true;
@@ -306,6 +326,8 @@ chrome.commands.onCommand.addListener(async (command, tab) => {
   if (!tab?.id || !/^https?:/.test(tab.url || "")) return;
   const map = { "translate-visible": "TRANSLATE_VISIBLE", "toggle-overlays": "TOGGLE_OVERLAYS" };
   if (!map[command]) return;
+  // before the user has seen what is sent and agreed, a shortcut opens that page instead of reading this one
+  if (command === "translate-visible" && !(await consentGiven())) { openWelcome(); return; }
   try {
     if (command === "translate-visible") await ensureContentScript(tab.id);
     await chrome.tabs.sendMessage(tab.id, { type: map[command] });

@@ -8,6 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
+import { extensionCopy, agree } from "./ext-copy.mjs";
 import { startMock } from "./mock-api.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -16,10 +17,7 @@ const extSrc = path.resolve(here, arg("--ext", "../../extension"));
 const out = arg("--out", "/tmp/gyt-queue"); fs.mkdirSync(out, { recursive: true });
 const PORT = 8788, PAGES = 14, MODEL_MS = 2500;
 
-const ext = fs.mkdtempSync(path.join(os.tmpdir(), "gyt-ext-"));
-fs.cpSync(extSrc, ext, { recursive: true });
-const pj = path.join(ext, "prompt.js");
-fs.writeFileSync(pj, fs.readFileSync(pj, "utf8").replace(/export const API_URL = "[^"]+"/, `export const API_URL = "http://127.0.0.1:${PORT}/v1/messages"`));
+const ext = extensionCopy(extSrc, { apiUrl: `http://127.0.0.1:${PORT}/v1/messages` });
 
 const pageImage = path.resolve(here, "../fixtures/demo-page.png");
 const { srv, calls, fetches } = await startMock(PORT, pageImage, { truth: pageImage.replace(/-page\.png$/, "-truth.json"), delayMs: MODEL_MS });
@@ -30,6 +28,7 @@ const context = await chromium.launchPersistentContext(profile, {
   viewport: { width: 1200, height: 900 },
 });
 const sw = context.serviceWorkers()[0] || (await context.waitForEvent("serviceworker"));
+await agree(sw);
 await sw.evaluate(async () => {
   await chrome.storage.sync.set({ enabled: true, enabledSites: ["127.0.0.1"], autoSites: ["127.0.0.1"], debugOverlay: true, useContext: false, includeSource: false, model: "claude-sonnet-5-5" });
   await chrome.storage.local.set({ apiKey: "sk-ant-test" });

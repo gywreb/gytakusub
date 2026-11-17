@@ -199,7 +199,19 @@
 
       <section class="card" id="sec-about" aria-labelledby="h-about">
         <h2 id="h-about">About</h2>
-        <p class="about">Gytakusub is free software under the <a href="LICENSE" target="_blank">GNU AGPL v3</a> · <a href="https://github.com/gywreb/gytakusub" target="_blank" rel="noopener">source code</a> · <a href="THIRD_PARTY.md" target="_blank">third-party components</a></p>
+        <div class="option">
+          <span class="option-text"><span class="option-title">What is sent to Claude</span><span class="option-desc" id="consentDesc">Checking…</span></span>
+          <button id="consentBtn" class="btn" type="button" hidden></button>
+        </div>
+        <div class="option">
+          <span class="option-text"><span class="option-title">Access to websites</span><span class="option-desc" id="accessDesc">Checking…</span></span>
+          <button id="accessBtn" class="btn" type="button" hidden></button>
+        </div>
+        <div class="option">
+          <span class="option-text"><span class="option-title">Help</span><span class="option-desc">Report a problem or ask on <a href="https://github.com/gywreb/gytakusub/issues" target="_blank" rel="noopener">GitHub Issues</a>. Issues are public, so don't attach manga pages or debug reports there.</span></span>
+        </div>
+        <p class="about" style="padding-top: var(--s3); border-top: 1px solid var(--border)">Gytakusub is an independent project, not made by or affiliated with Anthropic. <a href="https://gywreb.github.io/gytakusub/privacy.html" target="_blank" rel="noopener">Privacy policy</a> · <a href="welcome.html" target="_blank">Setup guide</a></p>
+        <p class="about">Gytakusub <span id="version"></span> is free software under the <a href="LICENSE" target="_blank">GNU AGPL v3</a> · <a href="https://github.com/gywreb/gytakusub" target="_blank" rel="noopener">source code</a> · <a href="THIRD_PARTY.md" target="_blank">third-party components</a></p>
       </section>
     </main>
   </div>

@@ -6,6 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
+import { extensionCopy, agree } from "./ext-copy.mjs";
 import { execFileSync } from "node:child_process";
 import { createCanvas, loadImage } from "canvas";
 import { startMock } from "./mock-api.mjs";
@@ -18,11 +19,8 @@ const pageImage = path.resolve(here, arg("--page", "../fixtures/demo-page.png"))
 const out = arg("--out", "/tmp/gyt-browser"); fs.mkdirSync(out, { recursive: true });
 const PORT = 8787;
 
-// Test copy of the extension pointed at the mock API (the product code is untouched).
-const ext = fs.mkdtempSync(path.join(os.tmpdir(), "gyt-ext-"));
-fs.cpSync(extSrc, ext, { recursive: true });
-const pj = path.join(ext, "prompt.js");
-fs.writeFileSync(pj, fs.readFileSync(pj, "utf8").replace(/export const API_URL = "[^"]+"/, `export const API_URL = "http://127.0.0.1:${PORT}/v1/messages"`));
+// Test copy of the extension pointed at the mock API, with site access (ext-copy.mjs).
+const ext = extensionCopy(extSrc, { apiUrl: `http://127.0.0.1:${PORT}/v1/messages` });
 // --segmenter <model.onnx>: ship a bubble segmentation model with the test copy, so
 // the service worker runs ONNX Runtime (CSP, wasm fetch, no dynamic import) for real.
 const segModel = arg("--segmenter", null);
@@ -46,6 +44,7 @@ const context = await chromium.launchPersistentContext(profile, {
 let sw = context.serviceWorkers()[0] || (await context.waitForEvent("serviceworker"));
 // the worker's own warnings (a GPU session that fails to start, a model that will not load)
 context.on("console", (m) => { if (m.type() === "warning" && /Gytakusub/.test(m.text())) console.log("  [worker]", m.text().slice(0, 300)); });
+await agree(sw);
 await sw.evaluate(async () => {
   await chrome.storage.sync.set({ enabled: true, enabledSites: ["127.0.0.1"], debugOverlay: true, peekOnHover: true, useContext: false, includeSource: false, model: "claude-sonnet-5-5" });
   await chrome.storage.local.set({ apiKey: "sk-ant-test" });

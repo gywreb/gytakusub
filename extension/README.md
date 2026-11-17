@@ -11,7 +11,12 @@ From the Chrome Web Store listing, or unpacked:
 2. Open `brave://extensions` (or `chrome://extensions`), turn on **Developer mode**.
 3. **Load unpacked** → pick the `gytakusub` folder.
 
-Then click the extension icon → **All settings** → paste your API key (platform.claude.com → Settings → API keys) → **Save & test**, and reload any manga tab that was already open.
+A setup page opens on install (later: Options → About → *Setup guide*):
+1. Read what is sent to Claude and where, and choose **I agree**. Nothing is sent before that.
+2. **Open settings** → paste your API key (platform.claude.com → Settings → API keys) → **Save & test**.
+3. **Allow access**, so Gytakusub can read manga images (they usually come from other servers than the page). Your browser asks you to confirm.
+
+Then reload any manga tab that was already open.
 
 Settings, glossary and (optionally) the API key sync through your browser's sync. The first translation after the browser starts takes a few seconds longer: the WebAssembly modules compile and the two models load once.
 
@@ -29,7 +34,8 @@ Settings, glossary and (optionally) the API key sync through your browser's sync
 | Correct a line / teach the glossary | Double-click a translated bubble → edit → **Ctrl+Enter**; or fill "original term = translation" → *Add* |
 | Peek at the original lettering | Options → *Peek at the original while hovering* (off by default), then rest the pointer on a translated bubble |
 | See what translating costs | Popup → "≈$… today" next to the model; Options → **Claude usage** (today, this month, per model, rate-limit headroom, monthly API credit left and when it renews) |
-| Report a bad page | Options → *Debug overlay*, then popup → **Export debug report** (one `.zip` for every translated page on the tab) |
+| Report a bad page | Options → *Debug overlay*, then popup → **Export debug report** (one `.zip` for every translated page on the tab). It contains the page images, so don't attach it to a public GitHub issue. |
+| Withdraw the agreement or remove site access | Options → **About** |
 
 ## How it works
 
@@ -58,6 +64,9 @@ One request per page: the page image (at most about 1,600 input tokens on most m
 ```
 manifest.json     MV3 manifest
 background.js     service worker: fetch → page engine → Claude → cache; keyboard commands; per-tab context
+access.js         the agreement (welcome.html) and site access, asked at first use
+imagecheck.js     downloads: only real images (by their bytes), capped at 25 MB
+welcome.*         setup page: what is sent and where, I agree, API key, Allow access
 settings.js       settings defaults and storage, shared by the worker, popup and options
 prompt.js         Claude prompt, structured-output schema, API call, response parsing
 content.js        image discovery, hover bar, overlay rendering & positioning, auto mode, debug report

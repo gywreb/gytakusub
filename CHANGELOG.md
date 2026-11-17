@@ -4,6 +4,34 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
 
 ## [Unreleased]
 
+## [2.7.0] — 2026-11-17
+
+Ready for the public Chrome Web Store listing. Everything stays free: each person uses their own Claude key, and nothing costs the developer per user.
+
+### Extension
+- **A setup page opens on install.** It says what is read (only pages you translate), what is sent (the page image in slices, your glossary and custom instructions, the chapter's names, and recent lines with Chapter context on), and where (Anthropic's Claude API, with your key, nothing else). Then: "I agree", add your key, allow access.
+  - Nothing is translated until you agree; the popup shows only "Set up", and the shortcut opens the setup page.
+  - Options → About shows when you agreed, and Withdraw. After withdrawing, nothing more is sent.
+- **Access to websites is asked when you first use it, not at install.** The setup page asks, and so does the popup the first time you turn on Enable here or Auto-translate, or press Translate. You can remove it in Options → About.
+  - Without it, nothing runs on sites, and the popup and any error say how to allow it.
+- **Safer image downloads.** Only real images are used (checked by their first bytes: JPEG, PNG, GIF, WebP, AVIF/HEIF, BMP); a login page or anything else is refused. Downloads stop as soon as they pass 25 MB instead of after reading the whole thing.
+- **The API key no longer reaches the script that runs inside web pages.** It never used it, but now it can't.
+- **Options → About**: version, help (GitHub Issues), privacy policy, setup guide, and "not made by or affiliated with Anthropic".
+
+### Store and support
+- Listing text for the public release: setup and access in the description, Homepage and Support URLs, the optional-access justification, what's new, reviewer notes for the setup page (`store/LISTING.md`).
+- "Going public" in `store/RELEASE-CHECKLIST.md`: trader status, visibility, rollback, watching issues, policy emails.
+- Issue forms: a bug report that warns not to attach manga pages, debug reports or keys (issues are public), and an idea form.
+- Privacy policy: the agreement, optional site access, and everything sent with an image.
+
+### Web app
+- The chapter-link setup guide was checked against Cloudflare's limits page, which changed on 13 November 2026: still 100,000 requests a day (reset at midnight UTC) and 10 ms CPU on the free plan. No change to the guide (#18).
+
+### Tests
+- `tests/browser/setup.mjs`: a new install without access, from the setup page through "I agree" and Withdraw, plus the worker's limits (no key in `GET_SETTINGS`, images only, the no-access message).
+- `tests/imagecheck.test.mjs`: image types by their bytes, and the size cap.
+- The other browser tests use a test copy with access granted at install (`tests/browser/ext-copy.mjs`): a headless browser can't click a permission prompt.
+
 ## [2.6.1] — 2026-11-16
 
 ### Releases

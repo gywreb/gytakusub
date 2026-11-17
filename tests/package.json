@@ -5,9 +5,9 @@
   "scripts": {
     "test": "npm run test:web && npm run test:extension",
     "test:web": "node fetcher.test.mjs && node usage.test.mjs",
-    "test:extension": "node engine.test.mjs && node segment.test.mjs && node ort-trap.test.mjs && node gpu.test.mjs && node concurrency.test.mjs && node lane.test.mjs && node cws-publish.test.mjs && node ci-status.test.mjs",
+    "test:extension": "node engine.test.mjs && node segment.test.mjs && node ort-trap.test.mjs && node gpu.test.mjs && node concurrency.test.mjs && node lane.test.mjs && node cws-publish.test.mjs && node ci-status.test.mjs && node imagecheck.test.mjs",
     "test:browser": "npm run test:browser:extension && npm run test:browser:web",
-    "test:browser:extension": "node browser/run.mjs --out /tmp/gyt-browser/good && node browser/run.mjs --bad-boxes --out /tmp/gyt-browser/bad-boxes && node browser/run.mjs --segmenter /tmp/gyt-fake-seg.onnx --out /tmp/gyt-browser/segmented && node browser/run.mjs --gpu --require-gpu --out /tmp/gyt-browser/gpu && node browser/queue.mjs --out /tmp/gyt-browser/queue",
+    "test:browser:extension": "node browser/run.mjs --out /tmp/gyt-browser/good && node browser/run.mjs --bad-boxes --out /tmp/gyt-browser/bad-boxes && node browser/run.mjs --segmenter /tmp/gyt-fake-seg.onnx --out /tmp/gyt-browser/segmented && node browser/run.mjs --gpu --require-gpu --out /tmp/gyt-browser/gpu && node browser/queue.mjs --out /tmp/gyt-browser/queue && node browser/setup.mjs --out /tmp/gyt-browser/setup",
     "test:browser:web": "node browser/web.mjs --out /tmp/gyt-browser/web",
     "e2e": "node engine-e2e.mjs fixtures/demo-page.png fixtures/demo-items.json /tmp/gyt-e2e.png",
     "viz": "node engine-viz.mjs",

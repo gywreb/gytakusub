@@ -25,7 +25,7 @@ Everything below is a one-time account step or a copy-paste from `store/LISTING.
 
 ## 4. Privacy practices tab (10 min) — this is where most rejections happen
 - [ ] Paste the **single purpose** text.
-- [ ] Paste each **permission justification** (storage, activeTab, scripting, host permission).
+- [ ] Paste each **permission justification** (storage, activeTab, scripting, optional host permission).
 - [ ] Remote code: **No** (paste the remote-code row from `LISTING.md` if the form asks why WebAssembly and the ONNX models are present).
 - [ ] Data usage: tick **Authentication information** and **Website content** only; tick all three certifications.
 - [ ] Privacy policy URL: `https://gywreb.github.io/gytakusub/privacy.html` (confirm the page loads first — Pages must be enabled, see repo README).
@@ -39,14 +39,25 @@ Everything below is a one-time account step or a copy-paste from `store/LISTING.
 
 ## 7. If it is rejected
 Paste the rejection email to me verbatim. The two likely reasons and what we'd do:
-- *"Broad host permissions not justified"* → we switch to `optional_host_permissions` and request access per site when the user enables it (I kept the code structure ready for this; it costs one extra permission prompt per site).
+- *"Broad host permissions not justified"* → since 2.7.0 site access is already optional and asked at first use. Next step would be asking per site (the image servers differ per site, so each new site would need its own prompt, sometimes two).
 - *"Description doesn't match functionality / misleading"* → adjust the wording they quote; no code change.
 
 ## 8. After approval
 - [ ] Install from the store link in Brave on the Windows machine and the MacBook; remove the unpacked copy.
 - [ ] Try Orion on the iPhone with the store link (free; beta extension support) and tell me what breaks, if anything.
 - [ ] Enable auto-translate only on the sites you actually read, via the popup.
-- [ ] After a week with no issues: Distribution → **Public**, if you want it discoverable.
+- [ ] Going public: see the next section.
+
+## Going public (2.7.0 onwards)
+What 2.7.0 adds for strangers: a setup page that shows what is sent and asks for agreement before anything is sent (Chrome Web Store user-data policy: disclosure and consent inside the extension, not only in the privacy policy), site access asked at first use, Help (GitHub Issues), "not affiliated with Anthropic", safer image downloads.
+- [ ] **Account → Trader status.** Every publisher must declare Trader or Non-Trader (EU Digital Services Act). It's your own call; Google won't decide it for you. A free hobby project with no business behind it is usually Non-Trader. If you choose Trader, your legal name, address and phone number are shown publicly on the listing.
+- [ ] **Store listing**: paste the new Description, the Homepage URL and the Support URL from `LISTING.md`.
+- [ ] **Privacy practices**: replace the host-permission justification with the *optional host permission* row; re-check the Website content wording.
+- [ ] **Distribution → Visibility: Public.** Free, all regions. Then Submit for review. (If 2.7.0 is already live as Unlisted, change the visibility and submit; the dashboard says whether it goes through review again. The policies are the same for every visibility.)
+- [ ] Before you go to bed on release day: install from the public listing in a fresh browser profile and walk through the setup page (agree → key → Allow access → translate one page). That's the path every new user takes.
+- [ ] **Watch** the repo (Watch → Custom → Issues) so new issues reach your email. Reply within a few days; if one is a real bug, label it `bug`.
+- [ ] **A bad release**: Build → Package → *Roll back to previous version* (no review, live within minutes; it re-publishes the previous package under a new version number you give it). Note: rolling back from 2.7.x to 2.6.x would bring back install-time site access, which people who installed 2.7 never granted, so the browser may disable the extension for them until they approve it. Prefer a fixed 2.7.x unless the bug is serious.
+- [ ] **A policy email from Google** (warning or takedown): paste it to me verbatim before changing anything; most need a listing or wording change, and you usually get a deadline.
 
 ## Uploading a new version by hand (item already exists)
 1. If a version is still in review: the item → ⋮ → **Cancel review** (it returns to draft).
