@@ -54,6 +54,10 @@
     .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); padding: 8px 14px; border-radius: 8px;
       background: rgba(17,24,39,.92); color: #fff; font: 13px/1.3 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
       box-shadow: 0 2px 10px rgba(0,0,0,.4); pointer-events: none; max-width: 80vw; }
+    .pause { bottom: 64px; display: flex; align-items: center; gap: 12px; padding: 10px 10px 10px 14px; pointer-events: auto; }
+    .pause[hidden] { display: none; }
+    .pause button { flex: none; padding: 6px 14px; border: 0; border-radius: 6px; background: #fff; color: #111827; font: 600 13px/1.2 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; cursor: pointer; }
+    .pause button:focus-visible { outline: 2px solid #7cb3ff; outline-offset: 2px; }
   `;
   const root = document.createElement("div"); root.className = "root";
   const bar = document.createElement("div"); bar.className = "bar"; bar.setAttribute("role", "toolbar"); bar.setAttribute("aria-label", "Gytakusub");
@@ -63,7 +67,11 @@
   const status = document.createElement("span"); status.className = "status";
   bar.append(btnTranslate, btnToggle, btnReport, status);
   const toastEl = document.createElement("div"); toastEl.className = "toast"; toastEl.setAttribute("role", "status"); toastEl.setAttribute("aria-live", "polite"); toastEl.hidden = true;
-  shadow.append(style, root, bar, toastEl);
+  const pauseEl = document.createElement("div"); pauseEl.className = "toast pause"; pauseEl.setAttribute("role", "alert"); pauseEl.hidden = true;
+  const pauseText = document.createElement("span");
+  const pauseBtn = document.createElement("button"); pauseBtn.type = "button"; pauseBtn.textContent = "Continue";
+  pauseEl.append(pauseText, pauseBtn);
+  shadow.append(style, root, bar, toastEl, pauseEl);
 
   const mount = () => { if (document.documentElement && !host.isConnected) document.documentElement.append(host); };
   if (document.body) mount(); else document.addEventListener("DOMContentLoaded", mount, { once: true });
@@ -89,7 +97,7 @@
     applyAutoMode();
     if (!settings.enabled) { bar.classList.remove("visible"); hoverImg = null; }
   }
-  chrome.storage.onChanged.addListener(() => loadSettings());
+  // the worker says when settings change (this script can't read extension storage itself, see background.js)
 
   const hostname = location.hostname;
   const siteExcluded = () => settings.excludedSites.split(/[\s,]+/).filter(Boolean).some((p) => hostname === p || hostname.endsWith("." + p));
@@ -235,8 +243,9 @@
     files.unshift({ name: "summary.json", data: new TextEncoder().encode(JSON.stringify(summary, null, 1)) });
     const zip = makeZip(files);
     const url = URL.createObjectURL(new Blob([zip], { type: "application/zip" }));
+    // clicked without being put in the page: a page script watching the DOM could otherwise read the zip
     const a = document.createElement("a"); a.href = url; a.download = `gytakusub-report-${location.hostname}-${stamp}.zip`; a.rel = "noopener";
-    document.documentElement.append(a); a.click(); a.remove();
+    a.click();
     setTimeout(() => URL.revokeObjectURL(url), 10000);
     toast(`Report downloaded (${done.length} page${done.length > 1 ? "s" : ""}, ${(zip.length / 1e6).toFixed(1)} MB). Attach the .zip.`, 7000);
     return { ok: true, pages: done.length, bytes: zip.length, files: files.map((f) => f.name) };
@@ -293,7 +302,12 @@
   function enqueue(img, force = false, auto = false) {
     if (!active()) { toast("Gytakusub is off on this site"); return; }
     const e = entries.get(img);
-    if (e && (e.status === "working" || e.status === "queued")) return;
+    if (e?.status === "working") return;
+    if (e?.status === "queued") { // asking for a page auto-translate is holding makes it yours: it isn't put back or paused
+      const job = queue.find((j) => j.img === img);
+      if (job && job.auto && !auto) { job.auto = false; job.force ||= force; pump(); }
+      return;
+    }
     entries.set(img, { ...(e || { hidden: false }), status: "queued", src: srcOf(img), error: undefined, failures: e && e.src === srcOf(img) ? e.failures : 0 });
     queue.push({ id: nextJobId++, img, force, auto });
     refreshBar();
@@ -307,6 +321,29 @@
     if (!e.result && !e.canvas && !e.hidden) entries.delete(img); else e.status = "idle";
   }
 
+  // A spending guard: on a site you auto-translate, page scripts (ads included) can add or swap
+  // images, and every new image is a Claude request. After AUTO_BUDGET auto-translated pages that
+  // Claude answered (not cached, not put back) in AUTO_WINDOW_MS on this tab, auto-translate waits
+  // for a real click on Continue. Pages you ask for yourself are never held. Up to MAX_PARALLEL - 1
+  // pages already in progress may still finish past it. Reading a long chapter rarely gets near it.
+  const AUTO_BUDGET = 100, AUTO_WINDOW_MS = 10 * 60 * 1000;
+  let autoSpent = [], autoPaused = false;
+  function autoBudgetLeft() {
+    const now = performance.now();
+    autoSpent = autoSpent.filter((t) => now - t < AUTO_WINDOW_MS);
+    return AUTO_BUDGET - autoSpent.length;
+  }
+  function pauseAuto() {
+    autoPaused = true;
+    pauseText.textContent = `Auto-translate paused after ${AUTO_BUDGET} pages in 10 minutes, to keep your Claude spending in check.`;
+    pauseEl.hidden = false;
+  }
+  pauseBtn.addEventListener("click", (ev) => {
+    if (!ev.isTrusted) return; // only you can let it go on, not a script on the page
+    autoPaused = false; autoSpent = []; pauseEl.hidden = true;
+    pump();
+  });
+
   function pump() {
     for (let i = queue.length - 1; i >= 0; i--) {
       const job = queue[i];
@@ -314,15 +351,22 @@
       else if (job.auto && !nearScreen(job.img)) { queue.splice(i, 1); putBack(job.img); }
     }
     queue.sort((a, b) => priorityOf(a.img) - priorityOf(b.img));
-    const settled = performance.now() - lastScroll >= SETTLE_MS;
+    const sinceScroll = performance.now() - lastScroll, settled = sinceScroll >= SETTLE_MS;
+    let waitsForSettle = false;
     for (let i = 0; i < queue.length;) {
       const job = queue[i];
       const room = running.size < MAX_PARALLEL || onScreen(job.img);
+      if (room && job.auto && !settled) waitsForSettle = true;
       if (!room || (job.auto && !settled)) { i++; continue; }
+      if (job.auto && (autoPaused || autoBudgetLeft() <= 0)) { if (!autoPaused) pauseAuto(); i++; continue; }
       queue.splice(i, 1);
       running.set(job.id, job);
       translateImage(job).finally(() => { running.delete(job.id); pump(); });
     }
+    // An auto page queued just after a scroll (Chrome fires one while a page loads) waits for
+    // the scroll to settle; without another scroll nothing would call pump again, and the
+    // first screen of a chapter stayed untranslated until you scrolled (2.6.0–2.6.1).
+    if (waitsForSettle) { clearTimeout(settleTimer); settleTimer = setTimeout(pump, SETTLE_MS - sinceScroll + 10); }
     refreshBar();
   }
 
@@ -376,7 +420,7 @@
   const blobToDataUrl = (blob) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(blob); });
   const loadImage = (dataUrl) => new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error("Could not decode image")); im.src = dataUrl; });
 
-  async function translateImage({ id, img, force = false }) {
+  async function translateImage({ id, img, force = false, auto = false }) {
     const entry = entries.get(img) || { status: "idle", hidden: false };
     entry.status = "working"; entry.error = undefined; entry.src = srcOf(img);
     entries.set(img, entry);
@@ -392,7 +436,7 @@
       }
       let res = await chrome.runtime.sendMessage(msg);
       if (!res) throw new Error("No response from background worker");
-      if (res.error && msg.url && /Could not fetch image \((401|403|404|429|5\d\d)\)|Failed to fetch/.test(res.error)) {
+      if (res.error && msg.url && /Could not fetch image \((401|403|404|429|5\d\d)\)|Failed to fetch|needs your permission/.test(res.error)) {
         // The site refused the worker's request (it carries no referrer and no
         // cookies — hotlink protection). The page itself is allowed to read the
         // image when it is same-origin or served with CORS headers: try from here.
@@ -405,6 +449,7 @@
       }
       if (res.cancelled) { putBack(img); refreshBar(); return; } // scrolled far past before Claude was asked
       if (res.error) throw new Error(res.error);
+      if (auto && !res.fromCache) autoSpent.push(performance.now()); // the spending guard counts what Claude answered
       if (srcOf(img) !== src) { entries.delete(img); return; } // image changed while we worked
       entry.result = res;
       await render(img, entry);
@@ -414,7 +459,7 @@
       entry.status = "error";
       entry.error = e.message || String(e);
       entry.failures = (entry.failures || 0) + 1;
-      toast("Gytakusub: " + entry.error, 6000, true);
+      toast(/^Gytakusub\b/.test(entry.error) ? entry.error : "Gytakusub: " + entry.error, 6000, true);
       console.warn("Gytakusub", e);
     }
     refreshBar();
@@ -632,8 +677,10 @@
 
   function translateVisible(force = false) {
     if (!active()) { toast("Gytakusub is off on this site"); return; }
+    // a page auto-translate is holding (waiting to settle, or paused by the spending guard) counts as untranslated: asking takes it over
+    const autoQueued = (i) => entries.get(i)?.status === "queued" && queue.some((j) => j.img === i && j.auto);
     const skip = force ? ["working", "queued"] : ["done", "working", "queued"];
-    const imgs = visibleImages().filter((i) => !skip.includes(entries.get(i)?.status));
+    const imgs = visibleImages().filter((i) => !skip.includes(entries.get(i)?.status) || autoQueued(i));
     if (!imgs.length) { toast("No untranslated images on screen"); return; }
     toast(`Translating ${imgs.length} image${imgs.length > 1 ? "s" : ""}…`);
     for (const img of imgs) enqueue(img, force);
@@ -669,6 +716,7 @@
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     switch (msg?.type) {
       case "PING": sendResponse({ ok: true }); break;
+      case "SETTINGS_CHANGED": loadSettings(); sendResponse({ ok: true }); break;
       case "TRANSLATE_VISIBLE": translateVisible(!!msg.force); sendResponse({ ok: true }); break;
       case "TOGGLE_OVERLAYS": allHidden = !allHidden; layout(); refreshBar(); sendResponse({ hidden: allHidden }); break;
       case "EXPORT_REPORT": exportReport([...entries.keys()]).then(sendResponse, (e) => sendResponse({ error: e.message || String(e) })); return true;

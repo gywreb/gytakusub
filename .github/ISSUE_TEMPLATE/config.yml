@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Privacy policy
+    url: https://gywreb.github.io/gytakusub/privacy.html
+    about: What Gytakusub sends, where, and what it never collects.
+  - name: Claude billing, keys or account
+    url: https://support.claude.com
+    about: Gytakusub isn't made by Anthropic and can't see your account. Questions about your Claude bill, keys or plan go to Anthropic.

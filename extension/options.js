@@ -4,10 +4,11 @@
 // empty defaults over them.
 import { getSettings } from "./settings.js";
 import { apiHeaders, API_URL } from "./prompt.js";
-import { addCall, emptyLog, limitsOf, explainApiError, summary, fmtUsd, fmtTokens, dayStart, PRICES_CHECKED, PRICE_SOURCE, CREDIT_PLANS, creditStatus, creditWords, limitWords } from "./usage.js";
+import { consentGiven, withdrawConsent, hasAccess, requestAccess, ALL_SITES, openWelcome } from "./access.js";
+import { addCall, emptyLog, limitsOf, explainApiError, usageView, dayStart, PRICES_CHECKED, PRICE_SOURCE } from "./usage.js";
 
 const $ = (id) => document.getElementById(id);
-const FIELDS = ["model", "targetLang", "glossary", "customPrompt", "fontFamily", "excludedSites", "creditPlan", "creditCustom", "creditRenews"];
+const FIELDS = ["model", "targetLang", "glossary", "customPrompt", "fontFamily", "excludedSites"];
 const CHECKS = ["useContext", "includeSource", "uppercase", "syncApiKey", "debugOverlay", "peekOnHover", "useGpu"];
 
 function show(kind, text) {
@@ -35,7 +36,6 @@ async function load() {
   loaded = true;
   for (const id of ["save", "testKey"]) $(id).disabled = false;
   markDirty(false);
-  showCredit();
 }
 
 async function save() {
@@ -63,52 +63,28 @@ async function save() {
 
 // ---------- Claude usage (usage.js), written by the service worker as pages are translated ----------
 function showUsage(log) {
-  const { today, month, limits } = summary(log?.v === 1 ? log : emptyLog());
-  const line = (t) => (t.requests ? `${t.requests.toLocaleString()} request${t.requests === 1 ? "" : "s"} · ${fmtTokens(t.input + t.read + t.write)} in · ${fmtTokens(t.output)} out` : "No requests yet");
-  const usd = (t) => (t.unpriced && !t.cost ? "—" : `${t.cost ? "≈" : ""}${fmtUsd(t.cost)}`);
-  $("cuTodayCost").textContent = usd(today);
-  $("cuTodaySub").textContent = line(today);
-  $("cuMonthLabel").textContent = new Date().toLocaleDateString([], { month: "long", timeZone: "UTC" });
-  $("cuMonthCost").textContent = usd(month);
-  $("cuMonthSub").textContent = line(month);
-  $("cuModels").replaceChildren(...month.models.map((m) => {
+  const v = usageView(log?.v === 1 ? log : emptyLog());
+  $("cuTodayCost").textContent = v.today.cost; $("cuTodaySub").textContent = v.today.sub;
+  $("cuMonthLabel").textContent = v.month.label;
+  $("cuMonthCost").textContent = v.month.cost; $("cuMonthSub").textContent = v.month.sub;
+  $("cuModels").replaceChildren(...v.models.map((m) => {
     const li = document.createElement("li");
     const name = document.createElement("span"); name.className = "model-name"; name.textContent = m.label;
-    const cost = document.createElement("span"); cost.className = "model-cost"; cost.textContent = m.unpriced && !m.cost ? "price unknown" : `≈${fmtUsd(m.cost)}`;
-    const what = document.createElement("span"); what.className = "model-what"; what.textContent = line(m);
+    const cost = document.createElement("span"); cost.className = "model-cost"; cost.textContent = m.cost;
+    const what = document.createElement("span"); what.className = "model-what"; what.textContent = m.sub;
     li.append(name, cost, what);
     return li;
   }));
-  $("cuModels").hidden = !month.models.length;
-  const speed = limitWords(limits);
-  $("cuLimits").hidden = !speed;
-  $("cuLimits").textContent = speed;
+  $("cuModels").hidden = !v.models.length;
+  $("cuTodayTokens").textContent = v.today.tokens; $("cuMonthTokens").textContent = v.month.tokens;
+  $("cuLimits").hidden = !v.limits;
+  $("cuLimits").textContent = v.limits;
   lastLog = log;
-  showCredit();
   $("cuChecked").textContent = new Date(PRICES_CHECKED + "T00:00:00Z").toLocaleDateString([], { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
   $("cuPriceLink").href = PRICE_SOURCE;
   $("cuDayStart").textContent = dayStart();
 }
 let lastLog = null;
-// The monthly API credit, from the form (so a change shows before Save).
-function showCredit() {
-  const c = creditStatus(lastLog?.v === 1 ? lastLog : emptyLog(), { creditPlan: $("creditPlan").value, creditCustom: $("creditCustom").value, creditRenews: $("creditRenews").value });
-  $("creditCustomField").hidden = $("creditPlan").value !== "custom";
-  $("cuCredit").hidden = !c;
-  if (!c) return;
-  const w = creditWords(c);
-  $("cuCreditFigure").textContent = w.headline;
-  $("cuCreditState").textContent = w.state; $("cuCreditState").hidden = !w.state;
-  $("cuCreditLeft").textContent = w.left;
-  $("cuCreditPace").textContent = w.pace;
-  const m = $("cuCreditMeter");
-  m.setAttribute("aria-valuenow", Math.round(c.share * 100));
-  m.setAttribute("aria-valuetext", `${w.headline}. ${w.left}.`);
-  m.classList.toggle("warn", !!w.state); m.classList.toggle("used", c.used > 0);
-  m.firstElementChild.style.width = `${c.share * 100}%`;
-}
-$("creditPlan").innerHTML = CREDIT_PLANS.map((p) => `<option value="${p.id}">${p.label}</option>`).join("");
-for (const id of ["creditPlan", "creditCustom", "creditRenews"]) $(id).addEventListener("input", showCredit);
 chrome.storage.local.get({ claudeUsage: null }).then(({ claudeUsage }) => showUsage(claudeUsage));
 // the rate-limit line goes stale after five minutes without an answer
 setInterval(() => chrome.storage.local.get({ claudeUsage: null }).then(({ claudeUsage }) => showUsage(claudeUsage)), 60e3);
@@ -181,4 +157,33 @@ markSection();
 
 $("save").title = /Mac|iPhone|iPad/.test(navigator.platform) ? "Save (⌘S)" : "Save (Ctrl+S)";
 for (const id of ["save", "testKey"]) $(id).disabled = true;
+// About: the agreement (welcome.html) and site access, each with the one action that changes it
+async function showPrivacy() {
+  const [{ consent }, agreed, access] = await Promise.all([chrome.storage.local.get("consent"), consentGiven(), hasAccess()]);
+  const when = agreed ? new Date(consent.at).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" }) : "";
+  $("consentDesc").textContent = agreed
+    ? `You agreed on ${when}. Withdraw and nothing more is sent until you agree again.`
+    : "Not agreed yet, so nothing is sent. Open the setup page to see what is sent and agree.";
+  $("consentBtn").textContent = agreed ? "Withdraw" : "Review and agree";
+  $("consentBtn").hidden = false;
+  $("accessDesc").textContent = access
+    ? "Allowed: Gytakusub can read images on websites, only when you translate or on sites with auto-translate on."
+    : "Not allowed: Gytakusub can't read manga images until you allow it.";
+  $("accessBtn").textContent = access ? "Remove access" : "Allow access";
+  $("accessBtn").disabled = !access && !agreed; // as on the setup page: agree first
+  $("accessBtn").title = $("accessBtn").disabled ? "Agree to what is sent first" : "";
+  $("accessBtn").hidden = false;
+}
+$("consentBtn").onclick = async () => { if (await consentGiven()) { await withdrawConsent(); showPrivacy(); } else openWelcome(); };
+// asking must be the first call in the click (the browser's rule for permission prompts)
+$("accessBtn").onclick = () => {
+  const wasAllowed = $("accessBtn").textContent === "Remove access";
+  (wasAllowed ? chrome.permissions.remove(ALL_SITES) : requestAccess()).finally(showPrivacy);
+};
+chrome.storage.onChanged.addListener((changes, area) => { if (area === "local" && changes.consent) showPrivacy(); });
+chrome.permissions.onAdded.addListener(showPrivacy);
+chrome.permissions.onRemoved.addListener(showPrivacy);
+showPrivacy();
+$("version").textContent = chrome.runtime.getManifest().version;
+
 load().then(markSection, (e) => show("err", "Could not read the settings: " + e.message)); // the filled-in form changes section heights

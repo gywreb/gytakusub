@@ -5,10 +5,12 @@
 // cache translations, keep per-tab glossary context, relay keyboard commands.
 
 import { callClaude, mergeContext } from "./prompt.js";
-import { addCall, emptyLog } from "./usage.js";
+import { addCall, addPage, emptyLog } from "./usage.js";
 import { preparePage, finishPage } from "./engine/page.js";
 import { DEFAULT_SETTINGS, getSettings, CS_FILES, ensureContentScript } from "./settings.js";
 import { createLane, Cancelled } from "./lane.js";
+import { consentGiven, hasAccess, openWelcome, CONSENT_VERSION } from "./access.js";
+import { sniffImageType, readCapped } from "./imagecheck.js";
 
 // Claude usage log (usage.js) in chrome.storage.local, read by the popup and Options. This worker is
 // its only writer; a page's slices answer in parallel, so the writes queue up instead of racing.
@@ -18,6 +20,14 @@ function recordUsage(r) {
   usageWrites = usageWrites.then(async () => {
     const { claudeUsage } = await chrome.storage.local.get({ claudeUsage: null });
     await chrome.storage.local.set({ claudeUsage: addCall(claudeUsage?.v === 1 ? claudeUsage : emptyLog(), { model: r.model, usage: r.usage, limits: r.limits }) });
+  }).catch((e) => console.warn("Gytakusub: usage log write failed", e));
+}
+/** One page translated by Claude: all its slices answered (their requests are already counted). */
+function recordPage(raw) {
+  if (!raw.length || !raw.every((r) => r?.usage)) return;
+  usageWrites = usageWrites.then(async () => {
+    const { claudeUsage } = await chrome.storage.local.get({ claudeUsage: null });
+    await chrome.storage.local.set({ claudeUsage: addPage(claudeUsage?.v === 1 ? claudeUsage : emptyLog(), { model: raw[0].model, usages: raw.map((r) => r.usage) }) });
   }).catch((e) => console.warn("Gytakusub: usage log write failed", e));
 }
 
@@ -50,7 +60,8 @@ function hostPatterns(hosts) {
 
 async function syncRegistration() {
   const s = await getSettings();
-  const hosts = s.enabled ? [...new Set([...(s.enabledSites || []), ...(s.autoSites || [])])] : [];
+  // without the site access asked for at first use (access.js), nothing is registered
+  const hosts = s.enabled && await hasAccess() ? [...new Set([...(s.enabledSites || []), ...(s.autoSites || [])])] : [];
   const matches = hostPatterns(hosts);
   const existing = await chrome.scripting.getRegisteredContentScripts({ ids: [CS_ID] }).catch(() => []);
   if (!matches.length) {
@@ -63,12 +74,42 @@ async function syncRegistration() {
 }
 
 /** Make sure the content script is present in a tab; inject it if not. */
-chrome.runtime.onInstalled.addListener(() => { updateBadge(); syncRegistration(); });
+chrome.runtime.onInstalled.addListener(async ({ reason, previousVersion }) => {
+  updateBadge(); syncRegistration();
+  // A new user sees what is sent where, and agrees, first. On an update, only someone who never
+  // saw this page (coming from before 2.7.0) or who agreed to an older version of it; not someone
+  // who withdrew on purpose.
+  if (reason === "update") chrome.storage.sync.remove(["creditPlan", "creditCustom", "creditRenews"]).catch(() => {}); // the monthly-credit fields removed in 2.7.0
+  const { consent } = await chrome.storage.local.get("consent");
+  if (reason === "install" && !consent) openWelcome();
+  if (reason === "update" && (consent ? (consent.version || 0) < CONSENT_VERSION : olderThan(previousVersion, "2.7.0"))) openWelcome("#update");
+});
+/** "2.6.1" < "2.7.0", numerically per part. */
+function olderThan(a = "0", b) {
+  const x = String(a).split(".").map(Number), y = b.split(".").map(Number);
+  for (let i = 0; i < Math.max(x.length, y.length); i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) < (y[i] || 0); }
+  return false;
+}
+chrome.permissions.onAdded.addListener(() => syncRegistration());
+chrome.permissions.onRemoved.addListener(() => syncRegistration());
 chrome.runtime.onStartup.addListener(() => { updateBadge(); syncRegistration(); });
-chrome.storage.onChanged.addListener((changes) => {
+chrome.storage.onChanged.addListener((changes, area) => {
   if (changes.enabled) updateBadge();
   if (changes.enabled || changes.enabledSites || changes.autoSites) syncRegistration();
+  if (area === "sync" || (area === "local" && changes.apiKey)) tellTabsSettingsChanged();
 });
+
+// The content script runs inside other people's pages. Chrome lets it read storage.local and
+// storage.sync by default, and the API key lives there: keep both to the extension's own pages
+// and this worker. The content script asks for its settings (GET_SETTINGS, without the key),
+// and hears about changes from tellTabsSettingsChanged.
+for (const area of [chrome.storage.local, chrome.storage.sync]) {
+  area.setAccessLevel?.({ accessLevel: "TRUSTED_CONTEXTS" }).catch((e) => console.warn("Gytakusub: storage access level", e));
+}
+async function tellTabsSettingsChanged() {
+  const tabs = await chrome.tabs.query({}).catch(() => []);
+  for (const t of tabs) chrome.tabs.sendMessage(t.id, { type: "SETTINGS_CHANGED" }).catch(() => {}); // tabs without the content script just refuse
+}
 
 // ---------- small utils ----------
 
@@ -120,22 +161,32 @@ async function updateTabCtx(tabId, newTerms, newLines) {
 // ---------- image bytes (only http(s) URLs or inline data from our own content script) ----------
 
 const MAX_BYTES = 25 * 1024 * 1024;
+// Only what is really an image, and never more than MAX_BYTES (imagecheck.js): the URL comes
+// from a page, and the bytes may go back to the content script (FETCH_IMAGE).
 async function fetchImageBlob({ url, dataUrl }, signal = undefined) {
-  let blob;
+  let bytes;
   if (dataUrl) {
     if (!/^data:image\//i.test(dataUrl)) throw new Error("Unsupported image data");
-    blob = dataUrlToBlob(dataUrl);
+    const blob = dataUrlToBlob(dataUrl);
+    if (blob.size > MAX_BYTES) throw new Error("Image is too large (over 25 MB)");
+    bytes = new Uint8Array(await blob.arrayBuffer());
   } else {
     let u;
     try { u = new URL(url); } catch { throw new Error("Invalid image URL"); }
     if (!/^https?:$/.test(u.protocol)) throw new Error("Only http(s) images are supported");
-    const res = await fetch(u.href, { credentials: "omit", signal });
+    let res;
+    try { res = await fetch(u.href, { credentials: "omit", signal }); }
+    catch (e) {
+      if (e?.name === "AbortError") throw e;
+      if (!(await hasAccess())) throw new Error(`Gytakusub needs your permission to read images from ${u.hostname}. Open the Gytakusub popup and choose Allow access.`);
+      throw new Error(`Could not download the image from ${u.hostname} (${e.message || "network error"})`);
+    }
     if (!res.ok) throw new Error(`Could not fetch image (${res.status})`);
-    blob = await res.blob();
+    bytes = await readCapped(res, MAX_BYTES);
   }
-  if (blob.size > MAX_BYTES) throw new Error("Image is too large (over 25 MB)");
-  if (!blob.type.startsWith("image/")) blob = new Blob([await blob.arrayBuffer()], { type: "image/jpeg" });
-  return blob;
+  const type = sniffImageType(bytes);
+  if (!type) throw new Error("That address did not return an image");
+  return new Blob([bytes], { type });
 }
 
 // ---------- page order: the page on screen first ----------
@@ -173,8 +224,8 @@ const disposeJob = (prepared) => { for (const s of prepared?.slices || []) { try
 async function handleTranslate(msg, sender) {
   const settings = await getSettings();
   if (!settings.enabled) throw new Error("Gytakusub is switched off (toolbar popup).");
-  if (!settings.apiKey) throw new Error("No API key set. Open Gytakusub options and paste your Claude API key.");
-
+  if (!(await consentGiven())) throw new Error("Gytakusub isn't set up yet: open the Gytakusub popup and choose Set up, to see what is sent to Claude and agree.");
+  if (!settings.apiKey) throw new Error("No API key set. Open Gytakusub's settings and paste your Claude API key.");
   const tabId = sender.tab?.id ?? -1;
   const jobKey = msg.jobId != null ? `${tabId}:${msg.jobId}` : null;
   const work = { distance: Number.isFinite(msg.distance) ? msg.distance : 0, onScreen: msg.onScreen === true, since: Date.now(), ctl: new AbortController(), asked: false };
@@ -191,7 +242,7 @@ async function translatePage(msg, settings, tabId, work) {
   const { signal } = work.ctl;
   const priority = () => work.distance;
   const held = heldFor(work);
-  const cacheKey = "cache:" + (await sha1(`${PROMPT_VERSION}|${settings.model}|${settings.targetLang}|${settings.includeSource}|${settings.useContext}|${msg.url || msg.dataUrl?.slice(0, 512) + msg.dataUrl?.length}`));
+  const cacheKey = "cache:" + (await sha1(`${PROMPT_VERSION}|${settings.model}|${settings.targetLang}|${settings.includeSource}|${settings.useContext}|${msg.url || msg.dataUrl}`)); // the whole data URL: two images can share a beginning
   const cached = (await chrome.storage.session.get(cacheKey))[cacheKey];
   const timing = {}; let t = performance.now();
   const lap = (k) => { const n = performance.now(); timing[k] = Math.round(n - t); t = n; };
@@ -217,6 +268,7 @@ async function translatePage(msg, settings, tabId, work) {
       }
     };
     const raw = await Promise.all(job.slices.map(withRetry));
+    recordPage(raw);
     results = raw.map((r) => ({ items: r.items }));
     usage = { input_tokens: 0, output_tokens: 0 };
     for (const r of raw) { newTerms.push(...r.terms); if (r.usage) { usage.input_tokens += r.usage.input_tokens || 0; usage.output_tokens += r.usage.output_tokens || 0; } }
@@ -287,25 +339,44 @@ async function addGlossary({ from, to }) {
   return { ok: true, replaced: dup };
 }
 
+/**
+ * The original image for the debug report (content.js exportReport). Its bytes go back into
+ * the page's process, so: only with the debug overlay on, only for a tab, and only something
+ * that really decodes as an image.
+ */
+async function fetchForReport(msg, sender) {
+  if (!sender.tab) throw new Error("Not from a tab");
+  if (!(await getSettings()).debugOverlay) throw new Error("Turn on the debug overlay in Options to export reports");
+  const blob = await fetchImageBlob(msg);
+  try { (await createImageBitmap(blob)).close(); } catch { throw new Error("That address did not return an image"); }
+  return { dataUrl: await blobToDataUrl(blob), type: blob.type };
+}
+
 // ---------- messaging ----------
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (sender.id !== chrome.runtime.id) return false; // only this extension's own pages and content scripts
   const reply = (p) => p.then((r) => sendResponse(r)).catch((e) => sendResponse({ error: e.message || String(e) }));
   switch (msg?.type) {
     case "TRANSLATE": handleTranslate(msg, sender).then(sendResponse, (e) => sendResponse(e instanceof Cancelled || e?.name === "AbortError" ? { cancelled: true } : { error: e.message || String(e) })); return true;
     case "JOBS": sendResponse(updateJobs(sender.tab?.id ?? -1, msg)); return false;
-    case "GET_SETTINGS": reply(getSettings()); return true;
+    // the content script runs inside other people's pages: it gets the settings, but not the API key
+    case "GET_SETTINGS": reply(getSettings().then(({ apiKey, ...rest }) => ({ ...rest, hasKey: !!apiKey }))); return true;
     case "EDIT_ITEM": reply(editItem(msg)); return true;
-    case "FETCH_IMAGE": reply(fetchImageBlob(msg).then(async (b) => ({ dataUrl: await blobToDataUrl(b), type: b.type }))); return true; // diagnostic export needs the original bytes
+    case "FETCH_IMAGE": reply(fetchForReport(msg, sender)); return true;
     case "ADD_GLOSSARY": reply(addGlossary(msg)); return true;
     default: return false;
   }
 });
 
 chrome.commands.onCommand.addListener(async (command, tab) => {
-  if (!tab?.id || !/^https?:/.test(tab.url || "")) return;
   const map = { "translate-visible": "TRANSLATE_VISIBLE", "toggle-overlays": "TOGGLE_OVERLAYS" };
-  if (!map[command]) return;
+  if (!map[command] || !tab?.id) return;
+  // before the user has seen what is sent and agreed, a shortcut opens that page instead of reading this one
+  if (command === "translate-visible" && !(await consentGiven())) { openWelcome(); return; }
+  // the address is visible with site access, or through the activeTab grant the shortcut gives;
+  // when it's missing, try anyway: a page scripts can't run on (chrome://, the store) fails below
+  if (tab.url && !/^https?:/.test(tab.url)) return;
   try {
     if (command === "translate-visible") await ensureContentScript(tab.id);
     await chrome.tabs.sendMessage(tab.id, { type: map[command] });

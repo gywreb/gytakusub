@@ -26,7 +26,14 @@
   .group .field + .option { border-top: 0; }
   .pop-foot { display: flex; gap: var(--s2); padding: 0 var(--s4) var(--s4); }
   .pop-foot .btn { flex: 1 1 auto; white-space: nowrap; }
-  #nokey { margin: var(--s3) var(--s4) 0; }
+  #nokey, #access { margin: var(--s3) var(--s4) 0; }
+  #setupNote { display: grid; gap: var(--s3); padding: var(--s4); }
+  #setupNote .primary { min-height: 40px; }
+  /* until the user has seen what is sent and agreed (welcome.html), the popup offers only that */
+  body:not(.setup) #setupNote, body.setup #offNote, body.setup #nokey, body.setup #access, body.setup .pop-body { display: none; }
+  body.setup .master { visibility: hidden; }
+  #access span { min-width: 0; }
+  #access .btn { flex: none; }
   #offNote { padding: var(--s3) var(--s4) var(--s4); }
   body:not(.off) #offNote, body.off .pop-body { display: none; }
   /* until the settings are read (a few ms): never show the HTML defaults as if they were the user's */
@@ -40,9 +47,15 @@
     <label class="master" title="Turn Gytakusub on or off on every site"><span id="enabledText">On</span><input type="checkbox" id="enabled" class="switch" aria-label="Gytakusub on" /></label>
   </header>
 
+  <div id="setupNote">
+    <p><b>Finish setting up Gytakusub.</b> See what it sends to Claude, agree, and allow it to read manga images. It takes a minute.</p>
+    <button id="openSetup" class="primary" type="button">Set up</button>
+  </div>
+
   <p id="offNote" class="hint">Gytakusub is off on every site. Turn it on with the switch above; your settings are kept.</p>
 
   <div id="nokey" class="notice" hidden><span>No Claude API key yet.</span><button id="openOptions2" class="btn small" type="button">Add key</button></div>
+  <div id="access" class="notice" hidden><span>Allow Gytakusub to read manga images on websites.</span><button id="allowAccess" class="btn small" type="button">Allow access</button></div>
 
   <main class="pop-body">
 
@@ -69,7 +82,7 @@
     <section class="group" aria-labelledby="trHead">
       <div class="group-head">
         <h2 id="trHead" class="group-title">Translation</h2>
-        <button id="usageToday" class="usage-link" type="button" hidden title="Claude usage today, estimated from this browser (details in Options)"></button>
+        <button id="usageToday" class="usage-link" type="button" hidden title="What translating cost today, counted in this browser (details in Settings)"></button>
       </div>
       <label class="field">
         <span>Model</span>

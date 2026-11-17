@@ -16,7 +16,6 @@
   .card > .lede { color: var(--muted); font-size: var(--t-caption); margin-bottom: var(--s2); }
   .card .field { padding: var(--s3) 0; }
   .card .field + .field, .card .field + .option, .card .option + .field { border-top: 1px solid var(--border); }
-  .card .credit-fields .field { padding: var(--s2) 0; border-top: 0; }
   .option .btn { flex: none; }
   .savebar { position: sticky; bottom: 0; z-index: 1; margin-top: var(--s5); border-top: 1px solid var(--border); background: var(--surface); }
   .savebar-inner { max-width: 980px; margin: 0 auto; padding: var(--s3) var(--s4); display: flex; align-items: center; justify-content: flex-end; gap: var(--s3); }
@@ -56,7 +55,7 @@
 
     <nav class="toc" aria-label="Sections">
       <a href="#sec-api">Claude API</a>
-      <a href="#sec-usage">Claude usage</a>
+      <a href="#sec-usage">Costs</a>
       <a href="#sec-translation">Translation</a>
       <a href="#sec-sites">Sites</a>
       <a href="#sec-look">Lettering &amp; speed</a>
@@ -92,30 +91,29 @@
       </section>
 
       <section class="card" id="sec-usage" aria-labelledby="h-usage">
-        <div class="sec-head"><h2 id="h-usage">Claude usage</h2><span class="source-badge">This browser</span></div>
-        <div id="cuCredit" class="credit" hidden>
-          <p class="credit-figure"><span id="cuCreditFigure"></span> <span id="cuCreditState" class="state-badge" hidden></span></p>
-          <div id="cuCreditMeter" class="meter" role="meter" aria-label="Monthly API credit used" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="meter-fill"></span></div>
-          <p id="cuCreditLeft" class="credit-left"></p>
-          <p id="cuCreditPace" class="hint"></p>
-        </div>
+        <div class="sec-head"><h2 id="h-usage">What translating costs</h2><span class="source-badge">This browser</span></div>
+        <p class="hint">Counted from Claude's own answers to this browser. Your phone and other browsers keep their own counts.</p>
         <div class="stats">
-          <div class="stat"><span class="stat-label">Today</span><span class="stat-value" id="cuTodayCost">$0</span><span class="stat-sub" id="cuTodaySub">No requests yet</span></div>
-          <div class="stat"><span class="stat-label" id="cuMonthLabel">This month</span><span class="stat-value" id="cuMonthCost">$0</span><span class="stat-sub" id="cuMonthSub">No requests yet</span></div>
+          <div class="stat"><span class="stat-label">Today</span><span class="stat-value" id="cuTodayCost">$0</span><span class="stat-sub" id="cuTodaySub">Nothing yet</span></div>
+          <div class="stat"><span class="stat-label" id="cuMonthLabel">This month</span><span class="stat-value" id="cuMonthCost">$0</span><span class="stat-sub" id="cuMonthSub">Nothing yet</span></div>
         </div>
-        <ul id="cuModels" class="model-rows" aria-label="This month by model"></ul>
-        <p id="cuLimits" class="hint" hidden></p>
-        <ul class="facts">
-          <li><b>Estimate:</b> tokens are exact for what this browser profile sent; the cost uses <a id="cuPriceLink" href="https://platform.claude.com/docs/en/about-claude/pricing" target="_blank" rel="noopener">Anthropic's prices</a> (checked <span id="cuChecked"></span>). The web app and your other browsers keep their own counts.</li>
-          <li><b>Exact bill:</b> the Claude Console's <a href="https://platform.claude.com/usage" target="_blank" rel="noopener">Usage</a> and <a href="https://platform.claude.com/cost" target="_blank" rel="noopener">Cost</a> pages.</li>
-          <li><b>Days</b> start at <span id="cuDayStart">midnight UTC</span> your time (midnight UTC), like Anthropic's usage reports.</li>
-        </ul>
-        <div class="credit-fields">
-          <div class="field"><label class="field-label" for="creditPlan">Monthly API credit</label><select id="creditPlan"></select></div>
-          <div class="field" id="creditCustomField" hidden><label class="field-label" for="creditCustom">Amount, USD a month</label><input id="creditCustom" type="number" min="0" step="1" inputmode="decimal" /></div>
-          <div class="field"><label class="field-label" for="creditRenews">Renews on</label><input id="creditRenews" type="date" /></div>
+        <ul id="cuModels" class="model-rows" aria-label="This month by model, with the cost per page"></ul>
+        <div class="usage-cap">
+          <p><b>Cap your spending on every device.</b> Set a monthly spend limit in the Claude Console (Billing → Spend limits). It covers everything that uses your key, and Claude stops there.</p>
+          <a class="btn small" href="https://platform.claude.com/settings/billing" target="_blank" rel="noopener">Open Billing</a>
         </div>
-        <p class="hint">Claude Max and Team plans include API credit each month (<a href="https://platform.claude.com/docs/en/about-claude/api-credits-for-subscribers" target="_blank" rel="noopener">Anthropic</a>). The Claude Console's <a href="https://platform.claude.com/settings/billing" target="_blank" rel="noopener">Billing page</a> shows it under Promotional credits with its expiry date: that's the renewal date to put here.</p>
+        <details class="usage-details">
+          <summary>Details</summary>
+          <ul class="facts">
+            <li><b>Today:</b> <span id="cuTodayTokens"></span></li>
+            <li><b>This month:</b> <span id="cuMonthTokens"></span></li>
+            <li id="cuLimits" hidden></li>
+            <li><b>Estimate:</b> tokens are exact; the cost uses <a id="cuPriceLink" href="https://platform.claude.com/docs/en/about-claude/pricing" target="_blank" rel="noopener">Anthropic's prices</a> (checked <span id="cuChecked"></span>). A page served from the cache costs nothing and isn't counted.</li>
+            <li><b>Exact bill:</b> the Claude Console's <a href="https://platform.claude.com/usage" target="_blank" rel="noopener">Usage</a> and <a href="https://platform.claude.com/cost" target="_blank" rel="noopener">Cost</a> pages.</li>
+            <li><b>Balance and credits</b> (including a plan's monthly API credit): the Console's <a href="https://platform.claude.com/settings/billing" target="_blank" rel="noopener">Billing page</a>. Anthropic has no way for apps to read them.</li>
+            <li><b>Days</b> start at <span id="cuDayStart">midnight UTC</span> your time (midnight UTC), like Anthropic's usage reports.</li>
+          </ul>
+        </details>
         <div class="row-end"><button id="cuClear" class="btn small danger" type="button">Clear usage history</button></div>
       </section>
 
@@ -199,7 +197,19 @@
 
       <section class="card" id="sec-about" aria-labelledby="h-about">
         <h2 id="h-about">About</h2>
-        <p class="about">Gytakusub is free software under the <a href="LICENSE" target="_blank">GNU AGPL v3</a> · <a href="https://github.com/gywreb/gytakusub" target="_blank" rel="noopener">source code</a> · <a href="THIRD_PARTY.md" target="_blank">third-party components</a></p>
+        <div class="option">
+          <span class="option-text"><span class="option-title">What is sent to Claude</span><span class="option-desc" id="consentDesc">Checking…</span></span>
+          <button id="consentBtn" class="btn" type="button" hidden></button>
+        </div>
+        <div class="option">
+          <span class="option-text"><span class="option-title">Access to websites</span><span class="option-desc" id="accessDesc">Checking…</span></span>
+          <button id="accessBtn" class="btn" type="button" hidden></button>
+        </div>
+        <div class="option">
+          <span class="option-text"><span class="option-title">Help</span><span class="option-desc">Report a problem or ask on <a href="https://github.com/gywreb/gytakusub/issues" target="_blank" rel="noopener">GitHub Issues</a>. Issues are public, so don't attach manga pages or debug reports there.</span></span>
+        </div>
+        <p class="about" style="padding-top: var(--s3); border-top: 1px solid var(--border)">Gytakusub is an independent project, not made by or affiliated with Anthropic. <a href="https://gywreb.github.io/gytakusub/privacy.html" target="_blank" rel="noopener">Privacy policy</a> · <a href="welcome.html" target="_blank">Setup guide</a></p>
+        <p class="about">Gytakusub <span id="version"></span> is free software under the <a href="LICENSE" target="_blank">GNU AGPL v3</a> · <a href="https://github.com/gywreb/gytakusub" target="_blank" rel="noopener">source code</a> · <a href="THIRD_PARTY.md" target="_blank">third-party components</a></p>
       </section>
     </main>
   </div>

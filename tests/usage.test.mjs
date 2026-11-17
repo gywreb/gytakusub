@@ -1,6 +1,6 @@
 // Claude usage accounting (extension/usage.js, shared with the web app): prices, costs,
 // the day-by-day log, rate-limit headers, and what API errors mean for the reader.
-import { PRICES, priceOf, tokensOf, costOf, limitsOf, addCall, totals, summary, modelKey, emptyLog, utcDay, KEEP_DAYS, fmtUsd, fmtTokens, explainApiError, creditAmount, creditStatus, creditWords, limitWords } from "../extension/usage.js";
+import { PRICES, priceOf, tokensOf, costOf, limitsOf, addCall, totals, summary, modelKey, emptyLog, utcDay, KEEP_DAYS, fmtUsd, fmtTokens, explainApiError, limitWords, addPage, usageView } from "../extension/usage.js";
 
 let passes = 0, failures = 0;
 const ok = (cond, name, extra = "") => { if (cond) { passes++; console.log("ok -", name); } else { failures++; console.log("not ok -", name, extra); } };
@@ -53,29 +53,6 @@ ok(limitsOf(new Headers()) === null && limitsOf(null) === null, "limitsOf: nothi
 const withLimits = addCall(emptyLog(), { model: "claude-sonnet-5-5", usage: {}, limits: l, at: t0 });
 ok(summary(withLimits, t0 + 60e3).limits?.requests.remaining === 49 && summary(withLimits, t0 + 6 * 60e3).limits === null, "rate-limit headroom is shown for five minutes, then it says nothing about now");
 
-// ---- the monthly API credit (Max 5x $100, Max 20x $200; refreshes each billing cycle) ----
-ok(creditAmount({ creditPlan: "max5x" }) === 100 && creditAmount({ creditPlan: "max20x" }) === 200 && creditAmount({ creditPlan: "custom", creditCustom: "250" }) === 250 && creditAmount({ creditPlan: "none" }) === 0 && creditAmount({}) === 0, "creditAmount: the plans' credit, a custom amount, or none");
-{
-  const at = Date.parse("2026-11-10T12:00:00Z");
-  let cl = emptyLog();
-  for (let d = 0; d < 7; d++) cl = addCall(cl, { model: "claude-sonnet-5-5", usage: { input_tokens: 1e6 }, at: at - d * 864e5 }); // $2 a day for 7 days (Nov 4–10)
-  cl = addCall(cl, { model: "claude-sonnet-5-5", usage: { input_tokens: 1e6 }, at: Date.parse("2026-11-01T12:00:00Z") }); // before this cycle (it started Nov 3)
-  const c = creditStatus(cl, { creditPlan: "max5x", creditRenews: "2026-12-03" }, at);
-  ok(c.amount === 100 && near(c.used, 14) && near(c.left, 86) && c.start.toISOString().slice(0, 10) === "2026-11-03" && c.renews.toISOString().slice(0, 10) === "2026-12-03", "creditStatus: spending since the cycle began (a month before the renewal)", JSON.stringify(c));
-  ok(near(c.pace, 2) && c.daysLeft === 23 && Math.abs(c.projected - (14 + 2 * 22.5)) < 1e-9 && c.runsOut === null, "creditStatus: the pace over the last 7 days and where it leads by the renewal");
-  const tight = creditStatus(cl, { creditPlan: "custom", creditCustom: 20, creditRenews: "2026-12-03" }, at);
-  ok(tight.runsOut && tight.runsOut.toISOString().slice(0, 10) === "2026-11-13", "creditStatus: at $2 a day, $6 left runs out in 3 days, before the renewal");
-  const rolled = creditStatus(cl, { creditPlan: "max5x", creditRenews: "2026-10-03" }, at);
-  ok(rolled.renews.toISOString().slice(0, 10) === "2026-12-03", "a renewal date in the past moves on by months");
-  const guess = creditStatus(cl, { creditPlan: "max5x" }, at);
-  ok(guess.guessedDate && guess.renews.toISOString().slice(0, 10) === "2026-12-01" && /probably renews/.test(creditWords(guess).left), "without a renewal date the calendar month is assumed, and said so");
-  ok(creditStatus(cl, { creditPlan: "none" }, at) === null, "no credit set: nothing to show");
-  const w = creditWords(c, (d) => d.toISOString().slice(5, 10));
-  ok(w.headline === "≈$14 of $100 used" && w.left === "≈$86 left · renews 12-03 (in 23 days)" && /\$2 a day\) you'll use ≈\$59 of it by then/.test(w.pace) && w.state === "", "creditWords: used, left, renewal and pace in plain words", JSON.stringify(w));
-  ok(creditWords(tight, (d) => d.toISOString().slice(5, 10)).state === "Runs out early" && /runs out around 11-13, before it renews/.test(creditWords(tight, (d) => d.toISOString().slice(5, 10)).pace), "creditWords: warns when it runs out before the renewal");
-  const spent = creditStatus(cl, { creditPlan: "custom", creditCustom: 10, creditRenews: "2026-12-03" }, at);
-  ok(creditWords(spent).state === "Used up" && /credits you bought.*requests stop until it renews/.test(creditWords(spent).pace), "creditWords: used up, and what that means");
-}
 {
   const lw = limitWords({ at: Date.parse("2026-11-10T03:00:00Z"), requests: { limit: 50, remaining: 47, reset: "2026-11-10T03:00:40Z" }, inputTokens: { limit: 40000, remaining: 36000, reset: "2026-11-10T03:00:50Z" }, outputTokens: null }, (t) => new Date(t).toISOString().slice(11, 19));
   ok(lw === "Speed limit (a minute's worth, refilling as you go): 47 of 50 requests, 36k of 40k input tokens left at 03:00:00. It's full again by 03:00:50.", "limitWords: the per-minute limit in plain words", lw);
@@ -102,6 +79,34 @@ const page = `| Claude Opus 5.5 | $4 / MTok | $5 / MTok | $8 / MTok | $0.20 / MT
 ok(priceRowsProblems(page).length === 0, "the price list matches the pricing page's rows", JSON.stringify(priceRowsProblems(page)));
 ok(priceRowsProblems(page.replace("| $10 / MTok |", "| $12 / MTok |")).length === 1, "a changed price is reported");
 ok(priceRowsProblems(page.replace(/^\| Claude Opus 5\.5 .*$/m, "")).length === 1, "a missing row is reported");
+
+// ---- pages: measured cost per page (a long page is several answers, one per slice) ----
+{
+  const at = Date.parse("2026-11-17T10:00:00Z");
+  const a = { input_tokens: 3000, output_tokens: 400 }, b = { input_tokens: 2500, output_tokens: 300 }, c = { input_tokens: 2000, output_tokens: 100 };
+  let l = emptyLog();
+  for (const u of [a, b]) l = addCall(l, { model: "claude-haiku-5-5", usage: u, at }); // a long page: two slices
+  l = addPage(l, { model: "claude-haiku-5-5", usages: [a, b], at });
+  l = addCall(l, { model: "claude-haiku-5-5", usage: c, at }); // a short page: one slice
+  l = addPage(l, { model: "claude-haiku-5-5", usages: [c], at });
+  l = addCall(l, { model: "claude-haiku-5-5", usage: c, at }); // a slice of a page that then failed: real spend, no page
+  const t = summary(l, at).today;
+  ok(t.requests === 4 && t.pages === 2 && near(t.pageCost, (5500 + 2000) * 0.1e-6 + (700 + 100) * 0.5e-6), "pages: counted once all slices answered, with their exact cost", JSON.stringify(t));
+  ok(near(t.cost - t.pageCost, 2000 * 0.1e-6 + 100 * 0.5e-6), "a failed page's answer is still spend, but not a page");
+  const v = usageView(l, at);
+  ok(v.today.sub === "2 pages" && v.today.tokens === "4 requests · 9.5k in · 900 out" && v.month.label === "November", "usageView: pages up front, requests and tokens as details", JSON.stringify(v.today));
+  ok(v.models[0].sub === `≈${fmtUsd(t.pageCost / 2)} a page · 2 pages` && v.models[0].cost === `≈${fmtUsd(t.cost)}`, "usageView: the measured cost per page", JSON.stringify(v.models[0]));
+  // a log from before pages were counted: requests only, no made-up per-page figure
+  let old = addCall(emptyLog(), { model: "claude-sonnet-5-5", usage: a, at });
+  const vo = usageView(old, at);
+  ok(vo.today.sub === "1 request" && vo.models[0].sub === "1 request" && !/a page/.test(vo.models[0].sub), "older logs: no per-page cost is guessed", JSON.stringify(vo.models[0]));
+  // an unknown model: pages without a price give no per-page figure
+  let un = addCall(emptyLog(), { model: "claude-future-9", usage: a, at });
+  un = addPage(un, { model: "claude-future-9", usages: [a], at });
+  const vu = usageView(un, at);
+  ok(vu.models[0].sub === "1 page" && vu.models[0].cost === "price unknown", "unpriced pages: counted, never priced", JSON.stringify(vu.models[0]));
+  ok(usageView(emptyLog(), at).today.sub === "Nothing yet" && usageView(emptyLog(), at).models.length === 0, "an empty log says so");
+}
 
 console.log(failures ? `USAGE TESTS FAILED (${failures} of ${failures + passes})` : `USAGE TESTS PASSED (${passes})`);
 process.exitCode = failures ? 1 : 0;

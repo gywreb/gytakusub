@@ -74,18 +74,16 @@ console.log(`API calls: ${JSON.stringify(calls)} status: ${JSON.stringify(status
 // Claude usage: each answer is logged; Settings shows today, the model and the rate-limit headroom
 await page.click("#btnSettings");
 await page.waitForSelector("#settings[open]");
-const cu = await page.evaluate(() => ({ cost: document.getElementById("cuTodayCost").textContent, sub: document.getElementById("cuTodaySub").textContent, models: document.getElementById("cuModels").textContent, limits: document.getElementById("cuLimits").textContent, progress: document.getElementById("progress").textContent }));
+const cu = await page.evaluate(() => ({ cost: document.getElementById("cuTodayCost").textContent, sub: document.getElementById("cuTodaySub").textContent, tokens: document.getElementById("cuTodayTokens").textContent, models: document.getElementById("cuModels").textContent, limits: document.getElementById("cuLimits").textContent, progress: document.getElementById("progress").textContent }));
 await page.screenshot({ path: path.join(out, "web-claude-usage.png"), fullPage: true });
-// the monthly API credit: choosing a plan and its renewal date shows what's used and left at once (before Save)
-await page.selectOption("#sCreditPlan", "max5x");
-const renew = new Date(Date.now() + 20 * 864e5).toISOString().slice(0, 10);
-await page.fill("#sCreditRenews", renew);
-const credit = await page.evaluate(() => ({ shown: !document.getElementById("cuCredit").hidden, figure: document.getElementById("cuCreditFigure").textContent, left: document.getElementById("cuCreditLeft").textContent }));
-if (!credit.shown || !/ of \$100 used$/.test(credit.figure) || !/left · renews .* \(in 20 days\)$/.test(credit.left)) fail("choosing Max 5x should show the credit used and left: " + JSON.stringify(credit));
+// no monthly-credit fields (removed in 2.7.0: nothing can read a balance); the Billing page is linked instead
+const billing = await page.evaluate(() => ({ fields: !!document.getElementById("sCreditPlan"), link: !!document.querySelector('a[href="https://platform.claude.com/settings/billing"]') }));
+if (billing.fields || !billing.link) fail("Settings should link the Console's Billing page and have no credit fields: " + JSON.stringify(billing));
 await page.keyboard.press("Escape");
 // the page's model is Haiku 5.5 by default: 1000 input + 200 output tokens = $0.0002 per answer
 const wantUsd = fmtUsd(calls.length * (1000 * 0.10 + 200 * 0.50) / 1e6);
-if (cu.cost !== `≈${wantUsd}` || !cu.sub.startsWith(`${calls.length} request${calls.length === 1 ? "" : "s"} · `) || !/Claude Haiku 5\.5/.test(cu.models)) fail(`Settings should show today's Claude usage (${calls.length} answers, ${wantUsd}): ${JSON.stringify(cu)}`);
+// one slice per page here: as many pages as answers, each measured at $0.0002
+if (cu.cost !== `≈${wantUsd}` || cu.sub !== `${calls.length} page${calls.length === 1 ? "" : "s"}` || !cu.tokens.startsWith(`${calls.length} request${calls.length === 1 ? "" : "s"} · `) || !/Claude Haiku 5\.5/.test(cu.models) || !cu.models.includes(`≈${fmtUsd(0.0002)} a page`)) fail(`Settings should show today's cost, pages and the cost per page (${calls.length} answers, ${wantUsd}): ${JSON.stringify(cu)}`);
 if (!/of 50 requests/.test(cu.limits)) fail("the rate-limit headroom from Claude's last answer should show: " + cu.limits);
 if (!/Claude today ≈/.test(cu.progress)) fail("the toolbar should show today's Claude cost: " + cu.progress);
 console.log("claude usage:", JSON.stringify(cu));
@@ -197,27 +195,20 @@ await page2.click('#chapterForm button[type="submit"]');
 await page2.waitForFunction(() => /⚠/.test(document.querySelector("#chapterInfo").textContent), null, { timeout: 30000 });
 const challengeMsg = await page2.textContent("#chapterInfo");
 if (!/checking your browser/i.test(challengeMsg)) fail("a bot-check site should be explained: " + challengeMsg);
-// the free allowance: this device's requests today, in the tab and in the manage panel
-const usage = await page2.textContent("#fetcherUsage");
-const used = Number(((/^≈([\d,]+) \/ 100,000 free today/.exec(usage) || [])[1] || "").replace(/,/g, ""));
-if (!(used >= 6)) fail("the tab should show today's requests from this device: " + usage);
-// the estimate counts the browser's permission checks (OPTIONS) too, so in Chromium it matches what the fetcher received
-const preflights = served.filter((r) => r.startsWith("OPTIONS")).length;
-if (used !== served.length || preflights < 4) fail(`the device count should match the requests the fetcher received, permission checks included: ${used} counted, ${served.length} received (${preflights} OPTIONS)`);
+// the free allowance without Cloudflare's count: only what this device sent, and no share of the
+// account's allowance (other devices and the browser's permission checks aren't visible from here)
+const chipDevice = await page2.textContent("#fetcherUsage");
+if (chipDevice !== "") fail("without Cloudflare's count the tab shouldn't show a share of the allowance: " + chipDevice);
+const sent = () => served.filter((r) => !r.startsWith("OPTIONS")).length; // what the app itself sent; OPTIONS are the browser's
 await page2.click("#btnFetcherManage");
-// opening the panel asks the fetcher for Cloudflare's count (/usage), itself one more request on this device
-// wait for that request to be counted in the chip and the meter (it lands a moment after the panel opens), rather than racing it
-const countNow = () => Number(((/^≈([\d,]+) \//.exec(document.querySelector("#fetcherUsage").textContent) || [])[1] || "").replace(/,/g, ""));
-await page2.waitForFunction((want) => {
-  const chip = Number(((/^≈([\d,]+) \//.exec(document.querySelector("#fetcherUsage").textContent) || [])[1] || "").replace(/,/g, ""));
-  return chip >= want && Number(document.querySelector("#usageMeter").getAttribute("aria-valuenow")) >= want;
-}, used + 1, { timeout: 10000 }).catch(() => {});
-const usedNow = await page2.evaluate(countNow);
-if (usedNow !== used + 1 || served.length !== usedNow) fail(`asking for the live count is a request too: ${used} → ${usedNow} (the fetcher received ${served.length})`);
-const meterNow = Number(await page2.getAttribute("#usageMeter", "aria-valuenow"));
+// opening the panel asks the fetcher for Cloudflare's count (/usage), itself one more request; wait for it to be counted
+await page2.waitForFunction((want) => Number(document.getElementById("usageCount").textContent.replace(/,/g, "")) >= want, sent(), { timeout: 10000 }).catch(() => {});
+const usedNow = Number((await page2.textContent("#usageCount")).replace(/,/g, ""));
+if (!(usedNow >= 7) || usedNow !== sent()) fail(`the device count should be exactly the requests this device sent: ${usedNow} counted, ${sent()} sent (${served.length - sent()} permission checks not counted)`);
 const usageNote = await page2.textContent("#usageNote");
+const deviceView = await page2.evaluate(() => ({ meter: document.getElementById("usageMeter").hidden, label: document.querySelector('[data-usage=device].muted')?.textContent }));
 await page2.screenshot({ path: path.join(out, "web-fetcher-manage.png"), fullPage: true });
-if (meterNow !== usedNow || !/2 chapters/.test(usageNote) || !/starts again at/.test(usageNote)) fail(`the manage panel's meter should show the same count (${meterNow} vs ${usedNow}) and the chapters opened: ${usageNote}`);
+if (!deviceView.meter || deviceView.label !== "requests sent from this device" || !/2 chapters opened/.test(usageNote) || !/starts again at/.test(usageNote)) fail(`the panel should show this device's count without a meter, and the chapters opened: ${JSON.stringify(deviceView)} ${usageNote}`);
 // without the analytics secrets on the Worker, the panel offers the live-count setup
 await page2.waitForSelector("#liveSetup", { state: "visible", timeout: 10000 }).catch(() => fail("a fetcher without the analytics secrets should offer the live-count setup"));
 if ((await page2.textContent("#usageSource")) !== "This device") fail("the device count should say it is this device's");

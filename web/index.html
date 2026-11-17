@@ -185,13 +185,13 @@
       <section class="mg-section" aria-labelledby="usageHead">
         <div class="sec-head"><h3 id="usageHead">Free allowance today</h3><span id="usageSource" class="source-badge"></span></div>
         <div class="usage">
-          <p class="usage-figure"><span id="usageCount">0</span> <span class="muted">of <span id="usageMax">100,000</span> requests</span> <span id="usageState" class="usage-state" hidden></span></p>
-          <div id="usageMeter" class="meter" role="meter" aria-labelledby="usageHead" aria-valuemin="0" aria-valuemax="100000" aria-valuenow="0"><span class="meter-fill"></span></div>
+          <p class="usage-figure"><span id="usageCount">0</span> <span class="muted" data-usage="live" hidden>of <span id="usageMax">100,000</span> requests</span><span class="muted" data-usage="device">requests sent from this device</span> <span id="usageState" class="usage-state" hidden></span></p>
+          <div id="usageMeter" class="meter" role="meter" data-usage="live" hidden aria-labelledby="usageHead" aria-valuemin="0" aria-valuemax="100000" aria-valuenow="0"><span class="meter-fill"></span></div>
           <p id="usageNote" class="muted small"></p>
         </div>
         <ul class="usage-facts small">
           <li><b>Free:</b> if it runs out, the fetcher stops until <span id="usageReset">the reset</span>. Nothing is charged.</li>
-          <li data-usage="device"><b>Estimate:</b> what this browser or app sent. Before each new page the browser asks the fetcher for permission, and Cloudflare counts that too, so a page costs 2 requests. The estimate counts both, and errs high rather than low. Your other devices and anyone with your connection link use the same allowance.</li>
+          <li data-usage="device"><b>Only this device:</b> the requests this browser or app sent today, counted as they're sent. The free 100,000 a day is for your whole Cloudflare account, and its count is higher: before a new page the browser also asks the fetcher for permission (Cloudflare counts that too, so a page is usually 2 requests), and your other devices and anyone with your connection link add theirs. So there's no meter here: set up the live count below to see the real total against the allowance.</li>
           <li data-usage="live" hidden><b>From Cloudflare:</b> every request to every Worker on your account today, the browser's permission checks included. Your browsers and the installed app show the same number.</li>
           <li data-usage="live" hidden><b>A few minutes behind:</b> Cloudflare adds requests to its count a few minutes after they happen. The count refreshes every minute while this tab is open, and each refresh is itself one request.</li>
           <li data-usage="device"><b>Cloudflare's own count:</b> <a href="https://dash.cloudflare.com/" target="_blank" rel="noopener">dash.cloudflare.com ↗</a> → Workers &amp; Pages → your Worker → Metrics, or set up the live count below.</li>
@@ -261,30 +261,29 @@
         <p id="sMsg" class="hint" role="status"></p>
       </section>
       <section class="group" aria-labelledby="sgUsage">
-        <div class="sec-head"><h3 id="sgUsage">Claude usage</h3><span class="source-badge">This browser</span></div>
-        <div id="cuCredit" class="credit" hidden>
-          <p class="credit-figure"><span id="cuCreditFigure"></span> <span id="cuCreditState" class="state-badge" hidden></span></p>
-          <div id="cuCreditMeter" class="meter" role="meter" aria-label="Monthly API credit used" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="meter-fill"></span></div>
-          <p id="cuCreditLeft" class="credit-left"></p>
-          <p id="cuCreditPace" class="hint"></p>
-        </div>
+        <div class="sec-head"><h3 id="sgUsage">What translating costs</h3><span class="source-badge">This browser</span></div>
+        <p class="hint">Counted from Claude's own answers to this browser. The extension and your other devices keep their own counts.</p>
         <div class="stats">
-          <div class="stat"><span class="stat-label">Today</span><span class="stat-value" id="cuTodayCost">$0</span><span class="stat-sub" id="cuTodaySub">No requests yet</span></div>
-          <div class="stat"><span class="stat-label" id="cuMonthLabel">This month</span><span class="stat-value" id="cuMonthCost">$0</span><span class="stat-sub" id="cuMonthSub">No requests yet</span></div>
+          <div class="stat"><span class="stat-label">Today</span><span class="stat-value" id="cuTodayCost">$0</span><span class="stat-sub" id="cuTodaySub">Nothing yet</span></div>
+          <div class="stat"><span class="stat-label" id="cuMonthLabel">This month</span><span class="stat-value" id="cuMonthCost">$0</span><span class="stat-sub" id="cuMonthSub">Nothing yet</span></div>
         </div>
-        <ul id="cuModels" class="model-rows" aria-label="This month by model"></ul>
-        <p id="cuLimits" class="hint" hidden></p>
-        <ul class="usage-facts small">
-          <li><b>Estimate:</b> tokens are exact for what this browser sent; the cost uses <a id="cuPriceLink" href="https://platform.claude.com/docs/en/about-claude/pricing" target="_blank" rel="noopener">Anthropic's prices ↗</a> (checked <span id="cuChecked"></span>). The extension and your other devices keep their own counts.</li>
-          <li><b>Exact bill:</b> the Claude Console's <a href="https://platform.claude.com/usage" target="_blank" rel="noopener">Usage ↗</a> and <a href="https://platform.claude.com/cost" target="_blank" rel="noopener">Cost ↗</a> pages.</li>
-          <li><b>Days</b> start at <span id="cuDayStart">midnight UTC</span> your time (midnight UTC), like Anthropic's usage reports.</li>
-        </ul>
-        <div class="credit-fields">
-          <label class="field">Monthly API credit <select id="sCreditPlan" name="credit-plan"></select></label>
-          <label class="field" id="sCreditCustomField" hidden>Amount, USD a month <input id="sCreditCustom" name="credit-amount" type="number" min="0" step="1" inputmode="decimal" /></label>
-          <label class="field">Renews on <input id="sCreditRenews" name="credit-renews" type="date" /></label>
+        <ul id="cuModels" class="model-rows" aria-label="This month by model, with the cost per page"></ul>
+        <div class="usage-cap">
+          <p><b>Cap your spending on every device.</b> Set a monthly spend limit in the Claude Console (Billing → Spend limits). It covers everything that uses your key, and Claude stops there.</p>
+          <a class="btn small" href="https://platform.claude.com/settings/billing" target="_blank" rel="noopener">Open Billing ↗</a>
         </div>
-        <p class="hint">Claude Max and Team plans include API credit each month (<a href="https://platform.claude.com/docs/en/about-claude/api-credits-for-subscribers" target="_blank" rel="noopener">Anthropic ↗</a>). The Claude Console's <a href="https://platform.claude.com/settings/billing" target="_blank" rel="noopener">Billing page ↗</a> shows it under Promotional credits with its expiry date: that's the renewal date to put here.</p>
+        <details class="usage-details">
+          <summary>Details</summary>
+          <ul class="usage-facts small">
+            <li><b>Today:</b> <span id="cuTodayTokens"></span></li>
+            <li><b>This month:</b> <span id="cuMonthTokens"></span></li>
+            <li id="cuLimits" hidden></li>
+            <li><b>Estimate:</b> tokens are exact; the cost uses <a id="cuPriceLink" href="https://platform.claude.com/docs/en/about-claude/pricing" target="_blank" rel="noopener">Anthropic's prices ↗</a> (checked <span id="cuChecked"></span>). A page you already translated costs nothing again and isn't counted.</li>
+            <li><b>Exact bill:</b> the Claude Console's <a href="https://platform.claude.com/usage" target="_blank" rel="noopener">Usage ↗</a> and <a href="https://platform.claude.com/cost" target="_blank" rel="noopener">Cost ↗</a> pages.</li>
+            <li><b>Balance and credits</b> (including a plan's monthly API credit): the Console's <a href="https://platform.claude.com/settings/billing" target="_blank" rel="noopener">Billing page ↗</a>. Anthropic has no way for apps to read them.</li>
+            <li><b>Days</b> start at <span id="cuDayStart">midnight UTC</span> your time (midnight UTC), like Anthropic's usage reports.</li>
+          </ul>
+        </details>
         <div class="row"><button type="button" id="cuClear" class="btn small danger">Clear usage history</button></div>
       </section>
       <section class="group" aria-labelledby="sgTranslate">

@@ -75,8 +75,12 @@ export function limitsOf(headers) {
 }
 
 // ---------- the log ----------
-// {v: 1, days: {"2026-11-10": {"claude-sonnet-5-5": {requests, input, output, read, write5m, write1h, cost, unpriced}}},
+// {v: 1, days: {"2026-11-10": {"claude-sonnet-5-5": {requests, input, output, read, write5m, write1h, cost, unpriced,
+//                                                    pages, pageCost, pagesUnpriced}}},
 //  limits: {at, model, requests, inputTokens, outputTokens} | null}
+// A request is one Claude answer; a long page can take several (one per slice). A page is
+// counted once all its slices are answered, with the exact cost of those answers (addPage), so
+// "per page" is measured, not guessed. Logs from before 2.7.0 have requests but no pages.
 // Days are UTC, like Anthropic's usage reports and the Console. 62 days are kept: this month and last.
 export const KEEP_DAYS = 62;
 export const utcDay = (t = Date.now()) => new Date(t).toISOString().slice(0, 10);
@@ -107,18 +111,38 @@ export function addCall(log, { model: reported, usage, limits = null, at = Date.
   return out;
 }
 
-/** Totals over a set of days: {requests, input, output, read, write, cost, unpriced, models:[{model,label,...}]} */
+/**
+ * A copy of `log` with one translated page added (pure): `usages` are the `usage` objects of all
+ * its slices' answers, which addCall has already counted as requests and cost. Pages served from
+ * the cache cost nothing and aren't counted.
+ */
+export function addPage(log, { model: reported, usages = [], at = Date.now() }) {
+  const model = modelKey(reported);
+  const out = { v: 1, days: { ...(log?.days || {}) }, limits: log?.limits || null };
+  const day = utcDay(at), d = { ...(out.days[day] || {}) };
+  const m = { requests: 0, input: 0, output: 0, read: 0, write5m: 0, write1h: 0, cost: 0, unpriced: 0, ...(d[model] || {}) };
+  const costs = usages.map((u) => costOf(model, u || {}));
+  m.pages = (m.pages || 0) + 1;
+  if (costs.some((c) => c == null)) m.pagesUnpriced = (m.pagesUnpriced || 0) + 1;
+  else m.pageCost = (m.pageCost || 0) + costs.reduce((a, b) => a + b, 0);
+  d[model] = m;
+  out.days[day] = d;
+  return out;
+}
+
+/** Totals over a set of days: {requests, input, output, read, write, cost, unpriced, pages, pageCost, pagesPriced, models:[{model,label,...}]} */
 export function totals(log, days) {
   const by = new Map();
   for (const day of days) for (const [model, m] of Object.entries(log?.days?.[day] || {})) {
-    const t = by.get(model) || { model, label: priceOf(model)?.label || model, requests: 0, input: 0, output: 0, read: 0, write: 0, cost: 0, unpriced: 0 };
+    const t = by.get(model) || { model, label: priceOf(model)?.label || model, requests: 0, input: 0, output: 0, read: 0, write: 0, cost: 0, unpriced: 0, pages: 0, pageCost: 0, pagesPriced: 0 };
     t.requests += m.requests; t.input += m.input; t.output += m.output; t.read += m.read; t.write += m.write5m + m.write1h;
     t.cost += m.cost; t.unpriced += m.unpriced;
+    t.pages += m.pages || 0; t.pageCost += m.pageCost || 0; t.pagesPriced += (m.pages || 0) - (m.pagesUnpriced || 0);
     by.set(model, t);
   }
   const models = [...by.values()].sort((a, b) => b.cost - a.cost || b.requests - a.requests);
   const sum = (k) => models.reduce((n, m) => n + m[k], 0);
-  return { requests: sum("requests"), input: sum("input"), output: sum("output"), read: sum("read"), write: sum("write"), cost: sum("cost"), unpriced: sum("unpriced"), models };
+  return { requests: sum("requests"), input: sum("input"), output: sum("output"), read: sum("read"), write: sum("write"), cost: sum("cost"), unpriced: sum("unpriced"), pages: sum("pages"), pageCost: sum("pageCost"), pagesPriced: sum("pagesPriced"), models };
 }
 
 /** Today (UTC) and this calendar month (UTC) so far. */
@@ -131,72 +155,11 @@ export function summary(log, at = Date.now()) {
   };
 }
 
-// ---------- the monthly API credit of a Max or Team plan ----------
-// Anthropic: Max 5x includes $100 and Max 20x $200 of Claude API credit a month (Team: up to $500,
-// pooled); the credit refreshes each billing cycle with no rollover, is spent before purchased
-// credits, and when it is gone (and nothing was bought) API requests stop until the next credit.
-// There is no API for the balance: the Console's Billing page shows the amount and expiry date.
-// So the reader tells the app the plan and the renewal date, and the app sets this browser's own
-// spending against it.
-export const CREDIT_SOURCE = "https://platform.claude.com/docs/en/about-claude/api-credits-for-subscribers";
-export const CREDIT_PLANS = [
-  { id: "none", label: "None, or I pay as I go", amount: 0 },
-  { id: "max5x", label: "Claude Max 5x: $100 a month", amount: 100 },
-  { id: "max20x", label: "Claude Max 20x: $200 a month", amount: 200 },
-  { id: "custom", label: "Team or another amount", amount: null },
-];
-
-/** The monthly credit in USD from settings {creditPlan, creditCustom}, or 0. */
-export function creditAmount(settings = {}) {
-  const plan = CREDIT_PLANS.find((p) => p.id === settings.creditPlan);
-  if (!plan) return 0;
-  return plan.amount ?? Math.max(0, Number(settings.creditCustom) || 0);
-}
-
-/**
- * This browser's spending against the monthly credit, or null when no credit is set.
- * {amount, used, left, share, start, renews, daysLeft, pace, projected, runsOut, guessedDate}
- * - The cycle ends on the renewal date the reader gave ("YYYY-MM-DD"; a past one moves on by
- *   months); without one, the calendar month is assumed (guessedDate: true).
- * - pace: USD a day over the last seven days of the cycle (fewer early in a cycle).
- * - runsOut: the day the credit would run out at that pace, if before the renewal.
- */
-export function creditStatus(log, settings, at = Date.now()) {
-  const amount = creditAmount(settings);
-  if (!amount) return null;
-  const now = new Date(at);
-  let renews = /^\d{4}-\d{2}-\d{2}$/.test(settings.creditRenews || "") ? new Date(settings.creditRenews + "T00:00:00Z") : null;
-  const guessedDate = !renews;
-  if (!renews) renews = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
-  while (renews <= now) renews = new Date(Date.UTC(renews.getUTCFullYear(), renews.getUTCMonth() + 1, renews.getUTCDate()));
-  const start = new Date(Date.UTC(renews.getUTCFullYear(), renews.getUTCMonth() - 1, renews.getUTCDate()));
-  const days = (from) => Object.keys(log?.days || {}).filter((d) => d >= utcDay(from) && d <= utcDay(at));
-  const used = totals(log, days(start)).cost;
-  const span = Math.min(7, Math.max(1, (at - start) / 864e5));
-  const pace = totals(log, days(Math.max(+start, at - span * 864e5))).cost / span;
-  const daysLeft = (renews - at) / 864e5;
-  const left = Math.max(0, amount - used);
-  const runsOutIn = pace > 0 ? left / pace : Infinity;
-  return {
-    amount, used, left, share: Math.min(1, used / amount), start, renews, daysLeft: Math.ceil(daysLeft), pace,
-    projected: used + pace * daysLeft, runsOut: used >= amount ? now : runsOutIn < daysLeft ? new Date(at + runsOutIn * 864e5) : null, guessedDate,
-  };
-}
-
-/** The credit in plain words: {headline, left, pace, state}. */
-export function creditWords(c, fmtDate = (d) => d.toLocaleDateString([], { month: "short", day: "numeric", timeZone: "UTC" })) {
-  const inDays = (n) => (n <= 1 ? "tomorrow" : `in ${n} days`);
-  const renew = `${c.guessedDate ? "probably renews" : "renews"} ${fmtDate(c.renews)} (${inDays(c.daysLeft)})`;
-  if (c.used >= c.amount) {
-    return { headline: `≈${fmtUsd(c.used)} of ${fmtUsd(c.amount)} used`, left: `Used up: ${renew}`, pace: "Claude now uses any credits you bought. With none left, requests stop until it renews.", state: "Used up" };
-  }
-  const pace = c.pace > 0
-    ? c.runsOut
-      ? `At this pace (≈${fmtUsd(c.pace)} a day) it runs out around ${fmtDate(c.runsOut)}, before it renews.`
-      : `At this pace (≈${fmtUsd(c.pace)} a day) you'll use ≈${fmtUsd(c.projected)} of it by then.`
-    : "Nothing spent in the last few days.";
-  return { headline: `≈${fmtUsd(c.used)} of ${fmtUsd(c.amount)} used`, left: `≈${fmtUsd(c.left)} left · ${renew}`, pace, state: c.runsOut ? "Runs out early" : c.share >= 0.8 ? "Almost used" : "" };
-}
+// No monthly-credit tracking: Anthropic has no way for an app to read a balance, plan or
+// promotional credit (the Usage & Cost Admin API reports usage and cost only, needs an Admin
+// key, and isn't available to individual Console accounts). A meter fed by this browser's own
+// records would overstate what's left whenever the web app or another browser also translates,
+// so the panel shows exact spend here and points to the Console's Billing page for the balance.
 
 /** The rate limit in plain words, or "" (headers from the last answer, at most five minutes old). */
 export function limitWords(limits, fmtTime = (t) => new Date(t).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })) {
@@ -214,6 +177,33 @@ export function limitWords(limits, fmtTime = (t) => new Date(t).toLocaleTimeStri
 // ---------- formatting ----------
 export const fmtTokens = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(n >= 1e7 ? 0 : 1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(n >= 1e4 ? 0 : 1)}k` : String(n));
 /** "$0.0042", "$0.12", "$3.40", "$100": small amounts keep two significant digits, so a cheap page doesn't read as $0.00. */
+/**
+ * What the usage panels show, in words, from this browser's log. Only measured numbers: what
+ * Claude's answers said they used, priced with PRICES; nothing about other devices, the balance
+ * or a plan (no app can read those).
+ * {today, month: {label, cost, sub, tokens}, models: [{label, cost, sub}], limits}
+ */
+export function usageView(log, at = Date.now()) {
+  const { today, month, limits } = summary(log, at);
+  const plural = (n, word) => `${n.toLocaleString()} ${word}${n === 1 ? "" : "s"}`;
+  const usd = (t) => (t.unpriced && !t.cost ? "—" : `${t.cost ? "≈" : ""}${fmtUsd(t.cost)}`);
+  const sub = (t) => (t.pages ? plural(t.pages, "page") : t.requests ? plural(t.requests, "request") : "Nothing yet");
+  const tokens = (t) => (t.requests ? `${plural(t.requests, "request")} · ${fmtTokens(t.input + t.read + t.write)} in · ${fmtTokens(t.output)} out` : "No requests yet");
+  const period = (t, label) => ({ label, cost: usd(t), sub: sub(t), tokens: tokens(t) });
+  return {
+    today: period(today, "Today"),
+    month: period(month, new Date(at).toLocaleDateString([], { month: "long", timeZone: "UTC" })),
+    models: month.models.map((m) => ({
+      label: m.label,
+      cost: m.unpriced && !m.cost ? "price unknown" : `≈${fmtUsd(m.cost)}`,
+      // per page only from pages whose every answer was priced; otherwise just what was sent
+      sub: m.pagesPriced ? `≈${fmtUsd(m.pageCost / m.pagesPriced)} a page · ${plural(m.pages, "page")}` : m.pages ? plural(m.pages, "page") : plural(m.requests, "request"),
+      tokens: `${m.label}: ${tokens(m)}`,
+    })),
+    limits: limitWords(limits),
+  };
+}
+
 export function fmtUsd(x) {
   if (!x) return "$0";
   if (Number.isInteger(x)) return `$${x}`;

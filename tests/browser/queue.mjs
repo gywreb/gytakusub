@@ -8,6 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
+import { extensionCopy, agree } from "./ext-copy.mjs";
 import { startMock } from "./mock-api.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -16,10 +17,7 @@ const extSrc = path.resolve(here, arg("--ext", "../../extension"));
 const out = arg("--out", "/tmp/gyt-queue"); fs.mkdirSync(out, { recursive: true });
 const PORT = 8788, PAGES = 14, MODEL_MS = 2500;
 
-const ext = fs.mkdtempSync(path.join(os.tmpdir(), "gyt-ext-"));
-fs.cpSync(extSrc, ext, { recursive: true });
-const pj = path.join(ext, "prompt.js");
-fs.writeFileSync(pj, fs.readFileSync(pj, "utf8").replace(/export const API_URL = "[^"]+"/, `export const API_URL = "http://127.0.0.1:${PORT}/v1/messages"`));
+const ext = extensionCopy(extSrc, { apiUrl: `http://127.0.0.1:${PORT}/v1/messages` });
 
 const pageImage = path.resolve(here, "../fixtures/demo-page.png");
 const { srv, calls, fetches } = await startMock(PORT, pageImage, { truth: pageImage.replace(/-page\.png$/, "-truth.json"), delayMs: MODEL_MS });
@@ -30,6 +28,7 @@ const context = await chromium.launchPersistentContext(profile, {
   viewport: { width: 1200, height: 900 },
 });
 const sw = context.serviceWorkers()[0] || (await context.waitForEvent("serviceworker"));
+await agree(sw);
 await sw.evaluate(async () => {
   await chrome.storage.sync.set({ enabled: true, enabledSites: ["127.0.0.1"], autoSites: ["127.0.0.1"], debugOverlay: true, useContext: false, includeSource: false, model: "claude-sonnet-5-5" });
   await chrome.storage.local.set({ apiKey: "sk-ant-test" });
@@ -50,11 +49,13 @@ await page.waitForTimeout(400); // auto-translate picks up the first pages
 
 // fling to the end: 600 px every 100 ms, like a fast wheel or a swipe
 const tScroll = Date.now();
+await page.evaluate(() => { window.__gaps = []; let last = 0; addEventListener("scroll", () => { const t = performance.now(); if (last) window.__gaps.push(Math.round(t - last)); last = t; }, { passive: true }); });
 for (;;) {
   const atEnd = await page.evaluate(() => { window.scrollBy(0, 600); return window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 2; });
   if (atEnd) break;
   await page.waitForTimeout(100);
 }
+const gaps = await page.evaluate(() => window.__gaps);
 const tStop = Date.now();
 const onScreenAtStop = await page.evaluate(() => [...document.images].filter((im) => { const r = im.getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight; }).map((im) => +im.id.slice(1)));
 const last = Math.max(...onScreenAtStop);
@@ -68,17 +69,19 @@ let state = await stateOf();
 while (state?.working && Date.now() - tStop < 120000) { await page.waitForTimeout(500); state = await stateOf(); }
 console.log(`at the end: ${state?.done} translated, ${state?.working} queued or in progress`);
 await page.screenshot({ path: path.join(out, "queue-stop.png") });
-await page.evaluate(() => window.scrollTo(0, 5 * 1032)); await page.waitForTimeout(300);
-await page.screenshot({ path: path.join(out, "queue-skipped.png") }); // a page flung past: left as it is
 
-// the worker's downloads only (the page loading its own images says Sec-Fetch-Dest: image)
+// the worker's downloads only (the page loading its own images says Sec-Fetch-Dest: image),
+// counted before the screenshot below scrolls back: auto-translate rightly picks those pages up then
 const fetched = [...new Set(fetches.filter((f) => f.dest !== "image").map((f) => Number(new URL(f.url, "http://x").searchParams.get("i"))).filter(Boolean))].sort((a, b) => a - b);
 const rendered = done.map((d) => d.i);
+const callsAtEnd = calls.length;
+await page.evaluate(() => window.scrollTo(0, 5 * 1032)); await page.waitForTimeout(150); // inside the 250 ms settle: nothing has started yet
+await page.screenshot({ path: path.join(out, "queue-skipped.png") }); // a page flung past: left as it is
 const lastDone = done.find((d) => d.i === last);
-console.log(`scrolled ${((tStop - tScroll) / 1000).toFixed(1)} s, on screen at the stop: ${onScreenAtStop.join(",")}`);
+console.log(`scrolled ${((tStop - tScroll) / 1000).toFixed(1)} s, on screen at the stop: ${onScreenAtStop.join(",")}; gaps between scroll events (ms): ${gaps.join(",")}`);
 console.log(`finished, in order: ${done.map((d) => `p${d.i}@${((d.t - t0) / 1000).toFixed(1)}s`).join(" ")}`);
 for (const d of done) console.log(`  p${d.i}: ${JSON.stringify(d.timing)}`);
-console.log(`page p${last} ready ${lastDone ? ((lastDone.t - tStop) / 1000).toFixed(1) + " s after the stop" : "never"}; Claude calls: ${calls.length}; image fetches: ${fetched.join(",")}`);
+console.log(`page p${last} ready ${lastDone ? ((lastDone.t - tStop) / 1000).toFixed(1) + " s after the stop" : "never"}; Claude calls: ${callsAtEnd}; image fetches: ${fetched.join(",")}`);
 
 let failures = 0;
 const fail = (m) => { failures++; console.log("FAIL: " + m); };
@@ -93,7 +96,7 @@ const skipped = Array.from({ length: PAGES }, (_, k) => k + 1).filter((i) => i >
 const touched = skipped.filter((i) => rendered.includes(i) || fetched.includes(i));
 if (touched.length) fail(`pages flung past were still worked on: ${touched.map((i) => "p" + i).join(",")}`);
 // one slice per page: every call to Claude belongs to a page that was translated
-if (calls.length !== new Set(rendered).size) fail(`${calls.length} Claude calls for ${new Set(rendered).size} translated pages: a page that was put back still cost tokens`);
+if (callsAtEnd !== new Set(rendered).size) fail(`${callsAtEnd} Claude calls for ${new Set(rendered).size} translated pages: a page that was put back still cost tokens`);
 console.log(failures ? `QUEUE TEST FAILED (${failures})` : "QUEUE TEST PASSED");
 process.exitCode = failures ? 1 : 0;
 await context.close(); srv.close(); fs.rmSync(ext, { recursive: true, force: true }); fs.rmSync(profile, { recursive: true, force: true });

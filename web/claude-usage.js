@@ -3,7 +3,7 @@
 // An installed app on a computer shares this storage with the browser it came from
 // (the same site), and open tabs see each other's updates. On iPhone and iPad a
 // Home Screen app has its own storage, so it keeps its own log.
-import { addCall, emptyLog } from "./usage.js";
+import { addCall, addPage, emptyLog } from "./usage.js";
 
 const KEY = "gytakusub.claudeUsage";
 const listeners = new Set();
@@ -21,6 +21,11 @@ function write(log) {
 /** Adds one Claude answer ({usage, model, limits} as callClaude returns them). */
 export function recordClaudeUsage(r) {
   if (r?.usage) write(addCall(readClaudeUsage(), { model: r.model, usage: r.usage, limits: r.limits }));
+}
+
+/** One page translated by Claude: all its slices answered (their requests are already counted). */
+export function recordClaudePage(answers) {
+  if (answers.length && answers.every((r) => r?.usage)) write(addPage(readClaudeUsage(), { model: answers[0].model, usages: answers.map((r) => r.usage) }));
 }
 
 export function clearClaudeUsage() { write(emptyLog()); }

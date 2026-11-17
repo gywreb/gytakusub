@@ -6,6 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
+import { extensionCopy, agree } from "./ext-copy.mjs";
 import { execFileSync } from "node:child_process";
 import { createCanvas, loadImage } from "canvas";
 import { startMock } from "./mock-api.mjs";
@@ -18,11 +19,8 @@ const pageImage = path.resolve(here, arg("--page", "../fixtures/demo-page.png"))
 const out = arg("--out", "/tmp/gyt-browser"); fs.mkdirSync(out, { recursive: true });
 const PORT = 8787;
 
-// Test copy of the extension pointed at the mock API (the product code is untouched).
-const ext = fs.mkdtempSync(path.join(os.tmpdir(), "gyt-ext-"));
-fs.cpSync(extSrc, ext, { recursive: true });
-const pj = path.join(ext, "prompt.js");
-fs.writeFileSync(pj, fs.readFileSync(pj, "utf8").replace(/export const API_URL = "[^"]+"/, `export const API_URL = "http://127.0.0.1:${PORT}/v1/messages"`));
+// Test copy of the extension pointed at the mock API, with site access (ext-copy.mjs).
+const ext = extensionCopy(extSrc, { apiUrl: `http://127.0.0.1:${PORT}/v1/messages` });
 // --segmenter <model.onnx>: ship a bubble segmentation model with the test copy, so
 // the service worker runs ONNX Runtime (CSP, wasm fetch, no dynamic import) for real.
 const segModel = arg("--segmenter", null);
@@ -46,6 +44,7 @@ const context = await chromium.launchPersistentContext(profile, {
 let sw = context.serviceWorkers()[0] || (await context.waitForEvent("serviceworker"));
 // the worker's own warnings (a GPU session that fails to start, a model that will not load)
 context.on("console", (m) => { if (m.type() === "warning" && /Gytakusub/.test(m.text())) console.log("  [worker]", m.text().slice(0, 300)); });
+await agree(sw);
 await sw.evaluate(async () => {
   await chrome.storage.sync.set({ enabled: true, enabledSites: ["127.0.0.1"], debugOverlay: true, peekOnHover: true, useContext: false, includeSource: false, model: "claude-sonnet-5-5" });
   await chrome.storage.local.set({ apiKey: "sk-ant-test" });
@@ -101,8 +100,8 @@ if (!process.argv.includes("--bad-boxes")) {
   await pop.waitForFunction(() => !document.getElementById("usageToday").hidden, null, { timeout: 5000 }).catch(() => {});
   const popupText = await pop.textContent("#usageToday"); await pop.close();
   const opt = await context.newPage(); await opt.goto(`chrome-extension://${extId}/options.html`);
-  await opt.waitForFunction(() => /request/.test(document.getElementById("cuTodaySub").textContent), null, { timeout: 5000 }).catch(() => {});
-  const optText = await opt.evaluate(() => [document.getElementById("cuTodayCost").textContent, document.getElementById("cuTodaySub").textContent, document.getElementById("cuModels").textContent, document.getElementById("cuLimits").textContent]);
+  await opt.waitForFunction(() => /page/.test(document.getElementById("cuTodaySub").textContent), null, { timeout: 5000 }).catch(() => {});
+  const optText = await opt.evaluate(() => [document.getElementById("cuTodayCost").textContent, document.getElementById("cuTodaySub").textContent, document.getElementById("cuModels").textContent, document.getElementById("cuLimits").textContent, document.getElementById("cuTodayTokens").textContent]);
   await opt.screenshot({ path: path.join(out, "options-usage.png"), fullPage: true });
   // the side nav stays on screen while the page scrolls, and marks the section in view
   await opt.setViewportSize({ width: 1280, height: 720 });
@@ -115,13 +114,16 @@ if (!process.argv.includes("--bad-boxes")) {
   await opt.click('.toc a[href="#sec-usage"]'); await opt.waitForTimeout(100);
   const navPicked = await opt.evaluate(() => document.querySelector('.toc a[aria-current]')?.textContent || null);
   // at the top it sits under the header; scrolled to the end it sticks 24 px from the top (--s5), whole
-  tocOk = navTop.current === "Claude API" && Math.abs(navEnd.top - 24) <= 1 && navEnd.bottom <= 720 && navEnd.current === "About" && navPicked === "Claude usage";
+  tocOk = navTop.current === "Claude API" && Math.abs(navEnd.top - 24) <= 1 && navEnd.bottom <= 720 && navEnd.current === "About" && navPicked === "Costs";
   console.log(`options nav: top ${JSON.stringify(navTop)}, scrolled to the end ${JSON.stringify(navEnd)}, after a click "${navPicked}"`);
   await opt.close();
   await page.bringToFront();
   // 1000 input + 200 output tokens per answer on Sonnet 5.5 ($2 / $10 per million) = $0.004
+  // every page here is one slice, so each page's measured cost is one answer's: $0.004 a page
   usageOk = m.requests === calls.length && Math.abs(m.cost - 0.004 * calls.length) < 1e-9 && log?.limits?.requests?.limit === 50
-    && popupText === `≈${fmtUsd(0.004 * calls.length)} today` && /Claude Sonnet 5\.5/.test(optText[2]) && /requests/.test(optText[3]);
+    && m.pages === calls.length && Math.abs(m.pageCost - 0.004 * calls.length) < 1e-9
+    && popupText === `≈${fmtUsd(0.004 * calls.length)} today` && /Claude Sonnet 5\.5/.test(optText[2]) && optText[2].includes(`≈${fmtUsd(0.004)} a page · ${calls.length} page`)
+    && optText[1] === `${calls.length} page${calls.length === 1 ? "" : "s"}` && optText[4].startsWith(`${calls.length} request`) && /requests/.test(optText[3]);
   console.log(`usage: ${m.requests} logged of ${calls.length} API calls, ≈$${m.cost}; popup "${popupText}"; options ${JSON.stringify(optText)}`);
 }
 

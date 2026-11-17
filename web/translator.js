@@ -3,7 +3,7 @@
 // and draws the text, mirroring the extension's service worker + content script.
 import { callClaude, mergeContext, apiHeaders, API_URL } from "./prompt.js";
 import { limitsOf, explainApiError } from "./usage.js";
-import { recordClaudeUsage } from "./claude-usage.js";
+import { recordClaudeUsage, recordClaudePage } from "./claude-usage.js";
 
 // every answer is logged as it arrives, so a page whose other slice fails still counts what it cost
 const callAndRecord = (settings, slice, ctx) => callClaude(settings, slice, ctx).then((r) => { recordClaudeUsage(r); return r; });
@@ -33,9 +33,6 @@ export const DEFAULT_SETTINGS = {
   uppercase: false,
   fontFamily: "",
   rtlSpreads: true,
-  creditPlan: "none", // a Max or Team plan's monthly Claude API credit (usage.js CREDIT_PLANS)
-  creditCustom: 0, // USD a month, for creditPlan "custom"
-  creditRenews: "", // YYYY-MM-DD, from the Console's Billing page
   fetcherUrl: "", // your chapter fetcher (fetcher/worker.js on Cloudflare), e.g. https://gytakusub.<you>.workers.dev
   fetcherKey: "", // its access key (the Worker's GYT_KEY secret)
   maxLongEdge: 1600,
@@ -45,7 +42,11 @@ export const DEFAULT_SETTINGS = {
 
 const SETTINGS_KEY = "gytakusub.settings";
 export function loadSettings() {
-  try { return { ...DEFAULT_SETTINGS, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}") }; }
+  try {
+    // creditPlan/creditCustom/creditRenews: the monthly-credit fields removed in 2.7.0 (see usage.js)
+    const { creditPlan, creditCustom, creditRenews, ...saved } = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}");
+    return { ...DEFAULT_SETTINGS, ...saved };
+  }
   catch { return { ...DEFAULT_SETTINGS }; }
 }
 export function saveSettings(s) {
@@ -74,6 +75,7 @@ export async function translateImage(img, settings, ctx = { terms: [], recent: [
   let results;
   try { results = await Promise.all(prep.slices.map((s) => callAndRecord(settings, s, ctx))); }
   catch (e) { rpc({ type: "drop", jobId: prep.jobId }).catch(() => {}); throw e; }
+  recordClaudePage(results);
   const terms = [];
   const usage = { input_tokens: 0, output_tokens: 0 };
   for (const r of results) { terms.push(...r.terms); if (r.usage) { usage.input_tokens += r.usage.input_tokens || 0; usage.output_tokens += r.usage.output_tokens || 0; } }

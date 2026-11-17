@@ -8,7 +8,7 @@
 // popup, Options page and in-page overlay, and the icons and fonts.
 const UI = [
   /^web\/[^/]+\.(html|css)$/, /^web\/app\.js$/, /^web\/manifest\.webmanifest$/, /^web\/icons\//,
-  /^extension\/[^/]+\.(html|css)$/, /^extension\/(popup|options|content)\.js$/, /^extension\/(icons|fonts)\//,
+  /^extension\/[^/]+\.(html|css)$/, /^extension\/(popup|options|content|welcome)\.js$/, /^extension\/(icons|fonts)\//,
 ];
 // An image in the description: Markdown ![…](…), an <img> tag, or a link to an image or a GitHub attachment.
 const IMAGE = /!\[[^\]]*\]\([^)]+\)|<img\s[^>]*src=|https:\/\/github\.com\/user-attachments\/assets\/|https?:\/\/\S+\.(png|jpe?g|gif|webp)\b/i;

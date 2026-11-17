@@ -1,0 +1,19 @@
+name: Idea or request
+description: Something Gytakusub could do better, or a site or language it should handle.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help
+      description: What you're trying to do, and what gets in the way today.
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where
+      options:
+        - Browser extension
+        - Web app
+        - Both
