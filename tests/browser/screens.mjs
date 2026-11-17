@@ -34,6 +34,7 @@ const READER = `<!doctype html><meta name="viewport" content="width=device-width
 const results = [];
 const check = (name, pass, detail = "") => { results.push({ name, pass: !!pass, detail }); console.log(`${pass ? "PASS" : "FAIL"}  ${name}${detail ? "  — " + detail : ""}`); };
 const rows = [];
+const rel0 = {}; // per density: each line's size / page width at the first size
 
 for (const dpr of DPRS) {
   const ext = extensionCopy(extDir, { apiUrl: `http://127.0.0.1:${PORT}/v1/messages` });
@@ -79,6 +80,15 @@ for (const dpr of DPRS) {
     rows.push(row); console.log(JSON.stringify(row));
     // never stretched (≥ 99% of the screen's pixels); at most 11% more (it shrinks lazily)
     if (!measureOnly) check(`${dpr}× at ${width} px: the overlay has the screen's pixels`, ratio >= 0.99 && ratio <= 1.11, `${got.join("×")} for ${want.join("×")}`);
+    if (!measureOnly) {
+      // the overlay sits exactly on the image's picture, and each line keeps its size relative to the page
+      const [a, b] = [rep.overlay.rect, rep.overlay.image];
+      const off = Math.max(...a.map((v, j) => Math.abs(v - b[j])));
+      check(`${dpr}× at ${width} px: the overlay sits on the picture`, off < 0.6, `off by ${off.toFixed(2)} px (${a.join(",")} vs ${b.join(",")})`);
+      const rel = sizes.map((v) => v / r.width);
+      if (!rel0[dpr]) rel0[dpr] = rel;
+      else { const worst = Math.max(...rel.map((v, j) => Math.abs(v / rel0[dpr][j] - 1))); check(`${dpr}× at ${width} px: every line keeps its size relative to the page`, worst < 0.03, `worst ${(worst * 100).toFixed(1)}%`); }
+    }
     // a crop of the biggest line, for review
     const sy = await page.evaluate(() => scrollY);
     const cx = r.left + (pl.rect.x - pl.letter) * s, cw = (pl.rect.w + 2 * pl.letter) * s, ch = (pl.rect.h + 2 * pl.letter) * s;

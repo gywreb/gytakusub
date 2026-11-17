@@ -18,7 +18,7 @@ The owner asked whether the translation adapts to every screen size. It had neve
 - **Pages far from the screen give their pixels back** (three screen-heights away) and are drawn again on return (within one). 2.10.0 kept a working-size canvas for every translated page.
 - **Erased areas at the page's own size**: `erase()` can hand back its mask; `finishPage` gets the page again at full size and inpaints each changed area there, with the mask resampled onto the full-size pixel grid by the exact affine map (`eraseFullSize`), so the patch lines up with the original to a fraction of a pixel. The erasing method itself (which pixels, how they are filled) is unchanged; replacing it is 2.12.0.
 - **A readable view**: a line drawn under 9 CSS px shows at 15 px beside its bubble while the pointer rests on it. The lettering itself can't grow, since it has to fit the bubble the artist drew.
-- **The web app renders at the page's own size**, capped at 16 million pixels (iOS Safari's canvas limit).
+- **The web app renders at the page's own size or the screen's, whichever is larger**, capped at 16 million pixels (iOS Safari's canvas limit), and redraws a page when unfolding, turning or widening needs more pixels. Its translation is part of the page image, so its position is exact at any size by construction; `tests/browser/web-screens.mjs` checks phone, foldable and tablet screens.
 - The debug report records the overlay: pixel ratio, backing size and each line's size on screen.
 
 ## Measured (`tests/browser/screens.mjs`, demo page and One Piece 1197 p.7)
@@ -29,7 +29,7 @@ The owner asked whether the translation adapts to every screen size. It had neve
 | Canvas pixels per screen pixel, 3× at 768 px | 0.50 | 1.00 |
 | After a resize | never redrawn | redrawn once it settles |
 | Lines under 9 px | unreadable | readable on hover |
-| Web app page size | 1129 × 1600 | 1200 × 1700 (the original's) |
+| Web app page size | 1129 × 1600 | the original's (1200 × 1700) or the screen's, if more |
 
 ## Not done here
 
