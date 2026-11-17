@@ -1,0 +1,818 @@
+{
+ "appDescription": {
+  "message": "Dịch trang manga và truyện tranh ngay trên mọi trang web, bằng khóa API Claude của chính bạn. Không cần tài khoản, không có máy chủ."
+ },
+ "cmdTranslate": {
+  "message": "Dịch mọi ảnh đang hiện trên màn hình"
+ },
+ "cmdToggle": {
+  "message": "Hiện / ẩn bản dịch trên trang này"
+ },
+ "popup_turn_gytakusub_on_or_off": {
+  "message": "Bật hoặc tắt Gytakusub trên mọi trang web"
+ },
+ "popup_enabled_arialabel": {
+  "message": "Bật Gytakusub"
+ },
+ "popup_finish_setting_up_gytakusub_see": {
+  "message": "<b>Hoàn tất thiết lập Gytakusub.</b> Xem những gì được gửi cho Claude, đồng ý, và cho phép đọc ảnh manga. Chỉ mất một phút."
+ },
+ "popup_openSetup": {
+  "message": "Thiết lập"
+ },
+ "popup_offNote": {
+  "message": "Gytakusub đang tắt trên mọi trang. Bật lại bằng công tắc phía trên; cài đặt của bạn vẫn được giữ."
+ },
+ "popup_no_claude_api_key_yet": {
+  "message": "Chưa có khóa API Claude."
+ },
+ "popup_openOptions2": {
+  "message": "Thêm khóa"
+ },
+ "popup_allow_gytakusub_to_read_manga": {
+  "message": "Cho phép Gytakusub đọc ảnh manga trên các trang web."
+ },
+ "popup_allowAccess": {
+  "message": "Cho phép truy cập"
+ },
+ "popup_translate": {
+  "message": "<span>Dịch các ảnh đang hiện</span><kbd id=\"kbdTranslate\">Alt+T</kbd>"
+ },
+ "popup_toggle_title": {
+  "message": "Ẩn / hiện bản dịch (Alt+Shift+T)"
+ },
+ "popup_toggle_arialabel": {
+  "message": "Ẩn hoặc hiện bản dịch"
+ },
+ "popup_siteHead": {
+  "message": "Trên <span id=\"host\">trang này</span>"
+ },
+ "popup_enable_here": {
+  "message": "Bật ở đây"
+ },
+ "popup_hover_button_and_keyboard_shortcuts": {
+  "message": "Nút khi rê chuột và phím tắt"
+ },
+ "popup_auto_translate_while_scrolling": {
+  "message": "Tự dịch khi cuộn"
+ },
+ "popup_sends_pages_to_claude_as": {
+  "message": "Gửi từng trang cho Claude khi bạn cuộn tới"
+ },
+ "popup_trHead": {
+  "message": "Dịch"
+ },
+ "popup_usageToday_title": {
+  "message": "Chi phí dịch hôm nay, đếm trên trình duyệt này (chi tiết trong Cài đặt)"
+ },
+ "popup_model": {
+  "message": "Mô hình"
+ },
+ "popup_model_hint_haiku": {
+  "message": "Nhanh nhất, rẻ nhất"
+ },
+ "popup_model_hint_sonnet": {
+  "message": "Cho trang dày chữ"
+ },
+ "popup_model_hint_opus": {
+  "message": "Tốt nhất, đắt nhất"
+ },
+ "popup_chapter_context": {
+  "message": "Ngữ cảnh chương"
+ },
+ "popup_names_recent_lines_for_continuity": {
+  "message": "Tên + câu gần đây, để dịch liền mạch"
+ },
+ "popup_openOptions": {
+  "message": "Tất cả cài đặt"
+ },
+ "popup_exportReport_title": {
+  "message": "Một tệp .zip gồm mọi trang đã dịch trong thẻ này: ảnh gốc, bản vẽ gỡ lỗi và JSON"
+ },
+ "popup_exportReport": {
+  "message": "Xuất báo cáo gỡ lỗi"
+ },
+ "popup_not_web_page": {
+  "message": "Không phải trang web."
+ },
+ "popup_no_access": {
+  "message": "Chưa được cho phép, nên Gytakusub không đọc được ảnh ở đây. Chọn Cho phép truy cập khi bạn sẵn sàng."
+ },
+ "popup_this_page": {
+  "message": "trang này"
+ },
+ "popup_state_excluded": {
+  "message": "{host} nằm trong danh sách trang bị tắt của bạn."
+ },
+ "popup_state_translated_one": {
+  "message": "Đã dịch {n}"
+ },
+ "popup_state_translated_other": {
+  "message": "Đã dịch {n}"
+ },
+ "popup_state_in_progress_one": {
+  "message": "{n} đang dịch"
+ },
+ "popup_state_in_progress_other": {
+  "message": "{n} đang dịch"
+ },
+ "popup_list_sep": {
+  "message": ","
+ },
+ "popup_state_hidden": {
+  "message": "(đang ẩn)"
+ },
+ "popup_not_active": {
+  "message": "Chưa bật trên trang này. Nút Dịch vẫn dùng được."
+ },
+ "popup_reload_tab": {
+  "message": "Tải lại thẻ để bật Gytakusub ở đây."
+ },
+ "popup_allow_above": {
+  "message": "Cho phép truy cập (ở trên) để dùng Gytakusub ở đây."
+ },
+ "popup_on": {
+  "message": "Bật"
+ },
+ "popup_off": {
+  "message": "Tắt"
+ },
+ "popup_toggle_title_key": {
+  "message": "Ẩn / hiện bản dịch ({key})"
+ },
+ "popup_preparing": {
+  "message": "Đang chuẩn bị…"
+ },
+ "popup_export_failed": {
+  "message": "Xuất thất bại: {error}"
+ },
+ "popup_report_downloaded_one": {
+  "message": "Đã tải báo cáo: {n} trang"
+ },
+ "popup_report_downloaded_other": {
+  "message": "Đã tải báo cáo: {n} trang"
+ },
+ "popup_usage_today": {
+  "message": "≈{cost} hôm nay"
+ },
+ "popup_usage_today_aria": {
+  "message": "Chi phí dịch hôm nay: khoảng {cost}. Mở chi tiết."
+ },
+ "welcome_set_up_gytakusub": {
+  "message": "Thiết lập Gytakusub"
+ },
+ "welcome_allSet": {
+  "message": "Xong rồi. Mở một chương manga và bấm biểu tượng Gytakusub trên thanh công cụ."
+ },
+ "welcome_h_consent": {
+  "message": "Gytakusub gửi gì, và gửi đi đâu"
+ },
+ "welcome_only_the_pages_you_translate": {
+  "message": "<b>Chỉ những trang bạn dịch.</b> Một trang chỉ được đọc khi bạn bấm nút Dịch của nó, nhấn <kbd class=\"kbdTranslate\">Alt+T</kbd>, hoặc bật tự dịch cho trang web đó. Các trang khác không bao giờ bị đọc."
+ },
+ "welcome_sent_to_anthropic_s_claude": {
+  "message": "<b>Gửi tới Claude API của Anthropic, bằng khóa của bạn:</b> ảnh của trang (cắt thành từng đoạn), bảng thuật ngữ và hướng dẫn riêng của bạn, cùng các tên đã dịch trong cùng chương. Khi bật <i>Ngữ cảnh chương</i> (bật sẵn, trừ khi bạn tắt), gửi thêm vài câu thoại gần nhất."
+ },
+ "welcome_nowhere_else_gytakusub_has_no": {
+  "message": "<b>Không gửi đi đâu khác.</b> Gytakusub không có máy chủ, không có tài khoản và không thu thập số liệu. Khóa của bạn ở lại trong trình duyệt này. Cài đặt và bảng thuật ngữ đi theo tính năng đồng bộ của trình duyệt, nếu bạn dùng nó (khóa cũng vậy, chỉ khi bạn chọn điều đó trong Cài đặt)."
+ },
+ "welcome_anthropic_handles_what_you_send": {
+  "message": "Anthropic xử lý những gì bạn gửi theo <a href=\"https://www.anthropic.com/legal/commercial-terms\" target=\"_blank\" rel=\"noopener\">điều khoản thương mại</a> và <a href=\"https://www.anthropic.com/legal/privacy\" target=\"_blank\" rel=\"noopener\">chính sách quyền riêng tư</a> của họ. <a href=\"https://gywreb.github.io/gytakusub/privacy.html\" target=\"_blank\" rel=\"noopener\">Chính sách quyền riêng tư</a> của Gytakusub có đầy đủ chi tiết."
+ },
+ "welcome_agree": {
+  "message": "Tôi đồng ý"
+ },
+ "welcome_h_key": {
+  "message": "Thêm khóa API Claude của bạn"
+ },
+ "welcome_create_a_key_in_the": {
+  "message": "Tạo khóa trong <a href=\"https://platform.claude.com/\" target=\"_blank\" rel=\"noopener\">Claude Console</a> (API keys), rồi dán vào cài đặt của Gytakusub. Khóa ở lại trong trình duyệt này và chỉ được gửi tới Anthropic."
+ },
+ "welcome_h_access": {
+  "message": "Cho phép Gytakusub đọc ảnh manga"
+ },
+ "welcome_manga_sites_usually_load_their": {
+  "message": "Các trang manga thường tải ảnh từ máy chủ khác, nên Gytakusub xin quyền truy cập mọi trang web. Trình duyệt sẽ hỏi bạn xác nhận, với câu chữ chuẩn của nó: tiện ích có thể <i>đọc và thay đổi mọi dữ liệu của bạn trên mọi trang web</i>. Gytakusub chỉ dùng quyền này để tải ảnh bạn dịch: nó chỉ đọc một trang khi bạn dịch, chỉ tự chạy trên những trang bạn bật tự dịch, và không thay đổi gì trên trang ngoài việc vẽ bản dịch lên ảnh."
+ },
+ "welcome_allow": {
+  "message": "Cho phép truy cập"
+ },
+ "welcome_h_use": {
+  "message": "Cách dịch"
+ },
+ "welcome_open_a_chapter_on_a": {
+  "message": "Mở một chương trên trang manga."
+ },
+ "welcome_click_the_gytakusub_icon_in": {
+  "message": "Bấm biểu tượng Gytakusub trên thanh công cụ. Nếu không thấy, mở menu hình mảnh ghép và ghim Gytakusub."
+ },
+ "welcome_turn_on_enable_here_for": {
+  "message": "Bật công tắc <b>Bật ở đây</b> để có nút Dịch trên từng trang, hoặc <b>Tự dịch khi cuộn</b>. Hoặc chỉ cần nhấn <kbd class=\"kbdTranslate\">Alt+T</kbd> để dịch những gì đang hiện."
+ },
+ "welcome_h_cost": {
+  "message": "Chi phí"
+ },
+ "welcome_you_pay_anthropic_for_what": {
+  "message": "Bạn trả cho Anthropic theo mức dùng, từ số dư trong Claude Console. Mô hình mặc định, Haiku 5.5, có giá bằng 1/20 Sonnet 5.5 (<a href=\"https://platform.claude.com/docs/en/about-claude/pricing\" target=\"_blank\" rel=\"noopener\">bảng giá của Anthropic</a>). Sau khi dịch vài trang, <b>Cài đặt → Chi phí dịch</b> cho biết mỗi trang tốn bao nhiêu, đếm từ chính câu trả lời của Claude cho trình duyệt này."
+ },
+ "welcome_to_cap_your_spending_on": {
+  "message": "Để giới hạn chi tiêu trên mọi thiết bị, đặt hạn mức chi hằng tháng ở <a href=\"https://platform.claude.com/settings/billing\" target=\"_blank\" rel=\"noopener\">trang Billing</a> của Console (Spend limits). Claude sẽ dừng ở đó."
+ },
+ "welcome_h_help": {
+  "message": "Trợ giúp"
+ },
+ "welcome_found_a_problem_or_have": {
+  "message": "Gặp lỗi hoặc có ý tưởng? <a href=\"https://github.com/gywreb/gytakusub/issues\" target=\"_blank\" rel=\"noopener\">Mở issue trên GitHub</a>. Issue là công khai, nên đừng đính kèm trang manga hay báo cáo gỡ lỗi ở đó."
+ },
+ "welcome_gytakusub_is_an_independent_open": {
+  "message": "Gytakusub là dự án độc lập, mã nguồn mở. Không do Anthropic làm ra, bảo trợ hay liên kết.<br /><a href=\"https://github.com/gywreb/gytakusub\" target=\"_blank\" rel=\"noopener\">Mã nguồn</a> · <a href=\"https://gywreb.github.io/gytakusub/privacy.html\" target=\"_blank\" rel=\"noopener\">Chính sách quyền riêng tư</a>"
+ },
+ "welcome_lede": {
+  "message": "Gytakusub dịch manga, manhwa và truyện tranh trên những trang web bạn chọn, bằng khóa API Claude của chính bạn. Ba bước là xong."
+ },
+ "welcome_lede_update": {
+  "message": "Giờ Gytakusub sẽ hỏi trước khi đọc bất kỳ trang nào. Hãy xem những gì được gửi đi và đồng ý để tiếp tục dịch."
+ },
+ "welcome_state_agreed": {
+  "message": "Đã đồng ý"
+ },
+ "welcome_state_key": {
+  "message": "Đã lưu khóa"
+ },
+ "welcome_state_allowed": {
+  "message": "Đã cho phép"
+ },
+ "welcome_hint_agreed": {
+  "message": "Bạn đã đồng ý ngày {date}. Bạn có thể rút lại bất cứ lúc nào trong Cài đặt → Giới thiệu."
+ },
+ "welcome_hint_not_agreed": {
+  "message": "Không có gì được gửi cho tới khi bạn đồng ý. Bạn có thể rút lại bất cứ lúc nào trong Cài đặt → Giới thiệu."
+ },
+ "welcome_change_key": {
+  "message": "Đổi khóa"
+ },
+ "welcome_open_settings": {
+  "message": "Mở cài đặt"
+ },
+ "welcome_hint_access_remove": {
+  "message": "Bạn có thể gỡ quyền này bất cứ lúc nào trong Cài đặt → Giới thiệu, hoặc ở trang tiện ích của trình duyệt."
+ },
+ "welcome_hint_agree_first": {
+  "message": "Hãy đồng ý ở bước 1 trước."
+ },
+ "welcome_not_allowed": {
+  "message": "Chưa được cho phép. Gytakusub không đọc được ảnh manga cho tới khi bạn cho phép."
+ },
+ "welcome_translate_shortcut": {
+  "message": "phím tắt Dịch"
+ },
+ "welcome_translate_into": {
+  "message": "Dịch trang sang"
+ },
+ "welcome_language_hint": {
+  "message": "Các trang của chính Gytakusub cũng theo ngôn ngữ này, nếu đã có bản dịch. Thêm ngôn ngữ khác: Cài đặt → Dịch."
+ },
+ "opt_gytakusub_settings": {
+  "message": "Cài đặt Gytakusub"
+ },
+ "opt_changes_apply_after_you_save": {
+  "message": "Thay đổi có hiệu lực sau khi bạn lưu."
+ },
+ "opt_sections": {
+  "message": "Mục"
+ },
+ "opt_claude_api": {
+  "message": "Claude API"
+ },
+ "opt_costs": {
+  "message": "Chi phí"
+ },
+ "opt_translation": {
+  "message": "Dịch"
+ },
+ "opt_sites": {
+  "message": "Trang web"
+ },
+ "opt_lettering_speed": {
+  "message": "Chữ & tốc độ"
+ },
+ "opt_troubleshooting": {
+  "message": "Gỡ lỗi"
+ },
+ "opt_about": {
+  "message": "Giới thiệu"
+ },
+ "opt_h_api": {
+  "message": "Claude API"
+ },
+ "opt_gytakusub_sends_pages_to_claude": {
+  "message": "Gytakusub gửi trang cho Claude bằng khóa của chính bạn."
+ },
+ "opt_api_key": {
+  "message": "Khóa API"
+ },
+ "opt_testKey": {
+  "message": "Lưu & thử"
+ },
+ "opt_apiKeyHint": {
+  "message": "Tạo khóa tại <a href=\"https://platform.claude.com/\" target=\"_blank\" rel=\"noopener\">platform.claude.com</a> → Settings → API keys. Chi phí được tính vào tài khoản Console đó, tách riêng với gói đăng ký Claude (gói Max, Ultra và Team có kèm tín dụng API hằng tháng)."
+ },
+ "opt_sync_the_key_to_my": {
+  "message": "Đồng bộ khóa sang các trình duyệt khác của tôi"
+ },
+ "opt_keeps_it_in_browser_sync": {
+  "message": "Lưu khóa trong đồng bộ của trình duyệt thay vì chỉ trên thiết bị này"
+ },
+ "opt_model": {
+  "message": "Mô hình"
+ },
+ "opt_claude_haiku_5_5_fastest": {
+  "message": "Claude Haiku 5.5 — nhanh nhất, rẻ nhất"
+ },
+ "opt_claude_sonnet_5_5_better": {
+  "message": "Claude Sonnet 5.5 — tốt hơn với trang dày chữ / chữ cách điệu"
+ },
+ "opt_claude_opus_5_5_best": {
+  "message": "Claude Opus 5.5 — chất lượng cao nhất, đắt nhất"
+ },
+ "opt_h_usage": {
+  "message": "Chi phí dịch"
+ },
+ "opt_this_browser": {
+  "message": "Trình duyệt này"
+ },
+ "opt_counted_from_claude_s_own": {
+  "message": "Đếm từ chính câu trả lời của Claude cho trình duyệt này. Điện thoại và các trình duyệt khác của bạn tự đếm riêng."
+ },
+ "opt_today": {
+  "message": "Hôm nay"
+ },
+ "opt_cuModels_arialabel": {
+  "message": "Tháng này theo mô hình, kèm chi phí mỗi trang"
+ },
+ "opt_cap_your_spending_on_every": {
+  "message": "<b>Giới hạn chi tiêu trên mọi thiết bị.</b> Đặt hạn mức chi hằng tháng trong Claude Console (Billing → Spend limits). Hạn mức áp dụng cho mọi thứ dùng khóa của bạn, và Claude sẽ dừng ở đó."
+ },
+ "opt_open_billing": {
+  "message": "Mở Billing"
+ },
+ "opt_details": {
+  "message": "Chi tiết"
+ },
+ "opt_today_2": {
+  "message": "<b>Hôm nay:</b> <span id=\"cuTodayTokens\"></span>"
+ },
+ "opt_this_month": {
+  "message": "<b>Tháng này:</b> <span id=\"cuMonthTokens\"></span>"
+ },
+ "opt_estimate_tokens_are_exact_the": {
+  "message": "<b>Ước tính:</b> số token là chính xác; chi phí tính theo <a id=\"cuPriceLink\" href=\"https://platform.claude.com/docs/en/about-claude/pricing\" target=\"_blank\" rel=\"noopener\">bảng giá của Anthropic</a> (kiểm tra ngày <span id=\"cuChecked\"></span>). Trang lấy từ bộ nhớ đệm không tốn phí và không được tính."
+ },
+ "opt_exact_bill_the_claude_console": {
+  "message": "<b>Hóa đơn chính xác:</b> các trang <a href=\"https://platform.claude.com/usage\" target=\"_blank\" rel=\"noopener\">Usage</a> và <a href=\"https://platform.claude.com/cost\" target=\"_blank\" rel=\"noopener\">Cost</a> của Claude Console."
+ },
+ "opt_balance_and_credits_including_a": {
+  "message": "<b>Số dư và tín dụng</b> (kể cả tín dụng API hằng tháng của gói đăng ký): <a href=\"https://platform.claude.com/settings/billing\" target=\"_blank\" rel=\"noopener\">trang Billing</a> của Console. Anthropic không cho ứng dụng nào đọc các số này."
+ },
+ "opt_days_start_at_midnight_utc": {
+  "message": "<b>Một ngày</b> bắt đầu lúc <span id=\"cuDayStart\">nửa đêm UTC</span> theo giờ của bạn (nửa đêm UTC), giống báo cáo sử dụng của Anthropic."
+ },
+ "opt_cuClear": {
+  "message": "Xóa lịch sử sử dụng"
+ },
+ "opt_h_translation": {
+  "message": "Dịch"
+ },
+ "opt_target_language": {
+  "message": "Ngôn ngữ đích"
+ },
+ "opt_glossary": {
+  "message": "Bảng thuật ngữ"
+ },
+ "opt_glossary_placeholder": {
+  "message": "Mỗi dòng một mục, ví dụ\nGojo Satoru = Satoru Gojo\n呪術 = chú thuật"
+ },
+ "opt_glossaryHint": {
+  "message": "Tên và thuật ngữ mô hình phải dùng đúng y như vậy. Những tên nó tự tìm ra sẽ được tự động ghi nhớ theo từng thẻ."
+ },
+ "opt_extra_instructions": {
+  "message": "Hướng dẫn thêm"
+ },
+ "opt_chapter_context": {
+  "message": "Ngữ cảnh chương"
+ },
+ "opt_sends_names_and_the_last": {
+  "message": "Gửi kèm các tên và khoảng 40 câu đã dịch gần nhất của thẻ này với mỗi trang: dịch liền mạch hơn, thêm khoảng 400 token đầu vào"
+ },
+ "opt_also_transcribe_the_original_text": {
+  "message": "Chép lại cả văn bản gốc"
+ },
+ "opt_slower_slightly_more_careful_reading": {
+  "message": "Chậm hơn, đọc kỹ hơn một chút; hữu ích khi gỡ lỗi"
+ },
+ "opt_uppercase_lettering": {
+  "message": "Chữ IN HOA"
+ },
+ "opt_comic_book_style": {
+  "message": "Kiểu truyện tranh"
+ },
+ "opt_h_sites": {
+  "message": "Trang web"
+ },
+ "opt_one_hostname_per_line_the": {
+  "message": "Mỗi dòng một tên miền. Cách dễ nhất để thêm một trang: mở trang đó và dùng các công tắc trong cửa sổ của thanh công cụ."
+ },
+ "opt_enabled_sites": {
+  "message": "Trang đã bật"
+ },
+ "opt_enabledSitesHint": {
+  "message": "Nút khi rê chuột và phím tắt chỉ hoạt động ở đây. Ở mọi nơi khác Gytakusub nằm im cho tới khi bạn dùng nút trên thanh công cụ hoặc phím tắt."
+ },
+ "opt_auto_translate_while_scrolling": {
+  "message": "Tự dịch khi cuộn"
+ },
+ "opt_autoSitesHint": {
+  "message": "Mỗi trang cuộn vào màn hình sẽ tự động được gửi cho Claude, nên chỉ thêm những trang web bạn muốn dùng token. Các trang này cũng được tính là đã bật."
+ },
+ "opt_disabled_sites": {
+  "message": "Trang bị tắt"
+ },
+ "opt_excludedSitesHint": {
+  "message": "Gytakusub luôn tắt trên các trang này và tên miền con của chúng."
+ },
+ "opt_h_look": {
+  "message": "Chữ & tốc độ"
+ },
+ "opt_font_family": {
+  "message": "Phông chữ"
+ },
+ "opt_fontHint": {
+  "message": "Để trống để dùng phông chữ đi kèm (Comic Neue Bold), hoặc ghi tên bất kỳ phông nào đã cài trên thiết bị này, ví dụ <code>\"Bangers\"</code>."
+ },
+ "opt_use_the_graphics_card_webgpu": {
+  "message": "Dùng card đồ họa (WebGPU)"
+ },
+ "opt_finds_text_and_bubbles_much": {
+  "message": "Tìm chữ và khung thoại nhanh hơn nhiều. Chỉ tắt nếu trang ra sai hoặc trình duyệt hoạt động bất thường."
+ },
+ "opt_peek_at_the_original_while": {
+  "message": "Xem nhanh bản gốc khi rê chuột"
+ },
+ "opt_hovering_a_translated_bubble_shows": {
+  "message": "Rê chuột lên khung thoại đã dịch sẽ hiện chữ gốc. Để sửa một câu, nhấp đúp vào khung thoại đó."
+ },
+ "opt_h_debug": {
+  "message": "Gỡ lỗi"
+ },
+ "opt_debug_overlay": {
+  "message": "Lớp phủ gỡ lỗi"
+ },
+ "opt_draws_the_detected_regions_and": {
+  "message": "Vẽ các vùng và vùng chữ phát hiện được lên trang đã dịch, và thêm nút Báo cáo vào thanh rê chuột để tải ảnh gốc, bản vẽ gỡ lỗi và JSON của trang đó. \"Xuất báo cáo gỡ lỗi\" trong cửa sổ thanh công cụ làm việc này cho mọi trang đã dịch trong thẻ."
+ },
+ "opt_translation_cache": {
+  "message": "Bộ nhớ đệm bản dịch"
+ },
+ "opt_translated_pages_the_names_found": {
+  "message": "Các trang đã dịch, tên tìm được theo từng thẻ và các câu bạn đã sửa được giữ cho tới khi đóng trình duyệt. Xóa chúng để dịch lại từ đầu."
+ },
+ "opt_clearCache": {
+  "message": "Xóa bộ nhớ đệm"
+ },
+ "opt_h_about": {
+  "message": "Giới thiệu"
+ },
+ "opt_what_is_sent_to_claude": {
+  "message": "Những gì được gửi cho Claude"
+ },
+ "opt_access_to_websites": {
+  "message": "Quyền truy cập trang web"
+ },
+ "opt_help": {
+  "message": "Trợ giúp"
+ },
+ "opt_report_a_problem_or_ask": {
+  "message": "Báo lỗi hoặc đặt câu hỏi trên <a href=\"https://github.com/gywreb/gytakusub/issues\" target=\"_blank\" rel=\"noopener\">GitHub Issues</a>. Issue là công khai, nên đừng đính kèm trang manga hay báo cáo gỡ lỗi ở đó."
+ },
+ "opt_gytakusub_is_an_independent_project": {
+  "message": "Gytakusub là dự án độc lập, không do Anthropic làm ra hay liên kết. <a href=\"https://gywreb.github.io/gytakusub/privacy.html\" target=\"_blank\" rel=\"noopener\">Chính sách quyền riêng tư</a> · <a href=\"welcome.html\" target=\"_blank\">Hướng dẫn thiết lập</a>"
+ },
+ "opt_gytakusub_is_free_software_under": {
+  "message": "Gytakusub <span id=\"version\"></span> là phần mềm tự do theo giấy phép <a href=\"LICENSE\" target=\"_blank\">GNU AGPL v3</a> · <a href=\"https://github.com/gywreb/gytakusub\" target=\"_blank\" rel=\"noopener\">mã nguồn</a> · <a href=\"THIRD_PARTY.md\" target=\"_blank\">thành phần bên thứ ba</a>"
+ },
+ "opt_save": {
+  "message": "Lưu"
+ },
+ "opt_unsaved": {
+  "message": "Có thay đổi chưa lưu"
+ },
+ "opt_loading": {
+  "message": "Cài đặt vẫn đang tải."
+ },
+ "opt_saved": {
+  "message": "Đã lưu."
+ },
+ "opt_confirm_clear_usage": {
+  "message": "Xóa lịch sử sử dụng của trình duyệt này? Claude Console vẫn giữ hồ sơ riêng của nó."
+ },
+ "opt_usage_cleared": {
+  "message": "Đã xóa lịch sử sử dụng."
+ },
+ "opt_show": {
+  "message": "Hiện"
+ },
+ "opt_hide": {
+  "message": "Ẩn"
+ },
+ "opt_testing": {
+  "message": "Đang thử…"
+ },
+ "opt_no_key_saved": {
+  "message": "Chưa lưu khóa API nào."
+ },
+ "opt_key_works": {
+  "message": "Khóa hoạt động. Mô hình {model} đã trả lời."
+ },
+ "opt_key_failed": {
+  "message": "Thử khóa thất bại: {error}"
+ },
+ "opt_confirm_clear_cache": {
+  "message": "Xóa các trang đã dịch, tên tìm được theo từng thẻ và các câu bạn đã sửa?"
+ },
+ "opt_cache_cleared_unsaved": {
+  "message": "Đã xóa bộ nhớ đệm. Các thay đổi khác của bạn chưa được lưu."
+ },
+ "opt_cache_cleared": {
+  "message": "Đã xóa bộ nhớ đệm."
+ },
+ "opt_save_title": {
+  "message": "Lưu ({key})"
+ },
+ "opt_consent_agreed": {
+  "message": "Bạn đã đồng ý ngày {date}. Nếu rút lại, sẽ không gửi thêm gì cho tới khi bạn đồng ý lần nữa."
+ },
+ "opt_consent_none": {
+  "message": "Chưa đồng ý, nên không có gì được gửi. Mở trang thiết lập để xem những gì được gửi và đồng ý."
+ },
+ "opt_withdraw": {
+  "message": "Rút lại"
+ },
+ "opt_review_agree": {
+  "message": "Xem và đồng ý"
+ },
+ "opt_access_allowed": {
+  "message": "Đã cho phép: Gytakusub có thể đọc ảnh trên các trang web, chỉ khi bạn dịch hoặc trên các trang đã bật tự dịch."
+ },
+ "opt_access_none": {
+  "message": "Chưa cho phép: Gytakusub không đọc được ảnh manga cho tới khi bạn cho phép."
+ },
+ "opt_remove_access": {
+  "message": "Gỡ quyền truy cập"
+ },
+ "opt_allow_access": {
+  "message": "Cho phép truy cập"
+ },
+ "opt_agree_first": {
+  "message": "Hãy đồng ý với những gì được gửi trước"
+ },
+ "opt_cannot_read": {
+  "message": "Không đọc được cài đặt: {error}"
+ },
+ "opt_other_language": {
+  "message": "Khác…"
+ },
+ "opt_other_language_label": {
+  "message": "Ngôn ngữ khác"
+ },
+ "opt_other_language_placeholder": {
+  "message": "Nhập tên ngôn ngữ"
+ },
+ "opt_target_language_hint": {
+  "message": "Các trang của chính Gytakusub cũng theo ngôn ngữ này, nếu đã có bản dịch (nếu không thì tiếng Anh)."
+ },
+ "content_translate_image": {
+  "message": "Dịch ảnh này"
+ },
+ "content_toggle_image": {
+  "message": "Hiện hoặc ẩn bản dịch"
+ },
+ "content_report": {
+  "message": "Báo cáo"
+ },
+ "content_report_title": {
+  "message": "Tải báo cáo chẩn đoán cho trang này (ảnh gốc, bản vẽ gỡ lỗi, JSON)"
+ },
+ "content_report_aria": {
+  "message": "Tải báo cáo chẩn đoán"
+ },
+ "content_continue": {
+  "message": "Tiếp tục"
+ },
+ "content_btn_translating": {
+  "message": "Đang dịch…"
+ },
+ "content_btn_queued": {
+  "message": "Đang chờ…"
+ },
+ "content_btn_redo": {
+  "message": "↻ Dịch lại"
+ },
+ "content_btn_translate": {
+  "message": "Dịch"
+ },
+ "content_btn_show": {
+  "message": "Hiện"
+ },
+ "content_btn_hide": {
+  "message": "Ẩn"
+ },
+ "content_lines_one": {
+  "message": "{n} câu"
+ },
+ "content_lines_other": {
+  "message": "{n} câu"
+ },
+ "content_nothing_translated": {
+  "message": "Chưa có gì được dịch trên trang này"
+ },
+ "content_preparing_report_one": {
+  "message": "Đang chuẩn bị báo cáo cho {n} trang…"
+ },
+ "content_preparing_report_other": {
+  "message": "Đang chuẩn bị báo cáo cho {n} trang…"
+ },
+ "content_report_done_one": {
+  "message": "Đã tải báo cáo ({n} trang, {size} MB). Báo cáo có chứa ảnh của trang: chỉ chia sẻ riêng, đừng đăng trong issue công khai."
+ },
+ "content_report_done_other": {
+  "message": "Đã tải báo cáo ({n} trang, {size} MB). Báo cáo có chứa ảnh của trang: chỉ chia sẻ riêng, đừng đăng trong issue công khai."
+ },
+ "content_paused_one": {
+  "message": "Đã tạm dừng tự dịch sau {n} trang trong 10 phút, để giữ chi tiêu Claude của bạn trong tầm kiểm soát."
+ },
+ "content_paused_other": {
+  "message": "Đã tạm dừng tự dịch sau {n} trang trong 10 phút, để giữ chi tiêu Claude của bạn trong tầm kiểm soát."
+ },
+ "content_error": {
+  "message": "Gytakusub: {error}"
+ },
+ "content_edit_dialog": {
+  "message": "Sửa bản dịch"
+ },
+ "content_translated_line": {
+  "message": "Câu đã dịch"
+ },
+ "content_save": {
+  "message": "Lưu"
+ },
+ "content_cancel": {
+  "message": "Hủy"
+ },
+ "content_teach": {
+  "message": "Dạy bảng thuật ngữ (áp dụng cho các trang sau)"
+ },
+ "content_original_term_ph": {
+  "message": "thuật ngữ gốc"
+ },
+ "content_original_term": {
+  "message": "Thuật ngữ gốc"
+ },
+ "content_translation_ph": {
+  "message": "bản dịch"
+ },
+ "content_translation": {
+  "message": "Bản dịch"
+ },
+ "content_add": {
+  "message": "Thêm"
+ },
+ "content_fill_both": {
+  "message": "Điền cả thuật ngữ gốc lẫn bản dịch của nó"
+ },
+ "content_glossary_updated": {
+  "message": "Đã cập nhật bảng thuật ngữ: {from} = {to}"
+ },
+ "content_glossary_added": {
+  "message": "Đã thêm vào bảng thuật ngữ: {from} = {to}"
+ },
+ "content_off_here": {
+  "message": "Gytakusub đang tắt trên trang web này"
+ },
+ "content_no_untranslated": {
+  "message": "Không có ảnh chưa dịch nào trên màn hình"
+ },
+ "content_translating_n_one": {
+  "message": "Đang dịch {n} ảnh…"
+ },
+ "content_translating_n_other": {
+  "message": "Đang dịch {n} ảnh…"
+ },
+ "bg_bad_data": {
+  "message": "Dữ liệu ảnh không được hỗ trợ"
+ },
+ "bg_too_large": {
+  "message": "Ảnh quá lớn (hơn {mb} MB)"
+ },
+ "bg_bad_url": {
+  "message": "Địa chỉ ảnh không hợp lệ"
+ },
+ "bg_http_only": {
+  "message": "Chỉ hỗ trợ ảnh http(s)"
+ },
+ "bg_no_access": {
+  "message": "Gytakusub cần bạn cho phép đọc ảnh từ {host}. Mở cửa sổ Gytakusub trên thanh công cụ và chọn Cho phép truy cập."
+ },
+ "bg_download_failed": {
+  "message": "Không tải được ảnh từ {host} ({error})"
+ },
+ "bg_fetch_status": {
+  "message": "Không lấy được ảnh ({status})"
+ },
+ "bg_not_image": {
+  "message": "Địa chỉ đó không trả về ảnh"
+ },
+ "bg_off": {
+  "message": "Gytakusub đang tắt (cửa sổ trên thanh công cụ)."
+ },
+ "bg_not_set_up": {
+  "message": "Gytakusub chưa được thiết lập: mở cửa sổ Gytakusub trên thanh công cụ và chọn Thiết lập, để xem những gì được gửi cho Claude và đồng ý."
+ },
+ "bg_no_key": {
+  "message": "Chưa có khóa API. Mở cài đặt của Gytakusub và dán khóa API Claude của bạn."
+ },
+ "bg_gloss_both": {
+  "message": "Cần cả bản gốc lẫn bản dịch"
+ },
+ "bg_report_needs_debug": {
+  "message": "Bật lớp phủ gỡ lỗi trong Cài đặt để xuất báo cáo"
+ },
+ "usage_pages_one": {
+  "message": "{n} trang"
+ },
+ "usage_pages_other": {
+  "message": "{n} trang"
+ },
+ "usage_requests_one": {
+  "message": "{n} yêu cầu"
+ },
+ "usage_requests_other": {
+  "message": "{n} yêu cầu"
+ },
+ "usage_nothing_yet": {
+  "message": "Chưa có gì"
+ },
+ "usage_tokens": {
+  "message": "{requests} · {in} vào · {out} ra"
+ },
+ "usage_no_requests": {
+  "message": "Chưa có yêu cầu nào"
+ },
+ "usage_today": {
+  "message": "Hôm nay"
+ },
+ "usage_price_unknown": {
+  "message": "chưa rõ giá"
+ },
+ "usage_per_page": {
+  "message": "≈{cost} mỗi trang · {pages}"
+ },
+ "usage_limit_requests": {
+  "message": "{left} / {limit} yêu cầu"
+ },
+ "usage_limit_input": {
+  "message": "{left} / {limit} token đầu vào"
+ },
+ "usage_limit_output": {
+  "message": "{left} / {limit} token đầu ra"
+ },
+ "usage_list_sep": {
+  "message": ","
+ },
+ "usage_limits": {
+  "message": "Giới hạn tốc độ (lượng dùng trong một phút, tự nạp lại dần): còn {parts} lúc {time}."
+ },
+ "usage_limits_full": {
+  "message": "Đầy lại trước {time}."
+ },
+ "api_err_spend_cap": {
+  "message": "Tài khoản Claude của bạn đã chạm mức chi tối đa hằng tháng. API tạm dừng tới 00:00 UTC ngày 1, trừ khi bạn xin nâng hạn mức trong Claude Console."
+ },
+ "api_err_rate_limit": {
+  "message": "Tài khoản của bạn tạm thời chạm giới hạn tốc độ của Claude. Đợi một phút rồi dịch lại; dịch ít trang cùng lúc hơn cũng giúp ích."
+ },
+ "api_err_credit": {
+  "message": "Số dư tín dụng Claude của bạn quá thấp. Nạp thêm (hoặc kiểm tra tín dụng API hằng tháng của gói đăng ký) trong Claude Console, mục Billing."
+ },
+ "api_err_spend_limit": {
+  "message": "Tài khoản Claude của bạn đã chạm hạn mức chi bạn đặt. Nâng hạn mức trong Claude Console, mục Billing → Spend limits."
+ },
+ "api_err_key": {
+  "message": "Claude từ chối khóa API. Kiểm tra lại trong Cài đặt, hoặc tạo khóa mới trong Claude Console."
+ },
+ "api_err_overloaded": {
+  "message": "Claude đang quá tải. Thử lại sau một phút."
+ },
+ "opt_customPrompt_placeholder": {
+  "message": "ví dụ: Giữ giọng văn thân mật. Dịch từ tượng thanh (SFX) thành từ tượng thanh tiếng Việt."
+ }
+}

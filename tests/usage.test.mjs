@@ -1,5 +1,8 @@
 // Claude usage accounting (extension/usage.js, shared with the web app): prices, costs,
 // the day-by-day log, rate-limit headers, and what API errors mean for the reader.
+import fs from "node:fs";
+import { loadLocale } from "../extension/i18n.js";
+await loadLocale("en", async (p) => JSON.parse(fs.readFileSync(new URL(`../extension/${p}`, import.meta.url), "utf8")));
 import { PRICES, priceOf, tokensOf, costOf, limitsOf, addCall, totals, summary, modelKey, emptyLog, utcDay, KEEP_DAYS, fmtUsd, fmtTokens, explainApiError, limitWords, addPage, usageView } from "../extension/usage.js";
 
 let passes = 0, failures = 0;

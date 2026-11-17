@@ -1,0 +1,818 @@
+{
+ "appDescription": {
+  "message": "어떤 사이트에서든 만화 페이지를 바로 번역하세요. 내 Claude API 키만 있으면 됩니다. 계정도 서버도 없습니다."
+ },
+ "cmdTranslate": {
+  "message": "화면에 보이는 모든 이미지 번역"
+ },
+ "cmdToggle": {
+  "message": "이 페이지의 번역 보이기 / 숨기기"
+ },
+ "popup_turn_gytakusub_on_or_off": {
+  "message": "모든 사이트에서 Gytakusub 켜기 또는 끄기"
+ },
+ "popup_enabled_arialabel": {
+  "message": "Gytakusub 켜짐"
+ },
+ "popup_finish_setting_up_gytakusub_see": {
+  "message": "<b>Gytakusub 설정을 마무리하세요.</b> Claude에 무엇을 보내는지 확인하고 동의한 뒤, 만화 이미지를 읽도록 허용하세요. 1분이면 됩니다."
+ },
+ "popup_openSetup": {
+  "message": "설정하기"
+ },
+ "popup_offNote": {
+  "message": "Gytakusub이 모든 사이트에서 꺼져 있습니다. 위 스위치로 다시 켜세요. 설정은 그대로 유지됩니다."
+ },
+ "popup_no_claude_api_key_yet": {
+  "message": "아직 Claude API 키가 없습니다."
+ },
+ "popup_openOptions2": {
+  "message": "키 추가"
+ },
+ "popup_allow_gytakusub_to_read_manga": {
+  "message": "Gytakusub이 웹사이트의 만화 이미지를 읽도록 허용하세요."
+ },
+ "popup_allowAccess": {
+  "message": "접근 허용"
+ },
+ "popup_translate": {
+  "message": "<span>보이는 이미지 번역</span><kbd id=\"kbdTranslate\">Alt+T</kbd>"
+ },
+ "popup_toggle_title": {
+  "message": "번역 숨기기 / 보이기 (Alt+Shift+T)"
+ },
+ "popup_toggle_arialabel": {
+  "message": "번역 숨기기 또는 보이기"
+ },
+ "popup_siteHead": {
+  "message": "<span id=\"host\">이 사이트</span>에서"
+ },
+ "popup_enable_here": {
+  "message": "여기서 사용"
+ },
+ "popup_hover_button_and_keyboard_shortcuts": {
+  "message": "마우스를 올리면 나오는 버튼과 키보드 단축키"
+ },
+ "popup_auto_translate_while_scrolling": {
+  "message": "스크롤하면서 자동 번역"
+ },
+ "popup_sends_pages_to_claude_as": {
+  "message": "스크롤하는 대로 페이지를 Claude에 보냅니다"
+ },
+ "popup_trHead": {
+  "message": "번역"
+ },
+ "popup_usageToday_title": {
+  "message": "오늘 번역에 든 비용, 이 브라우저에서 집계 (자세한 내용은 설정에서)"
+ },
+ "popup_model": {
+  "message": "모델"
+ },
+ "popup_model_hint_haiku": {
+  "message": "가장 빠르고 저렴함"
+ },
+ "popup_model_hint_sonnet": {
+  "message": "글이 많은 페이지용"
+ },
+ "popup_model_hint_opus": {
+  "message": "최고 품질, 가장 비쌈"
+ },
+ "popup_chapter_context": {
+  "message": "회차 맥락"
+ },
+ "popup_names_recent_lines_for_continuity": {
+  "message": "이름과 최근 대사로 번역의 일관성 유지"
+ },
+ "popup_openOptions": {
+  "message": "전체 설정"
+ },
+ "popup_exportReport_title": {
+  "message": "이 탭에서 번역한 모든 페이지를 담은 .zip: 원본 이미지, 디버그 렌더, JSON"
+ },
+ "popup_exportReport": {
+  "message": "디버그 보고서 내보내기"
+ },
+ "popup_not_web_page": {
+  "message": "웹 페이지가 아닙니다."
+ },
+ "popup_no_access": {
+  "message": "허락 없이는 Gytakusub이 여기 이미지를 읽을 수 없습니다. 준비되면 접근 허용을 선택하세요."
+ },
+ "popup_this_page": {
+  "message": "이 페이지"
+ },
+ "popup_state_excluded": {
+  "message": "{host}은(는) 사용 안 함 사이트 목록에 있습니다."
+ },
+ "popup_state_translated_one": {
+  "message": "{n}개 번역됨"
+ },
+ "popup_state_translated_other": {
+  "message": "{n}개 번역됨"
+ },
+ "popup_state_in_progress_one": {
+  "message": "{n}개 진행 중"
+ },
+ "popup_state_in_progress_other": {
+  "message": "{n}개 진행 중"
+ },
+ "popup_list_sep": {
+  "message": ","
+ },
+ "popup_state_hidden": {
+  "message": "(숨김)"
+ },
+ "popup_not_active": {
+  "message": "이 페이지에서는 아직 활성화되지 않았습니다. 번역은 그래도 됩니다."
+ },
+ "popup_reload_tab": {
+  "message": "탭을 새로고침하면 여기서 Gytakusub이 활성화됩니다."
+ },
+ "popup_allow_above": {
+  "message": "여기서 Gytakusub을 쓰려면 위에서 접근을 허용하세요."
+ },
+ "popup_on": {
+  "message": "켜짐"
+ },
+ "popup_off": {
+  "message": "꺼짐"
+ },
+ "popup_toggle_title_key": {
+  "message": "번역 숨기기 / 보이기 ({key})"
+ },
+ "popup_preparing": {
+  "message": "준비 중…"
+ },
+ "popup_export_failed": {
+  "message": "내보내기 실패: {error}"
+ },
+ "popup_report_downloaded_one": {
+  "message": "보고서를 내려받았습니다: {n}페이지"
+ },
+ "popup_report_downloaded_other": {
+  "message": "보고서를 내려받았습니다: {n}페이지"
+ },
+ "popup_usage_today": {
+  "message": "오늘 ≈{cost}"
+ },
+ "popup_usage_today_aria": {
+  "message": "오늘 번역에 든 비용: 약 {cost}. 자세히 보기."
+ },
+ "welcome_set_up_gytakusub": {
+  "message": "Gytakusub 설정하기"
+ },
+ "welcome_allSet": {
+  "message": "준비가 끝났습니다. 만화 한 화를 열고 툴바의 Gytakusub 아이콘을 클릭하세요."
+ },
+ "welcome_h_consent": {
+  "message": "Gytakusub이 무엇을, 어디로 보내는지"
+ },
+ "welcome_only_the_pages_you_translate": {
+  "message": "<b>번역하는 페이지만 보냅니다.</b> 페이지의 번역 버튼을 클릭하거나, <kbd class=\"kbdTranslate\">Alt+T</kbd>를 누르거나, 그 사이트에서 자동 번역을 켰을 때만 페이지를 읽습니다. 다른 페이지는 절대 읽지 않습니다."
+ },
+ "welcome_sent_to_anthropic_s_claude": {
+  "message": "<b>내 키로 Anthropic의 Claude API에 보내는 것:</b> 페이지 이미지(몇 조각으로 나눔), 내 용어집과 맞춤 지시, 같은 화에서 이미 번역한 이름. <i>회차 맥락</i>이 켜져 있으면(끄지 않는 한 켜짐) 최근 대사 몇 줄도 보냅니다."
+ },
+ "welcome_nowhere_else_gytakusub_has_no": {
+  "message": "<b>그 밖의 곳으로는 보내지 않습니다.</b> Gytakusub에는 서버도, 계정도, 분석 도구도 없습니다. 키는 이 브라우저에 보관됩니다. 브라우저 동기화를 쓴다면 설정과 용어집이 동기화됩니다(키는 설정에서 선택한 경우에만)."
+ },
+ "welcome_anthropic_handles_what_you_send": {
+  "message": "Anthropic은 보낸 내용을 자사의 <a href=\"https://www.anthropic.com/legal/commercial-terms\" target=\"_blank\" rel=\"noopener\">상업 약관</a>과 <a href=\"https://www.anthropic.com/legal/privacy\" target=\"_blank\" rel=\"noopener\">개인정보처리방침</a>에 따라 처리합니다. 자세한 내용은 Gytakusub의 <a href=\"https://gywreb.github.io/gytakusub/privacy.html\" target=\"_blank\" rel=\"noopener\">개인정보처리방침</a>을 보세요."
+ },
+ "welcome_agree": {
+  "message": "동의합니다"
+ },
+ "welcome_h_key": {
+  "message": "Claude API 키 추가"
+ },
+ "welcome_create_a_key_in_the": {
+  "message": "<a href=\"https://platform.claude.com/\" target=\"_blank\" rel=\"noopener\">Claude Console</a>(API keys)에서 키를 만든 다음 Gytakusub 설정에 붙여 넣으세요. 키는 이 브라우저에 보관되고 Anthropic에만 전송됩니다."
+ },
+ "welcome_h_access": {
+  "message": "Gytakusub이 만화 이미지를 읽도록 허용"
+ },
+ "welcome_manga_sites_usually_load_their": {
+  "message": "만화 사이트는 보통 다른 이미지 서버에서 페이지를 불러오기 때문에, Gytakusub은 모든 웹사이트에 대한 접근을 요청합니다. 브라우저는 정해진 문구로 확인을 요청합니다. 확장 프로그램이 <i>모든 웹사이트에서 내 데이터를 모두 읽고 변경</i>할 수 있다는 내용입니다. Gytakusub은 이 권한을 번역할 이미지를 내려받는 데만 씁니다. 페이지는 번역할 때만 읽고, 자동 번역을 켠 사이트에서만 스스로 동작하며, 이미지 위에 번역을 그리는 것 말고는 페이지를 전혀 바꾸지 않습니다."
+ },
+ "welcome_allow": {
+  "message": "접근 허용"
+ },
+ "welcome_h_use": {
+  "message": "번역하는 방법"
+ },
+ "welcome_open_a_chapter_on_a": {
+  "message": "만화 사이트에서 한 화를 엽니다."
+ },
+ "welcome_click_the_gytakusub_icon_in": {
+  "message": "툴바의 Gytakusub 아이콘을 클릭합니다. 보이지 않으면 퍼즐 조각 모양의 메뉴를 열고 Gytakusub을 고정하세요."
+ },
+ "welcome_turn_on_enable_here_for": {
+  "message": "<b>여기서 사용</b>을 켜면 페이지마다 번역 버튼이 생깁니다. <b>스크롤하면서 자동 번역</b>을 켤 수도 있습니다. 아니면 그냥 <kbd class=\"kbdTranslate\">Alt+T</kbd>를 눌러 화면에 보이는 것을 번역하세요."
+ },
+ "welcome_h_cost": {
+  "message": "비용"
+ },
+ "welcome_you_pay_anthropic_for_what": {
+  "message": "쓴 만큼 Anthropic에 Claude Console 잔액에서 지불합니다. 기본 모델인 Haiku 5.5는 Sonnet 5.5의 1/20 가격입니다(<a href=\"https://platform.claude.com/docs/en/about-claude/pricing\" target=\"_blank\" rel=\"noopener\">Anthropic 가격</a>). 몇 페이지를 번역하고 나면 <b>설정 → 번역에 드는 비용</b>에서 페이지당 비용을 볼 수 있습니다. Claude가 이 브라우저에 보낸 응답을 바탕으로 집계한 값입니다."
+ },
+ "welcome_to_cap_your_spending_on": {
+  "message": "모든 기기에서의 지출에 한도를 두려면 Console의 <a href=\"https://platform.claude.com/settings/billing\" target=\"_blank\" rel=\"noopener\">Billing 페이지</a>(Spend limits)에서 월 한도를 설정하세요. Claude는 그 한도에서 멈춥니다."
+ },
+ "welcome_h_help": {
+  "message": "도움말"
+ },
+ "welcome_found_a_problem_or_have": {
+  "message": "문제를 발견했거나 아이디어가 있나요? <a href=\"https://github.com/gywreb/gytakusub/issues\" target=\"_blank\" rel=\"noopener\">GitHub에 issue를 올려 주세요</a>. issue는 공개되므로 만화 페이지나 디버그 보고서는 첨부하지 마세요."
+ },
+ "welcome_gytakusub_is_an_independent_open": {
+  "message": "Gytakusub은 독립적인 오픈 소스 프로젝트입니다. Anthropic이 만들거나 보증한 것이 아니며, Anthropic과 제휴 관계도 아닙니다.<br /><a href=\"https://github.com/gywreb/gytakusub\" target=\"_blank\" rel=\"noopener\">소스 코드</a> · <a href=\"https://gywreb.github.io/gytakusub/privacy.html\" target=\"_blank\" rel=\"noopener\">개인정보처리방침</a>"
+ },
+ "welcome_lede": {
+  "message": "Gytakusub은 내가 고른 웹사이트에서 망가, 만화, 코믹스를 내 Claude API 키로 번역합니다. 세 단계면 준비 끝입니다."
+ },
+ "welcome_lede_update": {
+  "message": "이제 Gytakusub은 페이지를 읽기 전에 먼저 묻습니다. 무엇을 보내는지 확인하고 동의하면 계속 번역할 수 있습니다."
+ },
+ "welcome_state_agreed": {
+  "message": "동의함"
+ },
+ "welcome_state_key": {
+  "message": "키 저장됨"
+ },
+ "welcome_state_allowed": {
+  "message": "허용됨"
+ },
+ "welcome_hint_agreed": {
+  "message": "{date}에 동의했습니다. 설정 → 정보에서 언제든 철회할 수 있습니다."
+ },
+ "welcome_hint_not_agreed": {
+  "message": "동의하기 전에는 아무것도 보내지 않습니다. 설정 → 정보에서 언제든 철회할 수 있습니다."
+ },
+ "welcome_change_key": {
+  "message": "키 변경"
+ },
+ "welcome_open_settings": {
+  "message": "설정 열기"
+ },
+ "welcome_hint_access_remove": {
+  "message": "설정 → 정보 또는 브라우저의 확장 프로그램 페이지에서 언제든 해제할 수 있습니다."
+ },
+ "welcome_hint_agree_first": {
+  "message": "먼저 1단계에 동의하세요."
+ },
+ "welcome_not_allowed": {
+  "message": "허용되지 않음. 허용하기 전까지 Gytakusub은 만화 이미지를 읽을 수 없습니다."
+ },
+ "welcome_translate_shortcut": {
+  "message": "번역 단축키"
+ },
+ "welcome_translate_into": {
+  "message": "번역할 언어"
+ },
+ "welcome_language_hint": {
+  "message": "Gytakusub 자체 화면도 번역이 있으면 이 언어로 표시됩니다. 다른 언어: 설정 → 번역."
+ },
+ "opt_gytakusub_settings": {
+  "message": "Gytakusub 설정"
+ },
+ "opt_changes_apply_after_you_save": {
+  "message": "변경 사항은 저장한 뒤에 적용됩니다."
+ },
+ "opt_sections": {
+  "message": "섹션"
+ },
+ "opt_claude_api": {
+  "message": "Claude API"
+ },
+ "opt_costs": {
+  "message": "비용"
+ },
+ "opt_translation": {
+  "message": "번역"
+ },
+ "opt_sites": {
+  "message": "사이트"
+ },
+ "opt_lettering_speed": {
+  "message": "글자 & 속도"
+ },
+ "opt_troubleshooting": {
+  "message": "문제 해결"
+ },
+ "opt_about": {
+  "message": "정보"
+ },
+ "opt_h_api": {
+  "message": "Claude API"
+ },
+ "opt_gytakusub_sends_pages_to_claude": {
+  "message": "Gytakusub은 내 키로 페이지를 Claude에 보냅니다."
+ },
+ "opt_api_key": {
+  "message": "API 키"
+ },
+ "opt_testKey": {
+  "message": "저장 후 테스트"
+ },
+ "opt_apiKeyHint": {
+  "message": "<a href=\"https://platform.claude.com/\" target=\"_blank\" rel=\"noopener\">platform.claude.com</a> → Settings → API keys에서 만드세요. 사용료는 그 Console 계정으로 청구되며 Claude 구독과는 별개입니다(Max, Ultra, Team 요금제에는 매월 API 크레딧이 포함됩니다)."
+ },
+ "opt_sync_the_key_to_my": {
+  "message": "다른 브라우저와 키 동기화"
+ },
+ "opt_keeps_it_in_browser_sync": {
+  "message": "이 기기에만 두지 않고 브라우저 동기화에 저장합니다"
+ },
+ "opt_model": {
+  "message": "모델"
+ },
+ "opt_claude_haiku_5_5_fastest": {
+  "message": "Claude Haiku 5.5 — 가장 빠르고 저렴함"
+ },
+ "opt_claude_sonnet_5_5_better": {
+  "message": "Claude Sonnet 5.5 — 글이 많거나 스타일이 강한 페이지에 더 좋음"
+ },
+ "opt_claude_opus_5_5_best": {
+  "message": "Claude Opus 5.5 — 최고 품질, 가장 비쌈"
+ },
+ "opt_h_usage": {
+  "message": "번역에 드는 비용"
+ },
+ "opt_this_browser": {
+  "message": "이 브라우저"
+ },
+ "opt_counted_from_claude_s_own": {
+  "message": "Claude가 이 브라우저에 보낸 응답을 바탕으로 집계합니다. 휴대폰과 다른 브라우저는 각자 따로 집계합니다."
+ },
+ "opt_today": {
+  "message": "오늘"
+ },
+ "opt_cuModels_arialabel": {
+  "message": "이번 달 모델별 내역과 페이지당 비용"
+ },
+ "opt_cap_your_spending_on_every": {
+  "message": "<b>모든 기기에서의 지출에 한도를 두세요.</b> Claude Console(Billing → Spend limits)에서 월 한도를 설정하세요. 내 키를 쓰는 모든 곳에 적용되며, Claude는 그 한도에서 멈춥니다."
+ },
+ "opt_open_billing": {
+  "message": "Billing 열기"
+ },
+ "opt_details": {
+  "message": "자세히"
+ },
+ "opt_today_2": {
+  "message": "<b>오늘:</b> <span id=\"cuTodayTokens\"></span>"
+ },
+ "opt_this_month": {
+  "message": "<b>이번 달:</b> <span id=\"cuMonthTokens\"></span>"
+ },
+ "opt_estimate_tokens_are_exact_the": {
+  "message": "<b>추정치:</b> 토큰 수는 정확합니다. 비용은 <a id=\"cuPriceLink\" href=\"https://platform.claude.com/docs/en/about-claude/pricing\" target=\"_blank\" rel=\"noopener\">Anthropic 가격</a>(<span id=\"cuChecked\"></span>에 확인)으로 계산합니다. 캐시에서 가져온 페이지는 비용이 들지 않고 집계되지도 않습니다."
+ },
+ "opt_exact_bill_the_claude_console": {
+  "message": "<b>정확한 청구액:</b> Claude Console의 <a href=\"https://platform.claude.com/usage\" target=\"_blank\" rel=\"noopener\">Usage</a> 및 <a href=\"https://platform.claude.com/cost\" target=\"_blank\" rel=\"noopener\">Cost</a> 페이지."
+ },
+ "opt_balance_and_credits_including_a": {
+  "message": "<b>잔액과 크레딧</b>(요금제의 월 API 크레딧 포함): Console의 <a href=\"https://platform.claude.com/settings/billing\" target=\"_blank\" rel=\"noopener\">Billing 페이지</a>. Anthropic은 앱이 이 정보를 읽을 방법을 제공하지 않습니다."
+ },
+ "opt_days_start_at_midnight_utc": {
+  "message": "<b>하루</b>는 내 시간으로 <span id=\"cuDayStart\">UTC 자정</span>(UTC 자정)에 시작합니다. Anthropic 사용량 보고서와 같습니다."
+ },
+ "opt_cuClear": {
+  "message": "사용 기록 지우기"
+ },
+ "opt_h_translation": {
+  "message": "번역"
+ },
+ "opt_target_language": {
+  "message": "번역할 언어"
+ },
+ "opt_glossary": {
+  "message": "용어집"
+ },
+ "opt_glossary_placeholder": {
+  "message": "한 줄에 하나씩, 예:\nGojo Satoru = 고죠 사토루\n呪術 = 주술"
+ },
+ "opt_glossaryHint": {
+  "message": "모델이 반드시 그대로 써야 하는 이름과 용어입니다. 모델이 스스로 찾아낸 이름은 탭마다 자동으로 기억합니다."
+ },
+ "opt_extra_instructions": {
+  "message": "추가 지시"
+ },
+ "opt_chapter_context": {
+  "message": "회차 맥락"
+ },
+ "opt_sends_names_and_the_last": {
+  "message": "이 탭의 이름과 최근 번역한 대사 약 40줄을 페이지마다 함께 보냅니다. 일관성이 좋아지고 입력 토큰이 약 400개 늘어납니다"
+ },
+ "opt_also_transcribe_the_original_text": {
+  "message": "원문도 받아 적기"
+ },
+ "opt_slower_slightly_more_careful_reading": {
+  "message": "더 느리지만 조금 더 꼼꼼하게 읽습니다. 디버깅에 유용합니다"
+ },
+ "opt_uppercase_lettering": {
+  "message": "영문 대문자로 쓰기"
+ },
+ "opt_comic_book_style": {
+  "message": "코믹스 스타일"
+ },
+ "opt_h_sites": {
+  "message": "사이트"
+ },
+ "opt_one_hostname_per_line_the": {
+  "message": "한 줄에 호스트 이름 하나. 사이트를 추가하는 가장 쉬운 방법은 그 사이트를 열고 툴바 팝업의 스위치를 쓰는 것입니다."
+ },
+ "opt_enabled_sites": {
+  "message": "사용 중인 사이트"
+ },
+ "opt_enabledSitesHint": {
+  "message": "마우스를 올리면 나오는 버튼과 키보드 단축키는 여기서만 작동합니다. 다른 곳에서는 툴바 버튼이나 단축키를 쓰기 전까지 Gytakusub이 가만히 있습니다."
+ },
+ "opt_auto_translate_while_scrolling": {
+  "message": "스크롤하면서 자동 번역"
+ },
+ "opt_autoSitesHint": {
+  "message": "화면에 들어오는 모든 페이지가 자동으로 Claude에 전송되므로, 토큰을 써도 되는 사이트만 추가하세요. 이 사이트들도 사용 중인 사이트로 간주됩니다."
+ },
+ "opt_disabled_sites": {
+  "message": "사용 안 함 사이트"
+ },
+ "opt_excludedSitesHint": {
+  "message": "이 사이트와 하위 도메인에서는 Gytakusub이 꺼진 상태로 있습니다."
+ },
+ "opt_h_look": {
+  "message": "글자 & 속도"
+ },
+ "opt_font_family": {
+  "message": "글꼴"
+ },
+ "opt_fontHint": {
+  "message": "비워 두면 내장된 식자용 글꼴(Comic Neue Bold)을 씁니다. 이 기기에 설치된 아무 글꼴 이름이나 적을 수도 있습니다. 예: <code>\"Bangers\"</code>."
+ },
+ "opt_use_the_graphics_card_webgpu": {
+  "message": "그래픽 카드 사용 (WebGPU)"
+ },
+ "opt_finds_text_and_bubbles_much": {
+  "message": "글자와 말풍선을 훨씬 빨리 찾습니다. 페이지가 이상하게 나오거나 브라우저가 불안정할 때만 끄세요."
+ },
+ "opt_peek_at_the_original_while": {
+  "message": "마우스를 올리면 원문 보기"
+ },
+ "opt_hovering_a_translated_bubble_shows": {
+  "message": "번역된 말풍선에 마우스를 올리면 원래 글자가 보입니다. 대사를 고치려면 그 말풍선을 더블클릭하세요."
+ },
+ "opt_h_debug": {
+  "message": "문제 해결"
+ },
+ "opt_debug_overlay": {
+  "message": "디버그 오버레이"
+ },
+ "opt_draws_the_detected_regions_and": {
+  "message": "번역된 페이지에 감지한 영역과 글자 상자를 그리고, 플로팅 바에 보고서 버튼을 추가합니다. 이 버튼은 그 페이지의 원본, 디버그 렌더, JSON을 내려받습니다. 툴바 팝업의 \"디버그 보고서 내보내기\"는 탭에서 번역한 모든 페이지에 대해 같은 일을 합니다."
+ },
+ "opt_translation_cache": {
+  "message": "번역 캐시"
+ },
+ "opt_translated_pages_the_names_found": {
+  "message": "번역한 페이지, 탭마다 찾은 이름, 내가 고친 대사는 브라우저를 닫을 때까지 보관됩니다. 지우면 페이지를 처음부터 다시 번역합니다."
+ },
+ "opt_clearCache": {
+  "message": "캐시 지우기"
+ },
+ "opt_h_about": {
+  "message": "정보"
+ },
+ "opt_what_is_sent_to_claude": {
+  "message": "Claude에 보내는 내용"
+ },
+ "opt_access_to_websites": {
+  "message": "웹사이트 접근"
+ },
+ "opt_help": {
+  "message": "도움말"
+ },
+ "opt_report_a_problem_or_ask": {
+  "message": "문제 신고나 질문은 <a href=\"https://github.com/gywreb/gytakusub/issues\" target=\"_blank\" rel=\"noopener\">GitHub Issues</a>에서 하세요. issue는 공개되므로 만화 페이지나 디버그 보고서는 첨부하지 마세요."
+ },
+ "opt_gytakusub_is_an_independent_project": {
+  "message": "Gytakusub은 독립 프로젝트로, Anthropic이 만든 것이 아니며 Anthropic과 제휴 관계도 아닙니다. <a href=\"https://gywreb.github.io/gytakusub/privacy.html\" target=\"_blank\" rel=\"noopener\">개인정보처리방침</a> · <a href=\"welcome.html\" target=\"_blank\">설정 안내</a>"
+ },
+ "opt_gytakusub_is_free_software_under": {
+  "message": "Gytakusub <span id=\"version\"></span>은(는) <a href=\"LICENSE\" target=\"_blank\">GNU AGPL v3</a>에 따른 자유 소프트웨어입니다 · <a href=\"https://github.com/gywreb/gytakusub\" target=\"_blank\" rel=\"noopener\">소스 코드</a> · <a href=\"THIRD_PARTY.md\" target=\"_blank\">서드파티 구성 요소</a>"
+ },
+ "opt_save": {
+  "message": "저장"
+ },
+ "opt_unsaved": {
+  "message": "저장하지 않은 변경 사항"
+ },
+ "opt_loading": {
+  "message": "설정을 아직 불러오는 중입니다."
+ },
+ "opt_saved": {
+  "message": "저장했습니다."
+ },
+ "opt_confirm_clear_usage": {
+  "message": "이 브라우저의 사용 기록을 지울까요? Claude Console에는 자체 기록이 남아 있습니다."
+ },
+ "opt_usage_cleared": {
+  "message": "사용 기록을 지웠습니다."
+ },
+ "opt_show": {
+  "message": "보기"
+ },
+ "opt_hide": {
+  "message": "숨기기"
+ },
+ "opt_testing": {
+  "message": "테스트 중…"
+ },
+ "opt_no_key_saved": {
+  "message": "아직 저장된 API 키가 없습니다."
+ },
+ "opt_key_works": {
+  "message": "키가 작동합니다. 모델 {model}이(가) 응답했습니다."
+ },
+ "opt_key_failed": {
+  "message": "키 테스트 실패: {error}"
+ },
+ "opt_confirm_clear_cache": {
+  "message": "번역한 페이지, 탭마다 찾은 이름, 내가 고친 대사를 지울까요?"
+ },
+ "opt_cache_cleared_unsaved": {
+  "message": "캐시를 지웠습니다. 다른 변경 사항은 아직 저장되지 않았습니다."
+ },
+ "opt_cache_cleared": {
+  "message": "캐시를 지웠습니다."
+ },
+ "opt_save_title": {
+  "message": "저장 ({key})"
+ },
+ "opt_consent_agreed": {
+  "message": "{date}에 동의했습니다. 철회하면 다시 동의할 때까지 아무것도 보내지 않습니다."
+ },
+ "opt_consent_none": {
+  "message": "아직 동의하지 않아서 아무것도 보내지 않습니다. 설정 페이지를 열어 보내는 내용을 확인하고 동의하세요."
+ },
+ "opt_withdraw": {
+  "message": "철회"
+ },
+ "opt_review_agree": {
+  "message": "확인하고 동의"
+ },
+ "opt_access_allowed": {
+  "message": "허용됨: Gytakusub은 웹사이트의 이미지를 읽을 수 있습니다. 단, 번역할 때와 자동 번역을 켠 사이트에서만입니다."
+ },
+ "opt_access_none": {
+  "message": "허용되지 않음: 허용하기 전까지 Gytakusub은 만화 이미지를 읽을 수 없습니다."
+ },
+ "opt_remove_access": {
+  "message": "접근 해제"
+ },
+ "opt_allow_access": {
+  "message": "접근 허용"
+ },
+ "opt_agree_first": {
+  "message": "먼저 보내는 내용에 동의하세요"
+ },
+ "opt_cannot_read": {
+  "message": "설정을 읽을 수 없습니다: {error}"
+ },
+ "opt_other_language": {
+  "message": "기타…"
+ },
+ "opt_other_language_label": {
+  "message": "다른 언어"
+ },
+ "opt_other_language_placeholder": {
+  "message": "언어 입력"
+ },
+ "opt_target_language_hint": {
+  "message": "Gytakusub 자체 화면도 번역이 있으면 이 언어로 표시됩니다(없으면 영어)."
+ },
+ "opt_customPrompt_placeholder": {
+  "message": "예: 편한 말투를 유지할 것. 효과음(SFX)은 한국어 의성어로 번역할 것."
+ },
+ "content_translate_image": {
+  "message": "이 이미지 번역"
+ },
+ "content_toggle_image": {
+  "message": "번역 보이기 또는 숨기기"
+ },
+ "content_report": {
+  "message": "보고서"
+ },
+ "content_report_title": {
+  "message": "이 페이지의 진단 보고서 내려받기 (원본, 디버그 렌더, JSON)"
+ },
+ "content_report_aria": {
+  "message": "진단 보고서 내려받기"
+ },
+ "content_continue": {
+  "message": "계속"
+ },
+ "content_btn_translating": {
+  "message": "번역 중…"
+ },
+ "content_btn_queued": {
+  "message": "대기 중…"
+ },
+ "content_btn_redo": {
+  "message": "↻ 다시"
+ },
+ "content_btn_translate": {
+  "message": "번역"
+ },
+ "content_btn_show": {
+  "message": "보기"
+ },
+ "content_btn_hide": {
+  "message": "숨기기"
+ },
+ "content_lines_one": {
+  "message": "대사 {n}줄"
+ },
+ "content_lines_other": {
+  "message": "대사 {n}줄"
+ },
+ "content_nothing_translated": {
+  "message": "이 페이지에서는 아직 아무것도 번역하지 않았습니다"
+ },
+ "content_preparing_report_one": {
+  "message": "{n}페이지 보고서를 준비하는 중…"
+ },
+ "content_preparing_report_other": {
+  "message": "{n}페이지 보고서를 준비하는 중…"
+ },
+ "content_report_done_one": {
+  "message": "보고서를 내려받았습니다({n}페이지, {size} MB). 페이지 이미지가 들어 있으니 비공개로만 공유하고, 공개 issue에는 절대 올리지 마세요."
+ },
+ "content_report_done_other": {
+  "message": "보고서를 내려받았습니다({n}페이지, {size} MB). 페이지 이미지가 들어 있으니 비공개로만 공유하고, 공개 issue에는 절대 올리지 마세요."
+ },
+ "content_paused_one": {
+  "message": "10분 동안 {n}페이지를 번역해서 자동 번역을 일시 중지했습니다. Claude 지출을 관리하기 위해서입니다."
+ },
+ "content_paused_other": {
+  "message": "10분 동안 {n}페이지를 번역해서 자동 번역을 일시 중지했습니다. Claude 지출을 관리하기 위해서입니다."
+ },
+ "content_error": {
+  "message": "Gytakusub: {error}"
+ },
+ "content_edit_dialog": {
+  "message": "번역 수정"
+ },
+ "content_translated_line": {
+  "message": "번역된 대사"
+ },
+ "content_save": {
+  "message": "저장"
+ },
+ "content_cancel": {
+  "message": "취소"
+ },
+ "content_teach": {
+  "message": "용어집에 가르치기 (다음 페이지부터 적용)"
+ },
+ "content_original_term_ph": {
+  "message": "원래 용어"
+ },
+ "content_original_term": {
+  "message": "원래 용어"
+ },
+ "content_translation_ph": {
+  "message": "번역어"
+ },
+ "content_translation": {
+  "message": "번역어"
+ },
+ "content_add": {
+  "message": "추가"
+ },
+ "content_fill_both": {
+  "message": "원래 용어와 번역어를 모두 입력하세요"
+ },
+ "content_glossary_updated": {
+  "message": "용어집을 업데이트했습니다: {from} = {to}"
+ },
+ "content_glossary_added": {
+  "message": "용어집에 추가했습니다: {from} = {to}"
+ },
+ "content_off_here": {
+  "message": "이 사이트에서는 Gytakusub이 꺼져 있습니다"
+ },
+ "content_no_untranslated": {
+  "message": "화면에 번역하지 않은 이미지가 없습니다"
+ },
+ "content_translating_n_one": {
+  "message": "이미지 {n}개 번역 중…"
+ },
+ "content_translating_n_other": {
+  "message": "이미지 {n}개 번역 중…"
+ },
+ "bg_bad_data": {
+  "message": "지원하지 않는 이미지 데이터입니다"
+ },
+ "bg_too_large": {
+  "message": "이미지가 너무 큽니다({mb} MB 초과)"
+ },
+ "bg_bad_url": {
+  "message": "잘못된 이미지 주소입니다"
+ },
+ "bg_http_only": {
+  "message": "http(s) 이미지만 지원합니다"
+ },
+ "bg_no_access": {
+  "message": "{host}의 이미지를 읽으려면 Gytakusub에 허락이 필요합니다. 툴바에서 Gytakusub 팝업을 열고 접근 허용을 선택하세요."
+ },
+ "bg_download_failed": {
+  "message": "{host}에서 이미지를 내려받지 못했습니다({error})"
+ },
+ "bg_fetch_status": {
+  "message": "이미지를 가져오지 못했습니다({status})"
+ },
+ "bg_not_image": {
+  "message": "그 주소는 이미지를 돌려주지 않았습니다"
+ },
+ "bg_off": {
+  "message": "Gytakusub이 꺼져 있습니다(툴바 팝업)."
+ },
+ "bg_not_set_up": {
+  "message": "Gytakusub이 아직 설정되지 않았습니다. 툴바에서 Gytakusub 팝업을 열고 설정하기를 선택해, Claude에 보내는 내용을 확인하고 동의하세요."
+ },
+ "bg_no_key": {
+  "message": "API 키가 없습니다. Gytakusub 설정을 열고 Claude API 키를 붙여 넣으세요."
+ },
+ "bg_gloss_both": {
+  "message": "원문과 번역어가 모두 필요합니다"
+ },
+ "bg_report_needs_debug": {
+  "message": "보고서를 내보내려면 설정에서 디버그 오버레이를 켜세요"
+ },
+ "usage_pages_one": {
+  "message": "{n}페이지"
+ },
+ "usage_pages_other": {
+  "message": "{n}페이지"
+ },
+ "usage_requests_one": {
+  "message": "요청 {n}건"
+ },
+ "usage_requests_other": {
+  "message": "요청 {n}건"
+ },
+ "usage_nothing_yet": {
+  "message": "아직 없음"
+ },
+ "usage_tokens": {
+  "message": "{requests} · 입력 {in} · 출력 {out}"
+ },
+ "usage_no_requests": {
+  "message": "아직 요청 없음"
+ },
+ "usage_today": {
+  "message": "오늘"
+ },
+ "usage_price_unknown": {
+  "message": "가격 알 수 없음"
+ },
+ "usage_per_page": {
+  "message": "페이지당 ≈{cost} · {pages}"
+ },
+ "usage_limit_requests": {
+  "message": "요청 {left}/{limit}"
+ },
+ "usage_limit_input": {
+  "message": "입력 토큰 {left}/{limit}"
+ },
+ "usage_limit_output": {
+  "message": "출력 토큰 {left}/{limit}"
+ },
+ "usage_list_sep": {
+  "message": ","
+ },
+ "usage_limits": {
+  "message": "속도 제한(1분 분량의 한도로, 쓰는 동안 다시 채워짐): {time} 기준 {parts} 남음."
+ },
+ "usage_limits_full": {
+  "message": "늦어도 {time}까지는 다시 가득 찹니다."
+ },
+ "api_err_spend_cap": {
+  "message": "Claude 계정이 월 지출 상한에 도달했습니다. Claude Console에서 더 높은 한도를 요청하지 않으면 API는 1일 00:00 UTC까지 멈춥니다."
+ },
+ "api_err_rate_limit": {
+  "message": "계정이 일시적으로 Claude의 속도 제한에 걸렸습니다. 1분 기다린 뒤 다시 번역하세요. 한 번에 번역하는 페이지 수를 줄이는 것도 도움이 됩니다."
+ },
+ "api_err_credit": {
+  "message": "Claude 크레딧 잔액이 부족합니다. Claude Console의 Billing에서 크레딧을 추가하세요(또는 요금제의 월 API 크레딧을 확인하세요)."
+ },
+ "api_err_spend_limit": {
+  "message": "Claude 계정이 직접 설정한 지출 한도에 도달했습니다. Claude Console의 Billing → Spend limits에서 한도를 올리세요."
+ },
+ "api_err_key": {
+  "message": "Claude가 API 키를 거부했습니다. 설정에서 확인하거나 Claude Console에서 새 키를 만드세요."
+ },
+ "api_err_overloaded": {
+  "message": "지금 Claude에 요청이 몰려 있습니다. 1분 뒤에 다시 시도하세요."
+ }
+}

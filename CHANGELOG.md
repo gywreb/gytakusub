@@ -4,6 +4,29 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
 
 ## [Unreleased]
 
+## [2.8.0] — 2026-11-17
+
+Languages: pick the target from a list, and Gytakusub's own pages speak it.
+
+### Extension
+- **Target language is a dropdown** of 19 languages, each shown in its own name ("Tiếng Việt · Vietnamese"), in Settings and on the setup page. "Other…" keeps a box for any other language. Languages typed before 2.8.0 are kept and matched ("vietnamese", "Portuguese", "Chinese"). Thai and right-to-left languages aren't listed, because pages can't be lettered well in them yet; they can still be typed under Other.
+- **The interface follows the target language**, for ten languages: English, Vietnamese, Spanish, Portuguese (Brazil), Indonesian, French, German, Chinese (Simplified), Japanese and Korean. That covers the setup page, Settings, the toolbar popup, the buttons and messages on a manga page, and the worker's errors. Other target languages keep the interface in English.
+  - It switches at once, in every open page, including the buttons on a page you're reading.
+  - Pages declare their language (`<html lang>`), so screen readers read them right. Japanese wraps between phrases and Korean between words.
+  - Dates, times and plural forms follow the language.
+- **New installs start with the browser's own language** when it's on the list.
+- **The popup's model menu shows just the names** (Haiku 5.5, Sonnet 5.5, Opus 5.5), with what the chosen one is good for underneath. The longer labels didn't fit a 340 px popup in every language and font.
+- The extension's description and shortcut names are translated too (the browser shows them in its own language).
+- The translations were written with AI (Claude) and checked by machine, not yet by native speakers. A **Translation fix** issue form takes corrections.
+
+### Web app
+- The target language is the same dropdown, with Other…. Until you save settings, it guesses from the phone's language. The web app's own interface stays English for now (2.9.0).
+
+### Development
+- `scripts/check-i18n.mjs` (in CI): every language has every English message, with the same placeholders, markup and links, no stray `$`, and a description within the manifest's 132 characters.
+- `tests/browser/i18n.mjs`: every page in every language (labels right, no keys or English leftovers, nothing clipped or spilling sideways, no console errors), live switching, the worker's and the page overlay's language, the "Other" path and the first-install default. It found two bugs before release: the setup page didn't follow a change made in Settings, and the popup's model menu cut its descriptions off (on CI's wider Linux fonts, in seven of the ten languages, English included).
+- ADR 0010 records the choices: `docs/adr/0010-interface-language.md`.
+
 ## [2.7.0] — 2026-11-17
 
 Ready for the public Chrome Web Store listing. Everything stays free: each person uses their own Claude key, and nothing costs the developer per user.

@@ -3,14 +3,22 @@
 // for site access inside the click, which is the only time the browser allows it.
 import { CONSENT_VERSION, giveConsent, hasAccess, requestAccess } from "./access.js";
 import { getSettings } from "./settings.js";
+import { t, langTag } from "./i18n.js";
+import { useLanguageOf } from "./locale.js";
+import { languageOptions, findLanguage } from "./languages.js";
 
 const $ = (id) => document.getElementById(id);
 
-if (location.hash === "#update") {
-  $("lede").textContent = "Gytakusub now asks before it reads any page. Please look at what is sent and agree, to keep translating.";
-}
+const fmtDate = (iso) => { try { return new Date(iso).toLocaleDateString(langTag(), { day: "numeric", month: "long", year: "numeric" }); } catch { return ""; } };
 
-const fmtDate = (iso) => { try { return new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" }); } catch { return ""; } };
+/** This page in the target language: the static text, then everything refresh() writes. */
+async function speak(targetLang) {
+  await useLanguageOf(targetLang, document);
+  document.title = t("welcome_set_up_gytakusub");
+  $("lede").textContent = location.hash === "#update" ? t("welcome_lede_update") : t("welcome_lede");
+  showShortcut();
+  await refresh();
+}
 
 function mark(step, done, text) {
   $(step).classList.toggle("done", done);
@@ -21,21 +29,17 @@ function mark(step, done, text) {
 async function refresh() {
   const [{ consent }, s, access] = await Promise.all([chrome.storage.local.get("consent"), getSettings(), hasAccess()]);
   const agreed = (consent?.version || 0) >= CONSENT_VERSION;
-  mark("stepConsent", agreed, agreed ? "Agreed" : "");
+  mark("stepConsent", agreed, agreed ? t("welcome_state_agreed") : "");
   $("agree").hidden = agreed;
-  $("consentHint").textContent = agreed
-    ? `You agreed on ${fmtDate(consent.at)}. You can withdraw any time in Settings → About.`
-    : "Nothing is sent until you agree. You can withdraw any time in Settings → About.";
+  $("consentHint").textContent = agreed ? t("welcome_hint_agreed", { date: fmtDate(consent.at) }) : t("welcome_hint_not_agreed");
 
-  mark("stepKey", !!s.apiKey, s.apiKey ? "Key saved" : "");
-  $("openKey").textContent = s.apiKey ? "Change key" : "Open settings";
+  mark("stepKey", !!s.apiKey, s.apiKey ? t("welcome_state_key") : "");
+  $("openKey").textContent = s.apiKey ? t("welcome_change_key") : t("welcome_open_settings");
 
-  mark("stepAccess", access, access ? "Allowed" : "");
+  mark("stepAccess", access, access ? t("welcome_state_allowed") : "");
   $("allow").hidden = access;
   $("allow").disabled = !agreed;
-  $("accessHint").textContent = access
-    ? "You can remove this any time in Settings → About, or on the browser's extensions page."
-    : agreed ? "" : "Agree to step 1 first.";
+  $("accessHint").textContent = access ? t("welcome_hint_access_remove") : agreed ? "" : t("welcome_hint_agree_first");
 
   $("allSet").hidden = !(agreed && s.apiKey && access);
 }
@@ -54,7 +58,7 @@ $("allow").onclick = () => {
   requestAccess().then((ok) => {
     refresh().then(() => {
       if (ok) focusNext();
-      else $("accessHint").textContent = "Not allowed. Gytakusub can't read manga images until you allow it.";
+      else $("accessHint").textContent = t("welcome_not_allowed");
     });
   }, (e) => { $("accessHint").textContent = e.message; });
 };
@@ -63,9 +67,30 @@ chrome.storage.onChanged.addListener((changes) => { if (changes.consent || chang
 chrome.permissions.onAdded.addListener(refresh);
 chrome.permissions.onRemoved.addListener(refresh);
 
-chrome.commands.getAll().then((commands) => {
-  const key = commands.find((c) => c.name === "translate-visible")?.shortcut;
-  for (const el of document.querySelectorAll(".kbdTranslate")) { if (key) el.textContent = key; else el.replaceWith("the Translate shortcut"); }
-}).catch(() => {});
+/** The real shortcut where the text names it (people can change or remove it at chrome://extensions/shortcuts). */
+function showShortcut() {
+  chrome.commands.getAll().then((commands) => {
+    const key = commands.find((c) => c.name === "translate-visible")?.shortcut;
+    for (const el of document.querySelectorAll(".kbdTranslate")) { if (key) el.textContent = key; else el.replaceWith(t("welcome_translate_shortcut")); }
+  }).catch(() => {});
+}
 
-refresh();
+// The language to translate into, first: it decides this page's language too
+function showTarget(targetLang) {
+  const listed = findLanguage(targetLang);
+  $("targetLang").replaceChildren(...languageOptions().map(({ value, label }) => new Option(label, value)));
+  if (!listed) $("targetLang").prepend(new Option(targetLang, targetLang)); // a language typed under "Other" in Settings
+  $("targetLang").value = listed?.name || targetLang;
+}
+const s0 = await getSettings();
+showTarget(s0.targetLang);
+$("targetLang").onchange = async (e) => {
+  await chrome.storage.sync.set({ targetLang: e.target.value });
+  await speak(e.target.value);
+};
+// changed in Settings while this page is open
+chrome.storage.onChanged.addListener((changes, area) => {
+  const next = area === "sync" && changes.targetLang?.newValue;
+  if (next && next !== $("targetLang").value) { showTarget(next); speak(next); }
+});
+await speak(s0.targetLang);

@@ -1,6 +1,6 @@
 # Chrome Web Store listing — Gytakusub
 
-Last updated for 2.7.0 (public release).
+Last updated for 2.8.0 (languages).
 
 Copy each block into the matching field of the Developer Dashboard. Keep the wording: it is written to match what the extension actually does (reviewers compare listing claims against behaviour) and to stay generic about content sources.
 
@@ -21,7 +21,8 @@ HOW IT WORKS
 • Text and speech bubbles are found locally by open-source models (PaddleOCR's text detector and a speech-bubble segmentation model) and OpenCV, all running in your browser — on the graphics card when available. No page content is read except the images you translate.
 • The image is sent directly from your browser to Anthropic's Claude API using YOUR API key. Gytakusub has no server and never sees your data.
 • Names and recent dialogue are carried from page to page so translations stay consistent through a chapter.
-• Japanese (including vertical text), Korean, Chinese, Spanish, Italian and most other languages → English or any target language you set.
+• Japanese (including vertical text), Korean, Chinese, Spanish, Italian and most other languages → the language you pick: English, Vietnamese, Spanish, Portuguese, Indonesian, French, German, Chinese, Japanese, Korean and more, or any other you type.
+• The extension's own pages follow your language too: English, Tiếng Việt, Español, Português, Bahasa Indonesia, Français, Deutsch, 简体中文, 日本語, 한국어.
 
 YOU STAY IN CONTROL
 • Before anything is sent, a setup page shows exactly what is sent and where, and asks you to agree. You can withdraw any time.
@@ -63,6 +64,11 @@ https://github.com/gywreb/gytakusub/issues
 - Screenshots 1280×800, in this order: `screenshot-1-before-after.png`, `screenshot-2-closeup.png`, `screenshot-3-how-it-works.png`, `screenshot-4-japanese.png`, `screenshot-5-controls.png` (made by `npm run assets` in `tests/`: 1–4 render test pages through the engine, 5 is the real popup and Options page with demo data)
 - Small promo tile 440×280: `promo-small-440x280.png`
 - Marquee 1400×560: optional, not provided
+
+**What's new in 2.8.0** (paste into the version notes if the dashboard asks)
+```
+Pick the language to translate into from a list instead of typing it ("Other…" still takes any language). Gytakusub's own pages, the toolbar popup and the buttons on a page now switch to that language: English, Vietnamese, Spanish, Portuguese (Brazil), Indonesian, French, German, Chinese (Simplified), Japanese and Korean. New installs start with your browser's language. Translations were written with AI; corrections welcome on GitHub Issues.
+```
 
 **What's new in 2.7.0** (paste into the version notes if the dashboard asks)
 ```

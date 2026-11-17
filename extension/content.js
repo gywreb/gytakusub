@@ -60,18 +60,38 @@
     .pause button:focus-visible { outline: 2px solid #7cb3ff; outline-offset: 2px; }
   `;
   const root = document.createElement("div"); root.className = "root";
+  // The words on the page come from the worker with the settings (GET_SETTINGS: settings.ui, the
+  // content_* messages in the reader's language, English underneath); this script can't read the
+  // extension's files from inside someone else's page.
+  const T = (key, vars = {}) => String(settings.ui?.[key] ?? key).replace(/\{(\w+)\}/g, (all, name) => (name in vars ? String(vars[name]) : all));
+  const TN = (key, n, vars = {}) => {
+    let rule = "other";
+    try { rule = new Intl.PluralRules(settings.uiLang || "en").select(n); } catch { /* "other" */ }
+    return T(settings.ui?.[`${key}_${rule}`] != null ? `${key}_${rule}` : `${key}_other`, { n: n.toLocaleString(settings.uiLang || "en"), ...vars });
+  };
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
   const bar = document.createElement("div"); bar.className = "bar"; bar.setAttribute("role", "toolbar"); bar.setAttribute("aria-label", "Gytakusub");
-  const btnTranslate = document.createElement("button"); btnTranslate.setAttribute("aria-label", "Translate this image");
-  const btnToggle = document.createElement("button"); btnToggle.setAttribute("aria-label", "Show or hide translation");
-  const btnReport = document.createElement("button"); btnReport.textContent = "Report"; btnReport.title = "Download a diagnostic report for this page (original, debug render, JSON)"; btnReport.setAttribute("aria-label", "Download diagnostic report");
+  const btnTranslate = document.createElement("button");
+  const btnToggle = document.createElement("button");
+  const btnReport = document.createElement("button");
   const status = document.createElement("span"); status.className = "status";
   bar.append(btnTranslate, btnToggle, btnReport, status);
   const toastEl = document.createElement("div"); toastEl.className = "toast"; toastEl.setAttribute("role", "status"); toastEl.setAttribute("aria-live", "polite"); toastEl.hidden = true;
   const pauseEl = document.createElement("div"); pauseEl.className = "toast pause"; pauseEl.setAttribute("role", "alert"); pauseEl.hidden = true;
   const pauseText = document.createElement("span");
-  const pauseBtn = document.createElement("button"); pauseBtn.type = "button"; pauseBtn.textContent = "Continue";
+  const pauseBtn = document.createElement("button"); pauseBtn.type = "button";
   pauseEl.append(pauseText, pauseBtn);
   shadow.append(style, root, bar, toastEl, pauseEl);
+  /** Labels that don't change with a page's state, in the reader's language (called when settings arrive). */
+  function labelControls() {
+    btnTranslate.setAttribute("aria-label", T("content_translate_image"));
+    btnToggle.setAttribute("aria-label", T("content_toggle_image"));
+    btnReport.textContent = T("content_report"); btnReport.title = T("content_report_title"); btnReport.setAttribute("aria-label", T("content_report_aria"));
+    pauseBtn.textContent = T("content_continue");
+    if (!pauseEl.hidden) pauseText.textContent = TN("content_paused", AUTO_BUDGET);
+    editor.el?.remove(); editor.el = null; editor.open = false; // rebuilt in the new language when next opened
+  }
 
   const mount = () => { if (document.documentElement && !host.isConnected) document.documentElement.append(host); };
   if (document.body) mount(); else document.addEventListener("DOMContentLoaded", mount, { once: true });
@@ -94,6 +114,7 @@
       const s = await chrome.runtime.sendMessage({ type: "GET_SETTINGS" });
       if (s && !s.error) settings = s;
     } catch { /* background not ready yet */ }
+    labelControls();
     applyAutoMode();
     if (!settings.enabled) { bar.classList.remove("visible"); hoverImg = null; }
   }
@@ -157,12 +178,12 @@
   function refreshBar() {
     const e = hoverImg ? entries.get(hoverImg) : null;
     const st = e?.status;
-    btnTranslate.textContent = st === "working" ? "Translating…" : st === "queued" ? "Queued…" : st === "done" ? "↻ Redo" : "Translate";
+    btnTranslate.textContent = st === "working" ? T("content_btn_translating") : st === "queued" ? T("content_btn_queued") : st === "done" ? T("content_btn_redo") : T("content_btn_translate");
     btnTranslate.disabled = st === "working" || st === "queued";
     btnToggle.style.display = st === "done" ? "" : "none";
-    btnToggle.textContent = e?.hidden || allHidden ? "Show" : "Hide";
+    btnToggle.textContent = e?.hidden || allHidden ? T("content_btn_show") : T("content_btn_hide");
     btnReport.style.display = st === "done" && settings.debugOverlay ? "" : "none";
-    status.textContent = e?.error ? "⚠ " + e.error : st === "done" && e.result ? `${e.result.items.length} lines` : "";
+    status.textContent = e?.error ? "⚠ " + e.error : st === "done" && e.result ? TN("content_lines", e.result.items.length) : "";
     status.style.display = status.textContent ? "" : "none";
   }
 
@@ -202,8 +223,8 @@
   // render (clean page + boxes + text) and the report JSON — nothing to capture by hand.
   async function exportReport(imgs) {
     const done = imgs.filter((i) => entries.get(i)?.status === "done" && entries.get(i).result);
-    if (!done.length) { toast("Nothing translated on this page yet"); return { ok: false }; }
-    toast(`Preparing report for ${done.length} page${done.length > 1 ? "s" : ""}…`, 20000);
+    if (!done.length) { toast(T("content_nothing_translated")); return { ok: false }; }
+    toast(TN("content_preparing_report", done.length), 20000);
     const files = [];
     const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
     const summary = { gytakusub: chrome.runtime.getManifest().version, when: new Date().toISOString(), page: location.href, userAgent: navigator.userAgent, pages: [] };
@@ -247,7 +268,7 @@
     const a = document.createElement("a"); a.href = url; a.download = `gytakusub-report-${location.hostname}-${stamp}.zip`; a.rel = "noopener";
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 10000);
-    toast(`Report downloaded (${done.length} page${done.length > 1 ? "s" : ""}, ${(zip.length / 1e6).toFixed(1)} MB). Attach the .zip.`, 7000);
+    toast(TN("content_report_done", done.length, { size: (zip.length / 1e6).toFixed(1) }), 9000);
     return { ok: true, pages: done.length, bytes: zip.length, files: files.map((f) => f.name) };
   }
   function report(img) { return exportReport([img]); }
@@ -300,7 +321,7 @@
   const priorityOf = (img) => viewportDistance(img) + (document.hidden ? 1e7 : 0);
 
   function enqueue(img, force = false, auto = false) {
-    if (!active()) { toast("Gytakusub is off on this site"); return; }
+    if (!active()) { toast(T("content_off_here")); return; }
     const e = entries.get(img);
     if (e?.status === "working") return;
     if (e?.status === "queued") { // asking for a page auto-translate is holding makes it yours: it isn't put back or paused
@@ -335,7 +356,7 @@
   }
   function pauseAuto() {
     autoPaused = true;
-    pauseText.textContent = `Auto-translate paused after ${AUTO_BUDGET} pages in 10 minutes, to keep your Claude spending in check.`;
+    pauseText.textContent = TN("content_paused", AUTO_BUDGET);
     pauseEl.hidden = false;
   }
   pauseBtn.addEventListener("click", (ev) => {
@@ -436,7 +457,7 @@
       }
       let res = await chrome.runtime.sendMessage(msg);
       if (!res) throw new Error("No response from background worker");
-      if (res.error && msg.url && /Could not fetch image \((401|403|404|429|5\d\d)\)|Failed to fetch|needs your permission/.test(res.error)) {
+      if (res.error && msg.url && /^(http-(401|403|404|429|5\d\d)|network|no-access)$/.test(res.code || "")) {
         // The site refused the worker's request (it carries no referrer and no
         // cookies — hotlink protection). The page itself is allowed to read the
         // image when it is same-origin or served with CORS headers: try from here.
@@ -459,7 +480,7 @@
       entry.status = "error";
       entry.error = e.message || String(e);
       entry.failures = (entry.failures || 0) + 1;
-      toast(/^Gytakusub\b/.test(entry.error) ? entry.error : "Gytakusub: " + entry.error, 6000, true);
+      toast(/^Gytakusub\b/.test(entry.error) ? entry.error : T("content_error", { error: entry.error }), 6000, true);
       console.warn("Gytakusub", e);
     }
     refreshBar();
@@ -539,11 +560,12 @@
   // Editor: double-click a translated line to correct it (and optionally teach the glossary).
   const editor = { el: null, open: false, entry: null, idx: -1 };
   function buildEditor() {
-    const el = document.createElement("div"); el.className = "editor"; el.setAttribute("role", "dialog"); el.setAttribute("aria-label", "Edit translation"); el.hidden = true;
-    el.innerHTML = `<textarea aria-label="Translated line" spellcheck="true"></textarea>
-      <div class="row"><button class="primary" data-act="save">Save</button><button data-act="cancel">Cancel</button><span class="hint">Ctrl+Enter · Esc</span></div>
-      <div class="label">Teach the glossary (applies to later pages)</div>
-      <div class="row gloss"><input data-f="from" placeholder="original term" aria-label="Original term" /><span>=</span><input data-f="to" placeholder="translation" aria-label="Translation" /><button data-act="gloss">Add</button></div>`;
+    const el = document.createElement("div"); el.className = "editor"; el.setAttribute("role", "dialog"); el.setAttribute("aria-label", T("content_edit_dialog")); el.hidden = true;
+    // a fixed template; the only text in it is our own messages, escaped
+    el.innerHTML = `<textarea aria-label="${esc(T("content_translated_line"))}" spellcheck="true"></textarea>
+      <div class="row"><button class="primary" data-act="save">${esc(T("content_save"))}</button><button data-act="cancel">${esc(T("content_cancel"))}</button><span class="hint">Ctrl+Enter · Esc</span></div>
+      <div class="label">${esc(T("content_teach"))}</div>
+      <div class="row gloss"><input data-f="from" placeholder="${esc(T("content_original_term_ph"))}" aria-label="${esc(T("content_original_term"))}" /><span>=</span><input data-f="to" placeholder="${esc(T("content_translation_ph"))}" aria-label="${esc(T("content_translation"))}" /><button data-act="gloss">${esc(T("content_add"))}</button></div>`;
     // the reader must not see these keys (its hotkeys), and the page must not see the text
     for (const t of ["keydown", "keyup", "keypress", "mousedown", "mouseup", "click", "dblclick", "wheel"]) el.addEventListener(t, (ev) => ev.stopPropagation());
     el.addEventListener("keydown", (ev) => {
@@ -588,13 +610,13 @@
   }
   async function addGlossary() {
     const from = editor.el.querySelector('[data-f="from"]').value.trim(), to = editor.el.querySelector('[data-f="to"]').value.trim();
-    if (!from || !to) { toast("Fill both the original term and its translation"); return; }
+    if (!from || !to) { toast(T("content_fill_both")); return; }
     try {
       const r = await chrome.runtime.sendMessage({ type: "ADD_GLOSSARY", from, to });
       if (r?.error) throw new Error(r.error);
-      toast(r.replaced ? `Glossary updated: ${from} = ${to}` : `Added to glossary: ${from} = ${to}`);
+      toast(r.replaced ? T("content_glossary_updated", { from, to }) : T("content_glossary_added", { from, to }));
       editor.el.querySelector('[data-f="to"]').value = "";
-    } catch (err) { toast("Gytakusub: " + (err.message || err), 5000); }
+    } catch (err) { toast(T("content_error", { error: err.message || err }), 5000); }
   }
   document.addEventListener("dblclick", (ev) => {
     if (!ev.isTrusted || !active()) return;
@@ -676,13 +698,13 @@
   // ---------- bulk / auto ----------
 
   function translateVisible(force = false) {
-    if (!active()) { toast("Gytakusub is off on this site"); return; }
+    if (!active()) { toast(T("content_off_here")); return; }
     // a page auto-translate is holding (waiting to settle, or paused by the spending guard) counts as untranslated: asking takes it over
     const autoQueued = (i) => entries.get(i)?.status === "queued" && queue.some((j) => j.img === i && j.auto);
     const skip = force ? ["working", "queued"] : ["done", "working", "queued"];
     const imgs = visibleImages().filter((i) => !skip.includes(entries.get(i)?.status) || autoQueued(i));
-    if (!imgs.length) { toast("No untranslated images on screen"); return; }
-    toast(`Translating ${imgs.length} image${imgs.length > 1 ? "s" : ""}…`);
+    if (!imgs.length) { toast(T("content_no_untranslated")); return; }
+    toast(TN("content_translating_n", imgs.length));
     for (const img of imgs) enqueue(img, force);
   }
 

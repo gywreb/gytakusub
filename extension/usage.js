@@ -12,6 +12,7 @@
 // - Rate limits: the `anthropic-ratelimit-*` headers of the latest answer, where the
 //   browser lets the page read them.
 // Nothing here is sent anywhere.
+import { t, tn, langTag } from "./i18n.js";
 
 // Anthropic's prices in USD per million tokens, from PRICE_SOURCE as of PRICES_CHECKED.
 // scripts/check-guide.mjs compares them with that page every week and opens an issue when
@@ -162,14 +163,18 @@ export function summary(log, at = Date.now()) {
 // so the panel shows exact spend here and points to the Console's Billing page for the balance.
 
 /** The rate limit in plain words, or "" (headers from the last answer, at most five minutes old). */
-export function limitWords(limits, fmtTime = (t) => new Date(t).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })) {
+export function limitWords(limits, fmtTime = (x) => new Date(x).toLocaleTimeString(langTag(), { hour: "numeric", minute: "2-digit" })) {
   if (!limits) return "";
   const r = limits.requests, i = limits.inputTokens, o = limits.outputTokens;
-  const parts = [r && `${r.remaining} of ${r.limit} requests`, i && `${fmtTokens(i.remaining)} of ${fmtTokens(i.limit)} input tokens`, o && `${fmtTokens(o.remaining)} of ${fmtTokens(o.limit)} output tokens`].filter(Boolean);
+  const parts = [
+    r && t("usage_limit_requests", { left: r.remaining, limit: r.limit }),
+    i && t("usage_limit_input", { left: fmtTokens(i.remaining), limit: fmtTokens(i.limit) }),
+    o && t("usage_limit_output", { left: fmtTokens(o.remaining), limit: fmtTokens(o.limit) }),
+  ].filter(Boolean);
   if (!parts.length) return "";
   const resets = [r?.reset, i?.reset, o?.reset].filter(Boolean).map((x) => Date.parse(x)).filter(Number.isFinite);
-  const full = resets.length ? ` It's full again by ${fmtTime(Math.max(...resets))}.` : "";
-  return `Speed limit (a minute's worth, refilling as you go): ${parts.join(", ")} left at ${fmtTime(limits.at)}.${full}`;
+  const full = resets.length ? " " + t("usage_limits_full", { time: fmtTime(Math.max(...resets)) }) : "";
+  return t("usage_limits", { parts: parts.join(t("usage_list_sep")), time: fmtTime(limits.at) }) + full;
 }
 
 // ---------- words ----------
@@ -185,19 +190,18 @@ export const fmtTokens = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(n >= 1e7 ? 0 : 
  */
 export function usageView(log, at = Date.now()) {
   const { today, month, limits } = summary(log, at);
-  const plural = (n, word) => `${n.toLocaleString()} ${word}${n === 1 ? "" : "s"}`;
-  const usd = (t) => (t.unpriced && !t.cost ? "—" : `${t.cost ? "≈" : ""}${fmtUsd(t.cost)}`);
-  const sub = (t) => (t.pages ? plural(t.pages, "page") : t.requests ? plural(t.requests, "request") : "Nothing yet");
-  const tokens = (t) => (t.requests ? `${plural(t.requests, "request")} · ${fmtTokens(t.input + t.read + t.write)} in · ${fmtTokens(t.output)} out` : "No requests yet");
-  const period = (t, label) => ({ label, cost: usd(t), sub: sub(t), tokens: tokens(t) });
+  const usd = (x) => (x.unpriced && !x.cost ? "—" : `${x.cost ? "≈" : ""}${fmtUsd(x.cost)}`);
+  const sub = (x) => (x.pages ? tn("usage_pages", x.pages) : x.requests ? tn("usage_requests", x.requests) : t("usage_nothing_yet"));
+  const tokens = (x) => (x.requests ? t("usage_tokens", { requests: tn("usage_requests", x.requests), in: fmtTokens(x.input + x.read + x.write), out: fmtTokens(x.output) }) : t("usage_no_requests"));
+  const period = (x, label) => ({ label, cost: usd(x), sub: sub(x), tokens: tokens(x) });
   return {
-    today: period(today, "Today"),
-    month: period(month, new Date(at).toLocaleDateString([], { month: "long", timeZone: "UTC" })),
+    today: period(today, t("usage_today")),
+    month: period(month, new Date(at).toLocaleDateString(langTag(), { month: "long", timeZone: "UTC" })),
     models: month.models.map((m) => ({
       label: m.label,
-      cost: m.unpriced && !m.cost ? "price unknown" : `≈${fmtUsd(m.cost)}`,
+      cost: m.unpriced && !m.cost ? t("usage_price_unknown") : `≈${fmtUsd(m.cost)}`,
       // per page only from pages whose every answer was priced; otherwise just what was sent
-      sub: m.pagesPriced ? `≈${fmtUsd(m.pageCost / m.pagesPriced)} a page · ${plural(m.pages, "page")}` : m.pages ? plural(m.pages, "page") : plural(m.requests, "request"),
+      sub: m.pagesPriced ? t("usage_per_page", { cost: fmtUsd(m.pageCost / m.pagesPriced), pages: tn("usage_pages", m.pages) }) : m.pages ? tn("usage_pages", m.pages) : tn("usage_requests", m.requests),
       tokens: `${m.label}: ${tokens(m)}`,
     })),
     limits: limitWords(limits),
@@ -213,7 +217,7 @@ export function fmtUsd(x) {
 /** When the UTC day starts in the reader's own time, e.g. "7:00 AM". */
 export function dayStart() {
   const d = new Date();
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())).toLocaleTimeString(langTag(), { hour: "numeric", minute: "2-digit" });
 }
 
 /**
@@ -223,11 +227,11 @@ export function dayStart() {
  */
 export function explainApiError(status, body = {}) {
   const e = body.error || {}, code = e.details?.error_code || "", msg = String(e.message || "");
-  if (status === 429 && code === "enforced_spend_limit_reached") return "Your Claude account reached its monthly spend cap. The API pauses until 00:00 UTC on the 1st, unless you ask for a higher limit in the Claude Console.";
-  if (status === 429) return "Claude's rate limit for your account was reached for the moment. Wait a minute and translate again; fewer pages at once also helps.";
-  if (/credit balance/i.test(msg)) return "Your Claude credit balance is too low. Add credits (or check your plan's monthly API credits) in the Claude Console under Billing.";
-  if (status === 400 && /spend limit|usage limit/i.test(msg)) return "Your Claude account reached the spend limit you set. Raise it in the Claude Console under Limits.";
-  if (status === 401) return "Claude refused the API key. Check it in Settings, or create a new one in the Claude Console.";
-  if (status === 529) return "Claude is overloaded right now. Try again in a minute.";
+  if (status === 429 && code === "enforced_spend_limit_reached") return t("api_err_spend_cap");
+  if (status === 429) return t("api_err_rate_limit");
+  if (/credit balance/i.test(msg)) return t("api_err_credit");
+  if (status === 400 && /spend limit|usage limit/i.test(msg)) return t("api_err_spend_limit");
+  if (status === 401) return t("api_err_key");
+  if (status === 529) return t("api_err_overloaded");
   return "";
 }

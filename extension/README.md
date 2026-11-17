@@ -35,6 +35,7 @@ Settings, glossary and (optionally) the API key sync through your browser's sync
 | Peek at the original lettering | Options → *Peek at the original while hovering* (off by default), then rest the pointer on a translated bubble |
 | See what translating costs | Popup → "≈$… today" next to the model; Options → **What translating costs**: your cost per page for each model, today and this month (this browser only; tokens and rate limits under Details). Balance and spend limit: the Console's Billing page |
 | Report a bad page | Options → *Debug overlay*, then popup → **Export debug report** (one `.zip` for every translated page on the tab). It contains the page images, so don't attach it to a public GitHub issue. |
+| Change the language | Options → *Translation* → *Target language*, or the picker on the setup page. The extension's own pages follow it when they're translated into it (10 languages), and stay English otherwise. |
 | Withdraw the agreement or remove site access | Options → **About** |
 | Auto-translate paused with a Continue button | A spending guard: after 100 pages Claude translated in 10 minutes on one tab, auto-translate waits for you (a page swapping images could otherwise keep sending them). Click **Continue**; Translate visible works meanwhile. |
 
@@ -69,6 +70,10 @@ access.js         the agreement (welcome.html) and site access, asked at first u
 imagecheck.js     downloads: only real images (by their bytes), capped at 25 MB
 welcome.*         setup page: what is sent and where, I agree, API key, Allow access
 settings.js       settings defaults and storage, shared by the worker, popup and options
+languages.js      the target languages in the dropdown, and which have a translated interface
+i18n.js           interface text: loads _locales/<locale>/messages.json, fills data-i18n* elements, plurals
+locale.js         i18n.js for extension pages (reads the extension's own files)
+_locales/         interface text in 10 languages (Chrome's messages.json format; English is the reference)
 prompt.js         Claude prompt, structured-output schema, API call, response parsing
 content.js        image discovery, hover bar, overlay rendering & positioning, auto mode, debug report
 text.js           text fitting and drawing on the page side

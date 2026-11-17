@@ -1,0 +1,818 @@
+{
+ "appDescription": {
+  "message": "Terjemahkan halaman manga dan komik langsung di situs mana pun, dengan kunci API Claude milikmu sendiri. Tanpa akun, tanpa server."
+ },
+ "cmdTranslate": {
+  "message": "Terjemahkan semua gambar yang sedang tampil di layar"
+ },
+ "cmdToggle": {
+  "message": "Tampilkan / sembunyikan terjemahan di halaman ini"
+ },
+ "popup_turn_gytakusub_on_or_off": {
+  "message": "Nyalakan atau matikan Gytakusub di semua situs"
+ },
+ "popup_enabled_arialabel": {
+  "message": "Gytakusub menyala"
+ },
+ "popup_finish_setting_up_gytakusub_see": {
+  "message": "<b>Selesaikan pengaturan Gytakusub.</b> Lihat apa yang dikirim ke Claude, setujui, dan izinkan Gytakusub membaca gambar manga. Hanya butuh semenit."
+ },
+ "popup_openSetup": {
+  "message": "Atur"
+ },
+ "popup_offNote": {
+  "message": "Gytakusub mati di semua situs. Nyalakan dengan sakelar di atas; pengaturanmu tetap tersimpan."
+ },
+ "popup_no_claude_api_key_yet": {
+  "message": "Belum ada kunci API Claude."
+ },
+ "popup_openOptions2": {
+  "message": "Tambah kunci"
+ },
+ "popup_allow_gytakusub_to_read_manga": {
+  "message": "Izinkan Gytakusub membaca gambar manga di situs web."
+ },
+ "popup_allowAccess": {
+  "message": "Izinkan akses"
+ },
+ "popup_translate": {
+  "message": "<span>Terjemahkan gambar yang tampil</span><kbd id=\"kbdTranslate\">Alt+T</kbd>"
+ },
+ "popup_toggle_title": {
+  "message": "Sembunyikan / tampilkan terjemahan (Alt+Shift+T)"
+ },
+ "popup_toggle_arialabel": {
+  "message": "Sembunyikan atau tampilkan terjemahan"
+ },
+ "popup_siteHead": {
+  "message": "Di <span id=\"host\">situs ini</span>"
+ },
+ "popup_enable_here": {
+  "message": "Aktifkan di sini"
+ },
+ "popup_hover_button_and_keyboard_shortcuts": {
+  "message": "Tombol saat kursor di atas gambar dan pintasan keyboard"
+ },
+ "popup_auto_translate_while_scrolling": {
+  "message": "Terjemahkan otomatis saat menggulir"
+ },
+ "popup_sends_pages_to_claude_as": {
+  "message": "Mengirim halaman ke Claude saat kamu menggulir"
+ },
+ "popup_trHead": {
+  "message": "Terjemahan"
+ },
+ "popup_usageToday_title": {
+  "message": "Biaya menerjemahkan hari ini, dihitung di browser ini (detail di Pengaturan)"
+ },
+ "popup_model": {
+  "message": "Model"
+ },
+ "popup_model_hint_haiku": {
+  "message": "Tercepat, termurah"
+ },
+ "popup_model_hint_sonnet": {
+  "message": "Untuk halaman padat"
+ },
+ "popup_model_hint_opus": {
+  "message": "Terbaik, termahal"
+ },
+ "popup_chapter_context": {
+  "message": "Konteks bab"
+ },
+ "popup_names_recent_lines_for_continuity": {
+  "message": "Nama + baris terbaru, agar tetap nyambung"
+ },
+ "popup_openOptions": {
+  "message": "Semua pengaturan"
+ },
+ "popup_exportReport_title": {
+  "message": "Satu .zip berisi setiap halaman yang diterjemahkan di tab ini: gambar asli, render debug, dan JSON"
+ },
+ "popup_exportReport": {
+  "message": "Ekspor laporan debug"
+ },
+ "popup_not_web_page": {
+  "message": "Bukan halaman web."
+ },
+ "popup_no_access": {
+  "message": "Tanpa izin, Gytakusub tidak bisa membaca gambar di sini. Pilih Izinkan akses kalau kamu sudah siap."
+ },
+ "popup_this_page": {
+  "message": "halaman ini"
+ },
+ "popup_state_excluded": {
+  "message": "{host} ada di daftar situs yang kamu matikan."
+ },
+ "popup_state_translated_one": {
+  "message": "{n} diterjemahkan"
+ },
+ "popup_state_translated_other": {
+  "message": "{n} diterjemahkan"
+ },
+ "popup_state_in_progress_one": {
+  "message": "{n} sedang diproses"
+ },
+ "popup_state_in_progress_other": {
+  "message": "{n} sedang diproses"
+ },
+ "popup_list_sep": {
+  "message": ","
+ },
+ "popup_state_hidden": {
+  "message": "(disembunyikan)"
+ },
+ "popup_not_active": {
+  "message": "Belum aktif di halaman ini. Tombol Terjemahkan tetap berfungsi."
+ },
+ "popup_reload_tab": {
+  "message": "Muat ulang tab untuk mengaktifkan Gytakusub di sini."
+ },
+ "popup_allow_above": {
+  "message": "Izinkan akses (di atas) untuk memakai Gytakusub di sini."
+ },
+ "popup_on": {
+  "message": "Nyala"
+ },
+ "popup_off": {
+  "message": "Mati"
+ },
+ "popup_toggle_title_key": {
+  "message": "Sembunyikan / tampilkan terjemahan ({key})"
+ },
+ "popup_preparing": {
+  "message": "Menyiapkan…"
+ },
+ "popup_export_failed": {
+  "message": "Ekspor gagal: {error}"
+ },
+ "popup_report_downloaded_one": {
+  "message": "Laporan diunduh: {n} halaman"
+ },
+ "popup_report_downloaded_other": {
+  "message": "Laporan diunduh: {n} halaman"
+ },
+ "popup_usage_today": {
+  "message": "≈{cost} hari ini"
+ },
+ "popup_usage_today_aria": {
+  "message": "Biaya menerjemahkan hari ini: sekitar {cost}. Buka detail."
+ },
+ "welcome_set_up_gytakusub": {
+  "message": "Atur Gytakusub"
+ },
+ "welcome_allSet": {
+  "message": "Semua siap. Buka satu bab manga dan klik ikon Gytakusub di toolbar."
+ },
+ "welcome_h_consent": {
+  "message": "Apa yang dikirim Gytakusub, dan ke mana"
+ },
+ "welcome_only_the_pages_you_translate": {
+  "message": "<b>Hanya halaman yang kamu terjemahkan.</b> Sebuah halaman dibaca saat kamu mengklik tombol Terjemahkan-nya, menekan <kbd class=\"kbdTranslate\">Alt+T</kbd>, atau menyalakan terjemahan otomatis untuk situs itu. Halaman lain tidak pernah dibaca."
+ },
+ "welcome_sent_to_anthropic_s_claude": {
+  "message": "<b>Dikirim ke API Claude milik Anthropic, dengan kuncimu:</b> gambar halaman (dipotong menjadi beberapa bagian), glosarium dan instruksi khususmu, serta nama-nama yang sudah diterjemahkan di bab yang sama. Dengan <i>Konteks bab</i> (menyala kecuali kamu matikan), juga beberapa baris dialog terakhir."
+ },
+ "welcome_nowhere_else_gytakusub_has_no": {
+  "message": "<b>Tidak ke tempat lain.</b> Gytakusub tidak punya server, akun, maupun analitik. Kuncimu tetap di browser ini. Pengaturan dan glosariummu ikut sinkronisasi browsermu, jika kamu memakainya (kunci juga, hanya jika kamu memilih itu di Pengaturan)."
+ },
+ "welcome_anthropic_handles_what_you_send": {
+  "message": "Anthropic menangani apa yang kamu kirim sesuai <a href=\"https://www.anthropic.com/legal/commercial-terms\" target=\"_blank\" rel=\"noopener\">ketentuan komersial</a> dan <a href=\"https://www.anthropic.com/legal/privacy\" target=\"_blank\" rel=\"noopener\">kebijakan privasi</a> mereka. <a href=\"https://gywreb.github.io/gytakusub/privacy.html\" target=\"_blank\" rel=\"noopener\">Kebijakan privasi</a> Gytakusub berisi rinciannya."
+ },
+ "welcome_agree": {
+  "message": "Saya setuju"
+ },
+ "welcome_h_key": {
+  "message": "Tambahkan kunci API Claude-mu"
+ },
+ "welcome_create_a_key_in_the": {
+  "message": "Buat kunci di <a href=\"https://platform.claude.com/\" target=\"_blank\" rel=\"noopener\">Claude Console</a> (API keys), lalu tempelkan di pengaturan Gytakusub. Kunci tetap di browser ini dan hanya dikirim ke Anthropic."
+ },
+ "welcome_h_access": {
+  "message": "Izinkan Gytakusub membaca gambar manga"
+ },
+ "welcome_manga_sites_usually_load_their": {
+  "message": "Situs manga biasanya memuat halamannya dari server gambar lain, jadi Gytakusub meminta akses ke semua situs web. Browsermu akan meminta konfirmasi dengan kalimat bakunya: bahwa ekstensi bisa <i>membaca dan mengubah semua datamu di semua situs web</i>. Gytakusub hanya memakainya untuk mengunduh gambar yang kamu terjemahkan: ia hanya membaca halaman saat kamu menerjemahkannya, hanya berjalan sendiri di situs yang kamu nyalakan terjemahan otomatisnya, dan tidak pernah mengubah apa pun di halaman selain menggambar terjemahan di atas gambar."
+ },
+ "welcome_allow": {
+  "message": "Izinkan akses"
+ },
+ "welcome_h_use": {
+  "message": "Cara menerjemahkan"
+ },
+ "welcome_open_a_chapter_on_a": {
+  "message": "Buka satu bab di situs manga."
+ },
+ "welcome_click_the_gytakusub_icon_in": {
+  "message": "Klik ikon Gytakusub di toolbar. Kalau tidak terlihat, buka menu berbentuk kepingan puzzle dan sematkan Gytakusub."
+ },
+ "welcome_turn_on_enable_here_for": {
+  "message": "Nyalakan <b>Aktifkan di sini</b> untuk mendapat tombol Terjemahkan di setiap halaman, atau <b>Terjemahkan otomatis saat menggulir</b>. Atau cukup tekan <kbd class=\"kbdTranslate\">Alt+T</kbd> untuk menerjemahkan yang tampil di layar."
+ },
+ "welcome_h_cost": {
+  "message": "Biayanya"
+ },
+ "welcome_you_pay_anthropic_for_what": {
+  "message": "Kamu membayar Anthropic sesuai pemakaian, dari saldo Claude Console-mu. Model bawaan, Haiku 5.5, harganya 1/20 dari Sonnet 5.5 (<a href=\"https://platform.claude.com/docs/en/about-claude/pricing\" target=\"_blank\" rel=\"noopener\">harga Anthropic</a>). Setelah kamu menerjemahkan beberapa halaman, <b>Pengaturan → Biaya menerjemahkan</b> menunjukkan biaya tiap halaman, dihitung dari jawaban Claude sendiri ke browser ini."
+ },
+ "welcome_to_cap_your_spending_on": {
+  "message": "Untuk membatasi pengeluaran di semua perangkat, pasang batas pengeluaran bulanan di <a href=\"https://platform.claude.com/settings/billing\" target=\"_blank\" rel=\"noopener\">halaman Billing</a> Console (Spend limits). Claude berhenti di sana."
+ },
+ "welcome_h_help": {
+  "message": "Bantuan"
+ },
+ "welcome_found_a_problem_or_have": {
+  "message": "Menemukan masalah atau punya ide? <a href=\"https://github.com/gywreb/gytakusub/issues\" target=\"_blank\" rel=\"noopener\">Buka issue di GitHub</a>. Issue bersifat publik, jadi jangan lampirkan halaman manga atau laporan debug di sana."
+ },
+ "welcome_gytakusub_is_an_independent_open": {
+  "message": "Gytakusub adalah proyek independen dan sumber terbuka. Tidak dibuat, didukung, atau berafiliasi dengan Anthropic.<br /><a href=\"https://github.com/gywreb/gytakusub\" target=\"_blank\" rel=\"noopener\">Kode sumber</a> · <a href=\"https://gywreb.github.io/gytakusub/privacy.html\" target=\"_blank\" rel=\"noopener\">Kebijakan privasi</a>"
+ },
+ "welcome_lede": {
+  "message": "Gytakusub menerjemahkan manga, manhwa, dan komik di situs web pilihanmu, dengan kunci API Claude milikmu sendiri. Tiga langkah dan siap."
+ },
+ "welcome_lede_update": {
+  "message": "Sekarang Gytakusub bertanya dulu sebelum membaca halaman mana pun. Lihat apa yang dikirim dan setujui untuk terus menerjemahkan."
+ },
+ "welcome_state_agreed": {
+  "message": "Disetujui"
+ },
+ "welcome_state_key": {
+  "message": "Kunci tersimpan"
+ },
+ "welcome_state_allowed": {
+  "message": "Diizinkan"
+ },
+ "welcome_hint_agreed": {
+  "message": "Kamu menyetujui pada {date}. Kamu bisa menariknya kapan saja di Pengaturan → Tentang."
+ },
+ "welcome_hint_not_agreed": {
+  "message": "Tidak ada yang dikirim sampai kamu setuju. Kamu bisa menariknya kapan saja di Pengaturan → Tentang."
+ },
+ "welcome_change_key": {
+  "message": "Ganti kunci"
+ },
+ "welcome_open_settings": {
+  "message": "Buka pengaturan"
+ },
+ "welcome_hint_access_remove": {
+  "message": "Kamu bisa mencabutnya kapan saja di Pengaturan → Tentang, atau di halaman ekstensi browser."
+ },
+ "welcome_hint_agree_first": {
+  "message": "Setujui langkah 1 dulu."
+ },
+ "welcome_not_allowed": {
+  "message": "Tidak diizinkan. Gytakusub tidak bisa membaca gambar manga sampai kamu mengizinkannya."
+ },
+ "welcome_translate_shortcut": {
+  "message": "pintasan Terjemahkan"
+ },
+ "welcome_translate_into": {
+  "message": "Bahasa terjemahan"
+ },
+ "welcome_language_hint": {
+  "message": "Halaman Gytakusub sendiri juga mengikuti bahasa ini, jika sudah diterjemahkan. Bahasa lain: Pengaturan → Terjemahan."
+ },
+ "opt_gytakusub_settings": {
+  "message": "Pengaturan Gytakusub"
+ },
+ "opt_changes_apply_after_you_save": {
+  "message": "Perubahan berlaku setelah kamu menyimpan."
+ },
+ "opt_sections": {
+  "message": "Bagian"
+ },
+ "opt_claude_api": {
+  "message": "API Claude"
+ },
+ "opt_costs": {
+  "message": "Biaya"
+ },
+ "opt_translation": {
+  "message": "Terjemahan"
+ },
+ "opt_sites": {
+  "message": "Situs"
+ },
+ "opt_lettering_speed": {
+  "message": "Huruf & kecepatan"
+ },
+ "opt_troubleshooting": {
+  "message": "Pemecahan masalah"
+ },
+ "opt_about": {
+  "message": "Tentang"
+ },
+ "opt_h_api": {
+  "message": "API Claude"
+ },
+ "opt_gytakusub_sends_pages_to_claude": {
+  "message": "Gytakusub mengirim halaman ke Claude dengan kuncimu sendiri."
+ },
+ "opt_api_key": {
+  "message": "Kunci API"
+ },
+ "opt_testKey": {
+  "message": "Simpan & uji"
+ },
+ "opt_apiKeyHint": {
+  "message": "Buat di <a href=\"https://platform.claude.com/\" target=\"_blank\" rel=\"noopener\">platform.claude.com</a> → Settings → API keys. Pemakaian ditagihkan ke akun Console itu, terpisah dari langganan Claude (paket Max, Ultra, dan Team termasuk kredit API bulanan)."
+ },
+ "opt_sync_the_key_to_my": {
+  "message": "Sinkronkan kunci ke browser saya yang lain"
+ },
+ "opt_keeps_it_in_browser_sync": {
+  "message": "Menyimpannya di sinkronisasi browser, bukan hanya di perangkat ini"
+ },
+ "opt_model": {
+  "message": "Model"
+ },
+ "opt_claude_haiku_5_5_fastest": {
+  "message": "Claude Haiku 5.5 — tercepat, termurah"
+ },
+ "opt_claude_sonnet_5_5_better": {
+  "message": "Claude Sonnet 5.5 — lebih baik untuk halaman padat / bergaya"
+ },
+ "opt_claude_opus_5_5_best": {
+  "message": "Claude Opus 5.5 — kualitas terbaik, termahal"
+ },
+ "opt_h_usage": {
+  "message": "Biaya menerjemahkan"
+ },
+ "opt_this_browser": {
+  "message": "Browser ini"
+ },
+ "opt_counted_from_claude_s_own": {
+  "message": "Dihitung dari jawaban Claude sendiri ke browser ini. Ponsel dan browsermu yang lain menghitung sendiri."
+ },
+ "opt_today": {
+  "message": "Hari ini"
+ },
+ "opt_cuModels_arialabel": {
+  "message": "Bulan ini per model, dengan biaya per halaman"
+ },
+ "opt_cap_your_spending_on_every": {
+  "message": "<b>Batasi pengeluaran di semua perangkat.</b> Pasang batas pengeluaran bulanan di Claude Console (Billing → Spend limits). Batas itu berlaku untuk semua yang memakai kuncimu, dan Claude berhenti di sana."
+ },
+ "opt_open_billing": {
+  "message": "Buka Billing"
+ },
+ "opt_details": {
+  "message": "Detail"
+ },
+ "opt_today_2": {
+  "message": "<b>Hari ini:</b> <span id=\"cuTodayTokens\"></span>"
+ },
+ "opt_this_month": {
+  "message": "<b>Bulan ini:</b> <span id=\"cuMonthTokens\"></span>"
+ },
+ "opt_estimate_tokens_are_exact_the": {
+  "message": "<b>Perkiraan:</b> jumlah token tepat; biayanya memakai <a id=\"cuPriceLink\" href=\"https://platform.claude.com/docs/en/about-claude/pricing\" target=\"_blank\" rel=\"noopener\">harga Anthropic</a> (dicek pada <span id=\"cuChecked\"></span>). Halaman dari cache tidak berbiaya dan tidak dihitung."
+ },
+ "opt_exact_bill_the_claude_console": {
+  "message": "<b>Tagihan pasti:</b> halaman <a href=\"https://platform.claude.com/usage\" target=\"_blank\" rel=\"noopener\">Usage</a> dan <a href=\"https://platform.claude.com/cost\" target=\"_blank\" rel=\"noopener\">Cost</a> di Claude Console."
+ },
+ "opt_balance_and_credits_including_a": {
+  "message": "<b>Saldo dan kredit</b> (termasuk kredit API bulanan dari paket): <a href=\"https://platform.claude.com/settings/billing\" target=\"_blank\" rel=\"noopener\">halaman Billing</a> di Console. Anthropic tidak menyediakan cara bagi aplikasi untuk membacanya."
+ },
+ "opt_days_start_at_midnight_utc": {
+  "message": "<b>Hari</b> dimulai pukul <span id=\"cuDayStart\">tengah malam UTC</span> waktumu (tengah malam UTC), seperti laporan pemakaian Anthropic."
+ },
+ "opt_cuClear": {
+  "message": "Hapus riwayat pemakaian"
+ },
+ "opt_h_translation": {
+  "message": "Terjemahan"
+ },
+ "opt_target_language": {
+  "message": "Bahasa tujuan"
+ },
+ "opt_glossary": {
+  "message": "Glosarium"
+ },
+ "opt_glossary_placeholder": {
+  "message": "Satu per baris, misalnya\nGojo Satoru = Satoru Gojo\n呪術 = jujutsu"
+ },
+ "opt_glossaryHint": {
+  "message": "Nama dan istilah yang harus dipakai model persis seperti ini. Nama yang ia temukan sendiri diingat otomatis per tab."
+ },
+ "opt_extra_instructions": {
+  "message": "Instruksi tambahan"
+ },
+ "opt_chapter_context": {
+  "message": "Konteks bab"
+ },
+ "opt_sends_names_and_the_last": {
+  "message": "Mengirim nama dan ~40 baris terakhir yang diterjemahkan di tab ini bersama setiap halaman: lebih nyambung, sekitar 400 token input tambahan"
+ },
+ "opt_also_transcribe_the_original_text": {
+  "message": "Tulis ulang juga teks aslinya"
+ },
+ "opt_slower_slightly_more_careful_reading": {
+  "message": "Lebih lambat, membaca sedikit lebih teliti; berguna untuk debug"
+ },
+ "opt_uppercase_lettering": {
+  "message": "Huruf KAPITAL"
+ },
+ "opt_comic_book_style": {
+  "message": "Gaya komik"
+ },
+ "opt_h_sites": {
+  "message": "Situs"
+ },
+ "opt_one_hostname_per_line_the": {
+  "message": "Satu nama host per baris. Cara termudah menambah situs: buka situsnya dan pakai sakelar di jendela toolbar."
+ },
+ "opt_enabled_sites": {
+  "message": "Situs aktif"
+ },
+ "opt_enabledSitesHint": {
+  "message": "Tombol saat kursor di atas gambar dan pintasan keyboard hanya berfungsi di sini. Di tempat lain Gytakusub diam sampai kamu memakai tombol toolbar atau pintasannya."
+ },
+ "opt_auto_translate_while_scrolling": {
+  "message": "Terjemahkan otomatis saat menggulir"
+ },
+ "opt_autoSitesHint": {
+  "message": "Setiap halaman yang masuk ke layar dikirim ke Claude secara otomatis, jadi tambahkan hanya situs tempat kamu mau memakai token. Situs ini juga dihitung aktif."
+ },
+ "opt_disabled_sites": {
+  "message": "Situs nonaktif"
+ },
+ "opt_excludedSitesHint": {
+  "message": "Gytakusub tetap mati di situs ini dan subdomainnya."
+ },
+ "opt_h_look": {
+  "message": "Huruf & kecepatan"
+ },
+ "opt_font_family": {
+  "message": "Jenis huruf"
+ },
+ "opt_fontHint": {
+  "message": "Kosongkan untuk memakai huruf bawaan (Comic Neue Bold), atau tulis nama huruf apa pun yang terpasang di perangkat ini, misalnya <code>\"Bangers\"</code>."
+ },
+ "opt_use_the_graphics_card_webgpu": {
+  "message": "Pakai kartu grafis (WebGPU)"
+ },
+ "opt_finds_text_and_bubbles_much": {
+  "message": "Menemukan teks dan balon kata jauh lebih cepat. Matikan hanya jika halaman jadi salah atau browser bermasalah."
+ },
+ "opt_peek_at_the_original_while": {
+  "message": "Intip aslinya saat kursor di atasnya"
+ },
+ "opt_hovering_a_translated_bubble_shows": {
+  "message": "Mengarahkan kursor ke balon yang sudah diterjemahkan menampilkan tulisan aslinya. Untuk memperbaiki satu baris, klik dua kali balonnya."
+ },
+ "opt_h_debug": {
+  "message": "Pemecahan masalah"
+ },
+ "opt_debug_overlay": {
+  "message": "Lapisan debug"
+ },
+ "opt_draws_the_detected_regions_and": {
+  "message": "Menggambar area dan area teks yang terdeteksi di halaman yang diterjemahkan, dan menambah tombol Laporan di bilah melayang yang mengunduh gambar asli, render debug, dan JSON halaman itu. \"Ekspor laporan debug\" di jendela toolbar melakukannya untuk semua halaman yang diterjemahkan di tab."
+ },
+ "opt_translation_cache": {
+  "message": "Cache terjemahan"
+ },
+ "opt_translated_pages_the_names_found": {
+  "message": "Halaman yang diterjemahkan, nama yang ditemukan per tab, dan baris yang kamu ubah disimpan sampai browser ditutup. Hapus untuk menerjemahkan ulang dari awal."
+ },
+ "opt_clearCache": {
+  "message": "Hapus cache"
+ },
+ "opt_h_about": {
+  "message": "Tentang"
+ },
+ "opt_what_is_sent_to_claude": {
+  "message": "Apa yang dikirim ke Claude"
+ },
+ "opt_access_to_websites": {
+  "message": "Akses ke situs web"
+ },
+ "opt_help": {
+  "message": "Bantuan"
+ },
+ "opt_report_a_problem_or_ask": {
+  "message": "Laporkan masalah atau bertanya di <a href=\"https://github.com/gywreb/gytakusub/issues\" target=\"_blank\" rel=\"noopener\">GitHub Issues</a>. Issue bersifat publik, jadi jangan lampirkan halaman manga atau laporan debug di sana."
+ },
+ "opt_gytakusub_is_an_independent_project": {
+  "message": "Gytakusub adalah proyek independen, tidak dibuat oleh atau berafiliasi dengan Anthropic. <a href=\"https://gywreb.github.io/gytakusub/privacy.html\" target=\"_blank\" rel=\"noopener\">Kebijakan privasi</a> · <a href=\"welcome.html\" target=\"_blank\">Panduan pengaturan</a>"
+ },
+ "opt_gytakusub_is_free_software_under": {
+  "message": "Gytakusub <span id=\"version\"></span> adalah perangkat lunak bebas di bawah <a href=\"LICENSE\" target=\"_blank\">GNU AGPL v3</a> · <a href=\"https://github.com/gywreb/gytakusub\" target=\"_blank\" rel=\"noopener\">kode sumber</a> · <a href=\"THIRD_PARTY.md\" target=\"_blank\">komponen pihak ketiga</a>"
+ },
+ "opt_save": {
+  "message": "Simpan"
+ },
+ "opt_unsaved": {
+  "message": "Ada perubahan yang belum disimpan"
+ },
+ "opt_loading": {
+  "message": "Pengaturan masih dimuat."
+ },
+ "opt_saved": {
+  "message": "Tersimpan."
+ },
+ "opt_confirm_clear_usage": {
+  "message": "Hapus riwayat pemakaian browser ini? Claude Console tetap menyimpan catatannya sendiri."
+ },
+ "opt_usage_cleared": {
+  "message": "Riwayat pemakaian dihapus."
+ },
+ "opt_show": {
+  "message": "Tampilkan"
+ },
+ "opt_hide": {
+  "message": "Sembunyikan"
+ },
+ "opt_testing": {
+  "message": "Menguji…"
+ },
+ "opt_no_key_saved": {
+  "message": "Belum ada kunci API yang disimpan."
+ },
+ "opt_key_works": {
+  "message": "Kunci berfungsi. Model {model} menjawab."
+ },
+ "opt_key_failed": {
+  "message": "Uji kunci gagal: {error}"
+ },
+ "opt_confirm_clear_cache": {
+  "message": "Hapus halaman yang diterjemahkan, nama yang ditemukan per tab, dan baris yang kamu ubah?"
+ },
+ "opt_cache_cleared_unsaved": {
+  "message": "Cache dihapus. Perubahanmu yang lain belum disimpan."
+ },
+ "opt_cache_cleared": {
+  "message": "Cache dihapus."
+ },
+ "opt_save_title": {
+  "message": "Simpan ({key})"
+ },
+ "opt_consent_agreed": {
+  "message": "Kamu menyetujui pada {date}. Jika ditarik, tidak ada lagi yang dikirim sampai kamu setuju lagi."
+ },
+ "opt_consent_none": {
+  "message": "Belum disetujui, jadi tidak ada yang dikirim. Buka halaman pengaturan awal untuk melihat apa yang dikirim dan menyetujuinya."
+ },
+ "opt_withdraw": {
+  "message": "Tarik"
+ },
+ "opt_review_agree": {
+  "message": "Tinjau dan setujui"
+ },
+ "opt_access_allowed": {
+  "message": "Diizinkan: Gytakusub bisa membaca gambar di situs web, hanya saat kamu menerjemahkan atau di situs dengan terjemahan otomatis menyala."
+ },
+ "opt_access_none": {
+  "message": "Tidak diizinkan: Gytakusub tidak bisa membaca gambar manga sampai kamu mengizinkannya."
+ },
+ "opt_remove_access": {
+  "message": "Cabut akses"
+ },
+ "opt_allow_access": {
+  "message": "Izinkan akses"
+ },
+ "opt_agree_first": {
+  "message": "Setujui dulu apa yang dikirim"
+ },
+ "opt_cannot_read": {
+  "message": "Tidak bisa membaca pengaturan: {error}"
+ },
+ "opt_other_language": {
+  "message": "Lainnya…"
+ },
+ "opt_other_language_label": {
+  "message": "Bahasa lain"
+ },
+ "opt_other_language_placeholder": {
+  "message": "Ketik nama bahasa"
+ },
+ "opt_target_language_hint": {
+  "message": "Halaman Gytakusub sendiri juga mengikuti bahasa ini, jika sudah diterjemahkan (jika belum, bahasa Inggris)."
+ },
+ "opt_customPrompt_placeholder": {
+  "message": "misalnya: Pertahankan nada santai. Terjemahkan efek suara (SFX) menjadi onomatope bahasa Indonesia."
+ },
+ "content_translate_image": {
+  "message": "Terjemahkan gambar ini"
+ },
+ "content_toggle_image": {
+  "message": "Tampilkan atau sembunyikan terjemahan"
+ },
+ "content_report": {
+  "message": "Laporan"
+ },
+ "content_report_title": {
+  "message": "Unduh laporan diagnostik untuk halaman ini (asli, render debug, JSON)"
+ },
+ "content_report_aria": {
+  "message": "Unduh laporan diagnostik"
+ },
+ "content_continue": {
+  "message": "Lanjutkan"
+ },
+ "content_btn_translating": {
+  "message": "Menerjemahkan…"
+ },
+ "content_btn_queued": {
+  "message": "Dalam antrean…"
+ },
+ "content_btn_redo": {
+  "message": "↻ Ulangi"
+ },
+ "content_btn_translate": {
+  "message": "Terjemahkan"
+ },
+ "content_btn_show": {
+  "message": "Tampilkan"
+ },
+ "content_btn_hide": {
+  "message": "Sembunyikan"
+ },
+ "content_lines_one": {
+  "message": "{n} baris"
+ },
+ "content_lines_other": {
+  "message": "{n} baris"
+ },
+ "content_nothing_translated": {
+  "message": "Belum ada yang diterjemahkan di halaman ini"
+ },
+ "content_preparing_report_one": {
+  "message": "Menyiapkan laporan untuk {n} halaman…"
+ },
+ "content_preparing_report_other": {
+  "message": "Menyiapkan laporan untuk {n} halaman…"
+ },
+ "content_report_done_one": {
+  "message": "Laporan diunduh ({n} halaman, {size} MB). Isinya termasuk gambar halaman: bagikan secara pribadi, jangan pernah di issue publik."
+ },
+ "content_report_done_other": {
+  "message": "Laporan diunduh ({n} halaman, {size} MB). Isinya termasuk gambar halaman: bagikan secara pribadi, jangan pernah di issue publik."
+ },
+ "content_paused_one": {
+  "message": "Terjemahan otomatis dijeda setelah {n} halaman dalam 10 menit, agar pengeluaran Claude-mu tetap terkendali."
+ },
+ "content_paused_other": {
+  "message": "Terjemahan otomatis dijeda setelah {n} halaman dalam 10 menit, agar pengeluaran Claude-mu tetap terkendali."
+ },
+ "content_error": {
+  "message": "Gytakusub: {error}"
+ },
+ "content_edit_dialog": {
+  "message": "Ubah terjemahan"
+ },
+ "content_translated_line": {
+  "message": "Baris terjemahan"
+ },
+ "content_save": {
+  "message": "Simpan"
+ },
+ "content_cancel": {
+  "message": "Batal"
+ },
+ "content_teach": {
+  "message": "Ajari glosarium (berlaku untuk halaman berikutnya)"
+ },
+ "content_original_term_ph": {
+  "message": "istilah asli"
+ },
+ "content_original_term": {
+  "message": "Istilah asli"
+ },
+ "content_translation_ph": {
+  "message": "terjemahan"
+ },
+ "content_translation": {
+  "message": "Terjemahan"
+ },
+ "content_add": {
+  "message": "Tambah"
+ },
+ "content_fill_both": {
+  "message": "Isi istilah asli dan terjemahannya"
+ },
+ "content_glossary_updated": {
+  "message": "Glosarium diperbarui: {from} = {to}"
+ },
+ "content_glossary_added": {
+  "message": "Ditambahkan ke glosarium: {from} = {to}"
+ },
+ "content_off_here": {
+  "message": "Gytakusub mati di situs ini"
+ },
+ "content_no_untranslated": {
+  "message": "Tidak ada gambar yang belum diterjemahkan di layar"
+ },
+ "content_translating_n_one": {
+  "message": "Menerjemahkan {n} gambar…"
+ },
+ "content_translating_n_other": {
+  "message": "Menerjemahkan {n} gambar…"
+ },
+ "bg_bad_data": {
+  "message": "Data gambar tidak didukung"
+ },
+ "bg_too_large": {
+  "message": "Gambar terlalu besar (lebih dari {mb} MB)"
+ },
+ "bg_bad_url": {
+  "message": "Alamat gambar tidak valid"
+ },
+ "bg_http_only": {
+  "message": "Hanya gambar http(s) yang didukung"
+ },
+ "bg_no_access": {
+  "message": "Gytakusub butuh izinmu untuk membaca gambar dari {host}. Buka jendela Gytakusub di toolbar dan pilih Izinkan akses."
+ },
+ "bg_download_failed": {
+  "message": "Tidak bisa mengunduh gambar dari {host} ({error})"
+ },
+ "bg_fetch_status": {
+  "message": "Tidak bisa mengambil gambar ({status})"
+ },
+ "bg_not_image": {
+  "message": "Alamat itu tidak mengembalikan gambar"
+ },
+ "bg_off": {
+  "message": "Gytakusub sedang mati (jendela toolbar)."
+ },
+ "bg_not_set_up": {
+  "message": "Gytakusub belum diatur: buka jendela Gytakusub di toolbar dan pilih Atur, untuk melihat apa yang dikirim ke Claude dan menyetujuinya."
+ },
+ "bg_no_key": {
+  "message": "Belum ada kunci API. Buka pengaturan Gytakusub dan tempelkan kunci API Claude-mu."
+ },
+ "bg_gloss_both": {
+  "message": "Teks asli dan terjemahannya sama-sama diperlukan"
+ },
+ "bg_report_needs_debug": {
+  "message": "Nyalakan lapisan debug di Pengaturan untuk mengekspor laporan"
+ },
+ "usage_pages_one": {
+  "message": "{n} halaman"
+ },
+ "usage_pages_other": {
+  "message": "{n} halaman"
+ },
+ "usage_requests_one": {
+  "message": "{n} permintaan"
+ },
+ "usage_requests_other": {
+  "message": "{n} permintaan"
+ },
+ "usage_nothing_yet": {
+  "message": "Belum ada"
+ },
+ "usage_tokens": {
+  "message": "{requests} · {in} masuk · {out} keluar"
+ },
+ "usage_no_requests": {
+  "message": "Belum ada permintaan"
+ },
+ "usage_today": {
+  "message": "Hari ini"
+ },
+ "usage_price_unknown": {
+  "message": "harga tidak diketahui"
+ },
+ "usage_per_page": {
+  "message": "≈{cost} per halaman · {pages}"
+ },
+ "usage_limit_requests": {
+  "message": "{left} dari {limit} permintaan"
+ },
+ "usage_limit_input": {
+  "message": "{left} dari {limit} token input"
+ },
+ "usage_limit_output": {
+  "message": "{left} dari {limit} token output"
+ },
+ "usage_list_sep": {
+  "message": ","
+ },
+ "usage_limits": {
+  "message": "Batas kecepatan (jatah satu menit, terisi kembali perlahan): tersisa {parts} pada {time}."
+ },
+ "usage_limits_full": {
+  "message": "Penuh lagi paling lambat {time}."
+ },
+ "api_err_spend_cap": {
+  "message": "Akun Claude-mu mencapai batas pengeluaran bulanannya. API berhenti sampai 00:00 UTC tanggal 1, kecuali kamu meminta batas lebih tinggi di Claude Console."
+ },
+ "api_err_rate_limit": {
+  "message": "Akunmu untuk sementara mencapai batas kecepatan Claude. Tunggu semenit lalu terjemahkan lagi; menerjemahkan lebih sedikit halaman sekaligus juga membantu."
+ },
+ "api_err_credit": {
+  "message": "Saldo kredit Claude-mu terlalu rendah. Tambah kredit (atau periksa kredit API bulanan paketmu) di Claude Console, bagian Billing."
+ },
+ "api_err_spend_limit": {
+  "message": "Akun Claude-mu mencapai batas pengeluaran yang kamu pasang. Naikkan di Claude Console, bagian Billing → Spend limits."
+ },
+ "api_err_key": {
+  "message": "Claude menolak kunci API. Periksa di Pengaturan, atau buat yang baru di Claude Console."
+ },
+ "api_err_overloaded": {
+  "message": "Claude sedang kelebihan beban. Coba lagi dalam semenit."
+ }
+}
