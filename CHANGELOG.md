@@ -4,6 +4,14 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
 
 ## [Unreleased]
 
+## [2.11.1] — 2026-11-17
+
+### Pages
+- **Auto-translate no longer leaves a page untranslated while you're looking at it.** If you scrolled far past a page before Claude was asked, and came back before that cancellation reached the page, the page stayed untranslated until you pressed Translate. Auto-translate now re-checks every page near the screen once scrolling settles, after each page finishes and after a page is put back, instead of only reacting when a page comes into view.
+
+### Development
+- `tests/browser/autostall.mjs` plays that race three times: 0/3 pages translated before the fix, 3/3 after. Added to `test:browser:extension`.
+
 ## [2.11.0] — 2026-11-17
 
 Sharp on every screen. First step of the 3.0 plan: a robust core before new features.

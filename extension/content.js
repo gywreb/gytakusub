@@ -350,6 +350,33 @@
     const e = entries.get(img);
     if (!e) return;
     if (!e.result && !e.canvas && !e.hidden) entries.delete(img); else e.status = "idle";
+    scheduleReconcile();
+  }
+
+  // Auto-translate is a state, not an event: every page near the screen that isn't translated,
+  // in progress or waiting should be waiting. The IntersectionObserver below only says when a
+  // page *enters* that zone, so a page put back while already inside it (cancelled because you
+  // scrolled far away, the cancellation landing after you came back) got no second event and
+  // sat untranslated until you pressed Translate (before 2.11.1). So once scrolling settles,
+  // after each page finishes and after a page is put back, the pages near the screen are
+  // checked again. Pages that failed keep their rule (tried again when you come back to them).
+  let reconcileTimer = null;
+  function scheduleReconcile(delay = SETTLE_MS + 20) {
+    if (!io) return;
+    clearTimeout(reconcileTimer);
+    reconcileTimer = setTimeout(() => {
+      const since = performance.now() - lastScroll;
+      if (since < SETTLE_MS) { scheduleReconcile(SETTLE_MS - since + 20); return; }
+      reconcileAuto();
+    }, delay);
+  }
+  function reconcileAuto() {
+    if (!io || !autoOn()) return;
+    for (const img of document.images) {
+      if (!isEligible(img) || !nearScreen(img)) continue;
+      const e = entries.get(img);
+      if (!e || e.status === "idle" || (e.status === "done" && srcOf(img) !== e.src)) enqueue(img, false, true);
+    }
   }
 
   // A spending guard: on a site you auto-translate, page scripts (ads included) can add or swap
@@ -392,7 +419,7 @@
       if (job.auto && (autoPaused || autoBudgetLeft() <= 0)) { if (!autoPaused) pauseAuto(); i++; continue; }
       queue.splice(i, 1);
       running.set(job.id, job);
-      translateImage(job).finally(() => { running.delete(job.id); pump(); });
+      translateImage(job).finally(() => { running.delete(job.id); pump(); scheduleReconcile(); });
     }
     // An auto page queued just after a scroll (Chrome fires one while a page loads) waits for
     // the scroll to settle; without another scroll nothing would call pump again, and the
@@ -421,6 +448,7 @@
   function onScroll() {
     lastScroll = performance.now();
     scheduleReport();
+    scheduleReconcile();
     clearTimeout(settleTimer);
     if (queue.length) settleTimer = setTimeout(pump, SETTLE_MS + 10); // the page you stopped at may now skip the queue
   }
