@@ -31,6 +31,10 @@
 html { -webkit-text-size-adjust: 100%; }
 html, body { margin: 0; background: var(--bg); color: var(--fg); }
 body { font: var(--t-body)/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+/* Line breaks that read naturally (as in the extension's ui.css): Japanese breaks between phrases,
+   not inside words; Korean, written with spaces, only at spaces. */
+:root:lang(ja) { word-break: auto-phrase; }
+:root:lang(ko) { word-break: keep-all; overflow-wrap: anywhere; }
 @media (pointer: fine) { html { overscroll-behavior: none; } }
 h1, h2, h3 { text-wrap: balance; }
 p { margin: 0 0 var(--s3); text-wrap: pretty; }

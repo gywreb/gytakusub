@@ -1,0 +1,545 @@
+{
+ "web_mode": {
+  "message": "Mode"
+ },
+ "web_tabShots": {
+  "message": "Screenshots"
+ },
+ "web_tabChapter": {
+  "message": "Chapter link"
+ },
+ "web_installTitle": {
+  "message": "Install Gytakusub"
+ },
+ "web_add_it_to_your_home": {
+  "message": "Add it to your Home Screen so it opens like an app. Do this <b>before</b> you enter your keys: the installed app keeps its own settings, separate from the browser."
+ },
+ "web_in_safari_tap_the_share": {
+  "message": "In <b>Safari</b>, tap the <b>Share</b> button <span class=\"sym\" aria-hidden=\"true\">⬆︎</span> (bottom bar, or top right on iPad; on iOS 26 it may be behind the <b>•••</b> button)."
+ },
+ "web_scroll_down_and_tap_add": {
+  "message": "Scroll down and tap <b>Add to Home Screen</b>."
+ },
+ "web_leave_open_as_web_app": {
+  "message": "Leave <b>Open as Web App</b> on, if you see it, and tap <b>Add</b>."
+ },
+ "web_open_gytakusub_from_your_home": {
+  "message": "Open <b>Gytakusub</b> from your Home Screen."
+ },
+ "web_using_brave_on_iphone_it": {
+  "message": "Using Brave on iPhone? It can't add web apps. <button type=\"button\" id=\"btnCopyAppLink\" class=\"linkbtn\">Copy this page's link</button>, open it in Safari, and follow the steps there. Chrome on iPhone works too: Share → Add to Home Screen."
+ },
+ "web_install_it_so_it_opens": {
+  "message": "Install it so it opens like an app, from your home screen or app list."
+ },
+ "web_add_it_to_your_home_2": {
+  "message": "Add it to your home screen so it opens like an app: open the browser menu <span class=\"sym\" aria-hidden=\"true\">⋮</span> and tap <b>Install app</b> or <b>Add to Home screen</b>."
+ },
+ "web_on_your_phone_scan_this": {
+  "message": "<b>On your phone:</b> scan this with the phone's camera, then install it from there (the steps appear on the phone)."
+ },
+ "web_installQr_arialabel": {
+  "message": "QR code with the address of this app"
+ },
+ "web_or_open_on_your_phone": {
+  "message": "Or open <code id=\"installUrl\"></code> on your phone."
+ },
+ "web_installDesktopHint": {
+  "message": "On this computer, your browser's install button (in the address bar or menu) adds it as an app."
+ },
+ "web_btnInstallLater": {
+  "message": "Not now"
+ },
+ "web_add_a_manga_page_or": {
+  "message": "Add a manga page or screenshot"
+ },
+ "web_take_a_screenshot_in_any": {
+  "message": "Take a screenshot in any app or reader, then paste it here — or pick it from Photos. Your images go only to the Claude API with your own key."
+ },
+ "web_btnPaste": {
+  "message": "Paste image"
+ },
+ "web_choose_photos": {
+  "message": "Choose photos"
+ },
+ "web_tip_on_iphone_tap_the": {
+  "message": "Tip: on iPhone, tap the screenshot preview → Share → Copy, then come back and tap Paste."
+ },
+ "web_load": {
+  "message": "Load"
+ },
+ "web_fetcherStatus": {
+  "message": "Fetcher"
+ },
+ "web_set_up_chapter_links": {
+  "message": "Set up chapter links"
+ },
+ "web_browsers_don_t_let_a": {
+  "message": "Browsers don't let a web page read other websites. So chapter links go through a small program called a <b>fetcher</b>, running on a free Cloudflare account. It opens the chapter and passes the pages to this app. Screenshot mode works without it."
+ },
+ "web_got_a_connection_link": {
+  "message": "Got a connection link?"
+ },
+ "web_someone_who_already_has_a": {
+  "message": "Someone who already has a fetcher can send you one. Paste it here."
+ },
+ "web_wzLink_arialabel": {
+  "message": "Connection link"
+ },
+ "web_or_set_up_your_own": {
+  "message": "Or set up your own fetcher"
+ },
+ "web_free_about_10_minutes_once": {
+  "message": "Free. About 10 minutes, once. Easiest on a computer; afterwards you connect your phone with a link. Tap a <span class=\"chip-demo\">grey value</span> to copy it."
+ },
+ "web_get_the_two_free_accounts": {
+  "message": "Get the two free accounts"
+ },
+ "web_you_need_both_skip_any": {
+  "message": "You need both. Skip any you already have."
+ },
+ "web_github_where_your_copy_of": {
+  "message": "<b>GitHub</b> (where your copy of the fetcher lives): <a href=\"https://github.com/signup\" target=\"_blank\" rel=\"noopener\">github.com/signup ↗</a>"
+ },
+ "web_cloudflare_where_it_runs_dash": {
+  "message": "<b>Cloudflare</b> (where it runs): <a href=\"https://dash.cloudflare.com/sign-up\" target=\"_blank\" rel=\"noopener\">dash.cloudflare.com/sign-up ↗</a>. Confirm your email."
+ },
+ "web_create_your_access_key": {
+  "message": "Create your access key"
+ },
+ "web_only_someone_with_this_key": {
+  "message": "Only someone with this key can use your fetcher. The app remembers it; you'll paste it into Cloudflare in step 5."
+ },
+ "web_wzCopyKey": {
+  "message": "Copy"
+ },
+ "web_copy_the_fetcher_to_your": {
+  "message": "Copy the fetcher to your GitHub"
+ },
+ "web_open_github_com_gywreb_gytakusub": {
+  "message": "Open <a href=\"https://github.com/gywreb/gytakusub\" target=\"_blank\" rel=\"noopener\">github.com/gywreb/gytakusub ↗</a> while signed in."
+ },
+ "web_click_fork_top_right_then": {
+  "message": "Click <b>Fork</b> (top right), then <b>Create fork</b>."
+ },
+ "web_you_now_have_your_own": {
+  "message": "You now have your own copy, also named <button type=\"button\" class=\"chip\" data-copy=\"gytakusub\" title=\"Copy\">gytakusub</button>. Cloudflare can only deploy from a repository in your own account, which is why this copy is needed."
+ },
+ "web_deploy_it_on_cloudflare": {
+  "message": "Deploy it on Cloudflare"
+ },
+ "web_open_dash_cloudflare_com_then": {
+  "message": "Open <a href=\"https://dash.cloudflare.com/\" target=\"_blank\" rel=\"noopener\">dash.cloudflare.com ↗</a>, then <b>Workers &amp; Pages</b> → <b>Create application</b> → <b>GitHub</b>."
+ },
+ "web_if_asked_allow_cloudflare_to": {
+  "message": "If asked, allow Cloudflare to see your GitHub repositories. Then select your <button type=\"button\" class=\"chip\" data-copy=\"gytakusub\" title=\"Copy\">gytakusub</button>."
+ },
+ "web_project_worker_name_gytakusub_exactly": {
+  "message": "<b>Project / Worker name:</b> <button type=\"button\" class=\"chip\" data-copy=\"gytakusub\" title=\"Copy\">gytakusub</button>. Exactly this, or the build fails."
+ },
+ "web_path_fetcher_open_advanced_settings": {
+  "message": "<b>Path:</b> <button type=\"button\" class=\"chip\" data-copy=\"fetcher\" title=\"Copy\">fetcher</button>. Open <i>Advanced settings</i> to see it. It's the folder the fetcher is in."
+ },
+ "web_build_command_leave_empty": {
+  "message": "<b>Build command:</b> leave empty."
+ },
+ "web_deploy_command_npx_wrangler_deploy": {
+  "message": "<b>Deploy command:</b> <button type=\"button\" class=\"chip\" data-copy=\"npx wrangler deploy\" title=\"Copy\">npx wrangler deploy</button>"
+ },
+ "web_click_save_and_deploy_and": {
+  "message": "Click <b>Save and Deploy</b> and wait about a minute until it says it's deployed."
+ },
+ "web_if_the_build_fails_open": {
+  "message": "If the build fails, open the Worker's <b>Settings</b> → <b>Build</b>, check the same fields (the path is called <b>Root directory</b> there), correct them, and deploy again."
+ },
+ "web_give_the_fetcher_your_key": {
+  "message": "Give the fetcher your key"
+ },
+ "web_on_the_worker_s_page": {
+  "message": "On the Worker's page: <b>Settings</b> → <b>Variables and Secrets</b> → <b>Add</b>."
+ },
+ "web_type_secret_variable_name_gyt": {
+  "message": "Type: <b>Secret</b>. Variable name: <button type=\"button\" class=\"chip\" data-copy=\"GYT_KEY\" title=\"Copy\">GYT_KEY</button>. Value: your key (<button type=\"button\" class=\"linkbtn\" id=\"wzCopyKey2\">copy it</button>)."
+ },
+ "web_click_deploy": {
+  "message": "Click <b>Deploy</b>."
+ },
+ "web_copy_the_worker_s_address": {
+  "message": "Copy the Worker's address from its page. It looks like <code>https://gytakusub.<i>your-name</i>.workers.dev</code>."
+ },
+ "web_connect": {
+  "message": "Connect"
+ },
+ "web_fetcher_address": {
+  "message": "Fetcher address"
+ },
+ "web_access_key": {
+  "message": "Access key"
+ },
+ "web_wzKeyInput_placeholder": {
+  "message": "Filled in from step 2…"
+ },
+ "web_wzBack": {
+  "message": "‹ Back"
+ },
+ "web_wzNext": {
+  "message": "Done, next step ›"
+ },
+ "web_update_your_fetcher_later": {
+  "message": "Update your fetcher later"
+ },
+ "web_if_the_app_says_your": {
+  "message": "If the app says your fetcher is out of date: open your <button type=\"button\" class=\"chip\" data-copy=\"gytakusub\" title=\"Copy\">gytakusub</button> copy on GitHub and click <b>Sync fork</b> → <b>Update branch</b>. Cloudflare redeploys by itself within a minute. Then Connect again."
+ },
+ "web_if_a_cloudflare_screen_looks": {
+  "message": "If a Cloudflare screen looks different, Cloudflare's own help: <a href=\"https://developers.cloudflare.com/workers/ci-cd/builds/\" target=\"_blank\" rel=\"noopener\">deploying from GitHub</a> · <a href=\"https://developers.cloudflare.com/workers/configuration/secrets/\" target=\"_blank\" rel=\"noopener\">adding a secret</a>. Steps last checked against those pages on <span id=\"wzChecked\"></span>."
+ },
+ "web_mgDone": {
+  "message": "‹ Back to chapters"
+ },
+ "web_your_fetcher": {
+  "message": "Your fetcher"
+ },
+ "web_usageHead": {
+  "message": "Free allowance today"
+ },
+ "web_of_100_000_requests": {
+  "message": "of <span id=\"usageMax\">100,000</span> requests"
+ },
+ "web_requests_sent_from_this_device": {
+  "message": "requests sent from this device"
+ },
+ "web_free_if_it_runs_out": {
+  "message": "<b>Free:</b> if it runs out, the fetcher stops until <span id=\"usageReset\">the reset</span>. Nothing is charged."
+ },
+ "web_only_this_device_the_requests": {
+  "message": "<b>Only this device:</b> the requests this browser or app sent today, counted as they're sent. The free 100,000 a day is for your whole Cloudflare account, and its count is higher: before a new page the browser also asks the fetcher for permission (Cloudflare counts that too, so a page is usually 2 requests), and your other devices and anyone with your connection link add theirs. So there's no meter here: set up the live count below to see the real total against the allowance."
+ },
+ "web_from_cloudflare_every_request_to": {
+  "message": "<b>From Cloudflare:</b> every request to every Worker on your account today, the browser's permission checks included. Your browsers and the installed app show the same number."
+ },
+ "web_a_few_minutes_behind_cloudflare": {
+  "message": "<b>A few minutes behind:</b> Cloudflare adds requests to its count a few minutes after they happen. The count refreshes every minute while this tab is open, and each refresh is itself one request."
+ },
+ "web_cloudflare_s_own_count_dash": {
+  "message": "<b>Cloudflare's own count:</b> <a href=\"https://dash.cloudflare.com/\" target=\"_blank\" rel=\"noopener\">dash.cloudflare.com ↗</a> → Workers &amp; Pages → your Worker → Metrics, or set up the live count below."
+ },
+ "web_show_cloudflare_s_own_count": {
+  "message": "Show Cloudflare's own count here"
+ },
+ "web_optional_about_3_minutes_easiest": {
+  "message": "Optional, about 3 minutes, easiest on a computer. The fetcher then reads today's count from Cloudflare with a token that can only read analytics."
+ },
+ "web_in_dash_cloudflare_com_open": {
+  "message": "In <a href=\"https://dash.cloudflare.com/\" target=\"_blank\" rel=\"noopener\">dash.cloudflare.com ↗</a> open <b>Account API tokens</b> (press <kbd>Ctrl</kbd> <kbd>K</kbd>, or <kbd>⌘</kbd> <kbd>K</kbd> on a Mac, and search for it). Click <b>Create Token</b>, then under <b>Custom token</b> click <b>Get started</b>."
+ },
+ "web_token_name_gytakusub_usage_permissions": {
+  "message": "Token name: <button type=\"button\" class=\"chip\" data-copy=\"gytakusub-usage\" title=\"Copy\">gytakusub-usage</button>. Permissions: <b>Account</b> · <b>Account Analytics</b> · <b>Read</b>, nothing else. Click <b>Continue to summary</b>, then <b>Create Token</b>, and copy the token: Cloudflare shows it only once."
+ },
+ "web_press_ctrl_k_again_and": {
+  "message": "Press <kbd>Ctrl</kbd> <kbd>K</kbd> again and choose <b>Copy account ID</b>."
+ },
+ "web_on_your_worker_settings_variables": {
+  "message": "On your Worker: <b>Settings</b> → <b>Variables and Secrets</b> → <b>Add</b>, type <b>Secret</b>, name <button type=\"button\" class=\"chip\" data-copy=\"CF_API_TOKEN\" title=\"Copy\">CF_API_TOKEN</button>, value the token. <b>Add</b> one more Secret: <button type=\"button\" class=\"chip\" data-copy=\"CF_ACCOUNT_ID\" title=\"Copy\">CF_ACCOUNT_ID</button>, value the account ID. Click <b>Deploy</b>."
+ },
+ "web_liveCheck": {
+  "message": "Check now"
+ },
+ "web_cloudflare_s_guides_analytics_token": {
+  "message": "Cloudflare's guides: <a href=\"https://developers.cloudflare.com/analytics/graphql-api/getting-started/authentication/api-token-auth/\" target=\"_blank\" rel=\"noopener\">analytics token ↗</a> · <a href=\"https://developers.cloudflare.com/fundamentals/account/find-account-and-zone-ids/\" target=\"_blank\" rel=\"noopener\">account ID ↗</a>"
+ },
+ "web_your_fetcher_is_too_old": {
+  "message": "Your fetcher is too old for this. On GitHub open your <b>gytakusub</b> copy, click <b>Sync fork</b> → <b>Update branch</b>. Cloudflare redeploys it in about a minute."
+ },
+ "web_liveCheck2": {
+  "message": "Check again"
+ },
+ "web_mgDevicesHead": {
+  "message": "Use it on another device"
+ },
+ "web_copy_this_link_and_open": {
+  "message": "Copy this link and open it on your phone or another computer, or paste it into the Chapter link tab there. Give it only to people you trust with your fetcher: it contains your key."
+ },
+ "web_mgCopyLink": {
+  "message": "Copy connection link"
+ },
+ "web_mgChangeHead": {
+  "message": "Change or disconnect"
+ },
+ "web_mgSetup": {
+  "message": "Open the setup steps"
+ },
+ "web_mgForget": {
+  "message": "Disconnect this device"
+ },
+ "web_originals": {
+  "message": "Originals"
+ },
+ "web_btnClear": {
+  "message": "Clear"
+ },
+ "web_navPrev": {
+  "message": "‹ Previous chapter"
+ },
+ "web_navNext": {
+  "message": "Next chapter ›"
+ },
+ "web_close_settings": {
+  "message": "Close settings"
+ },
+ "web_from_platform_claude_com_settings": {
+  "message": "From platform.claude.com → Settings → API keys. Stored only on this device."
+ },
+ "web_sTest": {
+  "message": "Test the key"
+ },
+ "web_counted_from_claude_s_own": {
+  "message": "Counted from Claude's own answers to this browser. The extension and your other devices keep their own counts."
+ },
+ "web_chapter_context_names_and_recent": {
+  "message": "Chapter context (names and recent lines)"
+ },
+ "web_sgReading": {
+  "message": "Reading"
+ },
+ "web_right_to_left_two_page": {
+  "message": "Right-to-left two-page spreads on wide screens"
+ },
+ "web_sgApp": {
+  "message": "App"
+ },
+ "web_btnShowInstall": {
+  "message": "Install on your phone or computer"
+ },
+ "web_free_software_under_the_gnu": {
+  "message": "Free software under the <a href=\"LICENSE\" target=\"_blank\">GNU AGPL v3</a> · <a href=\"https://github.com/gywreb/gytakusub\" target=\"_blank\" rel=\"noopener\">source code</a> · <a href=\"THIRD_PARTY.md\" target=\"_blank\">third-party components</a>"
+ },
+ "web_settings": {
+  "message": "Settings"
+ },
+ "web_fx_challenge": {
+  "message": "This site puts a “checking your browser” wall in front of servers, so the fetcher can't open it. Use screenshot mode here, or the browser extension on a computer."
+ },
+ "web_fx_blocked": {
+  "message": "This site refuses the fetcher (it may need a login, or it blocks servers). Use screenshot mode here, or the browser extension on a computer."
+ },
+ "web_fx_no_images": {
+  "message": "No chapter pages were found on that page. If the site needs a login or builds its pages with a script, use screenshot mode."
+ },
+ "web_fx_not_found": {
+  "message": "The site says that page does not exist. Check the link."
+ },
+ "web_fx_unauthorized": {
+  "message": "Your fetcher refused the access key: the key here is not the GYT_KEY on your Worker."
+ },
+ "web_fx_setup": {
+  "message": "Your fetcher has no key yet (or one shorter than 24 characters). Do step 5: in Cloudflare open the Worker → Settings → Variables and Secrets, add the Secret GYT_KEY with your key, Deploy, then Connect again."
+ },
+ "web_fx_bad_url": {
+  "message": "That doesn't look like a web address of a chapter."
+ },
+ "web_fx_usage_old": {
+  "message": "Update your fetcher to {version} or newer for Cloudflare's count."
+ },
+ "web_fx_limit": {
+  "message": "Your fetcher has used today's {limit} free requests on Cloudflare. It works again at {time}, and nothing is charged. Screenshot mode still works."
+ },
+ "web_fx_silent": {
+  "message": "No answer from your fetcher. Check that you're online. Otherwise, either today's {limit} free requests are used up (it works again at {time}, and nothing is charged), or this page needed more work than Cloudflare's free plan allows per request (10 ms). Screenshot mode still works."
+ },
+ "web_fx_no_answer": {
+  "message": "No answer from {address}. Check the address (copy it from the Worker's page in Cloudflare) and that the deploy finished."
+ },
+ "web_fx_cpu": {
+  "message": "This page needed more work than Cloudflare's free plan allows per request (10 ms). Try again; if it keeps failing, use screenshot mode for this chapter."
+ },
+ "web_fx_not_fetcher_http": {
+  "message": "{address} answered HTTP {status}, not like a Gytakusub fetcher. Check the address."
+ },
+ "web_fx_http": {
+  "message": "The fetcher answered HTTP {status}."
+ },
+ "web_fx_no_address": {
+  "message": "Enter your fetcher's address: https://….workers.dev"
+ },
+ "web_fx_short_key": {
+  "message": "The access key must be at least {n} characters (generate one in step 2)."
+ },
+ "web_fx_not_fetcher": {
+  "message": "{address} answered, but not like a Gytakusub fetcher."
+ },
+ "web_fx_outdated": {
+  "message": "Your fetcher is version {version}; this app needs {needed} or newer. On GitHub, open your gytakusub copy → Sync fork → Update branch; wait a minute, then Connect again."
+ },
+ "web_cannot_decode": {
+  "message": "Could not decode the image."
+ },
+ "web_no_key": {
+  "message": "No API key set — open Settings (⚙) and paste your Claude API key."
+ },
+ "web_manage_status": {
+  "message": "Connected to {host}, version {version}, checked {date}."
+ },
+ "web_new_key": {
+  "message": "New key"
+ },
+ "web_usage_source_live": {
+  "message": "Cloudflare · {time}"
+ },
+ "web_usage_source_device": {
+  "message": "This device"
+ },
+ "web_usage_used_up": {
+  "message": "used up until {time}"
+ },
+ "web_usage_almost": {
+  "message": "almost used up"
+ },
+ "web_chip_used_up": {
+  "message": "free requests used up until {time}"
+ },
+ "web_chip_count": {
+  "message": "{requests} / {limit} free today"
+ },
+ "web_chip_title": {
+  "message": "Cloudflare's count, {time}"
+ },
+ "web_meter_text": {
+  "message": "{requests} of {limit} requests used today"
+ },
+ "web_usage_split": {
+  "message": "{name} {count}, other Workers {others}"
+ },
+ "web_usage_note_live": {
+  "message": "All your devices · starts again at {time}"
+ },
+ "web_usage_note_device_one": {
+  "message": "{n} chapter opened · the allowance starts again at {time}"
+ },
+ "web_usage_note_device_other": {
+  "message": "{n} chapters opened · the allowance starts again at {time}"
+ },
+ "web_live_error": {
+  "message": "Cloudflare's count didn't update: {error}"
+ },
+ "web_live_error_showing": {
+  "message": "Showing the count from {time}."
+ },
+ "web_checking": {
+  "message": "Checking…"
+ },
+ "web_live_not_yet": {
+  "message": "Not yet: the Worker has no CF_API_TOKEN and CF_ACCOUNT_ID secrets (after adding them, click Deploy)."
+ },
+ "web_live_on": {
+  "message": "Live count from Cloudflare is on."
+ },
+ "web_progress": {
+  "message": "{done} of {total} translated"
+ },
+ "web_progress_busy": {
+  "message": "{n} in progress"
+ },
+ "web_progress_cost": {
+  "message": "Claude today ≈ {cost}"
+ },
+ "web_page_original": {
+  "message": "Original"
+ },
+ "web_page_redo": {
+  "message": "Redo"
+ },
+ "web_status_queued": {
+  "message": "queued"
+ },
+ "web_status_loading": {
+  "message": "loading…"
+ },
+ "web_status_translating": {
+  "message": "translating…"
+ },
+ "web_status_no_text": {
+  "message": "no text found"
+ },
+ "web_not_translated_yet": {
+  "message": "Not translated yet"
+ },
+ "web_saved_personal": {
+  "message": "Saved for your personal reading. Please don't redistribute translated pages."
+ },
+ "web_no_image": {
+  "message": "No image found"
+ },
+ "web_paste_how": {
+  "message": "Paste with Ctrl/⌘+V, or long-press the page and choose Paste."
+ },
+ "web_clipboard_empty": {
+  "message": "Clipboard has no image. Copy a screenshot first."
+ },
+ "web_clipboard_denied": {
+  "message": "Clipboard access was denied. Use Choose photos instead."
+ },
+ "web_loading_chapter": {
+  "message": "Loading chapter…"
+ },
+ "web_chapter_pages_one": {
+  "message": "{n} page. Scroll — pages translate as they come into view."
+ },
+ "web_chapter_pages_other": {
+  "message": "{n} pages. Scroll — pages translate as they come into view."
+ },
+ "web_copied": {
+  "message": "{what} copied"
+ },
+ "web_copy_prompt": {
+  "message": "Copy it from here:"
+ },
+ "web_what_key": {
+  "message": "Key"
+ },
+ "web_what_link": {
+  "message": "Link"
+ },
+ "web_key_first": {
+  "message": "Generate a key in step 2 first"
+ },
+ "web_step": {
+  "message": "Step {step} of {total}"
+ },
+ "web_tap_generate": {
+  "message": "Tap Generate key first"
+ },
+ "web_connecting": {
+  "message": "Connecting…"
+ },
+ "web_connected_version": {
+  "message": "Connected (fetcher version {version})."
+ },
+ "web_connected_toast": {
+  "message": "Fetcher connected. Paste a chapter link."
+ },
+ "web_not_a_link": {
+  "message": "That isn't a connection link. It looks like https://gywreb.github.io/gytakusub/#connect=…"
+ },
+ "web_confirm_forget": {
+  "message": "Remove the fetcher address and key from this device? Chapter links stop working here until you connect again."
+ },
+ "web_installed": {
+  "message": "Installed. Open Gytakusub from your home screen or app list."
+ },
+ "web_link_filled": {
+  "message": "A connection link filled in the fetcher at {address}. If you trust it, tap Connect."
+ },
+ "web_tap_load": {
+  "message": "Tap Load to open this chapter."
+ },
+ "web_setup_waiting": {
+  "message": "Set up chapter links below; this chapter will be waiting."
+ },
+ "web_labels_english": {
+  "message": "Buttons on GitHub and Cloudflare are named here in English, as those sites show them in English."
+ },
+ "web_generate_key": {
+  "message": "Generate key"
+ }
+}

@@ -18,56 +18,56 @@
 <body>
 <header class="top">
   <div class="brand"><img src="icons/icon48.png" alt="" class="logo" width="28" height="28" /><h1 translate="no">Gytakusub</h1></div>
-  <nav class="modes" role="tablist" aria-label="Mode">
-    <button type="button" class="tab active" id="tabShots" data-mode="shots" role="tab" aria-selected="true" aria-controls="modeShots">Screenshots</button>
-    <button type="button" class="tab" id="tabChapter" data-mode="chapter" role="tab" aria-selected="false" aria-controls="modeChapter" tabindex="-1">Chapter link</button>
+  <nav class="modes" role="tablist" aria-label="Mode" data-i18n-attr="aria-label=web_mode">
+    <button type="button" class="tab active" id="tabShots" data-mode="shots" role="tab" aria-selected="true" aria-controls="modeShots" data-i18n="web_tabShots">Screenshots</button>
+    <button type="button" class="tab" id="tabChapter" data-mode="chapter" role="tab" aria-selected="false" aria-controls="modeChapter" tabindex="-1" data-i18n="web_tabChapter">Chapter link</button>
   </nav>
-  <button type="button" id="btnSettings" class="icon-btn" title="Settings" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1.1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34H9a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87V9a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1z"/></svg></button>
+  <button type="button" id="btnSettings" class="icon-btn" title="Settings" aria-label="Settings" data-i18n-attr="title=web_settings;aria-label=web_settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1.1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34H9a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87V9a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1z"/></svg></button>
 </header>
 
 <main>
   <!-- Install guide: shown until the app runs installed (or the reader says "Not now") -->
   <section id="installCard" class="install card hidden" aria-labelledby="installTitle">
-    <h2 id="installTitle">Install Gytakusub</h2>
+    <h2 id="installTitle" data-i18n="web_installTitle">Install Gytakusub</h2>
 
     <div data-platform="ios">
-      <p>Add it to your Home Screen so it opens like an app. Do this <b>before</b> you enter your keys: the installed app keeps its own settings, separate from the browser.</p>
+      <p data-i18n-html="web_add_it_to_your_home">Add it to your Home Screen so it opens like an app. Do this <b>before</b> you enter your keys: the installed app keeps its own settings, separate from the browser.</p>
       <ol>
-        <li>In <b>Safari</b>, tap the <b>Share</b> button <span class="sym" aria-hidden="true">⬆︎</span> (bottom bar, or top right on iPad; on iOS 26 it may be behind the <b>•••</b> button).</li>
-        <li>Scroll down and tap <b>Add to Home Screen</b>.</li>
-        <li>Leave <b>Open as Web App</b> on, if you see it, and tap <b>Add</b>.</li>
-        <li>Open <b>Gytakusub</b> from your Home Screen.</li>
+        <li data-i18n-html="web_in_safari_tap_the_share">In <b>Safari</b>, tap the <b>Share</b> button <span class="sym" aria-hidden="true">⬆︎</span> (bottom bar, or top right on iPad; on iOS 26 it may be behind the <b>•••</b> button).</li>
+        <li data-i18n-html="web_scroll_down_and_tap_add">Scroll down and tap <b>Add to Home Screen</b>.</li>
+        <li data-i18n-html="web_leave_open_as_web_app">Leave <b>Open as Web App</b> on, if you see it, and tap <b>Add</b>.</li>
+        <li data-i18n-html="web_open_gytakusub_from_your_home">Open <b>Gytakusub</b> from your Home Screen.</li>
       </ol>
-      <p class="muted small">Using Brave on iPhone? It can't add web apps. <button type="button" id="btnCopyAppLink" class="linkbtn">Copy this page's link</button>, open it in Safari, and follow the steps there. Chrome on iPhone works too: Share → Add to Home Screen.</p>
+      <p class="muted small" data-i18n-html="web_using_brave_on_iphone_it">Using Brave on iPhone? It can't add web apps. <button type="button" id="btnCopyAppLink" class="linkbtn">Copy this page's link</button>, open it in Safari, and follow the steps there. Chrome on iPhone works too: Share → Add to Home Screen.</p>
     </div>
 
     <div data-platform="prompt">
-      <p>Install it so it opens like an app, from your home screen or app list.</p>
-      <div class="row"><button type="button" id="btnInstall" class="primary">Install Gytakusub</button></div>
+      <p data-i18n="web_install_it_so_it_opens">Install it so it opens like an app, from your home screen or app list.</p>
+      <div class="row"><button type="button" id="btnInstall" class="primary" data-i18n="web_installTitle">Install Gytakusub</button></div>
     </div>
 
     <div data-platform="android">
-      <p>Add it to your home screen so it opens like an app: open the browser menu <span class="sym" aria-hidden="true">⋮</span> and tap <b>Install app</b> or <b>Add to Home screen</b>.</p>
+      <p data-i18n-html="web_add_it_to_your_home_2">Add it to your home screen so it opens like an app: open the browser menu <span class="sym" aria-hidden="true">⋮</span> and tap <b>Install app</b> or <b>Add to Home screen</b>.</p>
     </div>
 
     <div data-platform="desktop">
-      <p><b>On your phone:</b> scan this with the phone's camera, then install it from there (the steps appear on the phone).</p>
-      <div class="qr-row"><div id="installQr" class="qr" role="img" aria-label="QR code with the address of this app"></div><p class="muted small">Or open <code id="installUrl"></code> on your phone.</p></div>
-      <p class="muted small" id="installDesktopHint">On this computer, your browser's install button (in the address bar or menu) adds it as an app.</p>
+      <p data-i18n-html="web_on_your_phone_scan_this"><b>On your phone:</b> scan this with the phone's camera, then install it from there (the steps appear on the phone).</p>
+      <div class="qr-row"><div id="installQr" class="qr" role="img" aria-label="QR code with the address of this app" data-i18n-attr="aria-label=web_installQr_arialabel"></div><p class="muted small" data-i18n-html="web_or_open_on_your_phone">Or open <code id="installUrl"></code> on your phone.</p></div>
+      <p class="muted small" id="installDesktopHint" data-i18n="web_installDesktopHint">On this computer, your browser's install button (in the address bar or menu) adds it as an app.</p>
     </div>
 
-    <div class="row end"><button type="button" id="btnInstallLater" class="btn small">Not now</button></div>
+    <div class="row end"><button type="button" id="btnInstallLater" class="btn small" data-i18n="web_btnInstallLater">Not now</button></div>
   </section>
 
   <section id="modeShots" class="mode" role="tabpanel" aria-labelledby="tabShots">
     <div id="drop" class="drop">
-      <p class="big">Add a manga page or screenshot</p>
-      <p class="muted">Take a screenshot in any app or reader, then paste it here — or pick it from Photos. Your images go only to the Claude API with your own key.</p>
+      <p class="big" data-i18n="web_add_a_manga_page_or">Add a manga page or screenshot</p>
+      <p class="muted" data-i18n="web_take_a_screenshot_in_any">Take a screenshot in any app or reader, then paste it here — or pick it from Photos. Your images go only to the Claude API with your own key.</p>
       <div class="row">
-        <button type="button" id="btnPaste" class="primary">Paste image</button>
-        <label class="btn">Choose photos<input id="file" name="photos" type="file" accept="image/*" multiple hidden /></label>
+        <button type="button" id="btnPaste" class="primary" data-i18n="web_btnPaste">Paste image</button>
+        <label class="btn"><span data-i18n="web_choose_photos">Choose photos</span><input id="file" name="photos" type="file" accept="image/*" multiple hidden /></label>
       </div>
-      <p class="muted small">Tip: on iPhone, tap the screenshot preview → Share → Copy, then come back and tap Paste.</p>
+      <p class="muted small" data-i18n="web_tip_on_iphone_tap_the">Tip: on iPhone, tap the screenshot preview → Share → Copy, then come back and tap Paste.</p>
     </div>
   </section>
 
@@ -75,170 +75,172 @@
     <!-- Shown once a fetcher is connected and verified -->
     <div id="chapterReady" class="hidden">
       <form id="chapterForm" class="chapter-form">
-        <input id="chapterUrl" name="chapter" type="url" inputmode="url" placeholder="https://…/chapter-1" aria-label="Chapter link" autocomplete="off" spellcheck="false" autocapitalize="off" required />
-        <button class="primary" type="submit">Load</button>
+        <input id="chapterUrl" name="chapter" type="url" inputmode="url" placeholder="https://…/chapter-1" aria-label="Chapter link" autocomplete="off" spellcheck="false" autocapitalize="off" required data-i18n-attr="aria-label=web_tabChapter" />
+        <button class="primary" type="submit" data-i18n="web_load">Load</button>
       </form>
-      <button type="button" id="btnFetcherManage" class="status-chip"><span class="dot" aria-hidden="true"></span><span id="fetcherStatus">Fetcher</span><span id="fetcherUsage"></span><span class="chev" aria-hidden="true">›</span></button>
+      <button type="button" id="btnFetcherManage" class="status-chip"><span class="dot" aria-hidden="true"></span><span id="fetcherStatus" data-i18n="web_fetcherStatus">Fetcher</span><span id="fetcherUsage"></span><span class="chev" aria-hidden="true">›</span></button>
       <p id="chapterInfo" class="muted small"></p>
-      <div class="chapter-nav"><button id="navPrevTop" class="btn small" hidden>‹ Previous chapter</button><button id="navNextTop" class="btn small" hidden>Next chapter ›</button></div>
+      <div class="chapter-nav"><button id="navPrevTop" class="btn small" hidden data-i18n="web_navPrev">‹ Previous chapter</button><button id="navNextTop" class="btn small" hidden data-i18n="web_navNext">Next chapter ›</button></div>
     </div>
 
     <!-- Setup: the Chapter link form stays hidden until this is done -->
     <div id="fetcherWizard" class="wizard hidden">
-      <h2>Set up chapter links</h2>
-      <p>Browsers don't let a web page read other websites. So chapter links go through a small program called a <b>fetcher</b>, running on a free Cloudflare account. It opens the chapter and passes the pages to this app. Screenshot mode works without it.</p>
+      <h2 data-i18n="web_set_up_chapter_links">Set up chapter links</h2>
+      <p data-i18n-html="web_browsers_don_t_let_a">Browsers don't let a web page read other websites. So chapter links go through a small program called a <b>fetcher</b>, running on a free Cloudflare account. It opens the chapter and passes the pages to this app. Screenshot mode works without it.</p>
 
       <div class="choice">
-        <h3>Got a connection link?</h3>
-        <p class="muted small">Someone who already has a fetcher can send you one. Paste it here.</p>
-        <div class="row"><input id="wzLink" name="connection-link" type="url" inputmode="url" placeholder="https://gywreb.github.io/gytakusub/#connect=…" aria-label="Connection link" autocomplete="off" spellcheck="false" autocapitalize="off" /><button type="button" id="wzLinkConnect" class="primary">Connect</button></div>
+        <h3 data-i18n="web_got_a_connection_link">Got a connection link?</h3>
+        <p class="muted small" data-i18n="web_someone_who_already_has_a">Someone who already has a fetcher can send you one. Paste it here.</p>
+        <div class="row"><input id="wzLink" name="connection-link" type="url" inputmode="url" placeholder="https://gywreb.github.io/gytakusub/#connect=…" aria-label="Connection link" autocomplete="off" spellcheck="false" autocapitalize="off" data-i18n-attr="aria-label=web_wzLink_arialabel" /><button type="button" id="wzLinkConnect" class="primary" data-i18n="web_connect">Connect</button></div>
         <p id="wzLinkMsg" class="hint" role="status"></p>
       </div>
 
       <div class="choice">
-        <h3>Or set up your own fetcher</h3>
-        <p class="muted small">Free. About 10 minutes, once. Easiest on a computer; afterwards you connect your phone with a link. Tap a <span class="chip-demo">grey value</span> to copy it.</p>
+        <h3 data-i18n="web_or_set_up_your_own">Or set up your own fetcher</h3>
+        <p class="muted small" data-i18n-html="web_free_about_10_minutes_once">Free. About 10 minutes, once. Easiest on a computer; afterwards you connect your phone with a link. Tap a <span class="chip-demo">grey value</span> to copy it.</p>
+        <p class="muted small" data-labels-note hidden data-i18n="web_labels_english">Buttons on GitHub and Cloudflare are named here in English, as those sites show them in English.</p>
         <p id="wzProgress" class="progress" aria-live="polite"></p>
         <ol class="steps" id="wzSteps">
           <li data-step="1">
-            <h3><button type="button" class="step-title">Get the two free accounts</button></h3>
+            <h3><button type="button" class="step-title" data-i18n="web_get_the_two_free_accounts">Get the two free accounts</button></h3>
             <div class="step-body">
-              <p>You need both. Skip any you already have.</p>
+              <p data-i18n="web_you_need_both_skip_any">You need both. Skip any you already have.</p>
               <ol class="sub">
-                <li><b>GitHub</b> (where your copy of the fetcher lives): <a href="https://github.com/signup" target="_blank" rel="noopener">github.com/signup ↗</a></li>
-                <li><b>Cloudflare</b> (where it runs): <a href="https://dash.cloudflare.com/sign-up" target="_blank" rel="noopener">dash.cloudflare.com/sign-up ↗</a>. Confirm your email.</li>
+                <li data-i18n-html="web_github_where_your_copy_of"><b>GitHub</b> (where your copy of the fetcher lives): <a href="https://github.com/signup" target="_blank" rel="noopener">github.com/signup ↗</a></li>
+                <li data-i18n-html="web_cloudflare_where_it_runs_dash"><b>Cloudflare</b> (where it runs): <a href="https://dash.cloudflare.com/sign-up" target="_blank" rel="noopener">dash.cloudflare.com/sign-up ↗</a>. Confirm your email.</li>
               </ol>
             </div>
           </li>
           <li data-step="2">
-            <h3><button type="button" class="step-title">Create your access key</button></h3>
+            <h3><button type="button" class="step-title" data-i18n="web_create_your_access_key">Create your access key</button></h3>
             <div class="step-body">
-              <p>Only someone with this key can use your fetcher. The app remembers it; you'll paste it into Cloudflare in step 5.</p>
-              <div class="row"><code id="wzKey" class="key">—</code><button type="button" id="wzGen" class="btn small">Generate key</button><button type="button" id="wzCopyKey" class="btn small" disabled>Copy</button></div>
+              <p data-i18n="web_only_someone_with_this_key">Only someone with this key can use your fetcher. The app remembers it; you'll paste it into Cloudflare in step 5.</p>
+              <div class="row"><code id="wzKey" class="key">—</code><button type="button" id="wzGen" class="btn small" data-i18n="web_generate_key">Generate key</button><button type="button" id="wzCopyKey" class="btn small" disabled data-i18n="web_wzCopyKey">Copy</button></div>
             </div>
           </li>
           <li data-step="3">
-            <h3><button type="button" class="step-title">Copy the fetcher to your GitHub</button></h3>
+            <h3><button type="button" class="step-title" data-i18n="web_copy_the_fetcher_to_your">Copy the fetcher to your GitHub</button></h3>
             <div class="step-body">
               <ol class="sub">
-                <li>Open <a href="https://github.com/gywreb/gytakusub" target="_blank" rel="noopener">github.com/gywreb/gytakusub ↗</a> while signed in.</li>
-                <li>Click <b>Fork</b> (top right), then <b>Create fork</b>.</li>
+                <li data-i18n-html="web_open_github_com_gywreb_gytakusub">Open <a href="https://github.com/gywreb/gytakusub" target="_blank" rel="noopener">github.com/gywreb/gytakusub ↗</a> while signed in.</li>
+                <li data-i18n-html="web_click_fork_top_right_then">Click <b>Fork</b> (top right), then <b>Create fork</b>.</li>
               </ol>
-              <p class="muted small">You now have your own copy, also named <button type="button" class="chip" data-copy="gytakusub" title="Copy">gytakusub</button>. Cloudflare can only deploy from a repository in your own account, which is why this copy is needed.</p>
+              <p class="muted small" data-i18n-html="web_you_now_have_your_own">You now have your own copy, also named <button type="button" class="chip" data-copy="gytakusub" title="Copy">gytakusub</button>. Cloudflare can only deploy from a repository in your own account, which is why this copy is needed.</p>
             </div>
           </li>
           <li data-step="4">
-            <h3><button type="button" class="step-title">Deploy it on Cloudflare</button></h3>
+            <h3><button type="button" class="step-title" data-i18n="web_deploy_it_on_cloudflare">Deploy it on Cloudflare</button></h3>
             <div class="step-body">
               <ol class="sub">
-                <li>Open <a href="https://dash.cloudflare.com/" target="_blank" rel="noopener">dash.cloudflare.com ↗</a>, then <b>Workers &amp; Pages</b> → <b>Create application</b> → <b>GitHub</b>.</li>
-                <li>If asked, allow Cloudflare to see your GitHub repositories. Then select your <button type="button" class="chip" data-copy="gytakusub" title="Copy">gytakusub</button>.</li>
+                <li data-i18n-html="web_open_dash_cloudflare_com_then">Open <a href="https://dash.cloudflare.com/" target="_blank" rel="noopener">dash.cloudflare.com ↗</a>, then <b>Workers &amp; Pages</b> → <b>Create application</b> → <b>GitHub</b>.</li>
+                <li data-i18n-html="web_if_asked_allow_cloudflare_to">If asked, allow Cloudflare to see your GitHub repositories. Then select your <button type="button" class="chip" data-copy="gytakusub" title="Copy">gytakusub</button>.</li>
                 <li>Set these four fields; leave everything else as it is:
                   <ul>
-                    <li><b>Project / Worker name:</b> <button type="button" class="chip" data-copy="gytakusub" title="Copy">gytakusub</button>. Exactly this, or the build fails.</li>
-                    <li><b>Path:</b> <button type="button" class="chip" data-copy="fetcher" title="Copy">fetcher</button>. Open <i>Advanced settings</i> to see it. It's the folder the fetcher is in.</li>
-                    <li><b>Build command:</b> leave empty.</li>
-                    <li><b>Deploy command:</b> <button type="button" class="chip" data-copy="npx wrangler deploy" title="Copy">npx wrangler deploy</button></li>
+                    <li data-i18n-html="web_project_worker_name_gytakusub_exactly"><b>Project / Worker name:</b> <button type="button" class="chip" data-copy="gytakusub" title="Copy">gytakusub</button>. Exactly this, or the build fails.</li>
+                    <li data-i18n-html="web_path_fetcher_open_advanced_settings"><b>Path:</b> <button type="button" class="chip" data-copy="fetcher" title="Copy">fetcher</button>. Open <i>Advanced settings</i> to see it. It's the folder the fetcher is in.</li>
+                    <li data-i18n-html="web_build_command_leave_empty"><b>Build command:</b> leave empty.</li>
+                    <li data-i18n-html="web_deploy_command_npx_wrangler_deploy"><b>Deploy command:</b> <button type="button" class="chip" data-copy="npx wrangler deploy" title="Copy">npx wrangler deploy</button></li>
                   </ul>
                 </li>
-                <li>Click <b>Save and Deploy</b> and wait about a minute until it says it's deployed.</li>
+                <li data-i18n-html="web_click_save_and_deploy_and">Click <b>Save and Deploy</b> and wait about a minute until it says it's deployed.</li>
               </ol>
-              <p class="muted small">If the build fails, open the Worker's <b>Settings</b> → <b>Build</b>, check the same fields (the path is called <b>Root directory</b> there), correct them, and deploy again.</p>
+              <p class="muted small" data-i18n-html="web_if_the_build_fails_open">If the build fails, open the Worker's <b>Settings</b> → <b>Build</b>, check the same fields (the path is called <b>Root directory</b> there), correct them, and deploy again.</p>
             </div>
           </li>
           <li data-step="5">
-            <h3><button type="button" class="step-title">Give the fetcher your key</button></h3>
+            <h3><button type="button" class="step-title" data-i18n="web_give_the_fetcher_your_key">Give the fetcher your key</button></h3>
             <div class="step-body">
               <ol class="sub">
-                <li>On the Worker's page: <b>Settings</b> → <b>Variables and Secrets</b> → <b>Add</b>.</li>
-                <li>Type: <b>Secret</b>. Variable name: <button type="button" class="chip" data-copy="GYT_KEY" title="Copy">GYT_KEY</button>. Value: your key (<button type="button" class="linkbtn" id="wzCopyKey2">copy it</button>).</li>
-                <li>Click <b>Deploy</b>.</li>
-                <li>Copy the Worker's address from its page. It looks like <code>https://gytakusub.<i>your-name</i>.workers.dev</code>.</li>
+                <li data-i18n-html="web_on_the_worker_s_page">On the Worker's page: <b>Settings</b> → <b>Variables and Secrets</b> → <b>Add</b>.</li>
+                <li data-i18n-html="web_type_secret_variable_name_gyt">Type: <b>Secret</b>. Variable name: <button type="button" class="chip" data-copy="GYT_KEY" title="Copy">GYT_KEY</button>. Value: your key (<button type="button" class="linkbtn" id="wzCopyKey2">copy it</button>).</li>
+                <li data-i18n-html="web_click_deploy">Click <b>Deploy</b>.</li>
+                <li data-i18n-html="web_copy_the_worker_s_address">Copy the Worker's address from its page. It looks like <code>https://gytakusub.<i>your-name</i>.workers.dev</code>.</li>
               </ol>
             </div>
           </li>
           <li data-step="6">
-            <h3><button type="button" class="step-title">Connect</button></h3>
+            <h3><button type="button" class="step-title" data-i18n="web_connect">Connect</button></h3>
             <div class="step-body" id="wzStep5">
-              <label>Fetcher address <input id="wzUrl" name="fetcher-url" type="url" inputmode="url" placeholder="https://gytakusub.your-name.workers.dev" autocomplete="off" spellcheck="false" autocapitalize="off" /></label>
-              <label>Access key <input id="wzKeyInput" name="fetcher-key" type="password" placeholder="Filled in from step 2…" autocomplete="off" spellcheck="false" autocapitalize="off" /></label>
-              <div class="row"><button type="button" id="wzConnect" class="primary">Connect</button></div>
+              <label><span data-i18n="web_fetcher_address">Fetcher address</span> <input id="wzUrl" name="fetcher-url" type="url" inputmode="url" placeholder="https://gytakusub.your-name.workers.dev" autocomplete="off" spellcheck="false" autocapitalize="off" /></label>
+              <label><span data-i18n="web_access_key">Access key</span> <input id="wzKeyInput" name="fetcher-key" type="password" placeholder="Filled in from step 2…" autocomplete="off" spellcheck="false" autocapitalize="off" data-i18n-attr="placeholder=web_wzKeyInput_placeholder" /></label>
+              <div class="row"><button type="button" id="wzConnect" class="primary" data-i18n="web_connect">Connect</button></div>
               <p id="wzMsg" class="hint" role="status"></p>
             </div>
           </li>
         </ol>
-        <div class="row step-nav" id="wzStepNav"><button type="button" id="wzBack" class="btn small">‹ Back</button><button type="button" id="wzNext" class="primary">Done, next step ›</button></div>
+        <div class="row step-nav" id="wzStepNav"><button type="button" id="wzBack" class="btn small" data-i18n="web_wzBack">‹ Back</button><button type="button" id="wzNext" class="primary" data-i18n="web_wzNext">Done, next step ›</button></div>
         <details class="muted small">
-          <summary>Update your fetcher later</summary>
-          <p>If the app says your fetcher is out of date: open your <button type="button" class="chip" data-copy="gytakusub" title="Copy">gytakusub</button> copy on GitHub and click <b>Sync fork</b> → <b>Update branch</b>. Cloudflare redeploys by itself within a minute. Then Connect again.</p>
+          <summary data-i18n="web_update_your_fetcher_later">Update your fetcher later</summary>
+          <p data-i18n-html="web_if_the_app_says_your">If the app says your fetcher is out of date: open your <button type="button" class="chip" data-copy="gytakusub" title="Copy">gytakusub</button> copy on GitHub and click <b>Sync fork</b> → <b>Update branch</b>. Cloudflare redeploys by itself within a minute. Then Connect again.</p>
         </details>
-        <p class="muted small">If a Cloudflare screen looks different, Cloudflare's own help: <a href="https://developers.cloudflare.com/workers/ci-cd/builds/" target="_blank" rel="noopener">deploying from GitHub</a> · <a href="https://developers.cloudflare.com/workers/configuration/secrets/" target="_blank" rel="noopener">adding a secret</a>. Steps last checked against those pages on <span id="wzChecked"></span>.</p>
+        <p class="muted small" data-i18n-html="web_if_a_cloudflare_screen_looks">If a Cloudflare screen looks different, Cloudflare's own help: <a href="https://developers.cloudflare.com/workers/ci-cd/builds/" target="_blank" rel="noopener">deploying from GitHub</a> · <a href="https://developers.cloudflare.com/workers/configuration/secrets/" target="_blank" rel="noopener">adding a secret</a>. Steps last checked against those pages on <span id="wzChecked"></span>.</p>
       </div>
     </div>
 
     <!-- Fetcher management, once connected -->
     <div id="fetcherManage" class="wizard manage hidden">
-      <button type="button" id="mgDone" class="btn small back">‹ Back to chapters</button>
-      <h2>Your fetcher</h2>
+      <button type="button" id="mgDone" class="btn small back" data-i18n="web_mgDone">‹ Back to chapters</button>
+      <h2 data-i18n="web_your_fetcher">Your fetcher</h2>
       <p id="manageStatus" class="muted"></p>
 
       <section class="mg-section" aria-labelledby="usageHead">
-        <div class="sec-head"><h3 id="usageHead">Free allowance today</h3><span id="usageSource" class="source-badge"></span></div>
+        <div class="sec-head"><h3 id="usageHead" data-i18n="web_usageHead">Free allowance today</h3><span id="usageSource" class="source-badge"></span></div>
         <div class="usage">
-          <p class="usage-figure"><span id="usageCount">0</span> <span class="muted" data-usage="live" hidden>of <span id="usageMax">100,000</span> requests</span><span class="muted" data-usage="device">requests sent from this device</span> <span id="usageState" class="usage-state" hidden></span></p>
+          <p class="usage-figure"><span id="usageCount">0</span> <span class="muted" data-usage="live" hidden data-i18n-html="web_of_100_000_requests">of <span id="usageMax">100,000</span> requests</span><span class="muted" data-usage="device" data-i18n="web_requests_sent_from_this_device">requests sent from this device</span> <span id="usageState" class="usage-state" hidden></span></p>
           <div id="usageMeter" class="meter" role="meter" data-usage="live" hidden aria-labelledby="usageHead" aria-valuemin="0" aria-valuemax="100000" aria-valuenow="0"><span class="meter-fill"></span></div>
           <p id="usageNote" class="muted small"></p>
         </div>
         <ul class="usage-facts small">
-          <li><b>Free:</b> if it runs out, the fetcher stops until <span id="usageReset">the reset</span>. Nothing is charged.</li>
-          <li data-usage="device"><b>Only this device:</b> the requests this browser or app sent today, counted as they're sent. The free 100,000 a day is for your whole Cloudflare account, and its count is higher: before a new page the browser also asks the fetcher for permission (Cloudflare counts that too, so a page is usually 2 requests), and your other devices and anyone with your connection link add theirs. So there's no meter here: set up the live count below to see the real total against the allowance.</li>
-          <li data-usage="live" hidden><b>From Cloudflare:</b> every request to every Worker on your account today, the browser's permission checks included. Your browsers and the installed app show the same number.</li>
-          <li data-usage="live" hidden><b>A few minutes behind:</b> Cloudflare adds requests to its count a few minutes after they happen. The count refreshes every minute while this tab is open, and each refresh is itself one request.</li>
-          <li data-usage="device"><b>Cloudflare's own count:</b> <a href="https://dash.cloudflare.com/" target="_blank" rel="noopener">dash.cloudflare.com ↗</a> → Workers &amp; Pages → your Worker → Metrics, or set up the live count below.</li>
+          <li data-i18n-html="web_free_if_it_runs_out"><b>Free:</b> if it runs out, the fetcher stops until <span id="usageReset">the reset</span>. Nothing is charged.</li>
+          <li data-usage="device" data-i18n-html="web_only_this_device_the_requests"><b>Only this device:</b> the requests this browser or app sent today, counted as they're sent. The free 100,000 a day is for your whole Cloudflare account, and its count is higher: before a new page the browser also asks the fetcher for permission (Cloudflare counts that too, so a page is usually 2 requests), and your other devices and anyone with your connection link add theirs. So there's no meter here: set up the live count below to see the real total against the allowance.</li>
+          <li data-usage="live" hidden data-i18n-html="web_from_cloudflare_every_request_to"><b>From Cloudflare:</b> every request to every Worker on your account today, the browser's permission checks included. Your browsers and the installed app show the same number.</li>
+          <li data-usage="live" hidden data-i18n-html="web_a_few_minutes_behind_cloudflare"><b>A few minutes behind:</b> Cloudflare adds requests to its count a few minutes after they happen. The count refreshes every minute while this tab is open, and each refresh is itself one request.</li>
+          <li data-usage="device" data-i18n-html="web_cloudflare_s_own_count_dash"><b>Cloudflare's own count:</b> <a href="https://dash.cloudflare.com/" target="_blank" rel="noopener">dash.cloudflare.com ↗</a> → Workers &amp; Pages → your Worker → Metrics, or set up the live count below.</li>
         </ul>
 
         <!-- live count: the fetcher reads it from Cloudflare's analytics (optional) -->
         <div id="liveSetup" class="callout" hidden>
-          <h4>Show Cloudflare's own count here</h4>
-          <p class="muted small">Optional, about 3 minutes, easiest on a computer. The fetcher then reads today's count from Cloudflare with a token that can only read analytics.</p>
+          <h4 data-i18n="web_show_cloudflare_s_own_count">Show Cloudflare's own count here</h4>
+          <p class="muted small" data-i18n="web_optional_about_3_minutes_easiest">Optional, about 3 minutes, easiest on a computer. The fetcher then reads today's count from Cloudflare with a token that can only read analytics.</p>
+          <p class="muted small" data-labels-note hidden data-i18n="web_labels_english">Buttons on GitHub and Cloudflare are named here in English, as those sites show them in English.</p>
           <ol class="sub">
-            <li>In <a href="https://dash.cloudflare.com/" target="_blank" rel="noopener">dash.cloudflare.com ↗</a> open <b>Account API tokens</b> (press <kbd>Ctrl</kbd> <kbd>K</kbd>, or <kbd>⌘</kbd> <kbd>K</kbd> on a Mac, and search for it). Click <b>Create Token</b>, then under <b>Custom token</b> click <b>Get started</b>.</li>
-            <li>Token name: <button type="button" class="chip" data-copy="gytakusub-usage" title="Copy">gytakusub-usage</button>. Permissions: <b>Account</b> · <b>Account Analytics</b> · <b>Read</b>, nothing else. Click <b>Continue to summary</b>, then <b>Create Token</b>, and copy the token: Cloudflare shows it only once.</li>
-            <li>Press <kbd>Ctrl</kbd> <kbd>K</kbd> again and choose <b>Copy account ID</b>.</li>
-            <li>On your Worker: <b>Settings</b> → <b>Variables and Secrets</b> → <b>Add</b>, type <b>Secret</b>, name <button type="button" class="chip" data-copy="CF_API_TOKEN" title="Copy">CF_API_TOKEN</button>, value the token. <b>Add</b> one more Secret: <button type="button" class="chip" data-copy="CF_ACCOUNT_ID" title="Copy">CF_ACCOUNT_ID</button>, value the account ID. Click <b>Deploy</b>.</li>
+            <li data-i18n-html="web_in_dash_cloudflare_com_open">In <a href="https://dash.cloudflare.com/" target="_blank" rel="noopener">dash.cloudflare.com ↗</a> open <b>Account API tokens</b> (press <kbd>Ctrl</kbd> <kbd>K</kbd>, or <kbd>⌘</kbd> <kbd>K</kbd> on a Mac, and search for it). Click <b>Create Token</b>, then under <b>Custom token</b> click <b>Get started</b>.</li>
+            <li data-i18n-html="web_token_name_gytakusub_usage_permissions">Token name: <button type="button" class="chip" data-copy="gytakusub-usage" title="Copy">gytakusub-usage</button>. Permissions: <b>Account</b> · <b>Account Analytics</b> · <b>Read</b>, nothing else. Click <b>Continue to summary</b>, then <b>Create Token</b>, and copy the token: Cloudflare shows it only once.</li>
+            <li data-i18n-html="web_press_ctrl_k_again_and">Press <kbd>Ctrl</kbd> <kbd>K</kbd> again and choose <b>Copy account ID</b>.</li>
+            <li data-i18n-html="web_on_your_worker_settings_variables">On your Worker: <b>Settings</b> → <b>Variables and Secrets</b> → <b>Add</b>, type <b>Secret</b>, name <button type="button" class="chip" data-copy="CF_API_TOKEN" title="Copy">CF_API_TOKEN</button>, value the token. <b>Add</b> one more Secret: <button type="button" class="chip" data-copy="CF_ACCOUNT_ID" title="Copy">CF_ACCOUNT_ID</button>, value the account ID. Click <b>Deploy</b>.</li>
           </ol>
-          <div class="row"><button type="button" id="liveCheck" class="btn small">Check now</button><span id="liveMsg" class="hint" role="status"></span></div>
-          <p class="muted small">Cloudflare's guides: <a href="https://developers.cloudflare.com/analytics/graphql-api/getting-started/authentication/api-token-auth/" target="_blank" rel="noopener">analytics token ↗</a> · <a href="https://developers.cloudflare.com/fundamentals/account/find-account-and-zone-ids/" target="_blank" rel="noopener">account ID ↗</a></p>
+          <div class="row"><button type="button" id="liveCheck" class="btn small" data-i18n="web_liveCheck">Check now</button><span id="liveMsg" class="hint" role="status"></span></div>
+          <p class="muted small" data-i18n-html="web_cloudflare_s_guides_analytics_token">Cloudflare's guides: <a href="https://developers.cloudflare.com/analytics/graphql-api/getting-started/authentication/api-token-auth/" target="_blank" rel="noopener">analytics token ↗</a> · <a href="https://developers.cloudflare.com/fundamentals/account/find-account-and-zone-ids/" target="_blank" rel="noopener">account ID ↗</a></p>
         </div>
         <div id="liveUpdate" class="callout" hidden>
-          <h4>Show Cloudflare's own count here</h4>
-          <p class="small">Your fetcher is too old for this. On GitHub open your <b>gytakusub</b> copy, click <b>Sync fork</b> → <b>Update branch</b>. Cloudflare redeploys it in about a minute.</p>
-          <div class="row"><button type="button" id="liveCheck2" class="btn small">Check again</button></div>
+          <h4 data-i18n="web_show_cloudflare_s_own_count">Show Cloudflare's own count here</h4>
+          <p class="small" data-i18n-html="web_your_fetcher_is_too_old">Your fetcher is too old for this. On GitHub open your <b>gytakusub</b> copy, click <b>Sync fork</b> → <b>Update branch</b>. Cloudflare redeploys it in about a minute.</p>
+          <div class="row"><button type="button" id="liveCheck2" class="btn small" data-i18n="web_liveCheck2">Check again</button></div>
         </div>
         <p id="liveError" class="hint err" role="status" hidden></p>
       </section>
 
       <section class="mg-section" aria-labelledby="mgDevicesHead">
-        <h3 id="mgDevicesHead">Use it on another device</h3>
-        <p>Copy this link and open it on your phone or another computer, or paste it into the Chapter link tab there. Give it only to people you trust with your fetcher: it contains your key.</p>
-        <div class="row"><button type="button" id="mgCopyLink" class="btn small">Copy connection link</button></div>
+        <h3 id="mgDevicesHead" data-i18n="web_mgDevicesHead">Use it on another device</h3>
+        <p data-i18n="web_copy_this_link_and_open">Copy this link and open it on your phone or another computer, or paste it into the Chapter link tab there. Give it only to people you trust with your fetcher: it contains your key.</p>
+        <div class="row"><button type="button" id="mgCopyLink" class="btn small" data-i18n="web_mgCopyLink">Copy connection link</button></div>
       </section>
 
       <section class="mg-section" aria-labelledby="mgChangeHead">
-        <h3 id="mgChangeHead">Change or disconnect</h3>
-        <div class="row"><button type="button" id="mgSetup" class="btn small">Open the setup steps</button><button type="button" id="mgForget" class="btn small danger">Disconnect this device</button></div>
+        <h3 id="mgChangeHead" data-i18n="web_mgChangeHead">Change or disconnect</h3>
+        <div class="row"><button type="button" id="mgSetup" class="btn small" data-i18n="web_mgSetup">Open the setup steps</button><button type="button" id="mgForget" class="btn small danger" data-i18n="web_mgForget">Disconnect this device</button></div>
       </section>
     </div>
   </section>
 
   <div id="toolbar" class="toolbar hidden">
     <span id="progress" class="muted small" aria-live="polite"></span>
-    <label class="switch"><input type="checkbox" id="showOriginal" /> Originals</label>
-    <button type="button" id="btnClear" class="btn small">Clear</button>
+    <label class="switch"><input type="checkbox" id="showOriginal" /> <span data-i18n="web_originals">Originals</span></label>
+    <button type="button" id="btnClear" class="btn small" data-i18n="web_btnClear">Clear</button>
   </div>
 
   <div id="pages" class="pages" data-mode="shots"></div>
-  <div class="chapter-nav"><button id="navPrev" class="btn" hidden>‹ Previous chapter</button><button id="navNext" class="btn" hidden>Next chapter ›</button></div>
+  <div class="chapter-nav"><button id="navPrev" class="btn" hidden data-i18n="web_navPrev">‹ Previous chapter</button><button id="navNext" class="btn" hidden data-i18n="web_navNext">Next chapter ›</button></div>
 </main>
 
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
@@ -246,67 +248,67 @@
 <dialog id="settings" class="sheet-dialog" aria-labelledby="settingsTitle">
   <form method="dialog" class="sheet">
     <header class="sheet-head">
-      <h2 id="settingsTitle">Settings</h2>
-      <button type="submit" value="cancel" class="icon-btn" aria-label="Close settings" formnovalidate><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      <h2 id="settingsTitle" data-i18n="web_settings">Settings</h2>
+      <button type="submit" value="cancel" class="icon-btn" aria-label="Close settings" formnovalidate data-i18n-attr="aria-label=web_close_settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     </header>
     <div class="sheet-body">
       <section class="group" aria-labelledby="sgClaude">
         <h3 id="sgClaude">Claude</h3>
-        <label class="field">API key
-          <div class="row"><input id="sApiKey" name="claude-key" type="password" placeholder="sk-ant-api03-…" autocomplete="off" spellcheck="false" autocapitalize="off" /><button type="button" id="sShow" class="btn">Show</button></div>
-          <span class="hint">From platform.claude.com → Settings → API keys. Stored only on this device.</span>
+        <label class="field"><span data-i18n="opt_api_key">API key</span>
+          <div class="row"><input id="sApiKey" name="claude-key" type="password" placeholder="sk-ant-api03-…" autocomplete="off" spellcheck="false" autocapitalize="off" /><button type="button" id="sShow" class="btn" data-i18n="opt_show">Show</button></div>
+          <span class="hint" data-i18n="web_from_platform_claude_com_settings">From platform.claude.com → Settings → API keys. Stored only on this device.</span>
         </label>
-        <label class="field">Model <select id="sModel" name="model"></select></label>
-        <div class="row"><button type="button" id="sTest" class="btn small">Test the key</button></div>
+        <label class="field"><span data-i18n="popup_model">Model</span> <select id="sModel" name="model" aria-describedby="sModelHint"></select><span class="hint" id="sModelHint"></span></label>
+        <div class="row"><button type="button" id="sTest" class="btn small" data-i18n="web_sTest">Test the key</button></div>
         <p id="sMsg" class="hint" role="status"></p>
       </section>
       <section class="group" aria-labelledby="sgUsage">
-        <div class="sec-head"><h3 id="sgUsage">What translating costs</h3><span class="source-badge">This browser</span></div>
-        <p class="hint">Counted from Claude's own answers to this browser. The extension and your other devices keep their own counts.</p>
+        <div class="sec-head"><h3 id="sgUsage" data-i18n="opt_h_usage">What translating costs</h3><span class="source-badge" data-i18n="opt_this_browser">This browser</span></div>
+        <p class="hint" data-i18n="web_counted_from_claude_s_own">Counted from Claude's own answers to this browser. The extension and your other devices keep their own counts.</p>
         <div class="stats">
-          <div class="stat"><span class="stat-label">Today</span><span class="stat-value" id="cuTodayCost">$0</span><span class="stat-sub" id="cuTodaySub">Nothing yet</span></div>
+          <div class="stat"><span class="stat-label" data-i18n="opt_today">Today</span><span class="stat-value" id="cuTodayCost">$0</span><span class="stat-sub" id="cuTodaySub">Nothing yet</span></div>
           <div class="stat"><span class="stat-label" id="cuMonthLabel">This month</span><span class="stat-value" id="cuMonthCost">$0</span><span class="stat-sub" id="cuMonthSub">Nothing yet</span></div>
         </div>
-        <ul id="cuModels" class="model-rows" aria-label="This month by model, with the cost per page"></ul>
+        <ul id="cuModels" class="model-rows" aria-label="This month by model, with the cost per page" data-i18n-attr="aria-label=opt_cuModels_arialabel"></ul>
         <div class="usage-cap">
-          <p><b>Cap your spending on every device.</b> Set a monthly spend limit in the Claude Console (Billing → Spend limits). It covers everything that uses your key, and Claude stops there.</p>
-          <a class="btn small" href="https://platform.claude.com/settings/billing" target="_blank" rel="noopener">Open Billing ↗</a>
+          <p data-i18n-html="opt_cap_your_spending_on_every"><b>Cap your spending on every device.</b> Set a monthly spend limit in the Claude Console (Billing → Spend limits). It covers everything that uses your key, and Claude stops there.</p>
+          <a class="btn small" href="https://platform.claude.com/settings/billing" target="_blank" rel="noopener"><span data-i18n="opt_open_billing">Open Billing</span> ↗</a>
         </div>
         <details class="usage-details">
-          <summary>Details</summary>
+          <summary data-i18n="opt_details">Details</summary>
           <ul class="usage-facts small">
-            <li><b>Today:</b> <span id="cuTodayTokens"></span></li>
-            <li><b>This month:</b> <span id="cuMonthTokens"></span></li>
+            <li data-i18n-html="opt_today_2"><b>Today:</b> <span id="cuTodayTokens"></span></li>
+            <li data-i18n-html="opt_this_month"><b>This month:</b> <span id="cuMonthTokens"></span></li>
             <li id="cuLimits" hidden></li>
-            <li><b>Estimate:</b> tokens are exact; the cost uses <a id="cuPriceLink" href="https://platform.claude.com/docs/en/about-claude/pricing" target="_blank" rel="noopener">Anthropic's prices ↗</a> (checked <span id="cuChecked"></span>). A page you already translated costs nothing again and isn't counted.</li>
-            <li><b>Exact bill:</b> the Claude Console's <a href="https://platform.claude.com/usage" target="_blank" rel="noopener">Usage ↗</a> and <a href="https://platform.claude.com/cost" target="_blank" rel="noopener">Cost ↗</a> pages.</li>
-            <li><b>Balance and credits</b> (including a plan's monthly API credit): the Console's <a href="https://platform.claude.com/settings/billing" target="_blank" rel="noopener">Billing page ↗</a>. Anthropic has no way for apps to read them.</li>
-            <li><b>Days</b> start at <span id="cuDayStart">midnight UTC</span> your time (midnight UTC), like Anthropic's usage reports.</li>
+            <li data-i18n-html="opt_estimate_tokens_are_exact_the"><b>Estimate:</b> tokens are exact; the cost uses <a id="cuPriceLink" href="https://platform.claude.com/docs/en/about-claude/pricing" target="_blank" rel="noopener">Anthropic's prices ↗</a> (checked <span id="cuChecked"></span>). A page you already translated costs nothing again and isn't counted.</li>
+            <li data-i18n-html="opt_exact_bill_the_claude_console"><b>Exact bill:</b> the Claude Console's <a href="https://platform.claude.com/usage" target="_blank" rel="noopener">Usage ↗</a> and <a href="https://platform.claude.com/cost" target="_blank" rel="noopener">Cost ↗</a> pages.</li>
+            <li data-i18n-html="opt_balance_and_credits_including_a"><b>Balance and credits</b> (including a plan's monthly API credit): the Console's <a href="https://platform.claude.com/settings/billing" target="_blank" rel="noopener">Billing page ↗</a>. Anthropic has no way for apps to read them.</li>
+            <li data-i18n-html="opt_days_start_at_midnight_utc"><b>Days</b> start at <span id="cuDayStart">midnight UTC</span> your time (midnight UTC), like Anthropic's usage reports.</li>
           </ul>
         </details>
-        <div class="row"><button type="button" id="cuClear" class="btn small danger">Clear usage history</button></div>
+        <div class="row"><button type="button" id="cuClear" class="btn small danger" data-i18n="opt_cuClear">Clear usage history</button></div>
       </section>
       <section class="group" aria-labelledby="sgTranslate">
-        <h3 id="sgTranslate">Translation</h3>
-        <label class="field">Target language <select id="sTargetLang" name="target-language"></select></label>
-        <label class="field" id="sTargetOtherField" hidden>Other language <input id="sTargetOther" name="target-language-other" type="text" placeholder="Type a language" autocomplete="off" /></label>
-        <label class="field">Glossary <textarea id="sGlossary" name="glossary" rows="3" placeholder="Gojo Satoru = Satoru Gojo" spellcheck="false"></textarea></label>
-        <label class="field">Extra instructions <textarea id="sCustomPrompt" name="instructions" rows="2" placeholder="Keep the tone casual."></textarea></label>
-        <label class="check"><input type="checkbox" id="sUseContext" name="context" /> Chapter context (names and recent lines)</label>
-        <label class="check"><input type="checkbox" id="sUppercase" name="uppercase" /> UPPERCASE lettering</label>
+        <h3 id="sgTranslate" data-i18n="popup_trHead">Translation</h3>
+        <label class="field"><span data-i18n="opt_target_language">Target language</span> <select id="sTargetLang" name="target-language"></select></label>
+        <label class="field" id="sTargetOtherField" hidden><span data-i18n="opt_other_language_label">Other language</span> <input id="sTargetOther" name="target-language-other" type="text" placeholder="Type a language" autocomplete="off" data-i18n-attr="placeholder=opt_other_language_placeholder" /></label>
+        <label class="field"><span data-i18n="opt_glossary">Glossary</span> <textarea id="sGlossary" name="glossary" rows="3" placeholder="Gojo Satoru = Satoru Gojo" spellcheck="false"></textarea></label>
+        <label class="field"><span data-i18n="opt_extra_instructions">Extra instructions</span> <textarea id="sCustomPrompt" name="instructions" rows="2" placeholder="Keep the tone casual."></textarea></label>
+        <label class="check"><input type="checkbox" id="sUseContext" name="context" /> <span data-i18n="web_chapter_context_names_and_recent">Chapter context (names and recent lines)</span></label>
+        <label class="check"><input type="checkbox" id="sUppercase" name="uppercase" /> <span data-i18n="opt_uppercase_lettering">UPPERCASE lettering</span></label>
       </section>
       <section class="group" aria-labelledby="sgReading">
-        <h3 id="sgReading">Reading</h3>
-        <label class="check"><input type="checkbox" id="sRtl" name="rtl" /> Right-to-left two-page spreads on wide screens</label>
+        <h3 id="sgReading" data-i18n="web_sgReading">Reading</h3>
+        <label class="check"><input type="checkbox" id="sRtl" name="rtl" /> <span data-i18n="web_right_to_left_two_page">Right-to-left two-page spreads on wide screens</span></label>
       </section>
       <section class="group" aria-labelledby="sgApp">
-        <h3 id="sgApp">App</h3>
-        <div class="row"><button type="button" id="btnShowInstall" class="btn small">Install on your phone or computer</button></div>
-        <p class="hint">Free software under the <a href="LICENSE" target="_blank">GNU AGPL v3</a> · <a href="https://github.com/gywreb/gytakusub" target="_blank" rel="noopener">source code</a> · <a href="THIRD_PARTY.md" target="_blank">third-party components</a></p>
+        <h3 id="sgApp" data-i18n="web_sgApp">App</h3>
+        <div class="row"><button type="button" id="btnShowInstall" class="btn small" data-i18n="web_btnShowInstall">Install on your phone or computer</button></div>
+        <p class="hint" data-i18n-html="web_free_software_under_the_gnu">Free software under the <a href="LICENSE" target="_blank">GNU AGPL v3</a> · <a href="https://github.com/gywreb/gytakusub" target="_blank" rel="noopener">source code</a> · <a href="THIRD_PARTY.md" target="_blank">third-party components</a></p>
       </section>
     </div>
     <footer class="sheet-foot">
-      <button id="sSave" class="primary" value="save">Save</button>
+      <button id="sSave" class="primary" value="save" data-i18n="opt_save">Save</button>
     </footer>
   </form>
 </dialog>

@@ -43,7 +43,7 @@ Two requests from the owner: pick the language from a list, and have the extensi
 - **Follow the browser's language (plain `chrome.i18n`).** Zero code, but a Vietnamese reader on an English browser gets English, and it can't follow the target language. Kept only for the manifest strings and the first-install default.
 - **A separate "interface language" setting.** More flexible, one more choice for everyone. People who translate into a language almost always read it; an English interface is one "Other…" away. Can be added later without breaking anything.
 - **A JS i18n library (i18next and similar).** Plurals and formatting we already get from `Intl`; it would add a dependency and a second message format beside the one the manifest needs.
-- **Translate the web app's interface in the same release.** It shares the loader and the files (synced into `web/`), but its Cloudflare setup guide is long and quotes Cloudflare's own screens. Next release (2.9.0); 2.8.0 gives it the same language list.
+- **Translate the web app's interface in the same release.** It shares the loader and the files (synced into `web/`), but its Cloudflare setup guide is long and quotes Cloudflare's own screens. Done in 2.10.0 (see below); 2.8.0 gave it the same language list.
 
 ## Consequences
 
@@ -57,3 +57,13 @@ Two requests from the owner: pick the language from a list, and have the extensi
 - W3C WebExtensions issue 258, a proposed API for choosing an extension's language. https://github.com/w3c/webextensions/issues/258
 - Chrome's `chrome.i18n` reference: supported locales, `default_locale`. https://developer.chrome.com/docs/extensions/reference/api/i18n
 - Chrome blog, "Introducing four new international features in CSS": `word-break: auto-phrase` from Chrome 119, for `lang="ja"`. https://developer.chrome.com/blog/css-i18n-features
+
+## 2.10.0: the web app follows too
+
+- The web app's screens speak the target language the same way: the install card, screenshot mode, the chapter-link setup steps, the fetcher page, Settings, and every message from code (status, toasts, the fetcher's errors).
+- Its own messages are in `web/locales/<locale>/messages.json` (181), same format, checked by the same script. It loads them over the extension's (`_locales/`, synced), whose usage and Settings texts it reuses (no message name may be in both).
+- Saving another target language in Settings switches the app without a reload. Copy buttons inside translated sentences (the setup steps' grey values) are handled by one listener on the document, so they keep working when a sentence is redrawn in another language.
+- **GitHub's and Cloudflare's button and field names stay in English** (Fork, Workers & Pages, Variables and Secrets…), with a note saying so in other languages. GitHub has no other interface languages, and I can't check what Cloudflare's screens are called in each language, so quoting them in English is the one way the steps stay findable.
+- **iPhone and Android menu names** (Share, Add to Home Screen, Install app, Copy) are given as I believe each system shows them in that language, for example "Thêm vào MH chính" and "ホーム画面に追加". I couldn't check them against a real device in each language; the Translation fix issue form is for corrections. iOS 26's "Open as Web App" switch is named in both the language and English, because I'm least sure of its translated name.
+- `tests/browser/web-i18n.mjs` (83 checks): every language on a 390 px phone screen (home, setup steps, Settings), with the same rules as the extension's test, plus switching from Settings and a copy button working after the switch.
+

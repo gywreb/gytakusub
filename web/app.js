@@ -2,23 +2,34 @@
 import { loadSettings, saveSettings, loadImage, blobToDataUrl, translateImage, renderPage, prepareLettering, testKey } from "./translator.js";
 import { isConnected, connectFetcher, loadChapter, fetchPageImage, generateKey, connectionLink, readConnectionLink, fetcherBase, usageToday, onUsage, resetTime, FREE_DAILY, loadCloudUsage } from "./fetcher-client.js";
 import { MODELS } from "./prompt.js";
-import { loadLocale } from "./i18n.js";
-import { languageOptions, findLanguage, languageForLocale } from "./languages.js";
+import { loadLocale, applyI18n, t, tn, langTag, currentLocale } from "./i18n.js";
+import { languageOptions, findLanguage, languageForLocale, uiLocaleFor } from "./languages.js";
 import { summary, usageView, fmtUsd, dayStart, PRICES_CHECKED, PRICE_SOURCE } from "./usage.js";
 import { readClaudeUsage, onClaudeUsage, clearClaudeUsage } from "./claude-usage.js";
 import qrcode from "./lib/qrcode.mjs";
 
 const $ = (id) => document.getElementById(id);
 
-// Words shared with the extension (usage.js) come from _locales/; the web app's own screens are in
-// English for now, so it loads English. (The extension's interface follows the target language.)
-await loadLocale("en", async (path) => (await fetch(`./${path}`)).json());
 let settings = loadSettings();
 if (!localStorage.getItem("gytakusub.settings")) { // nothing saved yet
   // a first guess at the language to translate into: the device's own (Settings → Translation changes it)
   const guess = languageForLocale(navigator.language);
   if (guess) settings = { ...settings, targetLang: guess.name };
 }
+// The app speaks the target language when it has a translation, as the extension does (ADR 0010).
+// Messages: the ones shared with the extension (_locales/, synced from extension/) and the web
+// app's own (locales/), English underneath both.
+const readMessages = async (path) => {
+  const own = path.replace(/^_locales\//, "locales/");
+  const [shared, web] = await Promise.all([fetch(`./${path}`).then((r) => r.json()), fetch(`./${own}`).then((r) => (r.ok ? r.json() : {})).catch(() => ({}))]);
+  return { ...shared, ...web };
+};
+await loadLocale(uiLocaleFor(settings.targetLang), readMessages);
+applyI18n(document);
+const n = (x) => Number(x).toLocaleString(langTag());
+// GitHub's and Cloudflare's buttons are quoted in English (their own labels); say so in other languages
+const labelsNote = () => document.querySelectorAll("[data-labels-note]").forEach((el) => (el.hidden = currentLocale() === "en"));
+labelsNote();
 
 // "Chapter link" mode works only through a fetcher the user deployed and connected (verified with /ping).
 // Until then the tab shows the setup steps instead of the chapter form.
@@ -32,14 +43,14 @@ async function applyChapterMode(view) {
   $("fetcherManage").classList.toggle("hidden", chapterView !== "manage");
   if (ok) {
     const where = new URL(settings.fetcherUrl).host;
-    $("manageStatus").textContent = `Connected to ${where}, version ${settings.fetcherCheck.version}, checked ${new Date(settings.fetcherCheck.at).toLocaleDateString()}.`;
+    $("manageStatus").textContent = t("web_manage_status", { host: where, version: settings.fetcherCheck.version, date: new Date(settings.fetcherCheck.at).toLocaleDateString(langTag()) });
     showUsage();
     if (chapterView === "manage") refreshLive(true);
   }
   if (chapterView === "wizard") {
     if (!$("wzUrl").value && settings.fetcherUrl) $("wzUrl").value = settings.fetcherUrl;
     if (!$("wzKeyInput").value && settings.fetcherKey) $("wzKeyInput").value = settings.fetcherKey;
-    if (settings.fetcherKey) { $("wzKey").textContent = settings.fetcherKey; $("wzCopyKey").disabled = false; $("wzGen").textContent = "New key"; }
+    if (settings.fetcherKey) { $("wzKey").textContent = settings.fetcherKey; $("wzCopyKey").disabled = false; $("wzGen").textContent = t("web_new_key"); }
   }
 }
 // Today's use of the free allowance. With the live count (the fetcher reads Cloudflare's analytics)
@@ -71,19 +82,19 @@ document.addEventListener("visibilitychange", () => { if (liveWanted()) refreshL
 
 function showUsage() {
   if (!settings.fetcherUrl) return;
-  const n = (x) => x.toLocaleString(), time = (iso) => new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const time = (iso) => new Date(iso).toLocaleTimeString(langTag(), { hour: "numeric", minute: "2-digit" });
   const device = usageToday(fetcherBase(settings.fetcherUrl));
   const cloud = live.data, isLive = !!cloud;
-  $("usageSource").textContent = isLive ? `Cloudflare · ${time(cloud.asOf)}` : "This device";
+  $("usageSource").textContent = isLive ? t("web_usage_source_live", { time: time(cloud.asOf) }) : t("web_usage_source_device");
   $("usageSource").classList.toggle("live", isLive);
   if (isLive) {
     // Cloudflare's own count for the account: the only number that can sit against the allowance
     const requests = cloud.requests, limit = cloud.limit || FREE_DAILY;
     const share = Math.min(1, requests / limit), warn = share >= 0.8;
-    const state = share >= 1 ? `used up until ${resetTime()}` : warn ? "almost used up" : ""; // the state in words too, not only in red
-    $("fetcherUsage").textContent = share >= 1 ? `free requests ${state}` : (state ? `${n(requests)} / ${n(limit)} · ${state}` : `${n(requests)} / ${n(limit)} free today`);
+    const state = share >= 1 ? t("web_usage_used_up", { time: resetTime() }) : warn ? t("web_usage_almost") : ""; // the state in words too, not only in red
+    $("fetcherUsage").textContent = share >= 1 ? t("web_chip_used_up", { time: resetTime() }) : (state ? `${n(requests)} / ${n(limit)} · ${state}` : t("web_chip_count", { requests: n(requests), limit: n(limit) }));
     $("btnFetcherManage").classList.toggle("warn", warn);
-    $("btnFetcherManage").title = `Cloudflare's count, ${time(cloud.asOf)}`;
+    $("btnFetcherManage").title = t("web_chip_title", { time: time(cloud.asOf) });
     $("usageState").textContent = state ? state[0].toUpperCase() + state.slice(1) : "";
     $("usageState").hidden = !state;
     $("usageCount").textContent = n(requests);
@@ -91,13 +102,13 @@ function showUsage() {
     const meter = $("usageMeter");
     meter.setAttribute("aria-valuemax", limit);
     meter.setAttribute("aria-valuenow", Math.min(requests, limit));
-    meter.setAttribute("aria-valuetext", `${n(requests)} of ${n(limit)} requests used today`);
+    meter.setAttribute("aria-valuetext", t("web_meter_text", { requests: n(requests), limit: n(limit) }));
     meter.classList.toggle("warn", warn);
     meter.classList.toggle("used", requests > 0);
     meter.firstElementChild.style.width = `${share * 100}%`;
     const others = cloud.workers.slice(1).reduce((t, w) => t + w.requests, 0);
-    const split = cloud.workers.length > 1 ? `${cloud.workers[0].name} ${n(cloud.workers[0].requests)}, other Workers ${n(others)} · ` : "";
-    $("usageNote").textContent = `${split}All your devices · starts again at ${resetTime()}`;
+    const split = cloud.workers.length > 1 ? t("web_usage_split", { name: cloud.workers[0].name, count: n(cloud.workers[0].requests), others: n(others) }) + " · " : "";
+    $("usageNote").textContent = split + t("web_usage_note_live", { time: resetTime() });
   } else {
     // only what this device sent: the account's total (other devices, the browser's permission
     // checks) isn't visible from here, so no share of the allowance and no warning are made up
@@ -106,7 +117,7 @@ function showUsage() {
     $("btnFetcherManage").title = "";
     $("usageState").hidden = true;
     $("usageCount").textContent = n(device.requests);
-    $("usageNote").textContent = `${n(device.chapters)} chapter${device.chapters === 1 ? "" : "s"} opened · the allowance starts again at ${resetTime()}`;
+    $("usageNote").textContent = tn("web_usage_note_device", device.chapters, { time: resetTime() });
   }
   document.querySelectorAll("[data-usage=device]").forEach((el) => (el.hidden = isLive));
   document.querySelectorAll("[data-usage=live]").forEach((el) => (el.hidden = !isLive));
@@ -114,15 +125,15 @@ function showUsage() {
   $("liveSetup").hidden = live.state !== "setup";
   $("liveUpdate").hidden = live.state !== "old";
   $("liveError").hidden = live.state !== "error";
-  $("liveError").textContent = live.state === "error" ? `Cloudflare's count didn't update: ${live.error}${cloud ? ` Showing the count from ${time(cloud.asOf)}.` : ""}` : "";
+  $("liveError").textContent = live.state === "error" ? t("web_live_error", { error: live.error }) + (cloud ? " " + t("web_live_error_showing", { time: time(cloud.asOf) }) : "") : "";
 }
 onUsage(showUsage);
 async function checkLive(button) {
-  button.disabled = true; $("liveMsg").textContent = "Checking…";
+  button.disabled = true; $("liveMsg").textContent = t("web_checking");
   await refreshLive(true);
   button.disabled = false;
-  $("liveMsg").textContent = live.state === "live" ? "" : live.state === "setup" ? "Not yet: the Worker has no CF_API_TOKEN and CF_ACCOUNT_ID secrets (after adding them, click Deploy)." : "";
-  if (live.state === "live") toast("Live count from Cloudflare is on.");
+  $("liveMsg").textContent = live.state === "live" ? "" : live.state === "setup" ? t("web_live_not_yet") : "";
+  if (live.state === "live") toast(t("web_live_on"));
 }
 
 // ---------- Claude usage (usage.js): what this browser's translations cost ----------
@@ -143,15 +154,15 @@ function showClaudeUsage(log = readClaudeUsage()) {
   $("cuTodayTokens").textContent = v.today.tokens; $("cuMonthTokens").textContent = v.month.tokens;
   $("cuLimits").hidden = !v.limits;
   $("cuLimits").textContent = v.limits;
-  $("cuChecked").textContent = new Date(PRICES_CHECKED + "T00:00:00Z").toLocaleDateString([], { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+  $("cuChecked").textContent = new Date(PRICES_CHECKED + "T00:00:00Z").toLocaleDateString(langTag(), { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
   $("cuPriceLink").href = PRICE_SOURCE;
   $("cuDayStart").textContent = dayStart();
   updateToolbar();
 }
 onClaudeUsage(showClaudeUsage);
 $("cuClear").onclick = () => {
-  if (!confirm("Clear this browser's Claude usage history? The Claude Console keeps its own records.")) return;
-  clearClaudeUsage(); toast("Usage history cleared");
+  if (!confirm(t("opt_confirm_clear_usage"))) return;
+  clearClaudeUsage(); toast(t("opt_usage_cleared"));
 };
 
 let ctx = { terms: [], recent: [] }; // chapter context for this session
@@ -201,7 +212,7 @@ function updateToolbar() {
   $("toolbar").classList.toggle("hidden", list.length === 0);
   $("drop").classList.toggle("compact", currentMode === "shots" && list.length > 0);
   const today = summary(readClaudeUsage()).today;
-  $("progress").textContent = `${done} of ${list.length} translated${busy ? ` · ${busy} in progress` : ""}${today.requests ? ` · Claude today ≈ ${fmtUsd(today.cost)}` : ""}`;
+  $("progress").textContent = t("web_progress", { done: n(done), total: n(list.length) }) + (busy ? " · " + t("web_progress_busy", { n: n(busy) }) : "") + (today.requests ? " · " + t("web_progress_cost", { cost: fmtUsd(today.cost) }) : "");
   $("pages").classList.toggle("spread", list.length > 1);
   $("pages").classList.toggle("rtl", !!settings.rtlSpreads);
 }
@@ -211,7 +222,9 @@ function updateToolbar() {
 function addPage({ img, url, referer, file, mode = currentMode }) {
   const el = document.createElement("article");
   el.className = "page"; el.dataset.mode = mode;
-  el.innerHTML = `<div class="page-media"></div><div class="page-bar"><span class="status" role="status">queued</span><div class="page-actions"><button type="button" data-act="toggle" aria-pressed="false">Original</button><button type="button" data-act="redo">Redo</button><button type="button" data-act="save">Save</button></div></div>`;
+  el.innerHTML = `<div class="page-media"></div><div class="page-bar"><span class="status" role="status"></span><div class="page-actions"><button type="button" data-act="toggle" aria-pressed="false" data-i18n="web_page_original"></button><button type="button" data-act="redo" data-i18n="web_page_redo"></button><button type="button" data-act="save" data-i18n="opt_save"></button></div></div>`;
+  applyI18n(el);
+  el.querySelector(".status").textContent = t("web_status_queued");
   const page = { el, media: el.querySelector(".page-media"), img, url, referer, file, mode, status: "queued" };
   if (img) page.media.append(img);
   const toggle = el.querySelector('[data-act="toggle"]');
@@ -235,7 +248,7 @@ function setStatus(page, text, cls = "") {
 
 function enqueue(page, force = false) {
   if (page.status === "working") return;
-  page.status = "queued"; setStatus(page, "queued");
+  page.status = "queued"; setStatus(page, t("web_status_queued"));
   if (!queue.includes(page)) queue.push(page);
   pump();
 }
@@ -251,14 +264,14 @@ function pump() {
 }
 
 async function processPage(page) {
-  page.status = "working"; setStatus(page, "loading…");
+  page.status = "working"; setStatus(page, t("web_status_loading"));
   try {
     if (!page.img) {
       const blob = page.file || (await fetchPageImage(settings, page.url, page.referer));
       page.img = await loadImage(await blobToDataUrl(blob));
       page.media.append(page.img);
     }
-    setStatus(page, "translating…");
+    setStatus(page, t("web_status_translating"));
     const [result, look] = await Promise.all([
       translateImage(page.img, settings, settings.useContext ? ctx : { terms: [], recent: [] }),
       prepareLettering(settings), // the bundled fonts and the target language's hyphenation
@@ -271,7 +284,7 @@ async function processPage(page) {
     page.media.prepend(original, translated);
     page.result = result;
     page.status = "done";
-    setStatus(page, drawn ? "" : "no text found");
+    setStatus(page, drawn ? "" : t("web_status_no_text"));
   } catch (e) {
     page.status = "error";
     setStatus(page, "⚠ " + (e.message || e), "error");
@@ -281,10 +294,10 @@ async function processPage(page) {
 
 async function savePage(page) {
   const c = page.el.querySelector("canvas.translated");
-  if (!c) return toast("Not translated yet");
+  if (!c) return toast(t("web_not_translated_yet"));
   const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", 0.92));
   const file = new File([blob], `gytakusub-${Date.now()}.jpg`, { type: "image/jpeg" });
-  toast("Saved for your personal reading. Please don't redistribute translated pages.", 3500);
+  toast(t("web_saved_personal"), 3500);
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
     try { await navigator.share({ files: [file], title: "Gytakusub" }); return; } catch { /* cancelled */ return; }
   }
@@ -296,7 +309,7 @@ async function savePage(page) {
 
 async function addFiles(files) {
   const imgs = [...files].filter((f) => f.type.startsWith("image/"));
-  if (!imgs.length) return toast("No image found");
+  if (!imgs.length) return toast(t("web_no_image"));
   for (const f of imgs) {
     const img = await loadImage(await blobToDataUrl(f));
     enqueue(addPage({ img }));
@@ -307,7 +320,7 @@ async function addFiles(files) {
 $("file").onchange = (e) => { addFiles(e.target.files); e.target.value = ""; };
 
 $("btnPaste").onclick = async () => {
-  if (!navigator.clipboard?.read) return toast("Paste with Ctrl/⌘+V, or long-press the page and choose Paste.");
+  if (!navigator.clipboard?.read) return toast(t("web_paste_how"));
   try {
     const items = await navigator.clipboard.read();
     const files = [];
@@ -315,10 +328,10 @@ $("btnPaste").onclick = async () => {
       const type = it.types.find((t) => t.startsWith("image/"));
       if (type) files.push(new File([await it.getType(type)], "clipboard." + type.split("/")[1], { type }));
     }
-    if (!files.length) return toast("Clipboard has no image. Copy a screenshot first.");
+    if (!files.length) return toast(t("web_clipboard_empty"));
     addFiles(files);
   } catch (e) {
-    toast("Clipboard access was denied. Use Choose photos instead.");
+    toast(t("web_clipboard_denied"));
   }
 };
 
@@ -342,14 +355,14 @@ let io = null, chapterNav = { next: null, prev: null };
 async function openChapter(link, { keepContext = false } = {}) {
   setMode("chapter");
   $("chapterUrl").value = link;
-  $("chapterInfo").textContent = "Loading chapter…";
+  $("chapterInfo").textContent = t("web_loading_chapter");
   showNav({ next: null, prev: null });
   try {
     const ch = await loadChapter(settings, link);
     clearPages();
     if (!keepContext) ctx = { terms: [], recent: [] };
     history.replaceState(null, "", `?chapter=${encodeURIComponent(ch.url)}`);
-    $("chapterInfo").textContent = `${ch.title ? ch.title + " · " : ""}${ch.pages.length} pages. Scroll — pages translate as they come into view.`;
+    $("chapterInfo").textContent = (ch.title ? ch.title + " · " : "") + tn("web_chapter_pages", ch.pages.length);
     io = new IntersectionObserver((recs) => {
       for (const r of recs) if (r.isIntersecting) { const p = pages.find((p) => p.el === r.target); if (p && p.status === "idle") enqueue(p); }
     }, { rootMargin: "150% 0px" });
@@ -395,17 +408,21 @@ $("showOriginal").onchange = (e) => modePages().forEach((p) => p.showOriginal(e.
 // ---------- settings ----------
 
 const dlg = $("settings");
-$("sModel").innerHTML = MODELS.map((m) => `<option value="${m.id}">${m.label}</option>`).join("");
+// the model menu shows the names (they fit a phone in any language); what the chosen one is for sits below it
+$("sModel").replaceChildren(...MODELS.map((m) => new Option(m.label.split(" — ")[0], m.id)));
+const showModelHint = () => { const kind = ($("sModel").value.match(/haiku|sonnet|opus/) || [])[0]; $("sModelHint").textContent = kind ? t(`popup_model_hint_${kind}`) : ""; };
+$("sModel").addEventListener("change", showModelHint);
 // Target language: the list (languages.js) or "Other…" with a name typed in
 const OTHER_LANG = "__other";
-$("sTargetLang").replaceChildren(...languageOptions().map(({ value, label }) => new Option(label, value)), new Option("Other…", OTHER_LANG));
+const fillLanguages = () => { const keep = $("sTargetLang").value; $("sTargetLang").replaceChildren(...languageOptions().map(({ value, label }) => new Option(label, value)), new Option(t("opt_other_language"), OTHER_LANG)); if (keep) $("sTargetLang").value = keep; };
+fillLanguages();
 $("sTargetLang").addEventListener("change", () => {
   $("sTargetOtherField").hidden = $("sTargetLang").value !== OTHER_LANG;
   if (!$("sTargetOtherField").hidden) $("sTargetOther").focus();
 });
 function fillSettings() {
   showClaudeUsage();
-  $("sApiKey").value = settings.apiKey; $("sModel").value = settings.model;
+  $("sApiKey").value = settings.apiKey; $("sModel").value = settings.model; showModelHint();
   const listed = findLanguage(settings.targetLang);
   $("sTargetLang").value = listed ? listed.name : OTHER_LANG;
   $("sTargetOther").value = listed ? "" : settings.targetLang;
@@ -420,33 +437,47 @@ function readSettings() {
     uppercase: $("sUppercase").checked, rtlSpreads: $("sRtl").checked };
 }
 $("btnSettings").onclick = () => { fillSettings(); dlg.showModal(); };
-$("sShow").onclick = () => { const i = $("sApiKey"); i.type = i.type === "password" ? "text" : "password"; $("sShow").textContent = i.type === "password" ? "Show" : "Hide"; };
+$("sShow").onclick = () => { const i = $("sApiKey"); i.type = i.type === "password" ? "text" : "password"; $("sShow").textContent = t(i.type === "password" ? "opt_show" : "opt_hide"); };
 $("sTest").onclick = async () => {
-  const s = readSettings(); $("sMsg").className = "hint"; $("sMsg").textContent = "Testing…";
-  try { await testKey(s); $("sMsg").className = "hint ok"; $("sMsg").textContent = `Key works (${s.model}).`; }
-  catch (e) { $("sMsg").className = "hint err"; $("sMsg").textContent = "Failed: " + e.message; }
+  const s = readSettings(); $("sMsg").className = "hint"; $("sMsg").textContent = t("opt_testing");
+  try { await testKey(s); $("sMsg").className = "hint ok"; $("sMsg").textContent = t("opt_key_works", { model: s.model }); }
+  catch (e) { $("sMsg").className = "hint err"; $("sMsg").textContent = t("opt_key_failed", { error: e.message }); }
 };
-dlg.addEventListener("close", () => { if (dlg.returnValue === "save") { settings = readSettings(); saveSettings(settings); updateToolbar(); toast("Saved"); } });
+dlg.addEventListener("close", async () => {
+  if (dlg.returnValue !== "save") return;
+  const before = currentLocale();
+  settings = readSettings(); saveSettings(settings); updateToolbar();
+  if (uiLocaleFor(settings.targetLang) !== before) await speak(); // the app follows the target language
+  toast(t("opt_saved"));
+});
 
 // ---------- chapter fetcher setup ----------
 
 function wizardMsg(kind, text) { const m = $("wzMsg"); m.className = "hint" + (kind ? " " + kind : ""); m.textContent = text; }
 async function copyText(text, what) {
-  try { await navigator.clipboard.writeText(text); toast(`${what} copied`); }
-  catch { prompt(`Copy ${what.toLowerCase()}:`, text); }
+  try { await navigator.clipboard.writeText(text); toast(t("web_copied", { what })); }
+  catch { prompt(t("web_copy_prompt"), text); }
 }
 // When the steps were last checked against Cloudflare's pages (fetcher/guide-sources.json; a weekly CI job flags changes).
-fetch("fetcher-guide.json").then((r) => r.json()).then((g) => { $("wzChecked").textContent = new Date(g.checked + "T00:00:00Z").toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }); }).catch(() => {});
+let guideChecked = null;
+const showGuideChecked = () => { if (guideChecked) $("wzChecked").textContent = new Date(guideChecked + "T00:00:00Z").toLocaleDateString(langTag(), { year: "numeric", month: "long", day: "numeric", timeZone: "UTC" }); };
+fetch("fetcher-guide.json").then((r) => r.json()).then((g) => { guideChecked = g.checked; showGuideChecked(); }).catch(() => {});
 $("wzGen").onclick = () => {
   const key = generateKey();
-  $("wzKey").textContent = key; $("wzKeyInput").value = key; $("wzCopyKey").disabled = false; $("wzGen").textContent = "New key";
+  $("wzKey").textContent = key; $("wzKeyInput").value = key; $("wzCopyKey").disabled = false; $("wzGen").textContent = t("web_new_key");
   // remembered (not yet connected), so leaving for Cloudflare and coming back keeps it
   settings = { ...settings, fetcherKey: key, fetcherCheck: null }; saveSettings(settings);
 };
-$("wzCopyKey").onclick = () => copyText($("wzKey").textContent, "Key");
-$("wzCopyKey2").onclick = () => settings.fetcherKey ? copyText(settings.fetcherKey, "Key") : toast("Generate a key in step 2 first");
-// Copyable values in the steps (names and settings to type into GitHub/Cloudflare)
-document.querySelectorAll("#fetcherWizard .chip, #fetcherManage .chip").forEach((b) => (b.onclick = () => copyText(b.dataset.copy, `“${b.dataset.copy}”`)));
+$("wzCopyKey").onclick = () => copyText($("wzKey").textContent, t("web_what_key"));
+// Buttons inside translated sentences are re-created when the language changes: one listener for them all.
+document.addEventListener("click", (e) => {
+  const b = e.target.closest?.("button");
+  if (!b) return;
+  if (b.id === "wzCopyKey2") settings.fetcherKey ? copyText(settings.fetcherKey, t("web_what_key")) : toast(t("web_key_first"));
+  else if (b.id === "btnCopyAppLink") copyText(appUrl, t("web_what_link"));
+  // copyable values in the steps (names and settings to type into GitHub/Cloudflare)
+  else if (b.matches(".chip[data-copy]")) copyText(b.dataset.copy, `“${b.dataset.copy}”`);
+});
 
 // One step at a time; where you are is remembered, so going off to GitHub or Cloudflare and back keeps your place.
 const STEP_KEY = "gytakusub.setupStep";
@@ -455,7 +486,7 @@ function showStep(n) {
   const step = Math.max(1, Math.min(stepItems.length, n | 0));
   try { localStorage.setItem(STEP_KEY, String(step)); } catch { /* private mode */ }
   stepItems.forEach((li, i) => { li.classList.toggle("active", i + 1 === step); li.classList.toggle("done", i + 1 < step); });
-  $("wzProgress").textContent = `Step ${step} of ${stepItems.length}`;
+  $("wzProgress").textContent = t("web_step", { step, total: stepItems.length });
   stepItems[step - 1].querySelector(".step-body").append($("wzStepNav")); // Back/Next sit right under the open step, not after the list
   $("wzBack").hidden = step === 1;
   $("wzNext").hidden = step === stepItems.length;
@@ -464,19 +495,19 @@ stepItems.forEach((li, i) => (li.querySelector(".step-title").onclick = () => sh
 $("wzBack").onclick = () => showStep(Number(localStorage.getItem(STEP_KEY) || 1) - 1);
 $("wzNext").onclick = () => {
   const step = Number(localStorage.getItem(STEP_KEY) || 1);
-  if (step === 2 && !settings.fetcherKey) return toast("Tap Generate key first");
+  if (step === 2 && !settings.fetcherKey) return toast(t("web_tap_generate"));
   showStep(step + 1);
   $("wzProgress").scrollIntoView({ block: "nearest" });
 };
 showStep(Number(localStorage.getItem(STEP_KEY) || 1));
 async function connect(url, key, button, show) {
-  show("", "Connecting…"); button.disabled = true;
+  show("", t("web_connecting")); button.disabled = true;
   try {
     const fields = await connectFetcher(url, key);
     settings = { ...settings, ...fields }; saveSettings(settings);
-    show("ok", `Connected (fetcher version ${fields.fetcherCheck.version}).`);
+    show("ok", t("web_connected_version", { version: fields.fetcherCheck.version }));
     await applyChapterMode("ready");
-    toast("Fetcher connected. Paste a chapter link.");
+    toast(t("web_connected_toast"));
   } catch (e) {
     show("err", e.message);
   } finally { button.disabled = false; }
@@ -487,7 +518,7 @@ $("wzLinkConnect").onclick = () => {
   const show = (kind, text) => { const m = $("wzLinkMsg"); m.className = "hint" + (kind ? " " + kind : ""); m.textContent = text; };
   const raw = $("wzLink").value.trim();
   const shared = readConnectionLink(raw.includes("#") ? raw.slice(raw.indexOf("#")) : "");
-  if (!shared) return show("err", "That isn't a connection link. It looks like https://gywreb.github.io/gytakusub/#connect=…");
+  if (!shared) return show("err", t("web_not_a_link"));
   connect(shared.url, shared.key, $("wzLinkConnect"), show);
 };
 $("btnFetcherManage").onclick = () => applyChapterMode("manage");
@@ -495,9 +526,9 @@ $("liveCheck").onclick = (e) => checkLive(e.currentTarget);
 $("liveCheck2").onclick = (e) => checkLive(e.currentTarget);
 $("mgDone").onclick = () => applyChapterMode("ready");
 $("mgSetup").onclick = () => applyChapterMode("wizard");
-$("mgCopyLink").onclick = () => copyText(connectionLink(settings), "Connection link");
+$("mgCopyLink").onclick = () => copyText(connectionLink(settings), t("web_wzLink_arialabel"));
 $("mgForget").onclick = async () => {
-  if (!confirm("Remove the fetcher address and key from this device? Chapter links stop working here until you connect again.")) return;
+  if (!confirm(t("web_confirm_forget"))) return;
   settings = { ...settings, fetcherUrl: "", fetcherKey: "", fetcherCheck: null }; saveSettings(settings);
   $("wzUrl").value = ""; $("wzKeyInput").value = ""; wizardMsg("", "");
   await applyChapterMode("wizard");
@@ -524,20 +555,19 @@ function renderInstall(force = false) {
   if (show.includes("desktop") && !$("installQr").firstChild) {
     const q = qrcode(0, "M"); q.addData(appUrl); q.make();
     $("installQr").innerHTML = q.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
-    $("installUrl").textContent = appUrl.replace(/^https:\/\//, "");
   }
+  $("installUrl").textContent = appUrl.replace(/^https:\/\//, "");
   $("installDesktopHint").hidden = !!installPrompt;
   card.classList.remove("hidden");
 }
 addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installPrompt = e; renderInstall(); });
-addEventListener("appinstalled", () => { installPrompt = null; $("installCard").classList.add("hidden"); toast("Installed. Open Gytakusub from your home screen or app list."); });
+addEventListener("appinstalled", () => { installPrompt = null; $("installCard").classList.add("hidden"); toast(t("web_installed")); });
 $("btnInstall").onclick = async () => {
   if (!installPrompt) return;
   installPrompt.prompt();
   await installPrompt.userChoice.catch(() => null);
   installPrompt = null; renderInstall();
 };
-$("btnCopyAppLink").onclick = () => copyText(appUrl, "Link");
 $("btnInstallLater").onclick = () => {
   try { localStorage.setItem(INSTALL_LATER, "1"); } catch { /* private mode */ }
   $("installCard").classList.add("hidden");
@@ -555,16 +585,32 @@ if (shared) {
   await applyChapterMode("wizard");
   $("wzLink").value = location.origin + location.pathname + "#connect=…";
   $("wzUrl").value = shared.url; $("wzKeyInput").value = shared.key;
-  wizardMsg("", `A connection link filled in the fetcher at ${shared.url}. If you trust it, tap Connect.`);
+  wizardMsg("", t("web_link_filled", { address: shared.url }));
   showStep(6); $("wzStep5").scrollIntoView({ block: "center" });
 }
 // ?chapter=<link> (the bookmarklet in fetcher/README.md) fills in that chapter; it opens on a tap of Load, so a link
 // someone else sent can't make the fetcher visit a site or spend Claude credits by itself.
 const linked = new URLSearchParams(location.search).get("chapter");
-if (linked && !shared) { setMode("chapter"); $("chapterUrl").value = linked; $("chapterInfo").textContent = chapterView === "ready" ? "Tap Load to open this chapter." : "Set up chapter links below; this chapter will be waiting."; }
+if (linked && !shared) { setMode("chapter"); $("chapterUrl").value = linked; $("chapterInfo").textContent = chapterView === "ready" ? t("web_tap_load") : t("web_setup_waiting"); }
 // First visit: on a phone that hasn't installed the app yet, installing comes first (on iPhone the installed app
 // keeps its own settings, so a key typed in Safari would not be there); otherwise ask for the Claude key.
 const installFirst = isPhone && !installed && !$("installCard").classList.contains("hidden");
 if (!settings.apiKey && !installFirst) setTimeout(() => { fillSettings(); dlg.showModal(); }, 400);
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+
+/** The app in the target language's words, without a reload: messages, then everything drawn from code. */
+async function speak() {
+  await loadLocale(uiLocaleFor(settings.targetLang), readMessages);
+  applyI18n(document);
+  labelsNote();
+  fillLanguages(); showModelHint();
+  for (const p of pages) applyI18n(p.el);
+  if (settings.fetcherKey) $("wzGen").textContent = t("web_new_key");
+  showStep(Number(localStorage.getItem(STEP_KEY) || 1));
+  showGuideChecked();
+  renderInstall();
+  showClaudeUsage();
+  await applyChapterMode(chapterView);
+  updateToolbar();
+}
 updateToolbar();

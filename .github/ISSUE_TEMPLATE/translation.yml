@@ -6,7 +6,7 @@ body:
     attributes:
       value: |
         Gytakusub's pages were translated with AI and checked by machine, not yet by native speakers, so corrections are very welcome.
-        This form is for Gytakusub's own words (setup page, Settings, the toolbar popup, buttons on a page). For a manga page Claude translated badly, use **Bug report** instead.
+        This form is for Gytakusub's own words (the extension's setup page, Settings, toolbar popup and buttons on a page, and the web app's screens). For a manga page Claude translated badly, use **Bug report** instead.
   - type: dropdown
     id: language
     attributes:

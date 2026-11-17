@@ -1,0 +1,545 @@
+{
+ "web_mode": {
+  "message": "Mode"
+ },
+ "web_tabShots": {
+  "message": "Tangkapan layar"
+ },
+ "web_tabChapter": {
+  "message": "Tautan bab"
+ },
+ "web_installTitle": {
+  "message": "Pasang Gytakusub"
+ },
+ "web_add_it_to_your_home": {
+  "message": "Tambahkan ke Layar Utama agar terbuka seperti aplikasi. Lakukan ini <b>sebelum</b> memasukkan kunci: aplikasi yang terpasang menyimpan pengaturannya sendiri, terpisah dari browser."
+ },
+ "web_in_safari_tap_the_share": {
+  "message": "Di <b>Safari</b>, ketuk tombol <b>Bagikan</b> <span class=\"sym\" aria-hidden=\"true\">⬆︎</span> (bilah bawah, atau kanan atas di iPad; di iOS 26 mungkin ada di balik tombol <b>•••</b>)."
+ },
+ "web_scroll_down_and_tap_add": {
+  "message": "Gulir ke bawah dan ketuk <b>Tambah ke Layar Utama</b>."
+ },
+ "web_leave_open_as_web_app": {
+  "message": "Biarkan <b>Buka sebagai App Web</b> (Open as Web App) menyala, jika ada, lalu ketuk <b>Tambah</b>."
+ },
+ "web_open_gytakusub_from_your_home": {
+  "message": "Buka <b>Gytakusub</b> dari Layar Utama."
+ },
+ "web_using_brave_on_iphone_it": {
+  "message": "Pakai Brave di iPhone? Brave tidak bisa menambahkan aplikasi web. <button type=\"button\" id=\"btnCopyAppLink\" class=\"linkbtn\">Salin tautan halaman ini</button>, buka di Safari, lalu ikuti langkahnya di sana. Chrome di iPhone juga bisa: Bagikan → Tambah ke Layar Utama."
+ },
+ "web_install_it_so_it_opens": {
+  "message": "Pasang agar terbuka seperti aplikasi, dari layar utama atau daftar aplikasi."
+ },
+ "web_add_it_to_your_home_2": {
+  "message": "Tambahkan ke layar utama agar terbuka seperti aplikasi: buka menu browser <span class=\"sym\" aria-hidden=\"true\">⋮</span> lalu ketuk <b>Instal aplikasi</b> atau <b>Tambahkan ke Layar utama</b>."
+ },
+ "web_on_your_phone_scan_this": {
+  "message": "<b>Di ponsel:</b> pindai ini dengan kamera ponsel, lalu pasang dari sana (langkahnya muncul di ponsel)."
+ },
+ "web_installQr_arialabel": {
+  "message": "Kode QR berisi alamat aplikasi ini"
+ },
+ "web_or_open_on_your_phone": {
+  "message": "Atau buka <code id=\"installUrl\"></code> di ponsel."
+ },
+ "web_installDesktopHint": {
+  "message": "Di komputer ini, tombol pasang di browser (di bilah alamat atau menu) menambahkannya sebagai aplikasi."
+ },
+ "web_btnInstallLater": {
+  "message": "Nanti saja"
+ },
+ "web_add_a_manga_page_or": {
+  "message": "Tambahkan halaman manga atau tangkapan layar"
+ },
+ "web_take_a_screenshot_in_any": {
+  "message": "Ambil tangkapan layar di aplikasi atau pembaca mana pun, lalu tempel di sini — atau pilih dari Foto. Gambarmu hanya dikirim ke API Claude, dengan kuncimu sendiri."
+ },
+ "web_btnPaste": {
+  "message": "Tempel gambar"
+ },
+ "web_choose_photos": {
+  "message": "Pilih foto"
+ },
+ "web_tip_on_iphone_tap_the": {
+  "message": "Tips: di iPhone, ketuk pratinjau tangkapan layar → Bagikan → Salin, lalu kembali ke sini dan ketuk Tempel gambar."
+ },
+ "web_load": {
+  "message": "Buka"
+ },
+ "web_fetcherStatus": {
+  "message": "Fetcher"
+ },
+ "web_set_up_chapter_links": {
+  "message": "Atur tautan bab"
+ },
+ "web_browsers_don_t_let_a": {
+  "message": "Browser tidak mengizinkan halaman web membaca situs lain. Jadi tautan bab melewati program kecil bernama <b>fetcher</b>, yang berjalan di akun Cloudflare gratis. Ia membuka bab dan meneruskan halamannya ke aplikasi ini. Mode tangkapan layar berfungsi tanpanya."
+ },
+ "web_got_a_connection_link": {
+  "message": "Punya tautan koneksi?"
+ },
+ "web_someone_who_already_has_a": {
+  "message": "Orang yang sudah punya fetcher bisa mengirimkannya padamu. Tempel di sini."
+ },
+ "web_wzLink_arialabel": {
+  "message": "Tautan koneksi"
+ },
+ "web_or_set_up_your_own": {
+  "message": "Atau atur fetcher-mu sendiri"
+ },
+ "web_free_about_10_minutes_once": {
+  "message": "Gratis. Sekitar 10 menit, sekali saja. Paling mudah di komputer; setelah itu sambungkan ponselmu dengan sebuah tautan. Ketuk <span class=\"chip-demo\">nilai abu-abu</span> untuk menyalinnya."
+ },
+ "web_get_the_two_free_accounts": {
+  "message": "Buat dua akun gratis"
+ },
+ "web_you_need_both_skip_any": {
+  "message": "Kamu butuh keduanya. Lewati yang sudah kamu punya."
+ },
+ "web_github_where_your_copy_of": {
+  "message": "<b>GitHub</b> (tempat salinan fetcher-mu): <a href=\"https://github.com/signup\" target=\"_blank\" rel=\"noopener\">github.com/signup ↗</a>"
+ },
+ "web_cloudflare_where_it_runs_dash": {
+  "message": "<b>Cloudflare</b> (tempat ia berjalan): <a href=\"https://dash.cloudflare.com/sign-up\" target=\"_blank\" rel=\"noopener\">dash.cloudflare.com/sign-up ↗</a>. Konfirmasi email-mu."
+ },
+ "web_create_your_access_key": {
+  "message": "Buat kunci aksesmu"
+ },
+ "web_only_someone_with_this_key": {
+  "message": "Hanya yang punya kunci ini bisa memakai fetcher-mu. Aplikasi mengingatnya; kamu akan menempelkannya ke Cloudflare di langkah 5."
+ },
+ "web_wzCopyKey": {
+  "message": "Salin"
+ },
+ "web_copy_the_fetcher_to_your": {
+  "message": "Salin fetcher ke GitHub-mu"
+ },
+ "web_open_github_com_gywreb_gytakusub": {
+  "message": "Buka <a href=\"https://github.com/gywreb/gytakusub\" target=\"_blank\" rel=\"noopener\">github.com/gywreb/gytakusub ↗</a> dalam keadaan masuk."
+ },
+ "web_click_fork_top_right_then": {
+  "message": "Klik <b>Fork</b> (kanan atas), lalu <b>Create fork</b>."
+ },
+ "web_you_now_have_your_own": {
+  "message": "Sekarang kamu punya salinan sendiri, juga bernama <button type=\"button\" class=\"chip\" data-copy=\"gytakusub\" title=\"Salin\">gytakusub</button>. Cloudflare hanya bisa men-deploy dari repositori di akunmu sendiri, karena itu salinan ini diperlukan."
+ },
+ "web_deploy_it_on_cloudflare": {
+  "message": "Deploy di Cloudflare"
+ },
+ "web_open_dash_cloudflare_com_then": {
+  "message": "Buka <a href=\"https://dash.cloudflare.com/\" target=\"_blank\" rel=\"noopener\">dash.cloudflare.com ↗</a>, lalu <b>Workers &amp; Pages</b> → <b>Create application</b> → <b>GitHub</b>."
+ },
+ "web_if_asked_allow_cloudflare_to": {
+  "message": "Jika diminta, izinkan Cloudflare melihat repositori GitHub-mu. Lalu pilih <button type=\"button\" class=\"chip\" data-copy=\"gytakusub\" title=\"Salin\">gytakusub</button> milikmu."
+ },
+ "web_project_worker_name_gytakusub_exactly": {
+  "message": "<b>Project / Worker name:</b> <button type=\"button\" class=\"chip\" data-copy=\"gytakusub\" title=\"Salin\">gytakusub</button>. Persis begini, kalau tidak build-nya gagal."
+ },
+ "web_path_fetcher_open_advanced_settings": {
+  "message": "<b>Path:</b> <button type=\"button\" class=\"chip\" data-copy=\"fetcher\" title=\"Salin\">fetcher</button>. Buka <i>Advanced settings</i> untuk melihatnya. Itu folder tempat fetcher berada."
+ },
+ "web_build_command_leave_empty": {
+  "message": "<b>Build command:</b> biarkan kosong."
+ },
+ "web_deploy_command_npx_wrangler_deploy": {
+  "message": "<b>Deploy command:</b> <button type=\"button\" class=\"chip\" data-copy=\"npx wrangler deploy\" title=\"Salin\">npx wrangler deploy</button>"
+ },
+ "web_click_save_and_deploy_and": {
+  "message": "Klik <b>Save and Deploy</b> dan tunggu sekitar satu menit sampai tertulis sudah ter-deploy."
+ },
+ "web_if_the_build_fails_open": {
+  "message": "Jika build gagal, buka <b>Settings</b> → <b>Build</b> milik Worker, periksa isian yang sama (di sana path disebut <b>Root directory</b>), perbaiki, lalu deploy lagi."
+ },
+ "web_give_the_fetcher_your_key": {
+  "message": "Berikan kuncimu ke fetcher"
+ },
+ "web_on_the_worker_s_page": {
+  "message": "Di halaman Worker: <b>Settings</b> → <b>Variables and Secrets</b> → <b>Add</b>."
+ },
+ "web_type_secret_variable_name_gyt": {
+  "message": "Type: <b>Secret</b>. Variable name: <button type=\"button\" class=\"chip\" data-copy=\"GYT_KEY\" title=\"Salin\">GYT_KEY</button>. Value: kuncimu (<button type=\"button\" class=\"linkbtn\" id=\"wzCopyKey2\">salin</button>)."
+ },
+ "web_click_deploy": {
+  "message": "Klik <b>Deploy</b>."
+ },
+ "web_copy_the_worker_s_address": {
+  "message": "Salin alamat Worker dari halamannya. Bentuknya seperti <code>https://gytakusub.<i>nama-kamu</i>.workers.dev</code>."
+ },
+ "web_connect": {
+  "message": "Sambungkan"
+ },
+ "web_fetcher_address": {
+  "message": "Alamat fetcher"
+ },
+ "web_access_key": {
+  "message": "Kunci akses"
+ },
+ "web_wzKeyInput_placeholder": {
+  "message": "Terisi dari langkah 2…"
+ },
+ "web_wzBack": {
+  "message": "‹ Kembali"
+ },
+ "web_wzNext": {
+  "message": "Selesai, langkah berikutnya ›"
+ },
+ "web_update_your_fetcher_later": {
+  "message": "Memperbarui fetcher nanti"
+ },
+ "web_if_the_app_says_your": {
+  "message": "Jika aplikasi bilang fetcher-mu sudah usang: buka salinan <button type=\"button\" class=\"chip\" data-copy=\"gytakusub\" title=\"Salin\">gytakusub</button> milikmu di GitHub lalu klik <b>Sync fork</b> → <b>Update branch</b>. Cloudflare men-deploy ulang sendiri dalam satu menit. Lalu Sambungkan lagi."
+ },
+ "web_if_a_cloudflare_screen_looks": {
+  "message": "Jika tampilan Cloudflare berbeda, lihat bantuan Cloudflare sendiri: <a href=\"https://developers.cloudflare.com/workers/ci-cd/builds/\" target=\"_blank\" rel=\"noopener\">deploy dari GitHub</a> · <a href=\"https://developers.cloudflare.com/workers/configuration/secrets/\" target=\"_blank\" rel=\"noopener\">menambah secret</a>. Langkah-langkah ini terakhir dicocokkan dengan halaman tersebut pada <span id=\"wzChecked\"></span>."
+ },
+ "web_mgDone": {
+  "message": "‹ Kembali ke bab"
+ },
+ "web_your_fetcher": {
+  "message": "Fetcher-mu"
+ },
+ "web_usageHead": {
+  "message": "Jatah gratis hari ini"
+ },
+ "web_of_100_000_requests": {
+  "message": "dari <span id=\"usageMax\">100,000</span> permintaan"
+ },
+ "web_requests_sent_from_this_device": {
+  "message": "permintaan terkirim dari perangkat ini"
+ },
+ "web_free_if_it_runs_out": {
+  "message": "<b>Gratis:</b> jika habis, fetcher berhenti sampai <span id=\"usageReset\">jatah direset</span>. Tidak ada biaya."
+ },
+ "web_only_this_device_the_requests": {
+  "message": "<b>Hanya perangkat ini:</b> permintaan yang dikirim browser atau aplikasi ini hari ini, dihitung saat dikirim. Jatah gratis 100.000 per hari berlaku untuk seluruh akun Cloudflare-mu, dan hitungannya lebih tinggi: sebelum halaman baru, browser juga meminta izin ke fetcher (Cloudflare ikut menghitungnya, jadi satu halaman biasanya 2 permintaan), dan perangkatmu yang lain serta siapa pun yang punya tautan koneksimu ikut menambah. Karena itu tidak ada meteran di sini: aktifkan hitungan langsung di bawah untuk melihat total sebenarnya dibanding jatah."
+ },
+ "web_from_cloudflare_every_request_to": {
+  "message": "<b>Dari Cloudflare:</b> setiap permintaan ke setiap Worker di akunmu hari ini, termasuk permintaan izin dari browser. Browser-mu dan aplikasi yang terpasang menunjukkan angka yang sama."
+ },
+ "web_a_few_minutes_behind_cloudflare": {
+  "message": "<b>Tertinggal beberapa menit:</b> Cloudflare menambahkan permintaan ke hitungannya beberapa menit setelah terjadi. Hitungan diperbarui tiap menit selama tab ini terbuka, dan setiap pembaruan juga satu permintaan."
+ },
+ "web_cloudflare_s_own_count_dash": {
+  "message": "<b>Hitungan Cloudflare sendiri:</b> <a href=\"https://dash.cloudflare.com/\" target=\"_blank\" rel=\"noopener\">dash.cloudflare.com ↗</a> → Workers &amp; Pages → Worker-mu → Metrics, atau aktifkan hitungan langsung di bawah."
+ },
+ "web_show_cloudflare_s_own_count": {
+  "message": "Tampilkan hitungan Cloudflare di sini"
+ },
+ "web_optional_about_3_minutes_easiest": {
+  "message": "Opsional, sekitar 3 menit, paling mudah di komputer. Fetcher lalu membaca hitungan hari ini dari Cloudflare dengan token yang hanya bisa membaca statistik."
+ },
+ "web_in_dash_cloudflare_com_open": {
+  "message": "Di <a href=\"https://dash.cloudflare.com/\" target=\"_blank\" rel=\"noopener\">dash.cloudflare.com ↗</a> buka <b>Account API tokens</b> (tekan <kbd>Ctrl</kbd> <kbd>K</kbd>, atau <kbd>⌘</kbd> <kbd>K</kbd> di Mac, lalu cari). Klik <b>Create Token</b>, lalu di bagian <b>Custom token</b> klik <b>Get started</b>."
+ },
+ "web_token_name_gytakusub_usage_permissions": {
+  "message": "Token name: <button type=\"button\" class=\"chip\" data-copy=\"gytakusub-usage\" title=\"Salin\">gytakusub-usage</button>. Permissions: <b>Account</b> · <b>Account Analytics</b> · <b>Read</b>, tidak lebih. Klik <b>Continue to summary</b>, lalu <b>Create Token</b>, dan salin token-nya: Cloudflare hanya menampilkannya sekali."
+ },
+ "web_press_ctrl_k_again_and": {
+  "message": "Tekan <kbd>Ctrl</kbd> <kbd>K</kbd> lagi dan pilih <b>Copy account ID</b>."
+ },
+ "web_on_your_worker_settings_variables": {
+  "message": "Di Worker-mu: <b>Settings</b> → <b>Variables and Secrets</b> → <b>Add</b>, type <b>Secret</b>, name <button type=\"button\" class=\"chip\" data-copy=\"CF_API_TOKEN\" title=\"Salin\">CF_API_TOKEN</button>, value token-nya. <b>Add</b> satu Secret lagi: <button type=\"button\" class=\"chip\" data-copy=\"CF_ACCOUNT_ID\" title=\"Salin\">CF_ACCOUNT_ID</button>, value account ID. Klik <b>Deploy</b>."
+ },
+ "web_liveCheck": {
+  "message": "Periksa sekarang"
+ },
+ "web_cloudflare_s_guides_analytics_token": {
+  "message": "Panduan Cloudflare: <a href=\"https://developers.cloudflare.com/analytics/graphql-api/getting-started/authentication/api-token-auth/\" target=\"_blank\" rel=\"noopener\">token statistik ↗</a> · <a href=\"https://developers.cloudflare.com/fundamentals/account/find-account-and-zone-ids/\" target=\"_blank\" rel=\"noopener\">account ID ↗</a>"
+ },
+ "web_your_fetcher_is_too_old": {
+  "message": "Fetcher-mu terlalu lama untuk ini. Di GitHub buka salinan <b>gytakusub</b> milikmu, klik <b>Sync fork</b> → <b>Update branch</b>. Cloudflare men-deploy ulang dalam sekitar satu menit."
+ },
+ "web_liveCheck2": {
+  "message": "Periksa lagi"
+ },
+ "web_mgDevicesHead": {
+  "message": "Pakai di perangkat lain"
+ },
+ "web_copy_this_link_and_open": {
+  "message": "Salin tautan ini lalu buka di ponsel atau komputer lain, atau tempel di tab Tautan bab di sana. Berikan hanya kepada orang yang kamu percayai dengan fetcher-mu: tautan ini berisi kuncimu."
+ },
+ "web_mgCopyLink": {
+  "message": "Salin tautan koneksi"
+ },
+ "web_mgChangeHead": {
+  "message": "Ubah atau putuskan"
+ },
+ "web_mgSetup": {
+  "message": "Buka langkah pengaturan"
+ },
+ "web_mgForget": {
+  "message": "Putuskan perangkat ini"
+ },
+ "web_originals": {
+  "message": "Asli"
+ },
+ "web_btnClear": {
+  "message": "Hapus"
+ },
+ "web_navPrev": {
+  "message": "‹ Bab sebelumnya"
+ },
+ "web_navNext": {
+  "message": "Bab berikutnya ›"
+ },
+ "web_close_settings": {
+  "message": "Tutup pengaturan"
+ },
+ "web_from_platform_claude_com_settings": {
+  "message": "Dari platform.claude.com → Settings → API keys. Hanya disimpan di perangkat ini."
+ },
+ "web_sTest": {
+  "message": "Uji kunci"
+ },
+ "web_counted_from_claude_s_own": {
+  "message": "Dihitung dari jawaban Claude sendiri ke browser ini. Ekstensi dan perangkatmu yang lain menghitung sendiri."
+ },
+ "web_chapter_context_names_and_recent": {
+  "message": "Konteks bab (nama dan baris terbaru)"
+ },
+ "web_sgReading": {
+  "message": "Membaca"
+ },
+ "web_right_to_left_two_page": {
+  "message": "Dua halaman kanan-ke-kiri di layar lebar"
+ },
+ "web_sgApp": {
+  "message": "Aplikasi"
+ },
+ "web_btnShowInstall": {
+  "message": "Pasang di ponsel atau komputer"
+ },
+ "web_free_software_under_the_gnu": {
+  "message": "Perangkat lunak bebas di bawah <a href=\"LICENSE\" target=\"_blank\">GNU AGPL v3</a> · <a href=\"https://github.com/gywreb/gytakusub\" target=\"_blank\" rel=\"noopener\">kode sumber</a> · <a href=\"THIRD_PARTY.md\" target=\"_blank\">komponen pihak ketiga</a>"
+ },
+ "web_settings": {
+  "message": "Pengaturan"
+ },
+ "web_fx_challenge": {
+  "message": "Situs ini memasang dinding “memeriksa browser Anda” di depan server, jadi fetcher tidak bisa membukanya. Pakai mode tangkapan layar di sini, atau ekstensi browser di komputer."
+ },
+ "web_fx_blocked": {
+  "message": "Situs ini menolak fetcher (mungkin perlu login, atau memblokir server). Pakai mode tangkapan layar di sini, atau ekstensi browser di komputer."
+ },
+ "web_fx_no_images": {
+  "message": "Tidak ada halaman bab yang ditemukan di halaman itu. Jika situsnya perlu login atau membangun halamannya dengan skrip, pakai mode tangkapan layar."
+ },
+ "web_fx_not_found": {
+  "message": "Situs bilang halaman itu tidak ada. Periksa tautannya."
+ },
+ "web_fx_unauthorized": {
+  "message": "Fetcher-mu menolak kunci akses: kunci di sini bukan GYT_KEY di Worker-mu."
+ },
+ "web_fx_setup": {
+  "message": "Fetcher-mu belum punya kunci (atau kuncinya kurang dari 24 karakter). Lakukan langkah 5: di Cloudflare buka Worker → Settings → Variables and Secrets, tambahkan Secret GYT_KEY dengan kuncimu, Deploy, lalu Sambungkan lagi."
+ },
+ "web_fx_bad_url": {
+  "message": "Itu tidak tampak seperti alamat web sebuah bab."
+ },
+ "web_fx_usage_old": {
+  "message": "Perbarui fetcher-mu ke {version} atau yang lebih baru untuk melihat hitungan Cloudflare."
+ },
+ "web_fx_limit": {
+  "message": "Fetcher-mu sudah memakai {limit} permintaan gratis hari ini di Cloudflare. Ia berfungsi lagi pukul {time}, dan tidak ada biaya. Mode tangkapan layar tetap berfungsi."
+ },
+ "web_fx_silent": {
+  "message": "Fetcher-mu tidak menjawab. Pastikan kamu online. Jika ya, berarti {limit} permintaan gratis hari ini sudah habis (berfungsi lagi pukul {time}, dan tidak ada biaya), atau halaman ini butuh kerja lebih banyak daripada yang diizinkan paket gratis Cloudflare per permintaan (10 ms). Mode tangkapan layar tetap berfungsi."
+ },
+ "web_fx_no_answer": {
+  "message": "{address} tidak menjawab. Periksa alamatnya (salin dari halaman Worker di Cloudflare) dan pastikan deploy sudah selesai."
+ },
+ "web_fx_cpu": {
+  "message": "Halaman ini butuh kerja lebih banyak daripada yang diizinkan paket gratis Cloudflare per permintaan (10 ms). Coba lagi; jika terus gagal, pakai mode tangkapan layar untuk bab ini."
+ },
+ "web_fx_not_fetcher_http": {
+  "message": "{address} menjawab HTTP {status}, tidak seperti fetcher Gytakusub. Periksa alamatnya."
+ },
+ "web_fx_http": {
+  "message": "Fetcher menjawab HTTP {status}."
+ },
+ "web_fx_no_address": {
+  "message": "Masukkan alamat fetcher-mu: https://….workers.dev"
+ },
+ "web_fx_short_key": {
+  "message": "Kunci akses harus minimal {n} karakter (buat satu di langkah 2)."
+ },
+ "web_fx_not_fetcher": {
+  "message": "{address} menjawab, tapi tidak seperti fetcher Gytakusub."
+ },
+ "web_fx_outdated": {
+  "message": "Fetcher-mu versi {version}; aplikasi ini butuh {needed} atau yang lebih baru. Di GitHub, buka salinan gytakusub milikmu → Sync fork → Update branch; tunggu semenit, lalu Sambungkan lagi."
+ },
+ "web_cannot_decode": {
+  "message": "Gambar tidak bisa dibaca."
+ },
+ "web_no_key": {
+  "message": "Belum ada kunci API — buka Pengaturan (⚙) dan tempelkan kunci API Claude-mu."
+ },
+ "web_manage_status": {
+  "message": "Tersambung ke {host}, versi {version}, dicek pada {date}."
+ },
+ "web_new_key": {
+  "message": "Kunci baru"
+ },
+ "web_usage_source_live": {
+  "message": "Cloudflare · {time}"
+ },
+ "web_usage_source_device": {
+  "message": "Perangkat ini"
+ },
+ "web_usage_used_up": {
+  "message": "habis sampai {time}"
+ },
+ "web_usage_almost": {
+  "message": "hampir habis"
+ },
+ "web_chip_used_up": {
+  "message": "permintaan gratis habis sampai {time}"
+ },
+ "web_chip_count": {
+  "message": "{requests} / {limit} gratis hari ini"
+ },
+ "web_chip_title": {
+  "message": "Hitungan Cloudflare, {time}"
+ },
+ "web_meter_text": {
+  "message": "{requests} dari {limit} permintaan terpakai hari ini"
+ },
+ "web_usage_split": {
+  "message": "{name} {count}, Worker lain {others}"
+ },
+ "web_usage_note_live": {
+  "message": "Semua perangkatmu · direset pukul {time}"
+ },
+ "web_usage_note_device_one": {
+  "message": "{n} bab dibuka · jatah direset pukul {time}"
+ },
+ "web_usage_note_device_other": {
+  "message": "{n} bab dibuka · jatah direset pukul {time}"
+ },
+ "web_live_error": {
+  "message": "Hitungan Cloudflare tidak diperbarui: {error}"
+ },
+ "web_live_error_showing": {
+  "message": "Menampilkan hitungan pukul {time}."
+ },
+ "web_checking": {
+  "message": "Memeriksa…"
+ },
+ "web_live_not_yet": {
+  "message": "Belum: Worker belum punya secret CF_API_TOKEN dan CF_ACCOUNT_ID (setelah menambahkannya, klik Deploy)."
+ },
+ "web_live_on": {
+  "message": "Hitungan langsung dari Cloudflare aktif."
+ },
+ "web_progress": {
+  "message": "{done} dari {total} diterjemahkan"
+ },
+ "web_progress_busy": {
+  "message": "{n} sedang diproses"
+ },
+ "web_progress_cost": {
+  "message": "Claude hari ini ≈ {cost}"
+ },
+ "web_page_original": {
+  "message": "Asli"
+ },
+ "web_page_redo": {
+  "message": "Ulangi"
+ },
+ "web_status_queued": {
+  "message": "dalam antrean"
+ },
+ "web_status_loading": {
+  "message": "memuat…"
+ },
+ "web_status_translating": {
+  "message": "menerjemahkan…"
+ },
+ "web_status_no_text": {
+  "message": "tidak ada teks"
+ },
+ "web_not_translated_yet": {
+  "message": "Belum diterjemahkan"
+ },
+ "web_saved_personal": {
+  "message": "Disimpan untuk bacaan pribadimu. Mohon jangan sebarkan halaman yang sudah diterjemahkan."
+ },
+ "web_no_image": {
+  "message": "Tidak ada gambar"
+ },
+ "web_paste_how": {
+  "message": "Tempel dengan Ctrl/⌘+V, atau tekan lama di halaman dan pilih Tempel."
+ },
+ "web_clipboard_empty": {
+  "message": "Papan klip tidak berisi gambar. Salin tangkapan layar dulu."
+ },
+ "web_clipboard_denied": {
+  "message": "Akses papan klip ditolak. Pakai Pilih foto saja."
+ },
+ "web_loading_chapter": {
+  "message": "Memuat bab…"
+ },
+ "web_chapter_pages_one": {
+  "message": "{n} halaman. Gulir — halaman diterjemahkan saat muncul di layar."
+ },
+ "web_chapter_pages_other": {
+  "message": "{n} halaman. Gulir — halaman diterjemahkan saat muncul di layar."
+ },
+ "web_copied": {
+  "message": "{what} disalin"
+ },
+ "web_copy_prompt": {
+  "message": "Salin dari sini:"
+ },
+ "web_what_key": {
+  "message": "Kunci"
+ },
+ "web_what_link": {
+  "message": "Tautan"
+ },
+ "web_key_first": {
+  "message": "Buat kunci di langkah 2 dulu"
+ },
+ "web_step": {
+  "message": "Langkah {step} dari {total}"
+ },
+ "web_tap_generate": {
+  "message": "Ketuk Buat kunci dulu"
+ },
+ "web_connecting": {
+  "message": "Menyambungkan…"
+ },
+ "web_connected_version": {
+  "message": "Tersambung (fetcher versi {version})."
+ },
+ "web_connected_toast": {
+  "message": "Fetcher tersambung. Tempel tautan sebuah bab."
+ },
+ "web_not_a_link": {
+  "message": "Itu bukan tautan koneksi. Bentuknya seperti https://gywreb.github.io/gytakusub/#connect=…"
+ },
+ "web_confirm_forget": {
+  "message": "Hapus alamat dan kunci fetcher dari perangkat ini? Tautan bab tidak berfungsi di sini sampai kamu menyambungkan lagi."
+ },
+ "web_installed": {
+  "message": "Terpasang. Buka Gytakusub dari layar utama atau daftar aplikasi."
+ },
+ "web_link_filled": {
+  "message": "Sebuah tautan koneksi mengisi fetcher di {address}. Jika kamu memercayainya, ketuk Sambungkan."
+ },
+ "web_tap_load": {
+  "message": "Ketuk Buka untuk membuka bab ini."
+ },
+ "web_setup_waiting": {
+  "message": "Atur tautan bab di bawah; bab ini akan menunggu."
+ },
+ "web_labels_english": {
+  "message": "Tombol di GitHub dan Cloudflare disebut dengan nama bahasa Inggrisnya, seperti yang ditampilkan situs itu dalam bahasa Inggris."
+ },
+ "web_generate_key": {
+  "message": "Buat kunci"
+ }
+}
