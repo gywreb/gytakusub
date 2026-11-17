@@ -75,7 +75,7 @@ for (const s of SCREENS) {
     for (let i = 0; i < a.length; i += 4) if (Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]) > 6) diff++;
     return { canvas: [W, H], css: [r.width, r.height], col: col.width, scrollW: document.documentElement.scrollWidth, vw: innerWidth, diffShare: diff / (W * H) };
   });
-  await page.screenshot({ path: path.join(out, `${s.name.replace(/[^a-z]+/g, "-")}.png`) });
+  await page.screenshot({ path: path.join(out, `${s.name.toLowerCase().replace(/[^a-z]+/g, "-")}.png`) });
   const deviceWidth = m.css[0] * s.dpr;
   console.log(JSON.stringify({ screen: s.name, ...m, devicePixelsPerPagePixel: +(deviceWidth / m.canvas[0]).toFixed(2) }));
   check(`${s.name}: no sideways scrolling`, m.scrollW <= m.vw + 1, `${m.scrollW} for ${m.vw}`);
