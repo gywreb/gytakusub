@@ -324,6 +324,7 @@ async function translatePage(msg, settings, tabId, work) {
   if (page.detectMs) timing.detect = page.detectMs; // parts of "analyze": the text detector's and the bubble model's shares
   if (page.segmentMs) timing.segment = page.segmentMs;
   if (page.backend) timing.backend = page.backend; // where the models ran: webgpu / wasm / opencv
+  if (page.fill) timing.fill = page.fill; // part of "finish": the erased areas by fill, and the texture fills' time
   return {
     items: page.items, placements: page.placements, regions: page.regions, letter: page.letter, engine: page.engine,
     work: page.work, width: job.width, height: job.height, usage, timing,

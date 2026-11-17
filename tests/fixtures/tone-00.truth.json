@@ -1,0 +1,70 @@
+[
+ {
+  "box": [
+   90,
+   100,
+   470,
+   370
+  ],
+  "lettering": [
+   185.0,
+   222,
+   261.0,
+   135
+  ],
+  "glyph": 26,
+  "surface": "tone",
+  "kind": "bubble"
+ },
+ {
+  "box": [
+   640,
+   120,
+   460,
+   380
+  ],
+  "lettering": [
+   725.0,
+   242,
+   322.0,
+   135
+  ],
+  "glyph": 26,
+  "surface": "gradient",
+  "kind": "bubble"
+ },
+ {
+  "box": [
+   120,
+   540,
+   400,
+   250
+  ],
+  "lettering": [
+   168.0,
+   625,
+   243.0,
+   65
+  ],
+  "glyph": 26,
+  "surface": "white",
+  "kind": "bubble"
+ },
+ {
+  "box": [
+   335.0,
+   942,
+   500.0,
+   125
+  ],
+  "lettering": [
+   355.0,
+   962,
+   460.0,
+   85
+  ],
+  "glyph": 26,
+  "surface": "tone",
+  "kind": "narration"
+ }
+]

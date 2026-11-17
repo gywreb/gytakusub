@@ -1,3 +1,6 @@
+import { aotInpaint } from "./inpaint.js";
+import { latticeFill } from "./tone.js";
+
 // Removes the original lettering from the regions that received a translation.
 // Inside a bubble: the glyph components (never the outline) are inpainted with
 // the bubble's own surface. Free text over artwork: the glyphs are inpainted
@@ -9,9 +12,11 @@
  * @param {ImageData} img working-resolution page (same one analyze() saw)
  * @param {import("./analyze.js").Analysis} analysis
  * @param {Set<number>} regionIds regions that have translations to place
- * @param {{keepMask?: boolean}} [opts] keepMask: also return the inpainting mask (a cv.Mat the caller
- *   deletes) and each area's radius, so the same areas can be inpainted again at the page's full size
- * @returns {{image: ImageData, rois: Array<{x:number,y:number,w:number,h:number,radius?:number}>, mask?: any}} cleaned page and the areas that changed
+ * @param {{keepMask?: boolean, outline?: number}} [opts] keepMask: also return the inpainting mask
+ *   and the surfaces (cv.Mats the caller deletes) and how each area is to be filled, for
+ *   fillTexture() and for erasing again at the page's full size; outline: grow the mask over
+ *   lettering outlines by this share of a letter
+ * @returns {{image: ImageData, rois: Array<{x:number,y:number,w:number,h:number,radius?:number}>, mask?: any, surface?: any}} cleaned page and the areas that changed
  */
 export function erase(cv, img, analysis, regionIds, opts = {}) {
   const { W, H } = analysis;
@@ -78,7 +83,13 @@ export function erase(cv, img, analysis, regionIds, opts = {}) {
       const blocks = r.kind === "bubble" ? r.ref.blocks : [r.ref];
       let roi;
       if (blocks.length) {
-        for (const b of blocks) paintTextBox(pol, b, b.letter || letter);
+        // Free text: line by line (`parts`, the detected lines a paragraph was merged from), not
+        // the paragraph's whole box: lines chained across a picture make a box that holds the art
+        // between them, and every small stroke in it would pass for lettering.
+        for (const b of blocks) {
+          if (r.kind !== "bubble" && b.parts) b.parts.forEach((g, i) => paintTextBox(pol, { ...b, gbox: g }, b.lineLetters?.[i] || b.letter || letter));
+          else paintTextBox(pol, b, b.letter || letter);
+        }
         const pad = Math.round(letter * 0.8);
         const tx0 = Math.min(...blocks.map((b) => b.gbox.x)) - pad, ty0 = Math.min(...blocks.map((b) => b.gbox.y)) - pad;
         const tx1 = Math.max(...blocks.map((b) => b.gbox.x + b.gbox.w)) + pad, ty1 = Math.max(...blocks.map((b) => b.gbox.y + b.gbox.h)) + pad;
@@ -87,8 +98,8 @@ export function erase(cv, img, analysis, regionIds, opts = {}) {
       } else if (r.kind === "bubble" && r.ref.fill && paintInsideMask(pol, r.ref, letter)) {
         roi = { ...r.box };
       } else continue;
-      if (r.kind === "bubble") rois.push({ ...roi, radius: 3, inside: analysis.insideOf(r.id), dark: r.dark });
-      else rois.push({ ...roi, radius: Math.max(3, Math.round(letter * 0.3)) });
+      if (r.kind === "bubble") rois.push({ ...roi, radius: 3, inside: analysis.insideOf(r.id), dark: r.dark, letter });
+      else rois.push({ ...roi, radius: Math.max(3, Math.round(letter * 0.3)), letter });
       continue;
     }
     const glyphLabels = pol.glyphLabels.data32S, regionLabels = pol.regionLabels.data32S;
@@ -145,49 +156,185 @@ export function erase(cv, img, analysis, regionIds, opts = {}) {
       }
     }
     grown.delete();
-    // Inpaint each ROI separately: cost scales with ROI size, not the page.
+    if (opts.outline) growOutline(cv, mask, rois, W, opts.outline);
     for (const r of rois) {
       const rect = new cv.Rect(r.x, r.y, r.w, r.h);
-      const srcRoi = rgb.roi(rect), maskRoi = mask.roi(rect), dst = new cv.Mat();
-      cv.inpaint(srcRoi, maskRoi, dst, r.radius, cv.INPAINT_TELEA);
-      dst.copyTo(srcRoi);
-      srcRoi.delete(); maskRoi.delete(); dst.delete();
+      const srcRoi = rgb.roi(rect), maskRoi = mask.roi(rect);
+      // How the area is filled: a flat surface (most white bubbles) takes its own colour, exactly;
+      // anything else (screentone, gradients, art) is "texture", filled by fillTexture() (the
+      // screentone fill where the surface is a lattice, else the learned inpainter, else Telea)
+      // and given Telea meanwhile.
+      const rc = srcRoi.clone(), mc = maskRoi.clone(); // continuous copies to read
+      const flat = flatSurface(rc, mc, r.inside ? (x, y) => r.inside(r.x + x, r.y + y) : null);
+      rc.delete(); mc.delete();
+      if (flat) { r.fill = "flat"; r.color = flat; srcRoi.setTo(new cv.Scalar(flat[0], flat[1], flat[2]), maskRoi); }
+      else {
+        r.fill = "texture";
+        const dst = new cv.Mat();
+        cv.inpaint(srcRoi, maskRoi, dst, r.radius, cv.INPAINT_TELEA);
+        dst.copyTo(srcRoi); dst.delete();
+      }
+      srcRoi.delete(); maskRoi.delete();
     }
   }
 
   const out = new cv.Mat(); cv.cvtColor(rgb, out, cv.COLOR_RGB2RGBA);
   const result = new ImageData(new Uint8ClampedArray(out.data), W, H);
   src.delete(); rgb.delete(); out.delete();
-  if (opts.keepMask) return { image: result, rois: rois.map((r) => ({ x: r.x, y: r.y, w: r.w, h: r.h, radius: r.radius })), mask };
+  if (opts.keepMask) {
+    // Each textured bubble's surface (its interior, as far around the area as the fill looks),
+    // labelled with the area's number: the screentone fill copies only from there, never from the
+    // outline or the art outside.
+    const surface = cv.Mat.zeros(H, W, cv.CV_8UC1), sd = surface.data;
+    rois.forEach((r, i) => {
+      if (r.fill !== "texture" || !r.inside || i >= 254) return;
+      r.label = i + 1;
+      const m = contextMargin(r.letter);
+      for (let yy = Math.max(0, r.y - m); yy < Math.min(H, r.y + r.h + m); yy++) for (let xx = Math.max(0, r.x - m); xx < Math.min(W, r.x + r.w + m); xx++) if (r.inside(xx, yy)) sd[yy * W + xx] = r.label;
+    });
+    return { image: result, rois: rois.map((r) => ({ x: r.x, y: r.y, w: r.w, h: r.h, radius: r.radius, fill: r.fill, color: r.color, letter: r.letter, label: r.label || 0 })), mask, surface };
+  }
   mask.delete();
   return { image: result, rois: rois.map((r) => ({ x: r.x, y: r.y, w: r.w, h: r.h })) };
 }
 
 /**
- * Inpaints one changed area again at the page's full size, so the patch drawn over the
- * reader's image has that image's own pixels around the erased lettering (the work-resolution
- * patch, stretched, is softer than the page it covers). `natural`: that area of the full-size
- * page as ImageData, whose top-left is (nx, ny) in page pixels. `mask`: the slice's
- * work-resolution mask from erase(..., {keepMask: true}); `scale`: work pixels per page pixel;
- * (ox, oy): the slice's origin in page pixels. The mask is resampled onto the full-size pixel
- * grid by the exact affine map (pixel centres), not by resizing a rounded rectangle, so the
- * patch lines up with the original to a fraction of a pixel.
- * @returns {ImageData|null} the inpainted area, or null when no mask pixel falls inside it
+ * Grows each area's mask over the lettering's outline (a white stroke around black letters, a
+ * dark one around white letters, the glow of a shout): by `k` × the area's letter size, which is
+ * how thick lettering outlines run, and never past a bubble's interior, so the bubble's own
+ * outline stays. The fill (flat or texture) then covers the outline too; Telea alone smeared it.
  */
-export function eraseFullSize(cv, natural, nx, ny, mask, scale, ox, oy, radius) {
+function growOutline(cv, mask, rois, W, k) {
+  for (const r of rois) {
+    const g = Math.max(1, Math.round((r.letter || 8) * k));
+    const sub = mask.roi(new cv.Rect(r.x, r.y, r.w, r.h)), m = sub.clone(), grown = new cv.Mat(); // clones: continuous rows
+    const kern = cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(2 * g + 1, 2 * g + 1));
+    cv.dilate(m, grown, kern); kern.delete();
+    const gd = grown.data, md = m.data;
+    for (let y = 0; y < r.h; y++) for (let x = 0; x < r.w; x++) {
+      const i = y * r.w + x;
+      if (gd[i] && !md[i] && (!r.inside || r.inside(r.x + x, r.y + y))) md[i] = 255;
+    }
+    m.copyTo(sub);
+    grown.delete(); m.delete(); sub.delete();
+  }
+}
+
+/**
+ * The colour of the area's surface when it is flat (a white or plain bubble), else null.
+ * Measured on the area's unmasked pixels, and for a bubble only those at least 3 px inside its
+ * interior (the interior's edge carries bits of outline). Flat = nearly all of them sit at one
+ * level (within 8 of the median: JPEG noise), so a few stray marks don't make a white bubble
+ * "textured", while screentone (dots on a quarter or more of it) or a gradient is not flat.
+ */
+export function flatSurface(rgb, mask, inside) {
+  const d = rgb.data, md = mask.data, w = rgb.cols, h = rgb.rows, e = 3;
+  const lums = [], rs = [], gs = [], bs = [];
+  const deep = inside ? (x, y) => inside(x, y) && inside(x - e, y) && inside(x + e, y) && inside(x, y - e) && inside(x, y + e) : () => true;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (md[y * w + x] || !deep(x, y)) continue;
+    const p = (y * w + x) * 3;
+    lums.push((d[p] + d[p + 1] + d[p + 2]) / 3); rs.push(d[p]); gs.push(d[p + 1]); bs.push(d[p + 2]);
+  }
+  if (lums.length < 50) return null;
+  const med = (a) => a.slice().sort((x, y) => x - y)[a.length >> 1];
+  const m = med(lums);
+  const atLevel = lums.filter((l) => Math.abs(l - m) <= 8).length / lums.length;
+  if (atLevel < 0.95) return null;
+  return [med(rs), med(gs), med(bs)];
+}
+
+/**
+ * Erases one changed area again at the page's full size, so the patch drawn over the reader's
+ * image has that image's own pixels around the erased lettering (the work-resolution patch,
+ * stretched, is softer than the page it covers). `natural`: that area of the full-size page as
+ * ImageData, whose top-left is (nx, ny) in page pixels. `mask`: the slice's work-resolution mask
+ * from erase(..., {keepMask: true}); `scale`: work pixels per page pixel; (ox, oy): the slice's
+ * origin in page pixels. The mask is resampled onto the full-size pixel grid by the exact affine
+ * map (pixel centres), not by resizing a rounded rectangle, so the patch lines up with the
+ * original to a fraction of a pixel. The area is filled the way erase() chose for it (`area.fill`):
+ * its flat colour, or as texture (fillArea: screentone, learned, Telea), copying screentone only
+ * from the area's surface (`surface`, erase()'s, resampled the same way).
+ * @param {{fill?: "flat"|"texture", color?: number[], radius?: number, label?: number, letter?: number}} area
+ * @returns {Promise<ImageData|null>} the erased area, or null when no mask pixel falls inside it
+ */
+export async function eraseFullSize(cv, natural, nx, ny, mask, scale, ox, oy, area = {}, model = null, surface = null) {
   const W = natural.width, H = natural.height;
   const M = cv.matFromArray(2, 3, cv.CV_64F, [scale, 0, (nx - ox + 0.5) * scale - 0.5, 0, scale, (ny - oy + 0.5) * scale - 0.5]);
   const m = new cv.Mat();
   cv.warpAffine(mask, m, M, new cv.Size(W, H), cv.INTER_LINEAR | cv.WARP_INVERSE_MAP, cv.BORDER_CONSTANT, new cv.Scalar(0));
-  M.delete();
   // a quarter of a work pixel's coverage counts: the work mask was already grown over each stroke's fringe
   cv.threshold(m, m, 63, 255, cv.THRESH_BINARY);
-  if (!cv.countNonZero(m)) { m.delete(); return null; }
-  const src = cv.matFromImageData(natural), rgb = new cv.Mat(), dst = new cv.Mat(), out = new cv.Mat();
+  if (!cv.countNonZero(m)) { M.delete(); m.delete(); return null; }
+  let on = null;
+  if (surface && area.label) {
+    on = new cv.Mat();
+    cv.warpAffine(surface, on, M, new cv.Size(W, H), cv.INTER_NEAREST | cv.WARP_INVERSE_MAP, cv.BORDER_CONSTANT, new cv.Scalar(0));
+    const od = on.data; for (let i = 0; i < od.length; i++) od[i] = od[i] === area.label ? 255 : 0;
+  }
+  M.delete();
+  const src = cv.matFromImageData(natural), rgb = new cv.Mat(), out = new cv.Mat();
   cv.cvtColor(src, rgb, cv.COLOR_RGBA2RGB);
-  cv.inpaint(rgb, m, dst, Math.max(3, Math.round(radius / scale)), cv.INPAINT_TELEA);
-  cv.cvtColor(dst, out, cv.COLOR_RGB2RGBA);
+  let done = null;
+  if (area.fill === "flat" && area.color) { done = rgb.clone(); done.setTo(new cv.Scalar(area.color[0], area.color[1], area.color[2]), m); }
+  else if (area.fill === "texture") { const f = await fillArea(cv, model, rgb, m, on, { margin: Math.ceil(2 / scale) }); done = f.mat; area.filled = f.kind; area.fillMs = f.ms; }
+  if (!done) { done = new cv.Mat(); cv.inpaint(rgb, m, done, Math.max(3, Math.round((area.radius || 3) / scale)), cv.INPAINT_TELEA); }
+  cv.cvtColor(done, out, cv.COLOR_RGB2RGBA);
   const result = new ImageData(new Uint8ClampedArray(out.data), W, H);
-  src.delete(); rgb.delete(); dst.delete(); out.delete(); m.delete();
+  src.delete(); rgb.delete(); done.delete(); out.delete(); m.delete(); on?.delete();
   return result;
 }
+
+/**
+ * Fills one textured area: the screentone fill where its surface is a lattice (engine/tone.js),
+ * else the learned inpainter where there is one, else nothing (null: the caller keeps Telea).
+ * @returns {Promise<{mat: any|null, kind: "tone"|"learned"|"telea", ms: number}>} ms: the time it took
+ */
+export async function fillArea(cv, model, rgb, hole, source, opts = {}) {
+  const t0 = performance.now(), ms = () => Math.round(performance.now() - t0);
+  const tone = latticeFill(cv, rgb, hole, source, opts);
+  if (tone) return { mat: tone, kind: "tone", ms: ms() };
+  // (the model may be given as a function that loads it: then it is loaded only when an area needs it)
+  const m = typeof model === "function" ? await model() : model;
+  if (m) {
+    try { const mat = await aotInpaint(cv, m, rgb, hole); return { mat, kind: "learned", ms: ms() }; }
+    catch (e) { console.warn("Gytakusub: learned inpainting failed, using Telea", e); }
+  }
+  return { mat: null, kind: "telea", ms: ms() };
+}
+
+/**
+ * The fill for erase()'s textured areas, at the size erase() worked at (pages analysed at their
+ * own size, and the work copy): fillArea() on each, with some of the page around it, which both
+ * fills need to continue the texture. Changes only masked pixels of `img`; notes on each area
+ * how it was filled (`filled`) and how long that took (`fillMs`).
+ * @param {any} model the learned inpainter (or a function resolving to it), or null (screentone fill, else Telea)
+ * @param {{rois: any[], mask: any, surface?: any}} erased erase()'s answer with keepMask
+ */
+export async function fillTexture(cv, model, img, erased) {
+  const textured = erased.rois.filter((r) => r.fill === "texture");
+  if (!textured.length) return img;
+  const W = img.width, H = img.height;
+  const src = cv.matFromImageData(img), rgb = new cv.Mat(); cv.cvtColor(src, rgb, cv.COLOR_RGBA2RGB); src.delete();
+  for (const r of textured) {
+    const m = contextMargin(r.letter);
+    const x0 = Math.max(0, r.x - m), y0 = Math.max(0, r.y - m), x1 = Math.min(W, r.x + r.w + m), y1 = Math.min(H, r.y + r.h + m);
+    const rect = new cv.Rect(x0, y0, x1 - x0, y1 - y0);
+    const view = rgb.roi(rect), crop = view.clone(), hole = erased.mask.roi(rect).clone(); // continuous copies
+    let on = null;
+    if (erased.surface && r.label) { on = erased.surface.roi(rect).clone(); const od = on.data; for (let i = 0; i < od.length; i++) od[i] = od[i] === r.label ? 255 : 0; }
+    if (cv.countNonZero(hole)) {
+      const f = await fillArea(cv, model, crop, hole, on);
+      r.filled = f.kind; r.fillMs = f.ms;
+      if (f.mat) { f.mat.copyTo(view); f.mat.delete(); }
+    }
+    view.delete(); crop.delete(); hole.delete(); on?.delete();
+  }
+  const out = new cv.Mat(); cv.cvtColor(rgb, out, cv.COLOR_RGB2RGBA);
+  const result = new ImageData(new Uint8ClampedArray(out.data), W, H);
+  rgb.delete(); out.delete();
+  return result;
+}
+
+/** How much of the page around an area the texture fill sees: two letters, at least 24 px. */
+export const contextMargin = (letter) => Math.max(24, Math.round((letter || 8) * 2));

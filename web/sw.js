@@ -1,7 +1,7 @@
 // Gytakusub Web – service worker: cache the app shell so it opens instantly
 // (and offline for screenshot mode). Translation requests always go to the network.
-const CACHE = "gytakusub-v12";
-const SHELL = ["./", "./index.html", "./style.css", "./app.js", "./translator.js", "./fetcher-client.js", "./fetcher-worker.js", "./fetcher-guide.json", "./lib/qrcode.mjs", "./prompt.js", "./usage.js", "./i18n.js", "./languages.js", "./_locales/en/messages.json", "./locales/en/messages.json", "./claude-usage.js", "./text.js", "./engine-worker.js", "./engine/page.js", "./engine/cv.js", "./engine/analyze.js", "./engine/erase.js", "./engine/layout.js", "./vendor/hyphen-en.js", "./vendor/lettering-fonts.js", "./vendor/opencv.js", "./vendor/opencv_js.wasm", "./manifest.webmanifest", "./icons/icon48.png", "./icons/icon192.png", "./icons/icon512.png", "./icons/apple-touch-icon.png", "./fonts/ComicNeue-Bold.ttf", "./fonts/ComicRelief-Bold.ttf", "./fonts/Mali-Bold.ttf"];
+const CACHE = "gytakusub-v13";
+const SHELL = ["./", "./index.html", "./style.css", "./app.js", "./translator.js", "./fetcher-client.js", "./fetcher-worker.js", "./fetcher-guide.json", "./lib/qrcode.mjs", "./prompt.js", "./usage.js", "./i18n.js", "./languages.js", "./_locales/en/messages.json", "./locales/en/messages.json", "./claude-usage.js", "./text.js", "./engine-worker.js", "./engine/page.js", "./engine/cv.js", "./engine/analyze.js", "./engine/erase.js", "./engine/tone.js", "./engine/inpaint.js", "./engine/layout.js", "./vendor/hyphen-en.js", "./vendor/lettering-fonts.js", "./vendor/opencv.js", "./vendor/opencv_js.wasm", "./manifest.webmanifest", "./icons/icon48.png", "./icons/icon192.png", "./icons/icon512.png", "./icons/apple-touch-icon.png", "./fonts/ComicNeue-Bold.ttf", "./fonts/ComicRelief-Bold.ttf", "./fonts/Mali-Bold.ttf"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));

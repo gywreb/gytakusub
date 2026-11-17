@@ -32,7 +32,7 @@ const dark = (img) => { let n = 0; for (let i = 0; i < img.data.length; i += 4) 
 
 const AX = 100, AY = 150, AW = 420, AH = 90;
 const area = crop(AX, AY, AW, AH);
-const out = eraseFullSize(cv, area, AX, AY, mask, scale, 0, 0, 3);
+const out = await eraseFullSize(cv, area, AX, AY, mask, scale, 0, 0, { fill: "telea", radius: 3 });
 
 test("returns an image the size of the full-size area", () => {
   assert.ok(out);
@@ -64,13 +64,20 @@ test("tone keeps its level where letters crossed it", () => {
   for (let y = 10; y < AH - 10; y++) for (let x = NW / 2 - AX + 20; x < AW - 10; x++) { const p = (y * AW + x) * 4; n++; if (Math.abs(out.data[p] - 200) > 25) off++; }
   assert.ok(off / n < 0.01, `${off} of ${n} tone pixels off level`);
 });
+const nullArea = await eraseFullSize(cv, crop(0, 0, 60, 40), 0, 0, mask, scale, 0, 0, { radius: 3 });
+const shifted = await eraseFullSize(cv, area, AX, AY + 1000, mask, scale, 0, 1000, { radius: 3 });
+const flatArea = await eraseFullSize(cv, crop(100, 150, 150, 90), 100, 150, mask, scale, 0, 0, { fill: "flat", color: [255, 255, 255] });
 test("an area the mask doesn't reach returns null", () => {
-  assert.equal(eraseFullSize(cv, crop(0, 0, 60, 40), 0, 0, mask, scale, 0, 0, 3), null);
+  assert.equal(nullArea, null);
 });
 test("a slice origin is honoured (strip slices)", () => {
   // the same mask treated as a slice starting at page y=1000: the area moves with it
-  const shifted = eraseFullSize(cv, area, AX, AY + 1000, mask, scale, 0, 1000, 3);
   assert.ok(shifted && dark(shifted) < dark(area) * 0.01);
+});
+test("a flat area takes its surface colour exactly (white part of the page)", () => {
+  // the left half of the page is white: every masked pixel there becomes 255, no smear
+  let off = 0; for (let p = 0; p < flatArea.data.length; p += 4) if (flatArea.data[p] !== 255 && flatArea.data[p] < 250) off++;
+  assert.ok(off === 0, `${off} pixels not white`);
 });
 mask.delete();
 console.log(`\n${passed} passed`);

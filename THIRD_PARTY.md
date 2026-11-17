@@ -9,9 +9,10 @@ following, each under its own licence; the licence texts ship next to the files.
 | ONNX Runtime Web 1.31.1 (Microsoft) | `vendor/ort/` | MIT | `vendor/ort/LICENSE-onnxruntime.txt` |
 | PaddleOCR PP-OCRv6 (small) text detector | `vendor/ppocr-det.onnx`, `vendor/ppocr-det.json` | Apache-2.0 | `vendor/LICENSE-PaddleOCR.txt` |
 | Speech-bubble segmentation model (kitsumed, Ultralytics YOLOv8m-seg), int8 | `vendor/segment.onnx` (CPU), `vendor/segment-gpu.onnx` (WebGPU), `vendor/segment.json` | GPL-3.0 (model card) / Ultralytics AGPL-3.0 | `vendor/LICENSE-segment.txt` |
+| AOT-GAN inpainting model trained on manga (lemon-manga-translator), float32 | `vendor/inpaint.onnx`, `vendor/inpaint.json` (source and checksum) | GPL-3.0 | `vendor/LICENSE-inpaint.txt` |
 | English hyphenation patterns (hyphen) | `vendor/hyphen-en.js` | ISC | `vendor/LICENSE-hyphen.txt` |
 | Comic Neue Bold | `fonts/ComicNeue-Bold.ttf` | SIL OFL 1.1 | `fonts/LICENSE-ComicNeue.txt` |
 
 Apache-2.0, MIT, ISC and GPL-3.0 are compatible with distribution under AGPL-3.0;
 the OFL font is distributed as a separate font file, as that licence permits.
-How each was chosen: `docs/adr/0001-dependencies.md`, `0002`, `0004`, `0005`.
+How each was chosen: `docs/adr/0001-dependencies.md`, `0002`, `0004`, `0005`, `0013`.

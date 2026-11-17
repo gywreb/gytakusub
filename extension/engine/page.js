@@ -2,13 +2,16 @@
 // text regions for the model) and finish (place the translations, erase the
 // original lettering, hand back a cleaned page plus text placements).
 // Used by the extension's service worker and by the web app's Web Worker.
-import { getCV, getDetector, getSegmenter, getFallbackDetector, setEnginePrefs } from "./cv.js";
+import { getCV, getDetector, getSegmenter, getFallbackDetector, getInpainter, setEnginePrefs } from "./cv.js";
 import { ortBroken } from "./ort.js";
 import { analyze } from "./analyze.js";
 import { segment } from "./segment.js";
 import { detectText, detectInEmptyBubbles, detectInDarkShapes } from "./detect.js";
 import { layout } from "./layout.js";
-import { erase, eraseFullSize } from "./erase.js";
+import { erase, eraseFullSize, fillTexture, contextMargin } from "./erase.js";
+
+// How far the mask grows over a lettering's outline, as a share of its letter size (ADR 0013).
+export const OUTLINE = 0.3;
 import { sliceGeometry, normalizeItems } from "../prompt.js";
 
 /**
@@ -104,10 +107,17 @@ export async function finishPage(job, results, opts = {}) {
   const cv = await getCV();
   const { width, height, work, scale } = job;
   const full = !!opts.natural && scale < 0.999;
+  // the learned eraser's models (null without them: rules and Telea, as before 2.12)
+  // the learned eraser's model, loaded the first time an area needs it (white bubbles and
+  // screentone don't); null when opts.learned is false: rules and Telea, as before 2.12
+  const inpainter = opts.learned === false ? null : () => getInpainter();
   const items = [], placements = [], regions = [], rois = [], patches = [];
+  // what erasing cost on this page (the debug report shows it): areas by how they were filled, and
+  // the time the texture fills took (the part 2.12 added)
+  const fill = { ms: 0, flat: 0, tone: 0, learned: 0, telea: 0 };
   const canvas = new OffscreenCanvas(work.W, work.H);
   const ctx = canvas.getContext("2d");
-  job.slices.forEach((s, idx) => {
+  for (const [idx, s] of job.slices.entries()) {
     const an = s.analysis;
     const norm = normalizeItems(results[idx]?.items || [], s, width, height); // tag + box as page fractions
     const first = items.length;
@@ -117,16 +127,23 @@ export async function finishPage(job, results, opts = {}) {
     const { placements: pl, regionIds } = layout(an, local);
     for (const p of pl) placements.push({ ...p, rect: { x: p.rect.x + s.ox, y: p.rect.y + s.oy, w: p.rect.w, h: p.rect.h } });
     for (const r of an.regions) regions.push({ id: r.id, kind: r.kind, letter: r.letter, box: { x: r.box.x + s.ox, y: r.box.y + s.oy, w: r.box.w, h: r.box.h } });
-    const clean = regionIds.size ? erase(cv, s.imageData, an, regionIds, { keepMask: full }) : { image: s.imageData, rois: [] };
+    let clean = { image: s.imageData, rois: [] };
+    if (regionIds.size) {
+      clean = erase(cv, s.imageData, an, regionIds, { keepMask: true, outline: OUTLINE });
+      // textured areas at the size the page was analysed at (when that is its own size, the
+      // patches come from here; else the full-size pass below does them)
+      if (!full) clean.image = await fillTexture(cv, inpainter, clean.image, clean);
+    }
     ctx.putImageData(clean.image, s.ox, s.oy);
     if (full && clean.mask) {
-      for (const r of clean.rois) { const p = fullSizePatch(cv, opts.natural, s, scale, clean.mask, r); if (p) patches.push(p); }
-      clean.mask.delete();
+      for (const r of clean.rois) { const p = await fullSizePatch(cv, opts.natural, s, scale, clean.mask, r, inpainter, clean.surface); if (p) patches.push(p); }
     } else {
       for (const r of clean.rois) rois.push({ x: r.x + s.ox, y: r.y + s.oy, w: r.w, h: r.h });
     }
+    for (const r of clean.rois) { const kind = r.fill === "texture" ? r.filled || "telea" : r.fill || "telea"; fill[kind]++; fill.ms += r.fillMs || 0; }
+    clean.mask?.delete(); clean.surface?.delete();
     an.dispose();
-  });
+  }
   const letter = job.slices.length ? job.slices[0].analysis.letter : 0;
   const first = job.slices[0]?.analysis;
   const engine = !first ? "heuristic" : first.segmented ? "segmented" : first.learned ? "learned" : "heuristic";
@@ -135,6 +152,8 @@ export async function finishPage(job, results, opts = {}) {
   // Patches: just the areas the eraser changed, cut from the cleaned page. The
   // extension ships these (a few KB each) instead of the whole page; the content
   // script draws them over the image it already shows.
+  // the work copy shows the full-size erasing too (the debug export's clean page)
+  for (const p of patches) ctx.drawImage(p.canvas, p.x * scale, p.y * scale, p.w * scale, p.h * scale);
   // (work-size patches, when the page was analysed at its own size or no full-size page was given)
   for (const r of rois) {
     const c = new OffscreenCanvas(r.w, r.h);
@@ -142,21 +161,25 @@ export async function finishPage(job, results, opts = {}) {
     patches.push({ x: r.x / scale, y: r.y / scale, w: r.w / scale, h: r.h / scale, canvas: c });
   }
   const backend = job.slices[0]?.analysis.backend || null;
-  return { items, placements, regions, work, letter, canvas, patches, fullSize: full, engine, segmentMs, detectMs, backend };
+  if (fill.learned) fill.ep = (await getInpainter())?.ep || null; // where the learned fill ran: webgpu / wasm
+  return { items, placements, regions, work, letter, canvas, patches, fullSize: full, engine, segmentMs, detectMs, backend, fill };
 }
 
 /**
  * One erased area again at the page's own size: the work-resolution area `r` (slice coordinates)
  * widened to whole page pixels, cut from the full-size page, inpainted with the work mask resampled.
  */
-function fullSizePatch(cv, natural, s, scale, mask, r) {
-  const nx = s.x + Math.floor(r.x / scale), ny = s.y + Math.floor(r.y / scale);
-  const nx1 = Math.min(s.x + s.w, s.x + Math.ceil((r.x + r.w) / scale)), ny1 = Math.min(s.y + s.h, s.y + Math.ceil((r.y + r.h) / scale));
+async function fullSizePatch(cv, natural, s, scale, mask, r, model, surface) {
+  // a texture fill sees some of the page around the area (the patch is then that much larger;
+  // outside the mask its pixels are the page's own)
+  const m = r.fill === "texture" ? contextMargin(r.letter) : 0;
+  const nx = Math.max(s.x, s.x + Math.floor((r.x - m) / scale)), ny = Math.max(s.y, s.y + Math.floor((r.y - m) / scale));
+  const nx1 = Math.min(s.x + s.w, s.x + Math.ceil((r.x + r.w + m) / scale)), ny1 = Math.min(s.y + s.h, s.y + Math.ceil((r.y + r.h + m) / scale));
   const nw = nx1 - nx, nh = ny1 - ny;
   if (nw < 1 || nh < 1) return null;
   const c = new OffscreenCanvas(nw, nh), cctx = c.getContext("2d", { willReadFrequently: true });
   cctx.drawImage(natural, nx, ny, nw, nh, 0, 0, nw, nh);
-  const done = eraseFullSize(cv, cctx.getImageData(0, 0, nw, nh), nx, ny, mask, scale, s.x, s.y, r.radius || 3);
+  const done = await eraseFullSize(cv, cctx.getImageData(0, 0, nw, nh), nx, ny, mask, scale, s.x, s.y, r, model, surface);
   if (!done) return null;
   cctx.putImageData(done, 0, 0);
   return { x: nx, y: ny, w: nw, h: nh, canvas: c };

@@ -2,7 +2,7 @@
 // (extension service worker, the web app's Web Worker, or Node in tests).
 import loadOpenCV from "../vendor/opencv.js";
 import { loadDetector } from "./detect.js"; // static: MV3 service workers do not support dynamic import()
-import { getOrt, gpuAvailable, ortBroken } from "./ort.js";
+import { getOrt, gpuAvailable, ortBroken, createSession, run } from "./ort.js";
 import { loadSegmenter } from "./segment.js";
 
 let ready = null;
@@ -33,7 +33,7 @@ export function getCV(overrides = {}) {
 const prefs = { gpu: true };
 export function setEnginePrefs(next = {}) {
   const gpu = next.gpu !== false;
-  if (gpu !== prefs.gpu) { prefs.gpu = gpu; detectorReady = null; segmenterReady = null; }
+  if (gpu !== prefs.gpu) { prefs.gpu = gpu; detectorReady = null; segmenterReady = null; inpainterReady = null; }
 }
 
 let detectorReady = null;
@@ -118,4 +118,34 @@ export function getSegmenter(overrides = {}) {
     })();
   }
   return segmenterReady;
+}
+
+let inpainterReady = null;
+/**
+ * Resolves to the learned inpainter (engine/inpaint.js: AOT-GAN, vendor/inpaint.onnx), on the
+ * GPU when there is one, else the CPU; null when the file is missing or fails to load (the
+ * eraser then fills textured areas with Telea, as before 2.12).
+ * @param {object} [overrides] tests pass `modelBytes`, `wasmBinary`, `gpu`
+ * @returns {Promise<{ort, session, run, ep: "webgpu"|"wasm"}|null>}
+ */
+export function getInpainter(overrides = {}) {
+  if (ortBroken()) return Promise.resolve(null);
+  if (!inpainterReady) inpainterReady = loadModel("inpaint.onnx", overrides);
+  return inpainterReady;
+}
+
+/** A vendored model on the GPU when there is one (else the CPU); null when missing or broken. */
+async function loadModel(file, overrides) {
+  try {
+    const gpu = (overrides.gpu ?? prefs.gpu) && await gpuAvailable();
+    let bytes = overrides.modelBytes;
+    if (!bytes) {
+      const res = await fetch(new URL("../vendor/" + file, import.meta.url)).catch(() => null);
+      if (!res || !res.ok) return null;
+      bytes = new Uint8Array(await res.arrayBuffer());
+    }
+    const ort = getOrt(overrides.wasmBinary ? { wasmBinary: overrides.wasmBinary } : {});
+    const { session, ep } = await createSession(bytes, { gpu });
+    return { ort, session, run, ep };
+  } catch (e) { console.warn(`Gytakusub: ${file} unavailable`, e); return null; }
 }
