@@ -68,14 +68,14 @@
  "popup_model": {
   "message": "模型"
  },
- "popup_haiku_5_5_fastest_cheapest": {
-  "message": "Haiku 5.5 — 最快、最便宜"
+ "popup_model_hint_haiku": {
+  "message": "最快、最便宜"
  },
- "popup_sonnet_5_5_for_dense": {
-  "message": "Sonnet 5.5 — 适合文字密集的页面"
+ "popup_model_hint_sonnet": {
+  "message": "适合文字密集的页面"
  },
- "popup_opus_5_5_best_most": {
-  "message": "Opus 5.5 — 最好、最贵"
+ "popup_model_hint_opus": {
+  "message": "最好、最贵"
  },
  "popup_chapter_context": {
   "message": "章节上下文"

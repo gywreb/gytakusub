@@ -68,14 +68,14 @@
  "popup_model": {
   "message": "모델"
  },
- "popup_haiku_5_5_fastest_cheapest": {
-  "message": "Haiku 5.5 — 가장 빠르고 저렴함"
+ "popup_model_hint_haiku": {
+  "message": "가장 빠르고 저렴함"
  },
- "popup_sonnet_5_5_for_dense": {
-  "message": "Sonnet 5.5 — 글이 많은 페이지용"
+ "popup_model_hint_sonnet": {
+  "message": "글이 많은 페이지용"
  },
- "popup_opus_5_5_best_most": {
-  "message": "Opus 5.5 — 최고 품질, 가장 비쌈"
+ "popup_model_hint_opus": {
+  "message": "최고 품질, 가장 비쌈"
  },
  "popup_chapter_context": {
   "message": "회차 맥락"

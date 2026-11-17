@@ -68,14 +68,14 @@
  "popup_model": {
   "message": "Mô hình"
  },
- "popup_haiku_5_5_fastest_cheapest": {
-  "message": "Haiku 5.5 — nhanh nhất, rẻ nhất"
+ "popup_model_hint_haiku": {
+  "message": "Nhanh nhất, rẻ nhất"
  },
- "popup_sonnet_5_5_for_dense": {
-  "message": "Sonnet 5.5 — cho trang dày chữ"
+ "popup_model_hint_sonnet": {
+  "message": "Cho trang dày chữ"
  },
- "popup_opus_5_5_best_most": {
-  "message": "Opus 5.5 — tốt nhất, đắt nhất"
+ "popup_model_hint_opus": {
+  "message": "Tốt nhất, đắt nhất"
  },
  "popup_chapter_context": {
   "message": "Ngữ cảnh chương"

@@ -43,6 +43,7 @@ async function init() {
   $("enabled").checked = !!s.enabled;
   showEnabled(!!s.enabled);
   $("model").value = s.model;
+  showModelHint();
   $("useContext").checked = !!s.useContext;
   $("exportReport").hidden = !s.debugOverlay;
 
@@ -110,7 +111,12 @@ $("exportReport").onclick = async () => {
   if (r?.error) $("state").textContent = t("popup_export_failed", { error: r.error });
   else if (r?.ok) $("state").textContent = tn("popup_report_downloaded", r.pages);
 };
-$("model").onchange = (e) => chrome.storage.sync.set({ model: e.target.value });
+/** What the chosen model is good for, under the dropdown (the options show only the names, so they fit any font). */
+function showModelHint() {
+  const kind = ($("model").value.match(/haiku|sonnet|opus/) || [])[0];
+  $("modelHint").textContent = kind ? t(`popup_model_hint_${kind}`) : "";
+}
+$("model").onchange = (e) => { showModelHint(); chrome.storage.sync.set({ model: e.target.value }); };
 $("useContext").onchange = (e) => chrome.storage.sync.set({ useContext: e.target.checked });
 $("site").onchange = async (e) => {
   if (!currentHost) return;

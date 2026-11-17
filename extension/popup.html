@@ -86,11 +86,12 @@
       </div>
       <label class="field">
         <span data-i18n="popup_model">Model</span>
-        <select id="model">
-          <option value="claude-haiku-5-5" data-i18n="popup_haiku_5_5_fastest_cheapest">Haiku 5.5 — fastest, cheapest</option>
-          <option value="claude-sonnet-5-5" data-i18n="popup_sonnet_5_5_for_dense">Sonnet 5.5 — for dense pages</option>
-          <option value="claude-opus-5-5" data-i18n="popup_opus_5_5_best_most">Opus 5.5 — best, most expensive</option>
+        <select id="model" aria-describedby="modelHint">
+          <option value="claude-haiku-5-5">Haiku 5.5</option>
+          <option value="claude-sonnet-5-5">Sonnet 5.5</option>
+          <option value="claude-opus-5-5">Opus 5.5</option>
         </select>
+        <span class="hint" id="modelHint"></span>
       </label>
       <label class="option">
         <span class="option-text"><span class="option-title" data-i18n="popup_chapter_context">Chapter context</span><span class="option-desc" data-i18n="popup_names_recent_lines_for_continuity">Names + recent lines, for continuity</span></span>

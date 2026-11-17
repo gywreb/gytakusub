@@ -68,14 +68,14 @@
  "popup_model": {
   "message": "モデル"
  },
- "popup_haiku_5_5_fastest_cheapest": {
-  "message": "Haiku 5.5 — 最速・最安"
+ "popup_model_hint_haiku": {
+  "message": "最速・最安"
  },
- "popup_sonnet_5_5_for_dense": {
-  "message": "Sonnet 5.5 — 文字が多いページ"
+ "popup_model_hint_sonnet": {
+  "message": "文字の多いページ向け"
  },
- "popup_opus_5_5_best_most": {
-  "message": "Opus 5.5 — 最高品質・最も高価"
+ "popup_model_hint_opus": {
+  "message": "最高品質・最も高価"
  },
  "popup_chapter_context": {
   "message": "話のコンテキスト"

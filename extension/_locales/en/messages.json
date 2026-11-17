@@ -68,14 +68,14 @@
  "popup_model": {
   "message": "Model"
  },
- "popup_haiku_5_5_fastest_cheapest": {
-  "message": "Haiku 5.5 — fastest, cheapest"
+ "popup_model_hint_haiku": {
+  "message": "Fastest, cheapest"
  },
- "popup_sonnet_5_5_for_dense": {
-  "message": "Sonnet 5.5 — for dense pages"
+ "popup_model_hint_sonnet": {
+  "message": "For dense pages"
  },
- "popup_opus_5_5_best_most": {
-  "message": "Opus 5.5 — best, most expensive"
+ "popup_model_hint_opus": {
+  "message": "Best, most expensive"
  },
  "popup_chapter_context": {
   "message": "Chapter context"

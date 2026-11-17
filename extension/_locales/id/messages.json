@@ -68,14 +68,14 @@
  "popup_model": {
   "message": "Model"
  },
- "popup_haiku_5_5_fastest_cheapest": {
-  "message": "Haiku 5.5 — tercepat, termurah"
+ "popup_model_hint_haiku": {
+  "message": "Tercepat, termurah"
  },
- "popup_sonnet_5_5_for_dense": {
-  "message": "Sonnet 5.5 — halaman padat"
+ "popup_model_hint_sonnet": {
+  "message": "Untuk halaman padat"
  },
- "popup_opus_5_5_best_most": {
-  "message": "Opus 5.5 — terbaik, termahal"
+ "popup_model_hint_opus": {
+  "message": "Terbaik, termahal"
  },
  "popup_chapter_context": {
   "message": "Konteks bab"
