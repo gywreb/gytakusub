@@ -24,7 +24,7 @@ Languages: pick the target from a list, and Gytakusub's own pages speak it.
 
 ### Development
 - `scripts/check-i18n.mjs` (in CI): every language has every English message, with the same placeholders, markup and links, no stray `$`, and a description within the manifest's 132 characters.
-- `tests/browser/i18n.mjs`: every page in every language (labels right, no keys or English leftovers, nothing clipped or spilling sideways, no console errors), live switching, the worker's and the page overlay's language, the "Other" path and the first-install default. It found two bugs before release: the setup page didn't follow a change made in Settings, and the popup's model menu cut its descriptions off (in every language on CI's wider Linux fonts, English included).
+- `tests/browser/i18n.mjs`: every page in every language (labels right, no keys or English leftovers, nothing clipped or spilling sideways, no console errors), live switching, the worker's and the page overlay's language, the "Other" path and the first-install default. It found two bugs before release: the setup page didn't follow a change made in Settings, and the popup's model menu cut its descriptions off (on CI's wider Linux fonts, in seven of the ten languages, English included).
 - ADR 0010 records the choices: `docs/adr/0010-interface-language.md`.
 
 ## [2.7.0] — 2026-11-17

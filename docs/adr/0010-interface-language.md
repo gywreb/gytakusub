@@ -35,7 +35,7 @@ Two requests from the owner: pick the language from a list, and have the extensi
 **Translation quality:**
 - Written by Claude (Opus 5.5), not by native speakers, and none has had a native speaker's review yet. The owner reads Vietnamese, so that one can be checked first.
 - Checked by machine: `scripts/check-i18n.mjs` (every locale has every English key, the same placeholders, the same markup and link targets, no stray `$`), and `tests/browser/i18n.mjs` (every label in the right language, no key on screen, nothing clipped or spilling sideways, `lang` set, live switching, the worker and the overlay).
-- That test found two real problems before release: the setup page didn't follow a language change made in Settings, and the popup's model dropdown cut its labels off: in six languages here, and in every language (English too) on CI's wider Linux fonts. The dropdown now shows only the model names, with the chosen one's description underneath.
+- That test found two real problems before release: the setup page didn't follow a language change made in Settings, and the popup's model dropdown cut its labels off: in six languages here, and in seven of the ten (English too) on CI's wider Linux fonts. The dropdown now shows only the model names, with the chosen one's description underneath.
 - Corrections come from readers: a "Translation fix" issue form.
 
 ## Alternatives considered
