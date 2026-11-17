@@ -18,6 +18,7 @@ import { cv, detector, analyzePage } from "./cv-node.mjs";
 import { analyze } from "../extension/engine/analyze.js";
 import { layout } from "../extension/engine/layout.js";
 import { erase } from "../extension/engine/erase.js";
+import { loadLettering } from "./lettering-setup.mjs";
 
 const args = process.argv.slice(2);
 const verbose = args.includes("--verbose");
@@ -25,9 +26,7 @@ const zips = args.filter((a) => a.endsWith(".zip"));
 if (!zips.length) { console.error("usage: node layout-score.mjs <report.zip> [...] [--verbose]"); process.exit(2); }
 
 // the page-side text fitter, to measure what size the text really ends up at
-registerFont("../extension/fonts/ComicNeue-Bold.ttf", { family: "Gytakusub Comic", weight: "bold" });
-new Function(fs.readFileSync("../extension/vendor/hyphen-en.js", "utf8"))();
-new Function(fs.readFileSync("../extension/text.js", "utf8"))();
+loadLettering();
 const GyText = globalThis.GyText;
 const fitCanvas = createCanvas(10, 10), fitCtx = fitCanvas.getContext("2d");
 const SIZE_MUL = { small: 0.8, normal: 1, large: 1.3 };

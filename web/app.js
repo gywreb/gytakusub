@@ -1,5 +1,5 @@
 // Gytakusub Web – UI.
-import { loadSettings, saveSettings, loadImage, blobToDataUrl, translateImage, renderPage, testKey } from "./translator.js";
+import { loadSettings, saveSettings, loadImage, blobToDataUrl, translateImage, renderPage, prepareLettering, testKey } from "./translator.js";
 import { isConnected, connectFetcher, loadChapter, fetchPageImage, generateKey, connectionLink, readConnectionLink, fetcherBase, usageToday, onUsage, resetTime, FREE_DAILY, loadCloudUsage } from "./fetcher-client.js";
 import { MODELS } from "./prompt.js";
 import { loadLocale } from "./i18n.js";
@@ -259,12 +259,12 @@ async function processPage(page) {
       page.media.append(page.img);
     }
     setStatus(page, "translating…");
-    const [result] = await Promise.all([
+    const [result, look] = await Promise.all([
       translateImage(page.img, settings, settings.useContext ? ctx : { terms: [], recent: [] }),
-      document.fonts?.load('700 20px "Gytakusub Comic"').catch(() => null), // bundled lettering font
+      prepareLettering(settings), // the bundled fonts and the target language's hyphenation
     ]);
     if (settings.useContext) ctx = result.ctx;
-    const { original, translated, drawn } = renderPage(page.img, result, settings);
+    const { original, translated, drawn } = renderPage(page.img, result, settings, look);
     original.className = "original"; translated.className = "translated";
     page.media.querySelectorAll("canvas").forEach((c) => c.remove());
     page.img.remove();

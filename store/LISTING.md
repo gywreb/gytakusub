@@ -1,6 +1,6 @@
 # Chrome Web Store listing — Gytakusub
 
-Last updated for 2.8.0 (languages).
+Last updated for 2.9.0 (lettering in every listed language).
 
 Copy each block into the matching field of the Developer Dashboard. Keep the wording: it is written to match what the extension actually does (reviewers compare listing claims against behaviour) and to stay generic about content sources.
 
@@ -21,7 +21,7 @@ HOW IT WORKS
 • Text and speech bubbles are found locally by open-source models (PaddleOCR's text detector and a speech-bubble segmentation model) and OpenCV, all running in your browser — on the graphics card when available. No page content is read except the images you translate.
 • The image is sent directly from your browser to Anthropic's Claude API using YOUR API key. Gytakusub has no server and never sees your data.
 • Names and recent dialogue are carried from page to page so translations stay consistent through a chapter.
-• Japanese (including vertical text), Korean, Chinese, Spanish, Italian and most other languages → the language you pick: English, Vietnamese, Spanish, Portuguese, Indonesian, French, German, Chinese, Japanese, Korean and more, or any other you type.
+• Japanese (including vertical text), Korean, Chinese, Spanish, Italian and most other languages → the language you pick: English, Vietnamese, Spanish, Portuguese, Indonesian, French, German, Chinese, Japanese, Korean, Thai and more, or any other you type, lettered in a font that has all its letters.
 • The extension's own pages follow your language too: English, Tiếng Việt, Español, Português, Bahasa Indonesia, Français, Deutsch, 简体中文, 日本語, 한국어.
 
 YOU STAY IN CONTROL
@@ -64,6 +64,11 @@ https://github.com/gywreb/gytakusub/issues
 - Screenshots 1280×800, in this order: `screenshot-1-before-after.png`, `screenshot-2-closeup.png`, `screenshot-3-how-it-works.png`, `screenshot-4-japanese.png`, `screenshot-5-controls.png` (made by `npm run assets` in `tests/`: 1–4 render test pages through the engine, 5 is the real popup and Options page with demo data)
 - Small promo tile 440×280: `promo-small-440x280.png`
 - Marquee 1400×560: optional, not provided
+
+**What's new in 2.9.0** (paste into the version notes if the dashboard asks)
+```
+Translated pages letter properly in every listed language: Vietnamese, Thai, Polish, Turkish, Russian and Ukrainian get comic fonts with all their letters; Chinese and Japanese now break lines between words at a readable size (they were drawn tiny); Chinese, Japanese and Korean use your system's font for that language. Hyphenation follows the language (German, French, Spanish, Portuguese, Italian, Dutch, Polish, Ukrainian). Thai is now in the language list.
+```
 
 **What's new in 2.8.0** (paste into the version notes if the dashboard asks)
 ```

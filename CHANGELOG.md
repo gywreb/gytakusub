@@ -4,6 +4,33 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
 
 ## [Unreleased]
 
+## [2.9.0] — 2026-11-17
+
+Lettering that works in every listed language, in the extension and the web app.
+
+### Pages
+- **Every listed language has its own letters.** Comic Neue had 3 of the 52 Vietnamese letters I tested, and none of the Cyrillic ones. The browser filled the gaps from another font, so a word like "người" came out in two fonts. Two more open-licence comic fonts are bundled:
+  - **Comic Relief Bold**: Polish, Turkish, Russian, Ukrainian and other Latin and Cyrillic languages.
+  - **Mali Bold**: Vietnamese and Thai.
+  
+  A page is lettered in the first font that has all its letters, so a word never mixes two fonts. English and the Western European languages keep Comic Neue, at the same sizes as before.
+- **Chinese and Japanese translations were drawn at the minimum size** (before 2.8.0 too, for anyone who typed them in). Lines broke only at spaces, and these languages have none. They now break between words (the browser's `Intl.Segmenter`), with the line-start rules readers expect: no line starts with 。、」！？ or a small kana, and none ends with 「 or （. In a test bubble Chinese went from 8 px to 23 px, Japanese to 19 px.
+- **Chinese, Japanese and Korean use the system's font for that language** (Hiragino / Yu Gothic / Meiryo, PingFang / Microsoft YaHei, Apple SD Gothic Neo / Malgun Gothic, Noto CJK), so shared Han characters take the right forms.
+- **Hyphenation in the target language**: German, French, Spanish, Portuguese, Italian, Dutch, Polish and Ukrainian, as well as English. It only kicks in when a line doesn't fit whole. Vietnamese and other languages without patterns are no longer split by English rules. Russian, Turkish and Indonesian patterns aren't bundled because of their licences (LPPL, GPL-2.0), so those break at spaces only.
+- UPPERCASE lettering follows the language (Turkish i → İ, German ß → SS).
+- **Thai** joins the target list. Its interface stays English.
+
+### Debugging
+- Debug reports say which font a page was lettered in, and whether it was hyphenated.
+
+### Web app
+- The same fonts and rules. Its offline cache now includes the language files 2.8.0 added.
+
+### Development
+- `scripts/vendor-fonts.mjs` writes each font's characters and cap height into `vendor/lettering-fonts.js`; `scripts/vendor-hyphen.mjs` also writes `vendor/hyphen/*.json`. CI regenerates both.
+- `tests/lettering.test.mjs` (24 checks) and `tests/browser/lettering.mjs` (37 checks: seven languages through the real extension).
+- ADR 0011: `docs/adr/0011-lettering-per-language.md`.
+
 ## [2.8.0] — 2026-11-17
 
 Languages: pick the target from a list, and Gytakusub's own pages speak it.

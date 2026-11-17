@@ -1,7 +1,11 @@
 // Vendors the `hyphen` library (Franklin M. Liang's TeX hyphenation algorithm,
 // ISC) with the en-US patterns into extension/vendor/hyphen-en.js as one
-// classic script (content scripts cannot be modules) exposing globalThis.GyHyphen:
+// classic script (content scripts cannot be modules) exposing globalThis.GyHyphen,
+// and other languages' patterns as data in extension/vendor/hyphen/<name>.json,
+// loaded when that language is the target (GyHyphen.create(patterns)):
 //   node scripts/vendor-hyphen.mjs
+// Only patterns under permissive licences are bundled; their headers are in
+// extension/vendor/hyphen/LICENSE-patterns.txt (kept by hand, not generated).
 import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
@@ -18,9 +22,23 @@ const out = `// hyphen ${pkg.version} (ISC) + en-US patterns — see LICENSE-hyp
 const createHyphenator = ${wrapUmd("hyphen.js")};
 const patternsEnUs = ${wrapUmd("patterns/en-us.js")};
 /** Soft-hyphen (U+00AD) insertion at TeX break points; sync. */
-root.GyHyphen = { hyphenateEn: createHyphenator(patternsEnUs, { hyphenChar: "\\u00AD", minWordLength: 6 }), SOFT_HYPHEN: "\\u00AD" };
+const create = (patterns) => createHyphenator(patterns, { hyphenChar: "\\u00AD", minWordLength: 6 });
+root.GyHyphen = { hyphenateEn: create(patternsEnUs), create, SOFT_HYPHEN: "\\u00AD" };
 })(typeof globalThis !== "undefined" ? globalThis : this);
 `;
 fs.writeFileSync(path.join(root, "extension/vendor/hyphen-en.js"), out);
+
+// Other languages, as JSON data (no code): MIT, BSD-3-Clause or MIT-alternative patterns only.
+export const PATTERNS = ["de-1996", "es", "fr", "it", "nl", "pl", "pt", "uk"];
+const dataDir = path.join(root, "extension/vendor/hyphen");
+fs.mkdirSync(dataDir, { recursive: true });
+for (const f of fs.readdirSync(dataDir)) if (f.endsWith(".json") && !PATTERNS.includes(f.slice(0, -5))) fs.rmSync(path.join(dataDir, f));
+let total = 0;
+for (const name of PATTERNS) {
+  const data = JSON.stringify(require(path.join(dir, "patterns", `${name}.js`)));
+  fs.writeFileSync(path.join(dataDir, `${name}.json`), data + "\n");
+  total += data.length;
+}
+console.log(`hyphenation patterns: ${PATTERNS.join(", ")} (${(total / 1024).toFixed(0)} KB)`);
 fs.copyFileSync(path.join(dir, "LICENSE"), path.join(root, "extension/vendor/LICENSE-hyphen.txt"));
 console.log(`hyphen ${pkg.version}: ${(out.length / 1024).toFixed(0)} KB`);

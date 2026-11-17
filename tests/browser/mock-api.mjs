@@ -83,10 +83,11 @@ export function startMock(port, pageImage, opts = {}) {
       });
       const band = Math.max(1, Math.round(img.height / 24));
       matched.sort((a, b) => ((a.truth?.kind === "block") - (b.truth?.kind === "block")) || (Math.floor(a.st.y / band) - Math.floor(b.st.y / band)) || (a.st.x - b.st.x));
+      const texts = typeof opts.texts === "function" ? opts.texts() : opts.texts || TEXTS; // the lettering test answers in other languages
       const items = matched.slice(0, tagTo - tagFrom + 1).map(({ st, truth: best }, i) => {
         const box = best ? { x: best.box[0] * sc, y: best.box[1] * sc, w: best.box[2] * sc, h: best.box[3] * sc } : { x: st.x, y: st.y, w: st.r * 14, h: st.r * 7 };
         return {
-          tag: tagFrom + i, kind: "bubble", size: "normal", text: TEXTS[i % TEXTS.length],
+          tag: tagFrom + i, kind: "bubble", size: "normal", text: texts[i % texts.length],
           // badBoxes: correct tag, but the box drifts like a model that is weak at pixel coordinates
           box: opts.badBoxes
             ? [Math.round(box.x + box.w * 0.6), Math.round(box.y + box.h * 0.7), Math.round(box.w * 1.3), Math.round(box.h * 1.1)] // the 80th-percentile drift seen on real pages

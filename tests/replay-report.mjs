@@ -13,6 +13,7 @@ import { cv, detector, analyzePage } from "./cv-node.mjs";
 import { analyze } from "../extension/engine/analyze.js";
 import { layout } from "../extension/engine/layout.js";
 import { erase } from "../extension/engine/erase.js";
+import { loadLettering } from "./lettering-setup.mjs";
 
 const [,, zipPath, outArg] = process.argv;
 if (!zipPath) { console.error("usage: node replay-report.mjs <report.zip> [outdir]"); process.exit(2); }
@@ -20,9 +21,7 @@ const out = outArg || path.join(path.dirname(zipPath), path.basename(zipPath, ".
 fs.mkdirSync(out, { recursive: true });
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "gyt-report-"));
 execFileSync("unzip", ["-oq", zipPath, "-d", tmp]);
-registerFont("../extension/fonts/ComicNeue-Bold.ttf", { family: "Gytakusub Comic", weight: "bold" });
-new Function(fs.readFileSync("../extension/vendor/hyphen-en.js", "utf8"))();
-new Function(fs.readFileSync("../extension/text.js", "utf8"))();
+loadLettering();
 const GyText = globalThis.GyText;
 
 const summary = JSON.parse(fs.readFileSync(path.join(tmp, "summary.json"), "utf8"));

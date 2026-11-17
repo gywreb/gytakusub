@@ -1,5 +1,7 @@
 /* Gytakusub Web — one spacing/type scale, phone first (390 px), wider layouts from 640 px and 1024 px. */
 @font-face { font-family: "Gytakusub Comic"; src: url("fonts/ComicNeue-Bold.ttf") format("truetype"); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: "Gytakusub Comic Relief"; src: url("fonts/ComicRelief-Bold.ttf") format("truetype"); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: "Gytakusub Mali"; src: url("fonts/Mali-Bold.ttf") format("truetype"); font-weight: 700; font-style: normal; font-display: swap; }
 
 :root {
   color-scheme: dark;

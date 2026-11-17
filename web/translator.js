@@ -4,6 +4,7 @@
 import { callClaude, mergeContext, apiHeaders, API_URL } from "./prompt.js";
 import { limitsOf, explainApiError } from "./usage.js";
 import { recordClaudeUsage, recordClaudePage } from "./claude-usage.js";
+import { letteringFor } from "./languages.js";
 
 // every answer is logged as it arrives, so a page whose other slice fails still counts what it cost
 const callAndRecord = (settings, slice, ctx) => callClaude(settings, slice, ctx).then((r) => { recordClaudeUsage(r); return r; });
@@ -83,18 +84,42 @@ export async function translateImage(img, settings, ctx = { terms: [], recent: [
   return { items: fin.items, placements: fin.placements, regions: fin.regions, work: fin.work, letter: fin.letter, clean: fin.clean, width: prep.width, height: prep.height, usage, ctx: mergeContext(ctx, terms, fin.items.map((i) => i.text)) };
 }
 
+// Hyphenation for the target language: English's patterns load with the page
+// (vendor/hyphen-en.js); others from vendor/hyphen/<name>.json, once. None for the rest.
+const hyphenators = new Map();
+function hyphenatorFor(targetLang) {
+  const { hyphen } = letteringFor(targetLang);
+  if (!hyphen) return Promise.resolve(null);
+  if (hyphen === "en-us") return Promise.resolve(globalThis.GyHyphen?.hyphenateEn || null);
+  if (!hyphenators.has(hyphen)) {
+    hyphenators.set(hyphen, fetch(`./vendor/hyphen/${hyphen}.json`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then((patterns) => GyHyphen.create(patterns))
+      .catch((e) => { console.warn("Gytakusub: no hyphenation for", hyphen, e); hyphenators.delete(hyphen); return null; }));
+  }
+  return hyphenators.get(hyphen);
+}
+
+/** Everything drawing needs before the first page: the lettering fonts and the target language's hyphenation. */
+export async function prepareLettering(settings) {
+  const fonts = document.fonts ? (globalThis.GyFonts || []).map((f) => document.fonts.load(`${f.weight} 20px "${f.family}"`).catch(() => null)) : [];
+  const [hyphenator] = await Promise.all([hyphenatorFor(settings.targetLang), ...fonts]);
+  return { lang: letteringFor(settings.targetLang).lang, hyphenator };
+}
+
 /**
  * Render original + translated canvases at the engine's working resolution.
+ * `look`: prepareLettering()'s answer (the target language's rules).
  * @returns {{original:HTMLCanvasElement, translated:HTMLCanvasElement, drawn:number}}
  */
-export function renderPage(img, result, settings) {
+export function renderPage(img, result, settings, look = {}) {
   const { W, H } = result.work;
   const original = document.createElement("canvas"); original.width = W; original.height = H;
   original.getContext("2d").drawImage(img, 0, 0, W, H);
   const translated = document.createElement("canvas"); translated.width = W; translated.height = H;
   const tctx = translated.getContext("2d");
   tctx.drawImage(result.clean, 0, 0);
-  const drawn = GyText.draw(tctx, result.placements, { fontFamily: settings.fontFamily, uppercase: settings.uppercase });
+  const drawn = GyText.draw(tctx, result.placements, { fontFamily: settings.fontFamily, uppercase: settings.uppercase, lang: look.lang ?? null, hyphenator: look.hyphenator ?? null });
   return { original, translated, drawn };
 }
 

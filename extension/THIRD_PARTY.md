@@ -9,9 +9,15 @@ following, each under its own licence; the licence texts ship next to the files.
 | ONNX Runtime Web 1.31.1 (Microsoft) | `vendor/ort/` | MIT | `vendor/ort/LICENSE-onnxruntime.txt` |
 | PaddleOCR PP-OCRv6 (small) text detector | `vendor/ppocr-det.onnx`, `vendor/ppocr-det.json` | Apache-2.0 | `vendor/LICENSE-PaddleOCR.txt` |
 | Speech-bubble segmentation model (kitsumed, Ultralytics YOLOv8m-seg), int8 | `vendor/segment.onnx` (CPU), `vendor/segment-gpu.onnx` (WebGPU), `vendor/segment.json` | GPL-3.0 (model card) / Ultralytics AGPL-3.0 | `vendor/LICENSE-segment.txt` |
-| English hyphenation patterns (hyphen) | `vendor/hyphen-en.js` | ISC | `vendor/LICENSE-hyphen.txt` |
+| hyphen (hyphenation library) with English patterns | `vendor/hyphen-en.js` | ISC | `vendor/LICENSE-hyphen.txt` |
+| Hyphenation patterns: German, Spanish, French, Italian, Dutch, Polish, Portuguese, Ukrainian (hyph-utf8, via hyphen) | `vendor/hyphen/*.json` | MIT, BSD-3-Clause (each file's terms) | `vendor/hyphen/LICENSE-patterns.txt` |
 | Comic Neue Bold | `fonts/ComicNeue-Bold.ttf` | SIL OFL 1.1 | `fonts/LICENSE-ComicNeue.txt` |
+| Comic Relief Bold (Jeff Davis) | `fonts/ComicRelief-Bold.ttf` | SIL OFL 1.1 | `fonts/LICENSE-ComicRelief.txt` |
+| Mali Bold (Cadson Demak) | `fonts/Mali-Bold.ttf` | SIL OFL 1.1 | `fonts/LICENSE-Mali.txt` |
 
-Apache-2.0, MIT, ISC and GPL-3.0 are compatible with distribution under AGPL-3.0;
-the OFL font is distributed as a separate font file, as that licence permits.
-How each was chosen: `docs/adr/0001-dependencies.md`, `0002`, `0004`, `0005`.
+Apache-2.0, MIT, BSD-3-Clause, ISC and GPL-3.0 are compatible with distribution under AGPL-3.0;
+the OFL fonts are distributed as separate font files, as that licence permits. The two added
+fonts come unmodified from the Google Fonts repository (github.com/google/fonts, `ofl/comicrelief`
+and `ofl/mali`, 2026-11-17). Hyphenation patterns under LPPL or GPL-2.0 (Russian, Turkish,
+Indonesian) are not bundled.
+How each was chosen: `docs/adr/0001-dependencies.md`, `0002`, `0004`, `0005`, `0011` (fonts and hyphenation).

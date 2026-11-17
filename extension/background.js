@@ -13,7 +13,7 @@ import { consentGiven, hasAccess, openWelcome, CONSENT_VERSION } from "./access.
 import { sniffImageType, readCapped } from "./imagecheck.js";
 import { t, langTag, messagesWithPrefix } from "./i18n.js";
 import { useLanguageOf } from "./locale.js";
-import { uiLocaleFor, languageForLocale } from "./languages.js";
+import { uiLocaleFor, languageForLocale, letteringFor, LANGUAGES } from "./languages.js";
 
 // Claude usage log (usage.js) in chrome.storage.local, read by the popup and Options. This worker is
 // its only writer; a page's slices answer in parallel, so the writes queue up instead of racing.
@@ -373,6 +373,19 @@ async function speak(targetLang) {
   if (uiLocaleFor(targetLang) !== workerLocale) workerLocale = await useLanguageOf(targetLang);
   return workerLocale;
 }
+// Hyphenation patterns for the page script, which can't read our files from inside someone
+// else's page. Only names languages.js uses; read once per worker.
+const HYPHEN_NAMES = new Set(LANGUAGES.map((l) => l.hyphen).filter((h) => h && h !== "en-us"));
+const hyphenCache = new Map();
+function hyphenationPatterns(name) {
+  if (!HYPHEN_NAMES.has(name)) return Promise.reject(new Error("Unknown hyphenation patterns"));
+  if (!hyphenCache.has(name)) {
+    hyphenCache.set(name, fetch(chrome.runtime.getURL(`vendor/hyphen/${name}.json`)).then((r) => r.json()).then((patterns) => ({ patterns })));
+    hyphenCache.get(name).catch(() => hyphenCache.delete(name));
+  }
+  return hyphenCache.get(name);
+}
+
 /** An Error the content script can act on by its code, whatever language the message is in. */
 const coded = (message, code) => Object.assign(new Error(message), { code });
 
@@ -386,7 +399,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     case "JOBS": sendResponse(updateJobs(sender.tab?.id ?? -1, msg)); return false;
     // the content script runs inside other people's pages: it gets the settings, but not the API key
     // with the words it shows on the page, in the reader's language (it can't read our files itself)
-    case "GET_SETTINGS": reply(getSettings().then(async ({ apiKey, ...rest }) => ({ ...rest, hasKey: !!apiKey, uiLang: langTag(await speak(rest.targetLang)), ui: messagesWithPrefix("content_") }))); return true;
+    // and how to letter the target language (line breaking, hyphenation patterns, upper case)
+    case "GET_SETTINGS": reply(getSettings().then(async ({ apiKey, ...rest }) => ({ ...rest, hasKey: !!apiKey, uiLang: langTag(await speak(rest.targetLang)), ui: messagesWithPrefix("content_"), lettering: letteringFor(rest.targetLang) }))); return true;
+    case "GET_HYPHENATION": reply(hyphenationPatterns(msg.name)); return true;
     case "EDIT_ITEM": reply(editItem(msg)); return true;
     case "FETCH_IMAGE": reply(fetchForReport(msg, sender)); return true;
     case "ADD_GLOSSARY": reply(addGlossary(msg)); return true;

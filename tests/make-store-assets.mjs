@@ -7,7 +7,6 @@ import path from "node:path";
 
 const OUT = process.argv[2] || "../store/assets";
 fs.mkdirSync(OUT, { recursive: true });
-registerFont("../extension/fonts/ComicNeue-Bold.ttf", { family: "Gytakusub Comic", weight: "bold" });
 registerFont("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", { family: "DemoSans", weight: "bold" });
 registerFont("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", { family: "DemoSans", weight: "normal" });
 
@@ -16,8 +15,8 @@ import { cv, detector, analyzePage } from "./cv-node.mjs";
 import { analyze } from "../extension/engine/analyze.js";
 import { layout } from "../extension/engine/layout.js";
 import { erase } from "../extension/engine/erase.js";
-new Function(fs.readFileSync("../extension/vendor/hyphen-en.js", "utf8"))();
-new Function(fs.readFileSync("../extension/text.js", "utf8"))();
+import { loadLettering } from "./lettering-setup.mjs";
+loadLettering();
 const iou = (a, b) => { const ix = Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)), iy = Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y)); const i = ix * iy; return i / (a.w * a.h + b.w * b.h - i); };
 /**
  * A test page through the engine: analysis, layout, erase, lettering. The model's answer is
