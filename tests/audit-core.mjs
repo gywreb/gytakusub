@@ -1,7 +1,7 @@
 // Core-quality audit on real debug reports (2.11.0; the measurements behind the 3.0 plan).
 // For every page: analyse, lay out the report's items, erase, then measure
 //  - items drawn over unerased original text (untagged: placed by box only)
-//  - residual lettering inside each erased bubble (ink left vs ink before)
+//  - marks left by the eraser in each erased area (residue.mjs)
 // and write renders + a crop sheet of the worst bubbles for visual review.
 //   npm run audit -- <report.zip> <outdir>   (reports stay local: they hold the pages)
 import fs from "node:fs";
@@ -11,8 +11,10 @@ import { execFileSync } from "node:child_process";
 import { createCanvas, loadImage } from "canvas";
 import { cv, analyzePage } from "./cv-node.mjs";
 import { layout } from "../extension/engine/layout.js";
-import { erase } from "../extension/engine/erase.js";
+import { erase, fillTexture } from "../extension/engine/erase.js";
+import { getOrt, createSession, run as ortRun } from "../extension/engine/ort.js";
 import { loadLettering } from "./lettering-setup.mjs";
+import { marksLeft } from "./residue.mjs";
 
 const [,, zipPath, out] = process.argv;
 fs.mkdirSync(out, { recursive: true });
@@ -31,7 +33,30 @@ function rematch(an, rep, it) {
   for (const r of an.regions) if (cx >= r.box.x && cy >= r.box.y && cx <= r.box.x + r.box.w && cy <= r.box.y + r.box.h && (!best || r.box.w * r.box.h < best.box.w * best.box.h)) best = r;
   return best ? best.id : null;
 }
-const lum = (d, p) => (d[p * 4] + d[p * 4 + 1] + d[p * 4 + 2]) / 3;
+const clampBox = (b, W, H, pad) => { const x = Math.max(0, Math.round(b.x - pad)), y = Math.max(0, Math.round(b.y - pad)); return { x, y, w: Math.min(W, Math.round(b.x + b.w + pad)) - x, h: Math.min(H, Math.round(b.y + b.h + pad)) - y }; };
+
+// The 2.12 eraser (what finishPage runs) instead of 2.11's Telea, when any of these is set:
+//   GYT_OUTLINE=0.3       grow the mask over lettering outlines by this share of the letter size
+//   GYT_AOT=inpaint.onnx  the learned fill for textured areas (else Telea there); flat areas take their colour
+const NEW = !!(process.env.GYT_AOT || process.env.GYT_OUTLINE);
+const OUTLINE = Number(process.env.GYT_OUTLINE ?? 0.3);
+const loadModel = async (file) => {
+  const ort = getOrt();
+  const { session, ep } = await createSession(new Uint8Array(fs.readFileSync(file)), { gpu: false });
+  return { ort, session, run: ortRun, ep }; // ep "wasm": the CPU's size budget, as in the extension without a GPU
+};
+const aot = process.env.GYT_AOT ? await loadModel(process.env.GYT_AOT) : null;
+let aotMs = 0, aotAreas = 0, fills = { flat: 0, tone: 0, learned: 0, telea: 0 };
+
+async function eraseNew(an, pixels, regionIds) {
+  const res = erase(cv, pixels, an, regionIds, { keepMask: true, outline: OUTLINE });
+  const t0 = Date.now();
+  const image = await fillTexture(cv, aot, res.image, res);
+  aotMs += Date.now() - t0; aotAreas += res.rois.filter((r) => r.fill === "texture").length;
+  for (const r of res.rois) fills[r.fill === "texture" ? r.filled || "telea" : r.fill || "telea"]++;
+  res.mask.delete(); res.surface.delete();
+  return image;
+}
 
 const rows = [];
 const crops = [];
@@ -53,42 +78,31 @@ for (const pg of summary.pages) {
     return { tag: rematch(an, rep, it), box, text: it.text, size: it.size, kind: it.kind, index };
   });
   const { placements, regionIds } = layout(an, items);
-  const clean = erase(cv, pixels, an, regionIds).image;
+  // GYT_ERASED=dir: measure pages erased by an earlier run (its p<id>-erased.png), without erasing again
+  let clean;
+  if (process.env.GYT_ERASED) {
+    const e = await loadImage(path.join(process.env.GYT_ERASED, `p${pg.id}-erased.png`));
+    const ec = createCanvas(W, H), ex = ec.getContext("2d"); ex.drawImage(e, 0, 0);
+    clean = ex.getImageData(0, 0, W, H);
+  } else clean = NEW ? await eraseNew(an, pixels, regionIds) : erase(cv, pixels, an, regionIds).image;
   const after = clean.data;
 
   const untagged = placements.filter((p) => p.tag == null).length;
-  let bubbles = 0, inkBefore = 0, inkAfter = 0, dirty = 0;
+  // marks left in each erased area (residue.mjs): bubbles against their interior, free text
+  // against the page around it. The measure holds on a plain surround only; areas on a textured
+  // one (screentone, art) are counted apart, and fill-truth.mjs measures their fill.
+  let bubbles = 0, dirty = 0, freeDirty = 0, textured = 0;
   for (const r of an.regions) {
-    if (!regionIds.has(r.id) || r.kind !== "bubble") continue;
-    bubbles++;
-    const inside = an.insideOf(r.id);
-    const { x, y, w, h } = r.box;
-    // surface = median lum of interior in the original
-    const vals = [];
-    for (let yy = y; yy < y + h; yy += 2) for (let xx = x; xx < x + w; xx += 2) if (inside(xx, yy)) vals.push(lum(before, yy * W + xx));
-    vals.sort((a, b) => a - b);
-    const surf = vals[vals.length >> 1] ?? 255;
-    // only the lettering's window (detected lines grown by half a letter), away from the outline
-    const e = 3, L = Math.max(4, r.letter || 8);
-    const wins = (r.ref.blocks || []).map((b) => ({ x0: b.gbox.x - L / 2, y0: b.gbox.y - L / 2, x1: b.gbox.x + b.gbox.w + L / 2, y1: b.gbox.y + b.gbox.h + L / 2 }));
-    const inWin = (xx, yy) => wins.some((q) => xx >= q.x0 && xx < q.x1 && yy >= q.y0 && yy < q.y1);
-    let b0 = 0, b1 = 0, area = 0;
-    for (let yy = y + e; yy < y + h - e; yy++) for (let xx = x + e; xx < x + w - e; xx++) {
-      if (!inWin(xx, yy)) continue;
-      if (!(inside(xx, yy) && inside(xx - e, yy) && inside(xx + e, yy) && inside(xx, yy - e) && inside(xx, yy + e))) continue;
-      area++;
-      const p = yy * W + xx;
-      if (Math.abs(lum(before, p) - surf) > 60) b0++;
-      // residue: anything still visibly off the surface, ghosts included
-      if (Math.abs(lum(after, p) - surf) > 35) b1++;
-    }
-    inkBefore += b0; inkAfter += b1;
-    const left = b0 ? b1 / b0 : 0;
-    if (b0 > 30 && left > 0.15) dirty++;
-    crops.push({ page: pg.id, id: r.id, box: r.box, left, b0, b1, area, W, H, before, after, surf });
+    if (!regionIds.has(r.id)) continue;
+    const bubble = r.kind === "bubble";
+    if (bubble) bubbles++;
+    const m = marksLeft(before, after, W, H, r, bubble ? an.insideOf(r.id) : null);
+    if (m?.textured) textured++;
+    else if (m?.dirty) { if (bubble) dirty++; else freeDirty++; }
+    crops.push({ page: pg.id, id: r.id, box: clampBox(r.box, W, H, bubble ? 0 : Math.round(r.letter || 8)), left: m?.lettered && !m.textured ? m.left : 0, W, H, before, after });
   }
   const blocks = [...regionIds].filter((id) => an.regions.find((r) => r.id === id)?.kind !== "bubble").length;
-  rows.push({ page: pg.id, natural: rep.natural, work: [W, H], displayed: rep.displayed, items: items.length, placements: placements.length, untagged, bubbles, dirtyBubbles: dirty, freeText: blocks, inkLeft: inkBefore ? +(inkAfter / inkBefore).toFixed(3) : null });
+  rows.push({ page: pg.id, natural: rep.natural, work: [W, H], displayed: rep.displayed, items: items.length, placements: placements.length, untagged, bubbles, dirtyBubbles: dirty, freeText: blocks, dirtyFree: freeDirty, textured });
 
   // renders: erased only, and final
   const o = createCanvas(W, H), octx = o.getContext("2d"); octx.putImageData(clean, 0, 0);
@@ -99,8 +113,8 @@ for (const pg of summary.pages) {
   an.dispose();
 }
 
-// crop sheet of the 12 worst bubbles (original | erased), 2x
-crops.sort((a, b) => b.left * Math.min(1, b.b0 / 200) - a.left * Math.min(1, a.b0 / 200));
+// crop sheet of the 12 worst areas (original | erased), 2x
+crops.sort((a, b) => b.left - a.left);
 const worst = crops.slice(0, 12);
 const S = 2, pad = 8;
 let sheetW = 0, sheetH = pad;
@@ -111,7 +125,7 @@ if (worst.length) {
   let yy = pad;
   for (const k of worst) {
     sc.fillStyle = "#000"; sc.font = "14px sans-serif";
-    sc.fillText(`page ${k.page} region #${k.id}: ink left ${(k.left * 100).toFixed(0)}% (${k.b1}/${k.b0} px)`, pad, yy + 14);
+    sc.fillText(`page ${k.page} region #${k.id}: marks ${k.left.toFixed(2)}`, pad, yy + 14);
     yy += 20;
     for (const [i, src] of [k.before, k.after].entries()) {
       const id = new ImageData(new Uint8ClampedArray(k.box.w * k.box.h * 4), k.box.w, k.box.h);
@@ -125,6 +139,6 @@ if (worst.length) {
   fs.writeFileSync(path.join(out, `worst-bubbles.png`), sh.toBuffer("image/png"));
 }
 fs.writeFileSync(path.join(out, "audit.json"), JSON.stringify(rows, null, 1));
-const tot = rows.reduce((a, r) => ({ items: a.items + r.items, untagged: a.untagged + r.untagged, bubbles: a.bubbles + r.bubbles, dirty: a.dirty + r.dirtyBubbles, free: a.free + r.freeText }), { items: 0, untagged: 0, bubbles: 0, dirty: 0, free: 0 });
-console.log(JSON.stringify({ report: path.basename(zipPath), site: summary.page, pages: rows.length, ...tot }));
+const tot = rows.reduce((a, r) => ({ items: a.items + r.items, untagged: a.untagged + r.untagged, bubbles: a.bubbles + r.bubbles, dirty: a.dirty + r.dirtyBubbles, free: a.free + r.freeText, freeDirty: a.freeDirty + r.dirtyFree, textured: a.textured + r.textured }), { items: 0, untagged: 0, bubbles: 0, dirty: 0, free: 0, freeDirty: 0, textured: 0 });
+console.log(JSON.stringify({ report: path.basename(zipPath), site: summary.page, pages: rows.length, ...tot, ...(NEW ? { fills, aotMsPerArea: Math.round(aotMs / Math.max(1, aotAreas)) } : {}) }));
 fs.rmSync(tmp, { recursive: true, force: true });
