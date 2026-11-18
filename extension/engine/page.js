@@ -119,6 +119,9 @@ export async function finishPage(job, results, opts = {}) {
   const cache = job.fills || null;
   const canvas = new OffscreenCanvas(work.W, work.H);
   const ctx = canvas.getContext("2d");
+  // ids for regions the layout makes from adopted lettering: after the stamped ones, page-wide
+  let nextId = Math.max(0, ...job.slices.map((s) => s.tagTo || 0)) + 1;
+  const newId = () => nextId++;
   for (const [idx, s] of job.slices.entries()) {
     const an = s.analysis;
     const norm = normalizeItems(results[idx]?.items || [], s, width, height); // tag + box as page fractions
@@ -126,7 +129,7 @@ export async function finishPage(job, results, opts = {}) {
     items.push(...norm);
     // layout wants boxes as fractions of this slice; `index` ties a placement back to its item (edits)
     const local = norm.map((it, k) => ({ ...it, index: first + k, box: it.box ? [((it.box[0] * width) - s.x) / s.w, ((it.box[1] * height) - s.y) / s.h, (it.box[2] * width) / s.w, (it.box[3] * height) / s.h] : null }));
-    const { placements: pl, regionIds } = layout(an, local);
+    const { placements: pl, regionIds } = layout(an, local, { newId });
     for (const p of pl) placements.push({ ...p, rect: { x: p.rect.x + s.ox, y: p.rect.y + s.oy, w: p.rect.w, h: p.rect.h } });
     for (const r of an.regions) regions.push({ id: r.id, kind: r.kind, letter: r.letter, box: { x: r.box.x + s.ox, y: r.box.y + s.oy, w: r.box.w, h: r.box.h } });
     let clean = { image: s.imageData, rois: [] };

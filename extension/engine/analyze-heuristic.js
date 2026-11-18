@@ -151,7 +151,7 @@ export function mergeParagraphs(lines) {
       if (!stacked && !beside) continue;
       const ux0 = Math.min(A.x, B.x), uy0 = Math.min(A.y, B.y), ux1 = Math.max(A.x + A.w, B.x + B.w), uy1 = Math.max(A.y + A.h, B.y + B.h);
       const bx0 = Math.min(a.box.x, b.box.x), by0 = Math.min(a.box.y, b.box.y), bx1 = Math.max(a.box.x + a.box.w, b.box.x + b.box.w), by1 = Math.max(a.box.y + a.box.h, b.box.y + b.box.h);
-      out[i] = { ...a, gbox: { x: ux0, y: uy0, w: ux1 - ux0, h: uy1 - uy0 }, box: { x: bx0, y: by0, w: bx1 - bx0, h: by1 - by0 }, glyphs: a.glyphs.concat(b.glyphs), glyphCount: a.glyphCount + b.glyphCount, components: a.components + b.components, inkArea: a.inkArea + b.inkArea, letter: Math.max(a.letter, b.letter), lines: (a.lines || 1) + (b.lines || 1), lineWidth: (a.lineWidth || a.gbox.w) + (b.lineWidth || b.gbox.w), lineLetters: (a.lineLetters || [a.letter]).concat(b.lineLetters || [b.letter]), parts: (a.parts || [a.gbox]).concat(b.parts || [b.gbox]) };
+      out[i] = { ...a, gbox: { x: ux0, y: uy0, w: ux1 - ux0, h: uy1 - uy0 }, box: { x: bx0, y: by0, w: bx1 - bx0, h: by1 - by0 }, glyphs: a.glyphs.concat(b.glyphs), glyphCount: a.glyphCount + b.glyphCount, components: a.components + b.components, inkArea: a.inkArea + b.inkArea, letter: Math.max(a.letter, b.letter), lines: (a.lines || 1) + (b.lines || 1), lineWidth: (a.lineWidth || a.gbox.w) + (b.lineWidth || b.gbox.w), lineLetters: (a.lineLetters || [a.letter]).concat(b.lineLetters || [b.letter]), parts: (a.parts || [a.gbox]).concat(b.parts || [b.gbox]), lineBoxes: (a.lineBoxes || [a.line || a.gbox]).concat(b.lineBoxes || [b.line || b.gbox]), pieces: Math.max(a.pieces || 1, b.pieces || 1) };
       out.splice(j, 1); merged = true; break outer;
     }
   }
