@@ -8,6 +8,12 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
 
 Clean bubbles. Second step of the 3.0 plan: a robust core before new features.
 
+### Extension
+- **Auto-translate starts on the first load.** A page asked the extension for its settings once; when that answer failed or came too late (the extension's background still starting), the page kept its defaults until reloaded: no auto-translate, and the button's raw label ("content_btn_translate"). It now asks again until it has them, and the background reloads its own words when reading them failed.
+- **A reload doesn't pay for its pages twice.** When a page goes away (reload, next chapter), its pictures not yet sent to Claude are dropped; one already on its way is waited for by the reloaded page instead of asked again.
+- **On the graphics card, pages ask Claude side by side.** Pages off screen were held back while the page on screen was in progress, so a chapter's questions went out one at a time, up to 20 s apart. The hold is for the CPU, where the models block everything else, and now applies only there.
+- **The inpainting model no longer holds the queue while it loads.** In two reports from Windows its load and first run took 19–30 s, during which every page waited, and a page's own answer waited for it too. It now loads beside the queue, only once a page has an area that needs it; the page on screen starts it while its answer is on the way, and only pages that need it wait for it. The debug report records the load and the first run (`fill.model`) and a page's wait for it (`timing.modelWait`).
+
 ### Pages
 - **Pages appear as soon as the translation arrives.** The texture fills below now run while Claude is answering, not after. On an M4 MacBook they had added up to 1.7 s to each page (0.65 s on average on a black-and-white chapter); a page now waits for nothing but the answer. The page comes out exactly the same.
 - **Free text the detector missed or cut short is erased.** When Claude translates a line outside a bubble whose box holds lettering the analysis had set aside (a title too big for dialogue, small print, a line it dropped), that lettering is erased and the translation gets its room. A long caption's box no longer takes the credits beside it. Logos read as a stack of lines and lettering far above dialogue size are left alone. Lettering that can't be erased cleanly (outlined display letters) stays as it was rather than half-erased.
@@ -23,13 +29,14 @@ Clean bubbles. Second step of the 3.0 plan: a robust core before new features.
 - The extension is about 23 MB larger (the inpainting model).
 
 ### Web app
-- The same eraser, with the same fills ahead of the answer. The model is downloaded the first time a page needs it (white bubbles and screentone don't), then cached.
+- The same eraser, with the same fills ahead of the answer. The model is downloaded the first time a page needs it (white bubbles and screentone don't), then cached; as in the extension, it loads beside the pages' work.
 - **Export debug report** (Settings → App): one .zip of the translated pages, with the original images, Claude's answers, the regions, the timings and a render of each. It's the extension's format, so a problem seen on a phone can be replayed. On a phone it opens the share sheet (Save to Files); it holds the page images, so share it privately.
 
 ### Development
+- `tests/browser/startup.mjs` (in `test:browser:extension`): auto-translate when the first settings reads are turned away, pages left in the worker when the reader leaves (never sent), and a reload while a page is with Claude (asked once). 2.12.0 as first built fails the first and the last.
 - `npm run audit -- <report> <out> --rtdetr detector.onnx`: lines whose lettering survives erasing, by comic-translate's text detector as an independent witness; also translations drawn far from their text or shrunk for want of room, and every erased area's marks (`marks.json`) to compare two builds area by area.
 - `tests/freetext.test.mjs`: adopting set-aside lettering, which box gets it, the logo and bubble guards, the stamp rule, and blue and orange lettering erased whole. Added to `test:extension`.
-- `tests/tone.test.mjs` checks that a page filled ahead of the answer comes out identical; the real-browser test checks the fills are done before the answer.
+- `tests/tone.test.mjs` checks that a page filled ahead of the answer comes out identical, also when the inpainting model isn't loaded yet; the real-browser test checks the fills are done before the answer.
 - The debug report's timing adds `wait` (time waiting for the engine), `fill.ready` (areas filled ahead) and `fill.pre`.
 - ADR 0014.
 - `tests/fill-truth.mjs`: the eraser's fill against known backgrounds on real pages (they stay local).

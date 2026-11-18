@@ -14,6 +14,16 @@
 
   /** @type {Map<HTMLImageElement, {status:string, src:string, canvas?:HTMLCanvasElement, hidden:boolean, result?:any, error?:string, objectFit?:string}>} */
   const entries = new Map();
+  // This page's own name for its work in the worker, and a line to it: when the page goes (a reload,
+  // the next chapter) the line drops, and the worker drops this page's pages not yet sent to Claude
+  // instead of translating them for nobody (and making the next page wait behind them).
+  const pageToken = (crypto.randomUUID?.() || String(Math.random()).slice(2));
+  let line = null;
+  const keepLine = () => {
+    if (line) return;
+    try { line = chrome.runtime.connect({ name: "gyt-page:" + pageToken }); line.onDisconnect.addListener(() => { line = null; }); }
+    catch { line = null; } // the extension was reloaded: this script is an orphan, nothing to keep
+  };
   let settings = { enabled: true, autoSites: [], enabledSites: [], uppercase: false, fontFamily: "", excludedSites: "", peekOnHover: false };
   let allHidden = false;
   let hoverImg = null;
@@ -112,11 +122,24 @@
 
   // ---------- settings ----------
 
+  // Nothing shows and nothing starts until the worker has answered with the settings and the words:
+  // a worker that is starting, or busy finishing another page's work, may answer late or not at
+  // all — then the page asks again (0.5 s, 1, 2, 4, 8, then every 10 s) instead of running on
+  // defaults (no words: raw message keys on the buttons; no sites: auto-translate off until a reload).
+  let ready = false, retry = null, tries = 0;
+  let readyWaiters = [];
+  const whenReady = () => (ready ? Promise.resolve() : new Promise((r) => readyWaiters.push(r)));
   async function loadSettings() {
-    try {
-      const s = await chrome.runtime.sendMessage({ type: "GET_SETTINGS" });
-      if (s && !s.error) settings = s;
-    } catch { /* background not ready yet */ }
+    clearTimeout(retry);
+    let s = null;
+    try { s = await chrome.runtime.sendMessage({ type: "GET_SETTINGS" }); } catch { /* the worker is starting or was stopped */ }
+    if (!s || s.error || !s.ui?.content_btn_translate) {
+      retry = setTimeout(loadSettings, tries < 5 ? 500 * 2 ** tries : 10000);
+      tries++;
+      return;
+    }
+    settings = s; tries = 0;
+    if (!ready) { ready = true; readyWaiters.forEach((r) => r()); readyWaiters = []; }
     labelControls();
     ensureHyphenation(); // the target language may have changed
     applyAutoMode();
@@ -126,7 +149,7 @@
 
   const hostname = location.hostname;
   const siteExcluded = () => settings.excludedSites.split(/[\s,]+/).filter(Boolean).some((p) => hostname === p || hostname.endsWith("." + p));
-  const active = () => settings.enabled && !siteExcluded();
+  const active = () => ready && settings.enabled && !siteExcluded();
   const autoOn = () => active() && (settings.autoSites || []).includes(hostname);
 
   // ---------- image discovery ----------
@@ -443,7 +466,7 @@
         update.push({ id: job.id, distance: priorityOf(job.img), onScreen: !document.hidden && onScreen(job.img) });
         if (job.auto && (!job.img.isConnected || !nearScreen(job.img))) cancel.push(job.id);
       }
-      chrome.runtime.sendMessage({ type: "JOBS", update, cancel }).catch(() => {});
+      chrome.runtime.sendMessage({ type: "JOBS", page: pageToken, update, cancel }).catch(() => {});
     }
     if (queue.length) pump();
   }
@@ -518,7 +541,8 @@
     refreshBar();
     try {
       const src = entry.src;
-      const msg = { type: "TRANSLATE", force, jobId: id, distance: priorityOf(img), onScreen: !document.hidden && onScreen(img) };
+      keepLine();
+      const msg = { type: "TRANSLATE", force, page: pageToken, jobId: id, distance: priorityOf(img), onScreen: !document.hidden && onScreen(img) };
       if (/^(blob|data):/i.test(src)) {
         const blob = await (await fetch(src)).blob(); // only the page can read its own blob: URLs
         msg.dataUrl = await blobToDataUrl(blob);
@@ -534,7 +558,7 @@
         try {
           const blob = await (await fetch(src)).blob();
           if (!blob.type.startsWith("image/")) throw new Error("not an image");
-          res = await chrome.runtime.sendMessage({ type: "TRANSLATE", force, jobId: id, distance: priorityOf(img), onScreen: !document.hidden && onScreen(img), dataUrl: await blobToDataUrl(blob) });
+          res = await chrome.runtime.sendMessage({ type: "TRANSLATE", force, page: pageToken, jobId: id, distance: priorityOf(img), onScreen: !document.hidden && onScreen(img), dataUrl: await blobToDataUrl(blob) });
           if (!res) throw new Error("No response from background worker");
         } catch (e2) { console.info("Gytakusub: page-side fetch did not help either", e2?.message || e2); }
       }
@@ -896,7 +920,7 @@
     switch (msg?.type) {
       case "PING": sendResponse({ ok: true }); break;
       case "SETTINGS_CHANGED": loadSettings(); sendResponse({ ok: true }); break;
-      case "TRANSLATE_VISIBLE": translateVisible(!!msg.force); sendResponse({ ok: true }); break;
+      case "TRANSLATE_VISIBLE": whenReady().then(() => translateVisible(!!msg.force)); sendResponse({ ok: true }); break;
       case "TOGGLE_OVERLAYS": allHidden = !allHidden; layout(); refreshBar(); sendResponse({ hidden: allHidden }); break;
       case "EXPORT_REPORT": exportReport([...entries.keys()]).then(sendResponse, (e) => sendResponse({ error: e.message || String(e) })); return true;
       case "DEBUG_REPORT": {

@@ -6,12 +6,12 @@
 
 import { callClaude, mergeContext } from "./prompt.js";
 import { addCall, addPage, emptyLog } from "./usage.js";
-import { preparePage, prefillPage, finishPage } from "./engine/page.js";
+import { preparePage, prefillPage, finishPage, warmInpainter, inpainterWarm } from "./engine/page.js";
 import { DEFAULT_SETTINGS, getSettings, CS_FILES, ensureContentScript } from "./settings.js";
 import { createLane, Cancelled } from "./lane.js";
 import { consentGiven, hasAccess, openWelcome, CONSENT_VERSION } from "./access.js";
 import { sniffImageType, readCapped } from "./imagecheck.js";
-import { t, langTag, messagesWithPrefix } from "./i18n.js";
+import { t, langTag, messagesWithPrefix, localeLoaded } from "./i18n.js";
 import { useLanguageOf } from "./locale.js";
 import { uiLocaleFor, languageForLocale, letteringFor, LANGUAGES } from "./languages.js";
 
@@ -204,29 +204,50 @@ async function fetchImageBlob({ url, dataUrl }, signal = undefined) {
 // The content script numbers its pages and reports how far each is from the middle of the
 // screen and whether it is on screen (TRANSLATE carries the first values, JOBS updates them
 // while the user scrolls). The engine work of all tabs goes through one lane (lane.js),
-// nearest page first. While a page on screen is in progress, pages off screen are held:
-// their model runs would block this worker's one thread for seconds at a time, and the page
-// on screen would wait for its own reply from Claude in between. A page that auto-translate
+// nearest page first. When the models run on the CPU (no WebGPU), pages off screen are held
+// while a page on screen is in progress: their model runs would block this worker's one thread
+// for seconds at a time, and the page on screen would wait for its own reply from Claude in
+// between. On the GPU a model run leaves the thread free and takes a fraction of a second, and
+// holding them would only keep their questions from going to Claude alongside its (a chapter
+// translated one answer at a time, 20 s apart when Claude is slow). A page that auto-translate
 // picked up and the user then scrolled far past is cancelled, but only until Claude is
 // asked: after that its tokens are spent, so it finishes and is cached.
 // The hold lasts at most HOLD_MS from when the page on screen started, so a slow or stuck
 // answer from Claude doesn't stop the pages around it for long.
 const HOLD_MS = 20000;
 const lane = createLane();
-const jobs = new Map(); // "tabId:jobId" → { distance, onScreen, since, ctl: AbortController, asked: boolean }
-const heldFor = (work) => () => !work.onScreen && [...jobs.values()].some((j) => j !== work && j.onScreen && Date.now() - j.since < HOLD_MS);
+const jobs = new Map(); // "tabId:page:jobId" → { distance, onScreen, since, ctl: AbortController, asked: boolean }
+let engineOnCpu = true; // until a page's analysis says where its models ran
+const heldFor = (work) => () => engineOnCpu && !work.onScreen && [...jobs.values()].some((j) => j !== work && j.onScreen && Date.now() - j.since < HOLD_MS);
 
-function updateJobs(tabId, { update = [], cancel = [] } = {}) {
+function updateJobs(tabId, { page = "", update = [], cancel = [] } = {}) {
   for (const u of update) {
-    const j = jobs.get(`${tabId}:${u?.id}`);
+    const j = jobs.get(`${tabId}:${page}:${u?.id}`);
     if (!j) continue;
     if (Number.isFinite(u.distance)) j.distance = u.distance;
     if (typeof u.onScreen === "boolean") j.onScreen = u.onScreen;
   }
-  for (const id of cancel) { const j = jobs.get(`${tabId}:${id}`); if (j && !j.asked) j.ctl.abort(); }
+  for (const id of cancel) { const j = jobs.get(`${tabId}:${page}:${id}`); if (j && !j.asked) j.ctl.abort(); }
   lane.wake();
   return { ok: true };
 }
+
+// A page that goes away (reload, next chapter: its line from the content script drops): its pages
+// not yet sent to Claude are dropped; those already sent are paid for and finish (their answers are
+// cached, for when the reader comes back), but no longer count as on screen or near it.
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.sender?.id !== chrome.runtime.id || !port.name.startsWith("gyt-page:")) return;
+  const prefix = `${port.sender.tab?.id ?? -1}:${port.name.slice("gyt-page:".length)}:`;
+  port.onDisconnect.addListener(() => {
+    for (const [key, j] of jobs) {
+      if (!key.startsWith(prefix)) continue;
+      if (!j.asked) j.ctl.abort();
+      j.onScreen = false; j.distance = Infinity;
+      jobs.delete(key);
+    }
+    lane.wake();
+  });
+});
 
 const disposeJob = (prepared) => { for (const s of prepared?.slices || []) { try { s.analysis?.dispose?.(); } catch { /* already freed */ } } };
 
@@ -239,7 +260,7 @@ async function handleTranslate(msg, sender) {
   if (!(await consentGiven())) throw new Error(t("bg_not_set_up"));
   if (!settings.apiKey) throw new Error(t("bg_no_key"));
   const tabId = sender.tab?.id ?? -1;
-  const jobKey = msg.jobId != null ? `${tabId}:${msg.jobId}` : null;
+  const jobKey = msg.jobId != null ? `${tabId}:${msg.page ?? ""}:${msg.jobId}` : null;
   const work = { distance: Number.isFinite(msg.distance) ? msg.distance : 0, onScreen: msg.onScreen === true, since: Date.now(), ctl: new AbortController(), asked: false };
   let holdEnds = null;
   if (jobKey) { jobs.set(jobKey, work); lane.wake(); holdEnds = setTimeout(() => lane.wake(), HOLD_MS + 50); }
@@ -266,6 +287,7 @@ async function translatePage(msg, settings, tabId, work) {
   let asked = performance.now();
   timing.wait = 0;
   const job = await lane.run((checkpoint) => { timing.wait += Math.round(performance.now() - asked); return decode(blob, checkpoint); }, priority, signal, held); lap("analyze");
+  engineOnCpu = !/detect:webgpu/.test(job.slices?.[0]?.analysis?.backend || "");
   // the page at its own size again (when it was analysed smaller), so the erased areas come back
   // with its own resolution: made once, for the prefill and the finish
   const natural = job.scale < 0.999 ? await createImageBitmap(blob).catch(() => null) : null;
@@ -278,6 +300,31 @@ async function translatePage(msg, settings, tabId, work) {
 // would have spent idle (lower runs sooner; pages are ranked by their distance from the screen).
 const PREFILL_RANK = 1e9;
 
+// Answers on their way, by cache key (see answerPage).
+const answering = new Map();
+
+/** Claude's answer for the page's slices: the results, the tokens, the new terms; cached. */
+async function askClaude(settings, job, tabId, cacheKey) {
+  const ctx = await getTabCtx(tabId);
+  const call = (slice) => callClaude(settings, slice, ctx).then((r) => { recordUsage(r); return r; });
+  const withRetry = async (slice) => {
+    try { return await call(slice); }
+    catch (e) {
+      // a busy moment is worth one more try; a spent budget is not
+      if (/Claude API (429|529|503)/.test(e.message) && !/spend (cap|limit)/i.test(e.message)) { await new Promise((r) => setTimeout(r, 2500)); return call(slice); }
+      throw e;
+    }
+  };
+  const raw = await Promise.all(job.slices.map(withRetry));
+  recordPage(raw);
+  const results = raw.map((r) => ({ items: r.items }));
+  const usage = { input_tokens: 0, output_tokens: 0 }, newTerms = [];
+  for (const r of raw) { newTerms.push(...r.terms); if (r.usage) { usage.input_tokens += r.usage.input_tokens || 0; usage.output_tokens += r.usage.output_tokens || 0; } }
+  try { await chrome.storage.session.set({ [cacheKey]: { results, usage } }); }
+  catch (e) { console.warn("Gytakusub: cache write failed", e); }
+  return { results, usage, newTerms };
+}
+
 async function answerPage(msg, settings, tabId, work, { job, natural, cached, cacheKey, timing, lap, priority, held }) {
   const { signal } = work.ctl;
   let results, usage, newTerms = [];
@@ -288,28 +335,35 @@ async function answerPage(msg, settings, tabId, work, { job, natural, cached, ca
     work.asked = true; // from here the page is paid for: it finishes even if the user scrolls away
     // While Claude answers (seconds), the engine fills this page's textured areas ahead
     // (engine/page.js prefillPage), so the finish finds them done; it stops at its next area
-    // once the answer is in, and never delays another page's analysis or finish.
+    // once the answer is in. A page off screen does this only in time the engine would have spent
+    // idle; a page on screen at its own rank, since the reader is looking at it.
+    // Areas that need the learned fill's model before it is loaded are left for a second pass: the
+    // model loads beside the lane (engine/page.js warmInpainter), never inside it, and only once a
+    // page has such an area (so the page on screen starts it while its answer is on the way).
     const pre = new AbortController();
-    const prefilled = lane.run((checkpoint) => prefillPage(job, { natural, checkpoint }), () => priority() + PREFILL_RANK, pre.signal, held).catch(() => {});
+    const rank = () => priority() + (work.onScreen ? 0 : PREFILL_RANK);
+    const pass = () => lane.run((checkpoint) => prefillPage(job, { natural, checkpoint }), rank, pre.signal, held);
+    const prefilled = (async () => {
+      const { later } = await pass();
+      if (!later) return;
+      await Promise.race([warmInpainter(), new Promise((r) => pre.signal.addEventListener("abort", r, { once: true }))]);
+      if (!pre.signal.aborted) await pass();
+    })().catch(() => {});
     let failed = null;
     try {
-      const ctx = await getTabCtx(tabId);
-      const call = (slice) => callClaude(settings, slice, ctx).then((r) => { recordUsage(r); return r; });
-      const withRetry = async (slice) => {
-        try { return await call(slice); }
-        catch (e) {
-          // a busy moment is worth one more try; a spent budget is not
-          if (/Claude API (429|529|503)/.test(e.message) && !/spend (cap|limit)/i.test(e.message)) { await new Promise((r) => setTimeout(r, 2500)); return call(slice); }
-          throw e;
-        }
-      };
-      const raw = await Promise.all(job.slices.map(withRetry));
-      recordPage(raw);
-      results = raw.map((r) => ({ items: r.items }));
-      usage = { input_tokens: 0, output_tokens: 0 };
-      for (const r of raw) { newTerms.push(...r.terms); if (r.usage) { usage.input_tokens += r.usage.input_tokens || 0; usage.output_tokens += r.usage.output_tokens || 0; } }
-      try { await chrome.storage.session.set({ [cacheKey]: { results, usage } }); }
-      catch (e) { console.warn("Gytakusub: cache write failed", e); }
+      // the same page already on its way to Claude (the reader reloaded, or opened it twice): wait
+      // for that answer rather than pay for a second
+      // (or already answered while this one was being analysed: the cache was read before that)
+      const shared = !msg.force && answering.get(cacheKey);
+      const meanwhile = !msg.force && !shared ? (await chrome.storage.session.get(cacheKey).catch(() => ({})))[cacheKey] : null;
+      if (shared) ({ results, usage } = await shared);
+      else if (meanwhile) ({ results, usage } = meanwhile);
+      else {
+        const asking = askClaude(settings, job, tabId, cacheKey);
+        answering.set(cacheKey, asking);
+        try { ({ results, usage, newTerms } = await asking); }
+        finally { if (answering.get(cacheKey) === asking) answering.delete(cacheKey); }
+      }
     } catch (e) { failed = e; }
     finally { pre.abort(); await prefilled; } // (stopped before the analyses are used or freed)
     if (failed) { disposeJob(job); throw failed; }
@@ -320,6 +374,13 @@ async function answerPage(msg, settings, tabId, work, { job, natural, cached, ca
   // screen then waits at most for one model run of another page's analysis (that one hands
   // over at its next checkpoint), and nothing of it is left to wait behind the next page's
   // analysis, whose model runs hold the worker's one thread for seconds at a time.
+  // The learned fill's model, when this page needs it and it isn't loaded yet: waited for here,
+  // outside the lane. (Which areas need it, if no prefill got through them: they're filled now,
+  // the others with them, and the finish finds them done.)
+  if (!inpainterWarm()) {
+    if (job.later == null) { const a = performance.now(); await lane.run((checkpoint) => { timing.wait += Math.round(performance.now() - a); return prefillPage(job, { natural, checkpoint }); }, priority, undefined, held); }
+    if (job.later > 0) { const w0 = performance.now(); await warmInpainter(); timing.modelWait = Math.round(performance.now() - w0); }
+  }
   const asked = performance.now();
   const { page, patches, cleanDataUrl } = await lane.run(async () => {
     timing.wait += Math.round(performance.now() - asked);
@@ -400,7 +461,8 @@ async function fetchForReport(msg, sender) {
 // language like every page does; the messages are loaded again only when that language changes.
 let workerLocale = null;
 async function speak(targetLang) {
-  if (uiLocaleFor(targetLang) !== workerLocale) workerLocale = await useLanguageOf(targetLang);
+  // (and again when the last read failed: the words must not stay missing for the worker's life)
+  if (uiLocaleFor(targetLang) !== workerLocale || !localeLoaded()) workerLocale = await useLanguageOf(targetLang);
   return workerLocale;
 }
 // Hyphenation patterns for the page script, which can't read our files from inside someone

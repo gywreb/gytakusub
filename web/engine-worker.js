@@ -1,6 +1,6 @@
 // Gytakusub Web – the page engine (OpenCV analysis, erase, layout) runs here,
 // off the main thread. Same engine modules as the extension's service worker.
-import { preparePage, prefillPage, finishPage } from "./engine/page.js";
+import { preparePage, prefillPage, finishPage, warmInpainter, inpainterWarm } from "./engine/page.js";
 
 const jobs = new Map();
 let seq = 0;
@@ -27,11 +27,19 @@ self.onmessage = async (e) => {
       if (!job) { e.data.natural?.close(); self.postMessage({ id, ok: true }); return; }
       job.natural = e.data.natural || null;
       job.stop = false;
+      const stopped = new Promise((r) => { job.onStop = r; });
       const checkpoint = async () => {
         while (busy && !job.stop) await new Promise((r) => setTimeout(r, 25));
         if (job.stop) throw new Error("stopped");
       };
-      job.prefilling = prefillPage(job, { natural: job.natural, checkpoint }).catch(() => {});
+      // areas that need the learned fill's model before it is loaded: a second pass, once it is
+      // (it loads beside the pages' work, engine/page.js warmInpainter)
+      job.prefilling = (async () => {
+        const { later } = await prefillPage(job, { natural: job.natural, checkpoint });
+        if (!later) return;
+        await Promise.race([warmInpainter(), stopped]);
+        if (!job.stop) await prefillPage(job, { natural: job.natural, checkpoint });
+      })().catch(() => {});
       await job.prefilling;
       self.postMessage({ id, ok: true });
     } else if (type === "finish") {
@@ -41,11 +49,20 @@ self.onmessage = async (e) => {
       // the page at its own size again (when it was downscaled for the analysis): the erased
       // areas come back at full resolution, as patches over the original
       const natural = e.data.natural || job.natural || null;
-      let page;
-      try { page = await finishPage(job, e.data.results, { natural }); } finally { natural?.close(); }
+      let page, modelWait = null;
+      try {
+        // the learned fill's model, when this page needs it and it isn't loaded yet: waited for
+        // without holding the other pages' prefills (which areas need it, if no prefill got through
+        // them: they're filled now, the others with them)
+        if (!inpainterWarm()) {
+          if (job.later == null) await prefillPage(job, { natural });
+          if (job.later > 0) { const w0 = performance.now(); busy--; try { await warmInpainter(); } finally { busy++; } modelWait = Math.round(performance.now() - w0); }
+        }
+        page = await finishPage(job, e.data.results, { natural });
+      } finally { natural?.close(); }
       const patches = page.patches.map((p) => ({ x: p.x, y: p.y, w: p.w, h: p.h, bitmap: p.canvas.transferToImageBitmap() }));
       // (and what the debug report records: which engine, where the models ran, their times, how the areas were filled)
-      self.postMessage({ id, ok: true, items: page.items, placements: page.placements, regions: page.regions, work: page.work, letter: page.letter, patches, engine: page.engine, backend: page.backend, detectMs: page.detectMs, segmentMs: page.segmentMs, fill: page.fill }, patches.map((p) => p.bitmap));
+      self.postMessage({ id, ok: true, items: page.items, placements: page.placements, regions: page.regions, work: page.work, letter: page.letter, patches, engine: page.engine, backend: page.backend, detectMs: page.detectMs, segmentMs: page.segmentMs, fill: page.fill, modelWait }, patches.map((p) => p.bitmap));
     } else if (type === "drop") {
       const job = jobs.get(e.data.jobId); jobs.delete(e.data.jobId);
       if (job) { await stopPrefill(job); for (const s of job.slices) s.analysis.dispose(); job.natural?.close(); }
@@ -58,6 +75,6 @@ self.onmessage = async (e) => {
 
 /** Stops a page's prefill at its next area and waits for it (before its analyses are used or freed). */
 async function stopPrefill(job) {
-  job.stop = true;
+  job.stop = true; job.onStop?.();
   await job.prefilling;
 }

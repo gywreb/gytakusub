@@ -10,7 +10,7 @@ import path from "node:path";
 import { createCanvas, loadImage } from "canvas";
 import { cv, analyzePage } from "./cv-node.mjs";
 import { layout } from "../extension/engine/layout.js";
-import { erase, fillTexture } from "../extension/engine/erase.js";
+import { erase, fillTexture, NotLoaded } from "../extension/engine/erase.js";
 import { OUTLINE } from "../extension/engine/page.js";
 import { getOrt, createSession, run } from "../extension/engine/ort.js";
 import { marksLeft } from "./residue.mjs";
@@ -72,12 +72,13 @@ test("2.12: the white bubble is filled flat, with its own white", () => {
 // cache while the translation is on the way; the finish then reuses what matches. It must only save
 // time: the page comes out exactly as without it, when every region got a translation and when one
 // did not (its neighbours' inputs may then differ, and those areas are filled again).
-const fillWith = async (ids, cache) => {
+const fillWith = async (ids, cache, m = model) => {
   const e = erase(cv, new ImageData(new Uint8ClampedArray(before), W, H), an, ids, { keepMask: true, outline: OUTLINE });
-  const im = await fillTexture(cv, model, e.image, e, { cache });
+  const im = await fillTexture(cv, m, e.image, e, { cache });
   const hits = e.rois.filter((r) => r.fillHit).length, textured = e.rois.filter((r) => r.fill === "texture").length;
+  const later = e.rois.filter((r) => r.filled === "later").length, kinds = e.rois.map((r) => r.filled).filter(Boolean);
   e.mask.delete(); e.surface.delete();
-  return { im, hits, textured };
+  return { im, hits, textured, later, kinds };
 };
 const same = (a, b) => a.data.length === b.data.length && a.data.every((v, i) => v === b.data[i]);
 for (const [label, ids] of [["every region translated", regionIds], ["one region left out", new Set([...regionIds].slice(1))]]) {
@@ -88,6 +89,24 @@ for (const [label, ids] of [["every region translated", regionIds], ["one region
   test(`prefill, ${label}: the same page, and the areas found filled (${fin.hits} of ${fin.textured})`, () => {
     assert.ok(same(plain.im, fin.im), "the page differs from the one filled without the prefill");
     assert.ok(fin.hits > 0, "no area was reused");
+  });
+}
+
+// The model not loaded yet when the prefill runs (it loads beside the queue, engine/page.js warmInpainter):
+// the areas that need it are left for a second pass, the others filled at once; the same page again.
+{
+  const all = new Set(an.regions.map((r) => r.id));
+  const plain = await fillWith(regionIds, null);
+  const cache = new Map();
+  const first = await fillWith(all, cache, () => { throw new NotLoaded(); });
+  await fillWith(all, cache); // once it is loaded
+  const fin = await fillWith(regionIds, cache);
+  test(`prefill before the model is loaded: ${first.later} area(s) left for later, ${first.kinds.filter((k) => k === "tone").length} screentone filled at once; the same page`, () => {
+    assert.ok(first.later > 0, "no area needed the model: " + first.kinds.join(","));
+    assert.ok(first.kinds.includes("tone"), "the screentone was not filled in the first pass: " + first.kinds.join(","));
+    assert.ok(!first.kinds.includes("learned") && !first.kinds.includes("telea"), first.kinds.join(","));
+    assert.equal(fin.hits, fin.textured);
+    assert.ok(same(plain.im, fin.im), "the page differs from the one filled without the prefill");
   });
 }
 

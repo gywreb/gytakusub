@@ -8,7 +8,8 @@ import { analyze } from "./analyze.js";
 import { segment } from "./segment.js";
 import { detectText, detectInEmptyBubbles, detectInDarkShapes } from "./detect.js";
 import { layout } from "./layout.js";
-import { erase, eraseFullSize, fillTexture, contextMargin } from "./erase.js";
+import { erase, eraseFullSize, fillTexture, contextMargin, NotLoaded } from "./erase.js";
+import { aotInpaint } from "./inpaint.js";
 
 // How far the mask grows over a lettering's outline, as a share of its letter size (ADR 0013).
 export const OUTLINE = 0.3;
@@ -168,9 +169,42 @@ export async function finishPage(job, results, opts = {}) {
   const backend = job.slices[0]?.analysis.backend || null;
   if (fill.learned) fill.ep = (await getInpainter())?.ep || null; // where the learned fill ran: webgpu / wasm
   if (job.prefillMs != null) fill.pre = job.prefillMs; // the time prefillPage() spent while the translation was on the way
+  if (inpainterTimes.load != null) fill.model = { ...inpainterTimes }; // its load and first run, once per worker
   job.fills = null;
   return { items, placements, regions, work, letter, canvas, patches, fullSize: full, engine, segmentMs, detectMs, backend, fill };
 }
+
+/**
+ * The learned inpainter, loaded and run once on a small area. Callers start this once a page has
+ * an area that needs it (prefillPage counts them) and await it outside any queue they share:
+ * loading and the first run can take many seconds, and a page that waits for them must not hold
+ * the others up. Its times go into the debug report.
+ * @returns {Promise<object|null>} the model, or null without one
+ */
+export function warmInpainter() {
+  if (!warming) {
+    warming = (async () => {
+      const t0 = performance.now();
+      const model = await getInpainter();
+      inpainterTimes.load = Math.round(performance.now() - t0);
+      if (!model) return null;
+      try {
+        const cv = await getCV(), t1 = performance.now();
+        const rgb = new cv.Mat(72, 72, cv.CV_8UC3, new cv.Scalar(200, 200, 200)), hole = cv.Mat.zeros(72, 72, cv.CV_8UC1);
+        cv.rectangle(hole, new cv.Point(24, 24), new cv.Point(48, 48), new cv.Scalar(255), -1);
+        (await aotInpaint(cv, model, rgb, hole)).delete(); rgb.delete(); hole.delete();
+        inpainterTimes.warm = Math.round(performance.now() - t1);
+      } catch (e) { console.warn("Gytakusub: inpainter warm-up failed", e); }
+      return model;
+    })().then((model) => { warmed = { model }; return model; });
+  }
+  return warming;
+}
+let warming = null, warmed = null;
+/** Whether warmInpainter() is done (no page then waits for the model). */
+export const inpainterWarm = () => !!warmed;
+/** How long the inpainter took to load and to run first (ms; null until it has). */
+export const inpainterTimes = { load: null, warm: null };
 
 /**
  * Fills a page's textured areas ahead of its translation, while the caller waits for Claude
@@ -181,16 +215,22 @@ export async function finishPage(job, results, opts = {}) {
  * rest itself; its result is the same with or without this step, only sooner.
  * The caller must let this return (or throw from `checkpoint`) before calling finishPage(),
  * which frees the analyses.
+ * An area that needs the learned inpainter before warmInpainter() has it ready is left for later
+ * (the load must not happen inside the caller's queue): the count of those is returned, and kept
+ * in `job.later` once a pass got through every area. Called again once the model is ready, a pass
+ * fills just those (the others are found in the cache).
  * @param {Job} job from preparePage
  * @param {{natural?: ImageBitmap, checkpoint?: () => Promise<void>}} [opts] natural: as for
  *   finishPage (the same bitmap); checkpoint: awaited before each area, throws to stop
+ * @returns {Promise<{later: number}>}
  */
 export async function prefillPage(job, opts = {}) {
   const t0 = performance.now();
   const cv = await getCV();
   const full = !!opts.natural && job.scale < 0.999;
   const cache = job.fills || (job.fills = new Map());
-  const inpainter = () => getInpainter();
+  const inpainter = () => { if (!warmed) throw new NotLoaded(); return warmed.model; };
+  let later = 0;
   // the time spent filling, not waiting at checkpoints for other pages
   let waited = 0;
   const checkpoint = opts.checkpoint ? async () => { const w = performance.now(); try { await opts.checkpoint(); } finally { waited += performance.now() - w; } } : null;
@@ -200,17 +240,22 @@ export async function prefillPage(job, opts = {}) {
       if (!an.regions.length) continue;
       const clean = erase(cv, s.imageData, an, new Set(an.regions.map((r) => r.id)), { keepMask: true, outline: OUTLINE });
       try {
-        if (!full) await fillTexture(cv, inpainter, clean.image, clean, { cache, checkpoint });
-        else {
+        if (!full) {
+          await fillTexture(cv, inpainter, clean.image, clean, { cache, checkpoint });
+          later += clean.rois.filter((r) => r.filled === "later").length;
+        } else {
           for (const r of clean.rois) {
             if (r.fill !== "texture") continue;
             if (checkpoint) await checkpoint();
-            await fullSizePatch(cv, opts.natural, s, job.scale, clean.mask, r, inpainter, clean.surface, cache);
+            try { await fullSizePatch(cv, opts.natural, s, job.scale, clean.mask, r, inpainter, clean.surface, cache); }
+            catch (e) { if (!(e instanceof NotLoaded)) throw e; later++; }
           }
         }
       } finally { clean.mask?.delete(); clean.surface?.delete(); }
     }
-  } finally { job.prefillMs = Math.round(performance.now() - t0 - waited); }
+    job.later = later;
+    return { later };
+  } finally { job.prefillMs = (job.prefillMs || 0) + Math.round(performance.now() - t0 - waited); }
 }
 
 /**

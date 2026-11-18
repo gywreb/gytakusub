@@ -97,6 +97,7 @@ export async function translateImage(img, settings, ctx = { terms: [], recent: [
   if (fin.segmentMs) timing.segment = fin.segmentMs;
   if (fin.backend) timing.backend = fin.backend;
   if (fin.fill) timing.fill = fin.fill;
+  if (fin.modelWait != null) timing.modelWait = fin.modelWait; // (waiting for the learned fill's model to load)
   return { items: fin.items, placements: fin.placements, regions: fin.regions, work: fin.work, letter: fin.letter, patches: fin.patches, width: prep.width, height: prep.height, usage, engine: fin.engine, timing, ctx: mergeContext(ctx, terms, fin.items.map((i) => i.text)) };
 }
 

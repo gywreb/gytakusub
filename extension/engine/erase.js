@@ -411,7 +411,12 @@ export async function eraseFullSize(cv, natural, nx, ny, mask, scale, ox, oy, ar
   cv.cvtColor(src, rgb, cv.COLOR_RGBA2RGB);
   let done = null;
   if (area.fill === "flat" && area.color) { done = rgb.clone(); done.setTo(new cv.Scalar(area.color[0], area.color[1], area.color[2]), m); }
-  else if (area.fill === "texture") { const f = await fillArea(cv, model, rgb, m, on, { margin: Math.ceil(2 / scale), cache }); done = f.mat; area.filled = f.kind; area.fillMs = f.ms; area.fillHit = !!f.hit; }
+  else if (area.fill === "texture") {
+    let f;
+    try { f = await fillArea(cv, model, rgb, m, on, { margin: Math.ceil(2 / scale), cache }); }
+    catch (e) { src.delete(); rgb.delete(); out.delete(); m.delete(); on?.delete(); throw e; } // (NotLoaded: the caller leaves it for later)
+    done = f.mat; area.filled = f.kind; area.fillMs = f.ms; area.fillHit = !!f.hit;
+  }
   if (!done) { done = new cv.Mat(); cv.inpaint(rgb, m, done, Math.max(3, Math.round((area.radius || 3) / scale)), cv.INPAINT_TELEA); }
   cv.cvtColor(done, out, cv.COLOR_RGB2RGBA);
   const result = new ImageData(new Uint8ClampedArray(out.data), W, H);
@@ -428,6 +433,13 @@ export async function eraseFullSize(cv, natural, nx, ny, mask, scale, ox, oy, ar
  * only ever save time, never change a result.
  * @returns {Promise<{mat: any|null, kind: "tone"|"learned"|"telea", ms: number, hit?: boolean}>} ms: the time it took
  */
+/**
+ * Thrown by a model function (see fillArea) whose model isn't loaded yet, for a caller that
+ * would rather leave the area for later than wait for the load (prefillPage). fillTexture() then
+ * skips that area (`filled: "later"`, nothing cached) and goes on with the next.
+ */
+export class NotLoaded extends Error {}
+
 export async function fillArea(cv, model, rgb, hole, source, opts = {}) {
   const t0 = performance.now(), ms = () => Math.round(performance.now() - t0);
   const key = opts.cache ? fillKey(rgb, hole, source, opts.margin) : null;
@@ -470,7 +482,8 @@ export function fillKey(rgb, hole, source, margin = 0) {
  * own size, and the work copy): fillArea() on each, with some of the page around it, which both
  * fills need to continue the texture. Changes only masked pixels of `img`; notes on each area
  * how it was filled (`filled`) and how long that took (`fillMs`).
- * @param {any} model the learned inpainter (or a function resolving to it), or null (screentone fill, else Telea)
+ * @param {any} model the learned inpainter (or a function resolving to it, or throwing NotLoaded to
+ *   leave the areas that need it for later), or null (screentone fill, else Telea)
  * @param {{rois: any[], mask: any, surface?: any}} erased erase()'s answer with keepMask
  * @param {{cache?: Map<string, object>, checkpoint?: () => Promise<void>}} [opts] cache: see fillArea;
  *   checkpoint: awaited before each area (it throws to stop)
@@ -488,12 +501,16 @@ export async function fillTexture(cv, model, img, erased, opts = {}) {
     const view = rgb.roi(rect), crop = view.clone(), hole = erased.mask.roi(rect).clone(); // continuous copies
     let on = null;
     if (erased.surface && r.label) { on = erased.surface.roi(rect).clone(); const od = on.data; for (let i = 0; i < od.length; i++) od[i] = od[i] === r.label ? 255 : 0; }
-    if (cv.countNonZero(hole)) {
-      const f = await fillArea(cv, model, crop, hole, on, { cache: opts.cache });
-      r.filled = f.kind; r.fillMs = f.ms; r.fillHit = !!f.hit;
-      if (f.mat) { f.mat.copyTo(view); f.mat.delete(); }
-    }
-    view.delete(); crop.delete(); hole.delete(); on?.delete();
+    try {
+      if (cv.countNonZero(hole)) {
+        const f = await fillArea(cv, model, crop, hole, on, { cache: opts.cache });
+        r.filled = f.kind; r.fillMs = f.ms; r.fillHit = !!f.hit;
+        if (f.mat) { f.mat.copyTo(view); f.mat.delete(); }
+      }
+    } catch (e) {
+      if (!(e instanceof NotLoaded)) throw e;
+      r.filled = "later";
+    } finally { view.delete(); crop.delete(); hole.delete(); on?.delete(); }
   }
   const out = new cv.Mat(); cv.cvtColor(rgb, out, cv.COLOR_RGB2RGBA);
   const result = new ImageData(new Uint8ClampedArray(out.data), W, H);
