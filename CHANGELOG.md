@@ -9,6 +9,11 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
 Clean bubbles. Second step of the 3.0 plan: a robust core before new features.
 
 ### Pages
+- **Pages appear as soon as the translation arrives.** The texture fills below now run while Claude is answering, not after. On an M4 MacBook they had added up to 1.7 s to each page (0.65 s on average on a black-and-white chapter); a page now waits for nothing but the answer. The page comes out exactly the same.
+- **Free text the detector missed or cut short is erased.** When Claude translates a line outside a bubble whose box holds lettering the analysis had set aside (a title too big for dialogue, small print, a line it dropped), that lettering is erased and the translation gets its room. A long caption's box no longer takes the credits beside it. Logos read as a stack of lines and lettering far above dialogue size are left alone. Lettering that can't be erased cleanly (outlined display letters) stays as it was rather than half-erased.
+- **Coloured lettering is erased whole.** Blue, orange and pink letters, in bubbles and on plain backgrounds, were found by their dark parts only, so most of each letter stayed. They are now read by colour against the plain surround. Screentone and art still use the old masks.
+- **A loose box no longer pulls a line out of its own region.** A line moves to another region only when its box lies mostly on that region and little on its own.
+- On seven chapters (they stay local), lines whose Japanese an independent detector still finds after erasing: 66 → 33 of 780; on a colour chapter 18 → 2. Marks left in bubbles: 16 → 6. Every erased area was compared with 2.12.0: none worse, 19 better, 13 newly erased (each checked by eye).
 - **No more white clouds on toned bubbles.** The eraser now covers the white outline round lettering, which it used to leave behind and smear over the tone.
 - **Screentone is continued dot for dot.** Where a bubble or a panel is screentone, the eraser measures its pattern and copies it into the hole in step with the dots around it. It only does this when the pattern really predicts the surrounding tone; otherwise the next fill takes over.
 - **Art and irregular tone are filled by a manga-trained inpainting model** (AOT-GAN), on the graphics card when there is one. On 150 stretches of real pages with lettering drawn over them, the fill came out closer to what was really there in 142 (SSIM 0.45 → 0.62).
@@ -21,6 +26,11 @@ Clean bubbles. Second step of the 3.0 plan: a robust core before new features.
 - The same eraser. The model is downloaded the first time a page needs it (white bubbles and screentone don't), then cached.
 
 ### Development
+- `npm run audit -- <report> <out> --rtdetr detector.onnx`: lines whose lettering survives erasing, by comic-translate's text detector as an independent witness; also translations drawn far from their text or shrunk for want of room, and every erased area's marks (`marks.json`) to compare two builds area by area.
+- `tests/freetext.test.mjs`: adopting set-aside lettering, which box gets it, the logo and bubble guards, the stamp rule, and blue and orange lettering erased whole. Added to `test:extension`.
+- `tests/tone.test.mjs` checks that a page filled ahead of the answer comes out identical; the real-browser test checks the fills are done before the answer.
+- The debug report's timing adds `wait` (time waiting for the engine), `fill.ready` (areas filled ahead) and `fill.pre`.
+- ADR 0014.
 - `tests/fill-truth.mjs`: the eraser's fill against known backgrounds on real pages (they stay local).
 - `tests/lattice.test.mjs` (the screentone fill), `tests/inpaint.test.mjs` (the learned fill), `tests/tone.test.mjs` (a synthetic page with toned and gradient bubbles and narration on screentone, 2.11 vs 2.12). Added to `test:extension` with a check of the vendored model against its record.
 - `tests/residue.mjs`, the marks-left measure behind `npm run audit`: four faults fixed, and areas on a textured surround counted apart, since there it misjudges both ways. See ADR 0013.
