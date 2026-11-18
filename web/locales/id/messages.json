@@ -311,6 +311,9 @@
  "web_btnShowInstall": {
   "message": "Pasang di ponsel atau komputer"
  },
+ "web_report_hint": {
+  "message": "Untuk halaman yang hasilnya salah: satu .zip berisi halaman yang diterjemahkan, gambar aslinya, jawaban Claude, dan waktunya. Bagikan secara pribadi: berisi gambar halaman."
+ },
  "web_free_software_under_the_gnu": {
   "message": "Perangkat lunak bebas di bawah <a href=\"LICENSE\" target=\"_blank\">GNU AGPL v3</a> · <a href=\"https://github.com/gywreb/gytakusub\" target=\"_blank\" rel=\"noopener\">kode sumber</a> · <a href=\"THIRD_PARTY.md\" target=\"_blank\">komponen pihak ketiga</a>"
  },

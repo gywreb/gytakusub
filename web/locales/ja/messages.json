@@ -311,6 +311,9 @@
  "web_btnShowInstall": {
   "message": "スマートフォンやコンピュータにインストール"
  },
+ "web_report_hint": {
+  "message": "うまく翻訳されなかったページのために：翻訳済みのページ、元の画像、Claude の回答、処理時間をまとめた .zip です。ページの画像が含まれるため、共有は非公開で。"
+ },
  "web_free_software_under_the_gnu": {
   "message": "<a href=\"LICENSE\" target=\"_blank\">GNU AGPL v3</a> のフリーソフトウェア · <a href=\"https://github.com/gywreb/gytakusub\" target=\"_blank\" rel=\"noopener\">ソースコード</a> · <a href=\"THIRD_PARTY.md\" target=\"_blank\">サードパーティのコンポーネント</a>"
  },

@@ -311,6 +311,9 @@
  "web_btnShowInstall": {
   "message": "휴대폰이나 컴퓨터에 설치"
  },
+ "web_report_hint": {
+  "message": "잘못 번역된 페이지가 있을 때: 번역된 페이지, 원본 이미지, Claude의 답변, 처리 시간을 담은 .zip 파일입니다. 페이지 이미지가 들어 있으니 비공개로만 공유하세요."
+ },
  "web_free_software_under_the_gnu": {
   "message": "<a href=\"LICENSE\" target=\"_blank\">GNU AGPL v3</a>에 따른 자유 소프트웨어 · <a href=\"https://github.com/gywreb/gytakusub\" target=\"_blank\" rel=\"noopener\">소스 코드</a> · <a href=\"THIRD_PARTY.md\" target=\"_blank\">서드파티 구성 요소</a>"
  },

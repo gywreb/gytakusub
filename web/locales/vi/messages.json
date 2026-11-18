@@ -311,6 +311,9 @@
  "web_btnShowInstall": {
   "message": "Cài đặt lên điện thoại hoặc máy tính"
  },
+ "web_report_hint": {
+  "message": "Khi một trang dịch bị lỗi: một tệp .zip gồm các trang đã dịch, ảnh gốc, câu trả lời của Claude và thời gian xử lý. Chỉ chia sẻ riêng: tệp có chứa ảnh của trang."
+ },
  "web_free_software_under_the_gnu": {
   "message": "Phần mềm tự do theo giấy phép <a href=\"LICENSE\" target=\"_blank\">GNU AGPL v3</a> · <a href=\"https://github.com/gywreb/gytakusub\" target=\"_blank\" rel=\"noopener\">mã nguồn</a> · <a href=\"THIRD_PARTY.md\" target=\"_blank\">thành phần bên thứ ba</a>"
  },

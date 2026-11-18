@@ -18,4 +18,7 @@ for (const dir of ["engine", "vendor", "fonts", "_locales"]) {
 }
 fs.mkdirSync(web("icons"), { recursive: true });
 for (const f of fs.readdirSync(ext("icons"))) if (/^icon.*\.png$/.test(f)) fs.copyFileSync(ext(path.join("icons", f)), web(path.join("icons", f)));
+// the app's version, from the extension's manifest (one version for both): the debug report records it
+const { version } = JSON.parse(fs.readFileSync(ext("manifest.json"), "utf8"));
+fs.writeFileSync(web("version.js"), `// Written by scripts/sync-shared.mjs from extension/manifest.json.\nexport const VERSION = ${JSON.stringify(version)};\n`);
 console.log("synced shared files into web/");

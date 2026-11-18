@@ -23,7 +23,8 @@ Clean bubbles. Second step of the 3.0 plan: a robust core before new features.
 - The extension is about 23 MB larger (the inpainting model).
 
 ### Web app
-- The same eraser. The model is downloaded the first time a page needs it (white bubbles and screentone don't), then cached.
+- The same eraser, with the same fills ahead of the answer. The model is downloaded the first time a page needs it (white bubbles and screentone don't), then cached.
+- **Export debug report** (Settings → App): one .zip of the translated pages, with the original images, Claude's answers, the regions, the timings and a render of each. It's the extension's format, so a problem seen on a phone can be replayed. On a phone it opens the share sheet (Save to Files); it holds the page images, so share it privately.
 
 ### Development
 - `npm run audit -- <report> <out> --rtdetr detector.onnx`: lines whose lettering survives erasing, by comic-translate's text detector as an independent witness; also translations drawn far from their text or shrunk for want of room, and every erased area's marks (`marks.json`) to compare two builds area by area.
