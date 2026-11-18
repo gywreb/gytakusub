@@ -256,9 +256,10 @@ export function flatSurface(rgb, mask, inside) {
  * its flat colour, or as texture (fillArea: screentone, learned, Telea), copying screentone only
  * from the area's surface (`surface`, erase()'s, resampled the same way).
  * @param {{fill?: "flat"|"texture", color?: number[], radius?: number, label?: number, letter?: number}} area
+ * @param {Map<string, object>|null} [cache] see fillArea
  * @returns {Promise<ImageData|null>} the erased area, or null when no mask pixel falls inside it
  */
-export async function eraseFullSize(cv, natural, nx, ny, mask, scale, ox, oy, area = {}, model = null, surface = null) {
+export async function eraseFullSize(cv, natural, nx, ny, mask, scale, ox, oy, area = {}, model = null, surface = null, cache = null) {
   const W = natural.width, H = natural.height;
   const M = cv.matFromArray(2, 3, cv.CV_64F, [scale, 0, (nx - ox + 0.5) * scale - 0.5, 0, scale, (ny - oy + 0.5) * scale - 0.5]);
   const m = new cv.Mat();
@@ -277,7 +278,7 @@ export async function eraseFullSize(cv, natural, nx, ny, mask, scale, ox, oy, ar
   cv.cvtColor(src, rgb, cv.COLOR_RGBA2RGB);
   let done = null;
   if (area.fill === "flat" && area.color) { done = rgb.clone(); done.setTo(new cv.Scalar(area.color[0], area.color[1], area.color[2]), m); }
-  else if (area.fill === "texture") { const f = await fillArea(cv, model, rgb, m, on, { margin: Math.ceil(2 / scale) }); done = f.mat; area.filled = f.kind; area.fillMs = f.ms; }
+  else if (area.fill === "texture") { const f = await fillArea(cv, model, rgb, m, on, { margin: Math.ceil(2 / scale), cache }); done = f.mat; area.filled = f.kind; area.fillMs = f.ms; area.fillHit = !!f.hit; }
   if (!done) { done = new cv.Mat(); cv.inpaint(rgb, m, done, Math.max(3, Math.round((area.radius || 3) / scale)), cv.INPAINT_TELEA); }
   cv.cvtColor(done, out, cv.COLOR_RGB2RGBA);
   const result = new ImageData(new Uint8ClampedArray(out.data), W, H);
@@ -288,19 +289,47 @@ export async function eraseFullSize(cv, natural, nx, ny, mask, scale, ox, oy, ar
 /**
  * Fills one textured area: the screentone fill where its surface is a lattice (engine/tone.js),
  * else the learned inpainter where there is one, else nothing (null: the caller keeps Telea).
- * @returns {Promise<{mat: any|null, kind: "tone"|"learned"|"telea", ms: number}>} ms: the time it took
+ * `opts.cache` (a Map, see fillKey): an area filled before from the very same pixels, mask and
+ * surface is not filled again — prefillPage() fills a page's areas while its translation is on the
+ * way, and finishPage() then finds them there. A changed input is a new key, so the cache can
+ * only ever save time, never change a result.
+ * @returns {Promise<{mat: any|null, kind: "tone"|"learned"|"telea", ms: number, hit?: boolean}>} ms: the time it took
  */
 export async function fillArea(cv, model, rgb, hole, source, opts = {}) {
   const t0 = performance.now(), ms = () => Math.round(performance.now() - t0);
+  const key = opts.cache ? fillKey(rgb, hole, source, opts.margin) : null;
+  const had = key && opts.cache.get(key);
+  if (had) {
+    const mat = had.data ? cv.matFromArray(had.rows, had.cols, had.type, had.data) : null;
+    return { mat, kind: had.kind, ms: ms(), hit: true };
+  }
+  const done = await fillAreaNow(cv, model, rgb, hole, source, opts);
+  if (key) opts.cache.set(key, { kind: done.kind, ms: done.ms ?? ms(), ...(done.mat ? { data: new Uint8Array(done.mat.data), rows: done.mat.rows, cols: done.mat.cols, type: done.mat.type() } : {}) });
+  return { ...done, ms: ms() };
+}
+
+async function fillAreaNow(cv, model, rgb, hole, source, opts) {
   const tone = latticeFill(cv, rgb, hole, source, opts);
-  if (tone) return { mat: tone, kind: "tone", ms: ms() };
+  if (tone) return { mat: tone, kind: "tone" };
   // (the model may be given as a function that loads it: then it is loaded only when an area needs it)
   const m = typeof model === "function" ? await model() : model;
   if (m) {
-    try { const mat = await aotInpaint(cv, m, rgb, hole); return { mat, kind: "learned", ms: ms() }; }
+    try { const mat = await aotInpaint(cv, m, rgb, hole); return { mat, kind: "learned" }; }
     catch (e) { console.warn("Gytakusub: learned inpainting failed, using Telea", e); }
   }
-  return { mat: null, kind: "telea", ms: ms() };
+  return { mat: null, kind: "telea" };
+}
+
+/**
+ * What a fill depends on, as one string: the area's pixels, its mask, the surface it may copy
+ * from, and the margin. Two 32-bit hashes over all of it (a wrong hit would need both to collide
+ * on equal sizes) — a few milliseconds for a large area, against a fill's tens to hundreds.
+ */
+export function fillKey(rgb, hole, source, margin = 0) {
+  let a = 0x811c9dc5, b = 0x9747b28c;
+  const eat = (d) => { for (let i = 0; i < d.length; i++) { const v = d[i]; a = Math.imul(a ^ v, 0x01000193); b = Math.imul(b ^ v, 0x5bd1e995) ^ (b >>> 15); } };
+  eat(rgb.data); eat(hole.data); if (source) eat(source.data);
+  return `${rgb.cols}x${rgb.rows}:${margin}:${source ? 1 : 0}:${(a >>> 0).toString(36)}:${(b >>> 0).toString(36)}`;
 }
 
 /**
@@ -310,13 +339,16 @@ export async function fillArea(cv, model, rgb, hole, source, opts = {}) {
  * how it was filled (`filled`) and how long that took (`fillMs`).
  * @param {any} model the learned inpainter (or a function resolving to it), or null (screentone fill, else Telea)
  * @param {{rois: any[], mask: any, surface?: any}} erased erase()'s answer with keepMask
+ * @param {{cache?: Map<string, object>, checkpoint?: () => Promise<void>}} [opts] cache: see fillArea;
+ *   checkpoint: awaited before each area (it throws to stop)
  */
-export async function fillTexture(cv, model, img, erased) {
+export async function fillTexture(cv, model, img, erased, opts = {}) {
   const textured = erased.rois.filter((r) => r.fill === "texture");
   if (!textured.length) return img;
   const W = img.width, H = img.height;
   const src = cv.matFromImageData(img), rgb = new cv.Mat(); cv.cvtColor(src, rgb, cv.COLOR_RGBA2RGB); src.delete();
   for (const r of textured) {
+    if (opts.checkpoint) await opts.checkpoint(); // (prefillPage: a more urgent page may go first, or the answer has come)
     const m = contextMargin(r.letter);
     const x0 = Math.max(0, r.x - m), y0 = Math.max(0, r.y - m), x1 = Math.min(W, r.x + r.w + m), y1 = Math.min(H, r.y + r.h + m);
     const rect = new cv.Rect(x0, y0, x1 - x0, y1 - y0);
@@ -324,8 +356,8 @@ export async function fillTexture(cv, model, img, erased) {
     let on = null;
     if (erased.surface && r.label) { on = erased.surface.roi(rect).clone(); const od = on.data; for (let i = 0; i < od.length; i++) od[i] = od[i] === r.label ? 255 : 0; }
     if (cv.countNonZero(hole)) {
-      const f = await fillArea(cv, model, crop, hole, on);
-      r.filled = f.kind; r.fillMs = f.ms;
+      const f = await fillArea(cv, model, crop, hole, on, { cache: opts.cache });
+      r.filled = f.kind; r.fillMs = f.ms; r.fillHit = !!f.hit;
       if (f.mat) { f.mat.copyTo(view); f.mat.delete(); }
     }
     view.delete(); crop.delete(); hole.delete(); on?.delete();

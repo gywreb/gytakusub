@@ -6,7 +6,7 @@
 
 import { callClaude, mergeContext } from "./prompt.js";
 import { addCall, addPage, emptyLog } from "./usage.js";
-import { preparePage, finishPage } from "./engine/page.js";
+import { preparePage, prefillPage, finishPage } from "./engine/page.js";
 import { DEFAULT_SETTINGS, getSettings, CS_FILES, ensureContentScript } from "./settings.js";
 import { createLane, Cancelled } from "./lane.js";
 import { consentGiven, hasAccess, openWelcome, CONSENT_VERSION } from "./access.js";
@@ -262,30 +262,57 @@ async function translatePage(msg, settings, tabId, work) {
   // Cache holds the model's answer only (not image bytes, which would exhaust
   // storage.session after a few pages); the page is re-analysed on a hit.
   const blob = await fetchImageBlob(msg, signal); lap("fetch");
-  const job = await lane.run((checkpoint) => decode(blob, checkpoint), priority, signal, held); lap("analyze");
+  // time spent waiting for the engine before the analysis and the finish could start (other pages first)
+  let asked = performance.now();
+  timing.wait = 0;
+  const job = await lane.run((checkpoint) => { timing.wait += Math.round(performance.now() - asked); return decode(blob, checkpoint); }, priority, signal, held); lap("analyze");
+  // the page at its own size again (when it was analysed smaller), so the erased areas come back
+  // with its own resolution: made once, for the prefill and the finish
+  const natural = job.scale < 0.999 ? await createImageBitmap(blob).catch(() => null) : null;
+  try {
+    return await answerPage(msg, settings, tabId, work, { job, natural, cached, cacheKey, timing, lap, priority, held });
+  } finally { natural?.close(); }
+}
+
+// The prefill's place in the lane: behind every other task, so it only ever uses time the engine
+// would have spent idle (lower runs sooner; pages are ranked by their distance from the screen).
+const PREFILL_RANK = 1e9;
+
+async function answerPage(msg, settings, tabId, work, { job, natural, cached, cacheKey, timing, lap, priority, held }) {
+  const { signal } = work.ctl;
   let results, usage, newTerms = [];
   if (cached && !msg.force) {
     results = cached.results; usage = cached.usage;
   } else {
     if (signal.aborted) { disposeJob(job); throw new Cancelled(); }
     work.asked = true; // from here the page is paid for: it finishes even if the user scrolls away
-    const ctx = await getTabCtx(tabId);
-    const call = (slice) => callClaude(settings, slice, ctx).then((r) => { recordUsage(r); return r; });
-    const withRetry = async (slice) => {
-      try { return await call(slice); }
-      catch (e) {
-        // a busy moment is worth one more try; a spent budget is not
-        if (/Claude API (429|529|503)/.test(e.message) && !/spend (cap|limit)/i.test(e.message)) { await new Promise((r) => setTimeout(r, 2500)); return call(slice); }
-        throw e;
-      }
-    };
-    const raw = await Promise.all(job.slices.map(withRetry));
-    recordPage(raw);
-    results = raw.map((r) => ({ items: r.items }));
-    usage = { input_tokens: 0, output_tokens: 0 };
-    for (const r of raw) { newTerms.push(...r.terms); if (r.usage) { usage.input_tokens += r.usage.input_tokens || 0; usage.output_tokens += r.usage.output_tokens || 0; } }
-    try { await chrome.storage.session.set({ [cacheKey]: { results, usage } }); }
-    catch (e) { console.warn("Gytakusub: cache write failed", e); }
+    // While Claude answers (seconds), the engine fills this page's textured areas ahead
+    // (engine/page.js prefillPage), so the finish finds them done; it stops at its next area
+    // once the answer is in, and never delays another page's analysis or finish.
+    const pre = new AbortController();
+    const prefilled = lane.run((checkpoint) => prefillPage(job, { natural, checkpoint }), () => priority() + PREFILL_RANK, pre.signal, held).catch(() => {});
+    let failed = null;
+    try {
+      const ctx = await getTabCtx(tabId);
+      const call = (slice) => callClaude(settings, slice, ctx).then((r) => { recordUsage(r); return r; });
+      const withRetry = async (slice) => {
+        try { return await call(slice); }
+        catch (e) {
+          // a busy moment is worth one more try; a spent budget is not
+          if (/Claude API (429|529|503)/.test(e.message) && !/spend (cap|limit)/i.test(e.message)) { await new Promise((r) => setTimeout(r, 2500)); return call(slice); }
+          throw e;
+        }
+      };
+      const raw = await Promise.all(job.slices.map(withRetry));
+      recordPage(raw);
+      results = raw.map((r) => ({ items: r.items }));
+      usage = { input_tokens: 0, output_tokens: 0 };
+      for (const r of raw) { newTerms.push(...r.terms); if (r.usage) { usage.input_tokens += r.usage.input_tokens || 0; usage.output_tokens += r.usage.output_tokens || 0; } }
+      try { await chrome.storage.session.set({ [cacheKey]: { results, usage } }); }
+      catch (e) { console.warn("Gytakusub: cache write failed", e); }
+    } catch (e) { failed = e; }
+    finally { pre.abort(); await prefilled; } // (stopped before the analyses are used or freed)
+    if (failed) { disposeJob(job); throw failed; }
   }
   lap("model");
 
@@ -293,11 +320,10 @@ async function translatePage(msg, settings, tabId, work) {
   // screen then waits at most for one model run of another page's analysis (that one hands
   // over at its next checkpoint), and nothing of it is left to wait behind the next page's
   // analysis, whose model runs hold the worker's one thread for seconds at a time.
+  const asked = performance.now();
   const { page, patches, cleanDataUrl } = await lane.run(async () => {
-    // the page at its own size again, so the erased areas come back with its own resolution
-    const natural = job.scale < 0.999 ? await createImageBitmap(blob).catch(() => null) : null;
-    let page;
-    try { page = await finishPage(job, results, { natural }); } finally { natural?.close(); }
+    timing.wait += Math.round(performance.now() - asked);
+    const page = await finishPage(job, results, { natural });
     // The user's own corrections to this page's lines live beside the cached answer
     // (a Redo asks the model again and drops them).
     const editsKey = "edits:" + cacheKey;

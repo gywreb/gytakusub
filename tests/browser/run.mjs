@@ -29,7 +29,8 @@ if (segModel) {
   fs.writeFileSync(path.join(ext, "vendor", "segment.json"), JSON.stringify({ classes: ["bubble"] }));
 }
 
-const { srv, calls } = await startMock(PORT, pageImage, { badBoxes: process.argv.includes("--bad-boxes"), truth: pageImage.replace(/-page\.png$/, "-truth.json") });
+// the answer takes 1.5 s, as a fast real one would: the time the engine fills the page's textured areas ahead in
+const { srv, calls } = await startMock(PORT, pageImage, { badBoxes: process.argv.includes("--bad-boxes"), truth: pageImage.replace(/-page\.png$/, "-truth.json"), delayMs: 1500 });
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), "gyt-prof-"));
 const context = await chromium.launchPersistentContext(profile, {
   // Branded Google Chrome ≥137 ignores --load-extension; Playwright's Chromium and
@@ -219,6 +220,11 @@ for (const [i, d] of debugLogs.entries()) {
 if (!debugLogs.length) { failures++; console.log("FAIL: no render happened"); }
 if (segModel && debugLogs.some((d) => d.engine !== "segmented")) { failures++; console.log(`FAIL: a segmentation model was shipped but the engine ran as ${debugLogs.map((d) => d.engine).join(",")}`); }
 if (debugLogs.length) console.log(`engine: ${debugLogs[0].engine}, timing: ${JSON.stringify(debugLogs[0].timing)}`);
+// pages that asked Claude: their textured areas were filled while the answer was on the way (engine/page.js prefillPage)
+for (const d of debugLogs.filter((d) => d.timing?.model > 1000 && d.timing.fill)) {
+  const f = d.timing.fill, textured = (f.tone || 0) + (f.learned || 0) + (f.telea || 0);
+  if (f.ready !== textured) { failures++; console.log(`FAIL: ${f.ready} of ${textured} textured areas were filled ahead of the answer: ${JSON.stringify(f)}`); }
+}
 if (process.argv.includes("--require-gpu") && !debugLogs.every((d) => /detect:webgpu/.test(d.timing?.backend || "") && /segment:webgpu/.test(d.timing?.backend || ""))) { failures++; console.log(`FAIL: --require-gpu but the models ran on ${debugLogs.map((d) => d.timing?.backend).join(" | ")}`); }
 if (!reportOk) { failures++; console.log("FAIL: diagnostic report incomplete: " + JSON.stringify(rep).slice(0, 200)); }
 if (!zipOk) { failures++; console.log("FAIL: export zip missing files or corrupt: " + JSON.stringify(exp).slice(0, 200)); }

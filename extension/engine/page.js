@@ -114,7 +114,9 @@ export async function finishPage(job, results, opts = {}) {
   const items = [], placements = [], regions = [], rois = [], patches = [];
   // what erasing cost on this page (the debug report shows it): areas by how they were filled, and
   // the time the texture fills took (the part 2.12 added)
-  const fill = { ms: 0, flat: 0, tone: 0, learned: 0, telea: 0 };
+  const fill = { ms: 0, flat: 0, tone: 0, learned: 0, telea: 0, ready: 0 };
+  // areas prefillPage() already filled while the translation was on the way (same inputs, same result)
+  const cache = job.fills || null;
   const canvas = new OffscreenCanvas(work.W, work.H);
   const ctx = canvas.getContext("2d");
   for (const [idx, s] of job.slices.entries()) {
@@ -132,15 +134,15 @@ export async function finishPage(job, results, opts = {}) {
       clean = erase(cv, s.imageData, an, regionIds, { keepMask: true, outline: OUTLINE });
       // textured areas at the size the page was analysed at (when that is its own size, the
       // patches come from here; else the full-size pass below does them)
-      if (!full) clean.image = await fillTexture(cv, inpainter, clean.image, clean);
+      if (!full) clean.image = await fillTexture(cv, inpainter, clean.image, clean, { cache });
     }
     ctx.putImageData(clean.image, s.ox, s.oy);
     if (full && clean.mask) {
-      for (const r of clean.rois) { const p = await fullSizePatch(cv, opts.natural, s, scale, clean.mask, r, inpainter, clean.surface); if (p) patches.push(p); }
+      for (const r of clean.rois) { const p = await fullSizePatch(cv, opts.natural, s, scale, clean.mask, r, inpainter, clean.surface, cache); if (p) patches.push(p); }
     } else {
       for (const r of clean.rois) rois.push({ x: r.x + s.ox, y: r.y + s.oy, w: r.w, h: r.h });
     }
-    for (const r of clean.rois) { const kind = r.fill === "texture" ? r.filled || "telea" : r.fill || "telea"; fill[kind]++; fill.ms += r.fillMs || 0; }
+    for (const r of clean.rois) { const kind = r.fill === "texture" ? r.filled || "telea" : r.fill || "telea"; fill[kind]++; fill.ms += r.fillMs || 0; if (r.fillHit) fill.ready++; }
     clean.mask?.delete(); clean.surface?.delete();
     an.dispose();
   }
@@ -162,14 +164,57 @@ export async function finishPage(job, results, opts = {}) {
   }
   const backend = job.slices[0]?.analysis.backend || null;
   if (fill.learned) fill.ep = (await getInpainter())?.ep || null; // where the learned fill ran: webgpu / wasm
+  if (job.prefillMs != null) fill.pre = job.prefillMs; // the time prefillPage() spent while the translation was on the way
+  job.fills = null;
   return { items, placements, regions, work, letter, canvas, patches, fullSize: full, engine, segmentMs, detectMs, backend, fill };
+}
+
+/**
+ * Fills a page's textured areas ahead of its translation, while the caller waits for Claude
+ * (seconds in which the engine has nothing else to do for this page): every text region is
+ * erased as if it had a translation, and each textured area is filled into `job.fills`, keyed
+ * by the exact inputs of the fill (erase.js fillKey). finishPage() then reuses each area whose
+ * inputs came out the same — nearly all, since most regions get a translation — and fills the
+ * rest itself; its result is the same with or without this step, only sooner.
+ * The caller must let this return (or throw from `checkpoint`) before calling finishPage(),
+ * which frees the analyses.
+ * @param {Job} job from preparePage
+ * @param {{natural?: ImageBitmap, checkpoint?: () => Promise<void>}} [opts] natural: as for
+ *   finishPage (the same bitmap); checkpoint: awaited before each area, throws to stop
+ */
+export async function prefillPage(job, opts = {}) {
+  const t0 = performance.now();
+  const cv = await getCV();
+  const full = !!opts.natural && job.scale < 0.999;
+  const cache = job.fills || (job.fills = new Map());
+  const inpainter = () => getInpainter();
+  // the time spent filling, not waiting at checkpoints for other pages
+  let waited = 0;
+  const checkpoint = opts.checkpoint ? async () => { const w = performance.now(); try { await opts.checkpoint(); } finally { waited += performance.now() - w; } } : null;
+  try {
+    for (const s of job.slices) {
+      const an = s.analysis;
+      if (!an.regions.length) continue;
+      const clean = erase(cv, s.imageData, an, new Set(an.regions.map((r) => r.id)), { keepMask: true, outline: OUTLINE });
+      try {
+        if (!full) await fillTexture(cv, inpainter, clean.image, clean, { cache, checkpoint });
+        else {
+          for (const r of clean.rois) {
+            if (r.fill !== "texture") continue;
+            if (checkpoint) await checkpoint();
+            await fullSizePatch(cv, opts.natural, s, job.scale, clean.mask, r, inpainter, clean.surface, cache);
+          }
+        }
+      } finally { clean.mask?.delete(); clean.surface?.delete(); }
+    }
+  } finally { job.prefillMs = Math.round(performance.now() - t0 - waited); }
 }
 
 /**
  * One erased area again at the page's own size: the work-resolution area `r` (slice coordinates)
  * widened to whole page pixels, cut from the full-size page, inpainted with the work mask resampled.
  */
-async function fullSizePatch(cv, natural, s, scale, mask, r, model, surface) {
+async function fullSizePatch(cv, natural, s, scale, mask, r, model, surface, cache = null) {
   // a texture fill sees some of the page around the area (the patch is then that much larger;
   // outside the mask its pixels are the page's own)
   const m = r.fill === "texture" ? contextMargin(r.letter) : 0;
@@ -179,7 +224,7 @@ async function fullSizePatch(cv, natural, s, scale, mask, r, model, surface) {
   if (nw < 1 || nh < 1) return null;
   const c = new OffscreenCanvas(nw, nh), cctx = c.getContext("2d", { willReadFrequently: true });
   cctx.drawImage(natural, nx, ny, nw, nh, 0, 0, nw, nh);
-  const done = await eraseFullSize(cv, cctx.getImageData(0, 0, nw, nh), nx, ny, mask, scale, s.x, s.y, r, model, surface);
+  const done = await eraseFullSize(cv, cctx.getImageData(0, 0, nw, nh), nx, ny, mask, scale, s.x, s.y, r, model, surface, cache);
   if (!done) return null;
   cctx.putImageData(done, 0, 0);
   return { x: nx, y: ny, w: nw, h: nh, canvas: c };

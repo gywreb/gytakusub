@@ -68,5 +68,28 @@ test("2.12: the white bubble is filled flat, with its own white", () => {
   const area = res.rois.find((q) => q.x <= r.box.x + r.box.w && q.x + q.w >= r.box.x && q.y <= r.box.y + r.box.h && q.y + q.h >= r.box.y);
   assert.equal(area?.fill, "flat"); assert.deepEqual(area.color, [255, 255, 255]);
 });
+// The prefill (engine/page.js prefillPage): every region erased and its textured areas filled into a
+// cache while the translation is on the way; the finish then reuses what matches. It must only save
+// time: the page comes out exactly as without it, when every region got a translation and when one
+// did not (its neighbours' inputs may then differ, and those areas are filled again).
+const fillWith = async (ids, cache) => {
+  const e = erase(cv, new ImageData(new Uint8ClampedArray(before), W, H), an, ids, { keepMask: true, outline: OUTLINE });
+  const im = await fillTexture(cv, model, e.image, e, { cache });
+  const hits = e.rois.filter((r) => r.fillHit).length, textured = e.rois.filter((r) => r.fill === "texture").length;
+  e.mask.delete(); e.surface.delete();
+  return { im, hits, textured };
+};
+const same = (a, b) => a.data.length === b.data.length && a.data.every((v, i) => v === b.data[i]);
+for (const [label, ids] of [["every region translated", regionIds], ["one region left out", new Set([...regionIds].slice(1))]]) {
+  const plain = await fillWith(ids, null);
+  const cache = new Map();
+  await fillWith(new Set(an.regions.map((r) => r.id)), cache); // the prefill
+  const fin = await fillWith(ids, cache);
+  test(`prefill, ${label}: the same page, and the areas found filled (${fin.hits} of ${fin.textured})`, () => {
+    assert.ok(same(plain.im, fin.im), "the page differs from the one filled without the prefill");
+    assert.ok(fin.hits > 0, "no area was reused");
+  });
+}
+
 an.dispose();
 console.log(`\n${passed} passed`);

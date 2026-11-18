@@ -75,6 +75,10 @@ export async function translateImage(img, settings, ctx = { terms: [], recent: [
   if (!settings.apiKey) throw new Error(t("web_no_key"));
   const bitmap = await createImageBitmap(img);
   const prep = await rpc({ type: "prepare", bitmap, settings: { maxLongEdge: settings.maxLongEdge, stripWidth: settings.stripWidth, sliceHeight: settings.sliceHeight } }, [bitmap]);
+  // While Claude answers, the engine fills the page's textured areas ahead (the finish then finds
+  // them done). The page at its own size goes with it when the analysis worked on a smaller copy.
+  const natural = prep.work.W < prep.width ? await createImageBitmap(img) : null;
+  rpc({ type: "prefill", jobId: prep.jobId, natural }, natural ? [natural] : []).catch(() => {});
   let results;
   try { results = await Promise.all(prep.slices.map((s) => callAndRecord(settings, s, ctx))); }
   catch (e) { rpc({ type: "drop", jobId: prep.jobId }).catch(() => {}); throw e; }
@@ -82,9 +86,7 @@ export async function translateImage(img, settings, ctx = { terms: [], recent: [
   const terms = [];
   const usage = { input_tokens: 0, output_tokens: 0 };
   for (const r of results) { terms.push(...r.terms); if (r.usage) { usage.input_tokens += r.usage.input_tokens || 0; usage.output_tokens += r.usage.output_tokens || 0; } }
-  const downscaled = prep.work.W < prep.width;
-  const natural = downscaled ? await createImageBitmap(img) : null;
-  const fin = await rpc({ type: "finish", jobId: prep.jobId, results: results.map((r) => ({ items: r.items })), natural }, natural ? [natural] : []);
+  const fin = await rpc({ type: "finish", jobId: prep.jobId, results: results.map((r) => ({ items: r.items })) });
   return { items: fin.items, placements: fin.placements, regions: fin.regions, work: fin.work, letter: fin.letter, patches: fin.patches, width: prep.width, height: prep.height, usage, ctx: mergeContext(ctx, terms, fin.items.map((i) => i.text)) };
 }
 
