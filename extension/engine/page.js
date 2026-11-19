@@ -3,13 +3,13 @@
 // original lettering, hand back a cleaned page plus text placements).
 // Used by the extension's service worker and by the web app's Web Worker.
 import { getCV, getDetector, getSegmenter, getFallbackDetector, getInpainter, setEnginePrefs } from "./cv.js";
-import { ortBroken } from "./ort.js";
+import { ortBroken, gpuIsSoftware } from "./ort.js";
 import { analyze } from "./analyze.js";
 import { segment } from "./segment.js";
 import { detectText, detectInEmptyBubbles, detectInDarkShapes } from "./detect.js";
 import { layout } from "./layout.js";
 import { erase, eraseFullSize, fillTexture, contextMargin, NotLoaded } from "./erase.js";
-import { aotInpaint } from "./inpaint.js";
+import { aotInpaint, GPU_SIDE } from "./inpaint.js";
 
 // How far the mask grows over a lettering's outline, as a share of its letter size (ADR 0013).
 export const OUTLINE = 0.3;
@@ -38,10 +38,13 @@ async function analyzeSlice(cv, detector, segmenter, imageData, checkpoint = asy
 }
 
 /**
- * @param {ImageBitmap} bitmap the page at natural size
+ * @param {ImageBitmap} bitmap the page at natural size (a part: its own rows)
  * @param {{maxLongEdge:number, stripWidth:number, sliceHeight:number, useGpu?: boolean}} settings
- * @param {{checkpoint?: () => Promise<void>}} [opts] checkpoint: awaited between model runs, so a caller
- *   can let a more urgent page go first or stop here (it throws to stop; the analyses made so far are freed)
+ * @param {{checkpoint?: () => Promise<void>, part?: {W:number, H:number, index:number, y0:number}}} [opts]
+ *   checkpoint: awaited between model runs, so a caller can let a more urgent page go first or stop
+ *   here (it throws to stop; the analyses made so far are freed). part: only slice `index` of a
+ *   W×H tall image, whose rows from y0 the bitmap holds; everything comes back in the whole image's
+ *   coordinates, so the parts' results together are the image's.
  * @returns {Promise<Job>}
  */
 export async function preparePage(bitmap, settings, opts = {}) {
@@ -49,20 +52,24 @@ export async function preparePage(bitmap, settings, opts = {}) {
   setEnginePrefs({ gpu: settings?.useGpu !== false });
   const cv = await getCV();
   const [detector, segmenter] = await Promise.all([getDetector(), getSegmenter()]);
-  const W = bitmap.width, H = bitmap.height;
+  // a part of a tall image (opts.part): `bitmap` holds its rows from y0, the geometry is the whole image's
+  const part = opts.part || null;
+  const W = part ? part.W : bitmap.width, H = part ? part.H : bitmap.height, y0 = part ? part.y0 : 0;
   const geometry = sliceGeometry(W, H, settings);
   const scale = geometry[0].scale; // one scale for the whole page
   const work = { W: Math.max(1, Math.round(W * scale)), H: Math.max(1, Math.round(H * scale)) };
+  const chosen = part ? [geometry[part.index]] : geometry;
+  if (!chosen[0]) throw new Error(`Gytakusub: this image has no part ${part.index}`);
   const slices = [];
   let nextId = 1;
   try {
-    for (const s of geometry) {
+    for (const s of chosen) {
       await checkpoint();
       const cw = Math.max(1, Math.round(s.w * scale)), ch = Math.max(1, Math.round(s.h * scale));
       const canvas = new OffscreenCanvas(cw, ch);
       const ctx = canvas.getContext("2d", { willReadFrequently: true });
       ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, cw, ch);
-      ctx.drawImage(bitmap, s.x, s.y, s.w, s.h, 0, 0, cw, ch);
+      ctx.drawImage(bitmap, s.x, s.y - y0, s.w, s.h, 0, 0, cw, ch);
       const imageData = ctx.getImageData(0, 0, cw, ch);
       // bubbles from the segmentation model when there is one; the analysis then
       // only has to read the text inside them
@@ -83,8 +90,9 @@ export async function preparePage(bitmap, settings, opts = {}) {
       slices.push({
         // for the model
         b64, mediaType: "image/jpeg", cw, ch, tagFrom, tagTo,
-        // geometry in natural-page pixels (normalizeItems) and in work pixels
-        x: s.x, y: s.y, w: s.w, h: s.h, ox: Math.round(s.x * scale), oy: Math.round(s.y * scale),
+        // geometry in natural-page pixels (normalizeItems) and in work pixels; ny0: the natural
+        // row the caller's bitmaps start at (a part's own rows)
+        x: s.x, y: s.y, w: s.w, h: s.h, ox: Math.round(s.x * scale), oy: Math.round(s.y * scale), ny0: y0,
         imageData, analysis,
       });
     }
@@ -92,15 +100,16 @@ export async function preparePage(bitmap, settings, opts = {}) {
     for (const sl of slices) sl.analysis.dispose(); // stopped at a checkpoint, or failed: free what was made
     throw e;
   }
-  return { width: W, height: H, work, scale, slices };
+  return { width: W, height: H, work, scale, slices, part: part ? part.index : null };
 }
 
 /**
  * @param {Job} job from preparePage (its analyses are consumed and disposed here)
  * @param {Array<{items:any[]}>} results model output per slice, same order
- * @param {{natural?: ImageBitmap}} [opts] natural: the page at its own size again; when the page was
- *   downscaled for the analysis, the erased areas are then inpainted again at full size (patches
- *   with the page's own resolution). The caller keeps and closes the bitmap.
+ * @param {{natural?: ImageBitmap}} [opts] natural: the page at its own size again (a part: the same
+ *   rows as for preparePage); when the page was downscaled for the analysis, the erased areas are
+ *   then inpainted again at full size (patches with the page's own resolution). The caller keeps
+ *   and closes the bitmap.
  * @returns patches in PAGE pixels ({x, y, w, h} of the full-size page, canvas at that size or, without
  *   `natural`, at the work size), placements and regions in work pixels.
  */
@@ -118,7 +127,10 @@ export async function finishPage(job, results, opts = {}) {
   const fill = { ms: 0, flat: 0, tone: 0, learned: 0, telea: 0, ready: 0 };
   // areas prefillPage() already filled while the translation was on the way (same inputs, same result)
   const cache = job.fills || null;
-  const canvas = new OffscreenCanvas(work.W, work.H);
+  // the cleaned page at work size; a part's own rows only (a whole tall image's would be tens of MB)
+  const top = job.part != null ? Math.min(...job.slices.map((s) => s.oy)) : 0;
+  const rows = job.part != null ? Math.max(...job.slices.map((s) => s.oy + s.imageData.height)) - top : work.H;
+  const canvas = new OffscreenCanvas(work.W, Math.max(1, rows));
   const ctx = canvas.getContext("2d");
   // ids for regions the layout makes from adopted lettering: after the stamped ones, page-wide
   let nextId = Math.max(0, ...job.slices.map((s) => s.tagTo || 0)) + 1;
@@ -140,7 +152,7 @@ export async function finishPage(job, results, opts = {}) {
       // patches come from here; else the full-size pass below does them)
       if (!full) clean.image = await fillTexture(cv, inpainter, clean.image, clean, { cache });
     }
-    ctx.putImageData(clean.image, s.ox, s.oy);
+    ctx.putImageData(clean.image, s.ox, s.oy - top);
     if (full && clean.mask) {
       for (const r of clean.rois) { const p = await fullSizePatch(cv, opts.natural, s, scale, clean.mask, r, inpainter, clean.surface, cache); if (p) patches.push(p); }
     } else {
@@ -159,11 +171,11 @@ export async function finishPage(job, results, opts = {}) {
   // extension ships these (a few KB each) instead of the whole page; the content
   // script draws them over the image it already shows.
   // the work copy shows the full-size erasing too (the debug export's clean page)
-  for (const p of patches) ctx.drawImage(p.canvas, p.x * scale, p.y * scale, p.w * scale, p.h * scale);
+  for (const p of patches) ctx.drawImage(p.canvas, p.x * scale, p.y * scale - top, p.w * scale, p.h * scale);
   // (work-size patches, when the page was analysed at its own size or no full-size page was given)
   for (const r of rois) {
     const c = new OffscreenCanvas(r.w, r.h);
-    c.getContext("2d").drawImage(canvas, r.x, r.y, r.w, r.h, 0, 0, r.w, r.h);
+    c.getContext("2d").drawImage(canvas, r.x, r.y - top, r.w, r.h, 0, 0, r.w, r.h);
     patches.push({ x: r.x / scale, y: r.y / scale, w: r.w / scale, h: r.h / scale, canvas: c });
   }
   const backend = job.slices[0]?.analysis.backend || null;
@@ -171,7 +183,7 @@ export async function finishPage(job, results, opts = {}) {
   if (job.prefillMs != null) fill.pre = job.prefillMs; // the time prefillPage() spent while the translation was on the way
   if (inpainterTimes.load != null) fill.model = { ...inpainterTimes }; // its load and first run, once per worker
   job.fills = null;
-  return { items, placements, regions, work, letter, canvas, patches, fullSize: full, engine, segmentMs, detectMs, backend, fill };
+  return { items, placements, regions, work, letter, canvas, canvasTop: top, patches, fullSize: full, engine, segmentMs, detectMs, backend, fill };
 }
 
 /**
@@ -189,11 +201,23 @@ export function warmInpainter() {
       inpainterTimes.load = Math.round(performance.now() - t0);
       if (!model) return null;
       try {
-        const cv = await getCV(), t1 = performance.now();
-        const rgb = new cv.Mat(72, 72, cv.CV_8UC3, new cv.Scalar(200, 200, 200)), hole = cv.Mat.zeros(72, 72, cv.CV_8UC1);
-        cv.rectangle(hole, new cv.Point(24, 24), new cv.Point(48, 48), new cv.Scalar(255), -1);
-        (await aotInpaint(cv, model, rgb, hole)).delete(); rgb.delete(); hole.delete();
+        // On the GPU, at the largest size a fill runs at: the GPU programs for sizes from 128 px up
+        // are made only when one first runs (3 of 33, counted on Dawn), and on Windows the first
+        // large fill took 14–20 s on every worker start (2.12.0 warmed up at 72 px: 54 ms, no help).
+        // The second run's time tells what was first-run cost. On the CPU, a small area (a fill
+        // there costs ~40 µs a pixel, so a large one would cost seconds); on a GPU emulated on the
+        // CPU (test machines), 128 px, which makes the same 33 programs.
+        const cv = await getCV(), side = model.ep === "wasm" ? 72 : gpuIsSoftware() ? 128 : GPU_SIDE;
+        const rgb = new cv.Mat(side, side, cv.CV_8UC3, new cv.Scalar(200, 200, 200)), hole = cv.Mat.zeros(side, side, cv.CV_8UC1);
+        cv.rectangle(hole, new cv.Point(side / 3, side / 3), new cv.Point((2 * side) / 3, (2 * side) / 3), new cv.Scalar(255), -1);
+        let t1 = performance.now();
+        (await aotInpaint(cv, model, rgb, hole)).delete();
         inpainterTimes.warm = Math.round(performance.now() - t1);
+        t1 = performance.now();
+        (await aotInpaint(cv, model, rgb, hole)).delete();
+        inpainterTimes.again = Math.round(performance.now() - t1);
+        inpainterTimes.side = side;
+        rgb.delete(); hole.delete();
       } catch (e) { console.warn("Gytakusub: inpainter warm-up failed", e); }
       return model;
     })().then((model) => { warmed = { model }; return model; });
@@ -204,7 +228,7 @@ let warming = null, warmed = null;
 /** Whether warmInpainter() is done (no page then waits for the model). */
 export const inpainterWarm = () => !!warmed;
 /** How long the inpainter took to load and to run first (ms; null until it has). */
-export const inpainterTimes = { load: null, warm: null };
+export const inpainterTimes = { load: null, warm: null, again: null, side: null };
 
 /**
  * Fills a page's textured areas ahead of its translation, while the caller waits for Claude
@@ -271,7 +295,7 @@ async function fullSizePatch(cv, natural, s, scale, mask, r, model, surface, cac
   const nw = nx1 - nx, nh = ny1 - ny;
   if (nw < 1 || nh < 1) return null;
   const c = new OffscreenCanvas(nw, nh), cctx = c.getContext("2d", { willReadFrequently: true });
-  cctx.drawImage(natural, nx, ny, nw, nh, 0, 0, nw, nh);
+  cctx.drawImage(natural, nx, ny - (s.ny0 || 0), nw, nh, 0, 0, nw, nh);
   const done = await eraseFullSize(cv, cctx.getImageData(0, 0, nw, nh), nx, ny, mask, scale, s.x, s.y, r, model, surface, cache);
   if (!done) return null;
   cctx.putImageData(done, 0, 0);
@@ -305,4 +329,5 @@ export function blobToBase64(blob) {
  * @property {{W:number,H:number}} work working-resolution size (the cleaned page and placements use it)
  * @property {number} scale work / natural
  * @property {Array<object>} slices
+ * @property {number|null} part the slice this job is, for a part of a tall image (else null: all of them)
  */

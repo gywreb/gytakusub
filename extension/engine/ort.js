@@ -38,11 +38,20 @@ export function gpuAvailable() {
   if (!gpuProbe) gpuProbe = (async () => {
     try {
       const gpu = globalThis.navigator?.gpu;
-      return !!(gpu && await gpu.requestAdapter({ powerPreference: "high-performance" }));
+      const adapter = gpu && await gpu.requestAdapter({ powerPreference: "high-performance" });
+      if (adapter) {
+        const info = adapter.info || {};
+        // a GPU emulated on the CPU (SwiftShader, lavapipe: test machines, no GPU driver)
+        gpuSoftware = !!(info.isFallbackAdapter || adapter.isFallbackAdapter || /swiftshader|lavapipe|llvmpipe/i.test(`${info.architecture} ${info.description} ${info.device}`));
+      }
+      return !!adapter;
     } catch { return false; }
   })();
   return gpuProbe;
 }
+let gpuSoftware = false;
+/** After gpuAvailable(): whether the GPU is emulated on the CPU (models run, but slowly). */
+export const gpuIsSoftware = () => gpuSoftware;
 
 /**
  * Loads a model for inference, on the GPU when asked and available, else the CPU.

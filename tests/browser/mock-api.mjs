@@ -45,6 +45,14 @@ export function startMock(port, pageImage, opts = {}) {
         <div style="height:1200px">footer</div></body>`);
     }
     // a long chapter (queue test): n copies of the page, each its own address
+    // files a test made (opts.files: a directory): its pages and their images
+    if (opts.files && req.url.startsWith("/files/")) {
+      const name = path.basename(decodeURIComponent(req.url.slice(7).split("?")[0]));
+      const file = path.join(opts.files, name);
+      if (!fs.existsSync(file)) { res.writeHead(404); return res.end(); }
+      const type = { ".html": "text/html", ".png": "image/png", ".jpg": "image/jpeg" }[path.extname(name)] || "application/octet-stream";
+      res.writeHead(200, { "Content-Type": type }); return res.end(fs.readFileSync(file));
+    }
     if (req.url === "/blank") { res.writeHead(200, { "Content-Type": "text/html" }); return res.end("<!doctype html><title>Elsewhere</title><p>No pages here."); }
     if (req.url.startsWith("/chapter")) {
       const q = new URL(req.url, "http://x").searchParams;

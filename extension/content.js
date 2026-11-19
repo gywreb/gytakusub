@@ -9,10 +9,13 @@
   window.__gytLoaded = true;
 
   const GyText = globalThis.GyText;
-  const MIN_W = 280, MIN_H = 280; // px, natural or rendered
+  const MIN_W = 280, MIN_H = 280; // px, as shown on the page
   const MAX_PARALLEL = 3;
 
-  /** @type {Map<HTMLImageElement, {status:string, src:string, canvas?:HTMLCanvasElement, hidden:boolean, result?:any, error?:string, objectFit?:string}>} */
+  /** An image's translation. `units`: its whole page (key WHOLE), or the parts of a tall image
+   * (key = slice index) each with its own state; `status`, `result`, `patches` and `error` are the
+   * image's, from them (settle, merge).
+   * @type {Map<HTMLImageElement, {status:string, src:string, units:Map<number, {status:string, result?:any, patches?:any[], error?:string, failures?:number}>, canvas?:HTMLCanvasElement, hidden:boolean, result?:any, patches?:any[], error?:string, objectFit?:string}>} */
   const entries = new Map();
   // This page's own name for its work in the worker, and a line to it: when the page goes (a reload,
   // the next chapter) the line drops, and the worker drops this page's pages not yet sent to Claude
@@ -24,6 +27,22 @@
     try { line = chrome.runtime.connect({ name: "gyt-page:" + pageToken }); line.onDisconnect.addListener(() => { line = null; }); }
     catch { line = null; } // the extension was reloaded: this script is an orphan, nothing to keep
   };
+  // Chrome stops an extension's worker after 30 s without an event (developer.chrome.com, service
+  // worker lifecycle), and its models go with it: the next chapter loaded them again and paid the
+  // GPU's first-run cost again (14–20 s on Windows, in two reports 12 minutes apart). While you
+  // read with auto-translate on (this tab in front, a page translated in the last 10 minutes), a
+  // word every 20 s keeps it.
+  const WARM_FOR_MS = 10 * 60 * 1000;
+  let lastWork = 0, beat = null;
+  function keepWarm() {
+    lastWork = Date.now();
+    if (!beat) beat = setInterval(() => {
+      if (document.hidden || !autoOn() || Date.now() - lastWork > WARM_FOR_MS) { clearInterval(beat); beat = null; return; }
+      keepLine();
+      try { line?.postMessage({ type: "BEAT" }); } catch { /* the worker restarted: a new line next time */ }
+    }, 20000);
+  }
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && lastWork && Date.now() - lastWork < WARM_FOR_MS) keepWarm(); });
   let settings = { enabled: true, autoSites: [], enabledSites: [], uppercase: false, fontFamily: "", excludedSites: "", peekOnHover: false };
   let allHidden = false;
   let hoverImg = null;
@@ -156,17 +175,84 @@
 
   const srcOf = (img) => img.currentSrc || img.src || "";
 
+  // A page is something you read, so what counts is the size it's shown at. A large file shown
+  // small is a site's logo, a cover thumbnail or a reaction emoji: these were translated (paid
+  // for, and counted as pages) until 2.12.0. An image not laid out yet (lazy) counts once it
+  // loads: onImgLoad checks again.
   function isEligible(img) {
     if (!(img instanceof HTMLImageElement)) return false;
     const r = img.getBoundingClientRect();
-    const bigNatural = img.naturalWidth >= MIN_W && img.naturalHeight >= MIN_H;
-    const bigRendered = r.width >= MIN_W && r.height >= MIN_H;
-    return (bigNatural || bigRendered) && !!srcOf(img);
+    return r.width >= MIN_W && r.height >= MIN_H && !!srcOf(img);
   }
 
-  function viewportDistance(img) {
-    const r = img.getBoundingClientRect();
+  function viewportDistance(img, key = WHOLE) {
+    const r = unitRect(img, key);
     return Math.abs(r.top + r.height / 2 - window.innerHeight / 2);
+  }
+
+  // ---------- parts: a tall image in screen-sized pieces ----------
+  // A chapter can come as one tall image (a site served one as 800×17055 px): translated whole,
+  // nothing showed for a minute, and all of it was paid for at once. The engine already reads
+  // such an image in slices (prompt.js sliceGeometry, the same rule as here); each slice is now a
+  // part with its own place in the queue, its own question and its own drawing, starting with the
+  // one on screen, and auto-translate takes the parts near the screen as you scroll, as it does
+  // pages. Their results draw as one overlay.
+  const WHOLE = -1;
+  function unitsOf(img) {
+    const W = img.naturalWidth, H = img.naturalHeight;
+    const sliceH = settings.sliceHeight || 1800, stripW = settings.stripWidth || 1000;
+    if (!W || !H || !(H > 2.2 * W && H > sliceH)) return [{ key: WHOLE, y: 0, h: H }];
+    const step = Math.round(sliceH / Math.min(1, stripW / W)), out = [];
+    for (let y = 0, key = 0; y < H; y += step, key++) out.push({ key, y, h: Math.min(step, H - y) });
+    return out;
+  }
+  /** Where a unit of an image is on screen (the whole image's box for WHOLE). */
+  function unitRect(img, key = WHOLE) {
+    const r = img.getBoundingClientRect();
+    if (key === WHOLE || !img.naturalHeight) return r;
+    const u = unitsOf(img).find((x) => x.key === key);
+    if (!u) return r;
+    const k = r.height / img.naturalHeight;
+    return { left: r.left, right: r.right, width: r.width, top: r.top + u.y * k, bottom: r.top + (u.y + u.h) * k, height: u.h * k };
+  }
+  /** The image's entry, new when there is none or the reader put another page in this <img>. */
+  function entryFor(img) {
+    let e = entries.get(img);
+    if (e && e.src !== srcOf(img)) { e.canvas?.remove(); entries.delete(img); e = null; }
+    if (!e) { e = { src: srcOf(img), hidden: false, units: new Map(), status: "idle", result: null, patches: [] }; entries.set(img, e); }
+    return e;
+  }
+  /** The image's status from its units': in progress first, then translated (any part), then failed. */
+  function settle(e) {
+    const us = [...e.units.values()];
+    e.status = us.some((u) => u.status === "working") ? "working" : us.some((u) => u.status === "queued") ? "queued"
+      : us.some((u) => u.result) ? "done" : us.some((u) => u.status === "error") ? "error" : "idle";
+    const failed = us.filter((u) => u.status === "error");
+    e.error = failed.length ? failed[failed.length - 1].error : undefined;
+  }
+  /** The image's result: its page's, or its parts' together (all in the whole image's coordinates). */
+  function merge(e) {
+    const done = [...e.units.entries()].filter(([, u]) => u.result).sort((a, b) => a[0] - b[0]).map(([, u]) => u);
+    if (!done.length) { e.result = null; e.patches = []; return; }
+    if (done.length === 1 && done[0].result.part == null) { e.result = done[0].result; e.patches = done[0].patches; return; }
+    const items = [], placements = [], regions = [], patches = [], loaded = [];
+    for (const u of done) {
+      const r = u.result, base = items.length;
+      items.push(...r.items); // the same objects: an edit to a line reaches its part
+      // tags count from 1 in each part; `item` indexes the merged items, `own`/`cacheKey`/`localItem` lead back to the part's
+      for (const pl of r.placements) placements.push({ ...pl, item: pl.item != null ? pl.item + base : pl.item, part: r.part, own: pl, cacheKey: r.cacheKey, localItem: pl.item });
+      for (const g of r.regions) regions.push({ ...g, part: r.part });
+      patches.push(...r.patches); loaded.push(...u.patches);
+    }
+    const first = done[0].result;
+    e.result = { ...first, items, placements, regions, patches, cacheKey: null, fromCache: done.every((u) => u.result.fromCache),
+      parts: done.map((u) => ({ part: u.result.part, timing: u.result.timing, fromCache: u.result.fromCache, usage: u.result.usage })) };
+    e.patches = loaded;
+  }
+  /** The units of an image on screen (or within `margin` screens): those of a tall image, or its page. */
+  function shownUnits(img, margin = 0) {
+    const all = unitsOf(img), on = all.filter((u) => u.key === WHOLE || nearScreen(img, margin, u.key));
+    return (on.length ? on : all.slice(0, 1)).map((u) => u.key);
   }
 
   function visibleImages(marginFactor = 0.5) {
@@ -192,26 +278,35 @@
     positionBar();
     clearTimeout(hideTimer);
   }
+  // At the image's top right corner (the top of the screen on a tall image scrolled past its top).
+  // Placed again while the page scrolls under it and whenever its buttons change: it was placed
+  // only when the mouse entered an image, so on a tall image it stayed behind as you scrolled,
+  // and a wider label ("Translating…") ran past the image's edge.
   function positionBar() {
     if (!hoverImg) return;
     const r = hoverImg.getBoundingClientRect();
     bar.style.left = Math.max(4, Math.min(window.innerWidth - bar.offsetWidth - 4, r.right - bar.offsetWidth - 8)) + "px";
     bar.style.top = Math.max(4, r.top + 8) + "px";
   }
+  let barFrame = 0;
+  const followBar = () => { if (hoverImg && !barFrame) barFrame = requestAnimationFrame(() => { barFrame = 0; positionBar(); }); };
   function scheduleHide() {
     clearTimeout(hideTimer);
     hideTimer = setTimeout(() => { bar.classList.remove("visible"); hoverImg = null; }, 350);
   }
   function refreshBar() {
-    const e = hoverImg ? entries.get(hoverImg) : null;
-    const st = e?.status;
+    const e = hoverImg && entries.get(hoverImg)?.src === srcOf(hoverImg) ? entries.get(hoverImg) : null;
+    // what the button does applies to what's on screen: the page, or a tall image's parts there
+    const ss = e ? shownUnits(hoverImg).map((k) => e.units.get(k)?.status) : [];
+    const st = ss.includes("working") ? "working" : ss.includes("queued") ? "queued" : ss.length && ss.every((x) => x === "done") ? "done" : null;
     btnTranslate.textContent = st === "working" ? T("content_btn_translating") : st === "queued" ? T("content_btn_queued") : st === "done" ? T("content_btn_redo") : T("content_btn_translate");
     btnTranslate.disabled = st === "working" || st === "queued";
-    btnToggle.style.display = st === "done" ? "" : "none";
+    btnToggle.style.display = e?.result ? "" : "none";
     btnToggle.textContent = e?.hidden || allHidden ? T("content_btn_show") : T("content_btn_hide");
-    btnReport.style.display = st === "done" && settings.debugOverlay ? "" : "none";
-    status.textContent = e?.error ? "⚠ " + e.error : st === "done" && e.result ? TN("content_lines", e.result.items.length) : "";
+    btnReport.style.display = e?.result && settings.debugOverlay ? "" : "none";
+    status.textContent = e?.error ? "⚠ " + e.error : e?.result ? TN("content_lines", e.result.items.length) : "";
     status.style.display = status.textContent ? "" : "none";
+    followBar();
   }
 
   document.addEventListener("mouseover", (ev) => {
@@ -224,7 +319,13 @@
   bar.addEventListener("mouseleave", scheduleHide);
 
   // Only real user clicks may spend tokens (a page script can't synthesize isTrusted).
-  btnTranslate.addEventListener("click", (ev) => { if (ev.isTrusted && hoverImg) enqueue(hoverImg, entries.get(hoverImg)?.status === "done"); });
+  // (a tall image: its parts on screen; Redo when they're all translated)
+  btnTranslate.addEventListener("click", (ev) => {
+    if (!ev.isTrusted || !hoverImg) return;
+    const e = entries.get(hoverImg)?.src === srcOf(hoverImg) ? entries.get(hoverImg) : null;
+    const keys = shownUnits(hoverImg), redo = keys.every((k) => e?.units.get(k)?.status === "done");
+    for (const k of keys) if (redo || e?.units.get(k)?.status !== "done") enqueue(hoverImg, redo, false, k);
+  });
   btnToggle.addEventListener("click", (ev) => {
     if (!ev.isTrusted || !hoverImg) return;
     const e = entries.get(hoverImg);
@@ -242,6 +343,7 @@
       gytakusub: chrome.runtime.getManifest().version, when: new Date().toISOString(), page: location.href, image: e.src,
       natural: [img.naturalWidth, img.naturalHeight], displayed: [Math.round(img.getBoundingClientRect().width), Math.round(img.getBoundingClientRect().height)], objectFit: e.objectFit,
       work: res.work, letter: res.letter, fromCache: res.fromCache, timing: res.timing, engine: res.engine,
+      ...(res.parts ? { parts: res.parts } : {}), // a tall image's parts: each one's timing
       // how the overlay was drawn: the screen's pixel ratio, its pixels, and each line's size on screen (CSS px)
       overlay: { dpr: window.devicePixelRatio || 1, backing: [e.canvas?.width || 0, e.canvas?.height || 0],
         // where the overlay sits on screen and where the image's picture is (CSS px): they must match
@@ -257,7 +359,7 @@
   // Export: one .zip with, per translated page, the original image, the debug
   // render (clean page + boxes + text) and the report JSON — nothing to capture by hand.
   async function exportReport(imgs) {
-    const done = imgs.filter((i) => entries.get(i)?.status === "done" && entries.get(i).result);
+    const done = imgs.filter((i) => entries.get(i)?.result);
     if (!done.length) { toast(T("content_nothing_translated")); return { ok: false }; }
     toast(TN("content_preparing_report", done.length), 20000);
     const files = [];
@@ -271,12 +373,17 @@
       // debug render: the whole cleaned page (from the worker, cached answer, no model call) + boxes + text
       try {
         const msg = /^(blob|data):/i.test(e.src) ? { dataUrl: await blobToDataUrl(await (await fetch(e.src)).blob()) } : { url: e.src };
-        const full = await chrome.runtime.sendMessage({ type: "TRANSLATE", wantClean: true, ...msg });
-        if (full?.cleanDataUrl) {
-          const clean = await loadImage(full.cleanDataUrl);
+        // a tall image's parts each come back with their own rows (cleanTop: where they start)
+        const cleans = [];
+        for (const part of res.parts ? res.parts.map((x) => x.part) : [null]) {
+          const full = await chrome.runtime.sendMessage({ type: "TRANSLATE", wantClean: true, ...msg, ...(part != null ? { part } : {}) });
+          if (full?.cleanDataUrl) cleans.push({ img: await loadImage(full.cleanDataUrl), top: full.cleanTop || 0 });
+        }
+        if (cleans.length) {
           const c = document.createElement("canvas"); c.width = res.work.W; c.height = res.work.H;
           const ctx = c.getContext("2d");
-          ctx.drawImage(clean, 0, 0, res.work.W, res.work.H); drawDebug(ctx, res);
+          for (const cl of cleans) ctx.drawImage(cl.img, 0, cl.top, res.work.W, cl.img.height * (res.work.W / cl.img.width));
+          drawDebug(ctx, res);
           await Promise.all([ensureFont(), ensureHyphenation()]);
           GyText.draw(ctx, res.placements, lettering(res));
           const png = await new Promise((r) => c.toBlob(r, "image/png"));
@@ -347,35 +454,39 @@
   let nextJobId = 1, lastScroll = 0;
   const SETTLE_MS = 250;
 
-  /** On screen or within auto-translate's look-ahead (the IntersectionObserver's 200% margin). */
-  function nearScreen(img, screens = 2) {
-    const r = img.getBoundingClientRect(), vh = window.innerHeight, vw = window.innerWidth;
+  /** On screen or within auto-translate's look-ahead (the IntersectionObserver's 200% margin); a unit of the image when `key` names one. */
+  function nearScreen(img, screens = 2, key = WHOLE) {
+    const r = unitRect(img, key), vh = window.innerHeight, vw = window.innerWidth;
     return r.bottom >= -vh * screens && r.top <= vh * (1 + screens) && r.right >= 0 && r.left <= vw;
   }
-  const onScreen = (img) => nearScreen(img, 0);
+  const onScreen = (img, key = WHOLE) => nearScreen(img, 0, key);
   // a hidden tab's pages wait for the visible tab's
-  const priorityOf = (img) => viewportDistance(img) + (document.hidden ? 1e7 : 0);
+  const priorityOf = (img, key = WHOLE) => viewportDistance(img, key) + (document.hidden ? 1e7 : 0);
 
-  function enqueue(img, force = false, auto = false) {
+  function enqueue(img, force = false, auto = false, key = WHOLE) {
     if (!active()) { toast(T("content_off_here")); return; }
-    const e = entries.get(img);
-    if (e?.status === "working") return;
-    if (e?.status === "queued") { // asking for a page auto-translate is holding makes it yours: it isn't put back or paused
-      const job = queue.find((j) => j.img === img);
+    const e = entryFor(img), u = e.units.get(key);
+    if (u?.status === "working") return;
+    if (u?.status === "queued") { // asking for a page auto-translate is holding makes it yours: it isn't put back or paused
+      const job = queue.find((j) => j.img === img && j.key === key);
       if (job && job.auto && !auto) { job.auto = false; job.force ||= force; pump(); }
       return;
     }
-    entries.set(img, { ...(e || { hidden: false }), status: "queued", src: srcOf(img), error: undefined, failures: e && e.src === srcOf(img) ? e.failures : 0 });
-    queue.push({ id: nextJobId++, img, force, auto });
+    e.units.set(key, { ...(u || {}), status: "queued", error: undefined });
+    settle(e);
+    queue.push({ id: nextJobId++, img, key, force, auto });
     refreshBar();
     pump();
   }
 
-  /** A page that was waiting or cancelled goes back to untranslated, keeping its overlay settings. */
-  function putBack(img) {
+  /** A page (or part) that was waiting or cancelled goes back to untranslated, keeping its overlay settings. */
+  function putBack(img, key = WHOLE) {
     const e = entries.get(img);
     if (!e) return;
-    if (!e.result && !e.canvas && !e.hidden) entries.delete(img); else e.status = "idle";
+    const u = e.units.get(key);
+    if (u?.result) u.status = "done"; else e.units.delete(key);
+    settle(e);
+    if (!e.units.size && !e.canvas && !e.hidden) entries.delete(img);
     scheduleReconcile();
   }
 
@@ -398,10 +509,18 @@
   }
   function reconcileAuto() {
     if (!io || !autoOn()) return;
-    for (const img of document.images) {
-      if (!isEligible(img) || !nearScreen(img)) continue;
-      const e = entries.get(img);
-      if (!e || e.status === "idle" || (e.status === "done" && srcOf(img) !== e.src)) enqueue(img, false, true);
+    for (const img of document.images) if (isEligible(img) && nearScreen(img)) autoUnits(img, false);
+  }
+  /** Auto-translate's pick on one image: its page, or its parts near the screen, that aren't
+   * translated, in progress or waiting. A page that failed is tried again when it comes back near
+   * the screen (`retry`: the IntersectionObserver), a part at the next check; twice at most. */
+  function autoUnits(img, retry) {
+    if (!img.naturalWidth) return; // not loaded yet: its size decides its parts (onImgLoad checks again)
+    const e = entries.get(img), fresh = !e || e.src !== srcOf(img);
+    for (const u of unitsOf(img)) {
+      if (!nearScreen(img, 2, u.key)) continue;
+      const s = fresh ? null : e.units.get(u.key);
+      if (!s || s.status === "idle" || (s.status === "error" && (retry || u.key !== WHOLE) && (s.failures || 0) < 2)) enqueue(img, false, true, u.key);
     }
   }
 
@@ -432,14 +551,14 @@
     for (let i = queue.length - 1; i >= 0; i--) {
       const job = queue[i];
       if (!job.img.isConnected) { queue.splice(i, 1); entries.delete(job.img); }
-      else if (job.auto && !nearScreen(job.img)) { queue.splice(i, 1); putBack(job.img); }
+      else if (job.auto && !nearScreen(job.img, 2, job.key)) { queue.splice(i, 1); putBack(job.img, job.key); }
     }
-    queue.sort((a, b) => priorityOf(a.img) - priorityOf(b.img));
+    queue.sort((a, b) => priorityOf(a.img, a.key) - priorityOf(b.img, b.key));
     const sinceScroll = performance.now() - lastScroll, settled = sinceScroll >= SETTLE_MS;
     let waitsForSettle = false;
     for (let i = 0; i < queue.length;) {
       const job = queue[i];
-      const room = running.size < MAX_PARALLEL || onScreen(job.img);
+      const room = running.size < MAX_PARALLEL || onScreen(job.img, job.key);
       if (room && job.auto && !settled) waitsForSettle = true;
       if (!room || (job.auto && !settled)) { i++; continue; }
       if (job.auto && (autoPaused || autoBudgetLeft() <= 0)) { if (!autoPaused) pauseAuto(); i++; continue; }
@@ -463,8 +582,8 @@
     if (running.size) {
       const update = [], cancel = [];
       for (const job of running.values()) {
-        update.push({ id: job.id, distance: priorityOf(job.img), onScreen: !document.hidden && onScreen(job.img) });
-        if (job.auto && (!job.img.isConnected || !nearScreen(job.img))) cancel.push(job.id);
+        update.push({ id: job.id, distance: priorityOf(job.img, job.key), onScreen: !document.hidden && onScreen(job.img, job.key) });
+        if (job.auto && (!job.img.isConnected || !nearScreen(job.img, 2, job.key))) cancel.push(job.id);
       }
       chrome.runtime.sendMessage({ type: "JOBS", page: pageToken, update, cancel }).catch(() => {});
     }
@@ -473,13 +592,14 @@
   function scheduleReport() { if (!jobsTimer && (running.size || queue.length)) jobsTimer = setTimeout(reportJobs, 150); }
   function onScroll() {
     lastScroll = performance.now();
+    followBar();
     scheduleReport();
     scheduleReconcile();
     clearTimeout(settleTimer);
     if (queue.length) settleTimer = setTimeout(pump, SETTLE_MS + 10); // the page you stopped at may now skip the queue
   }
   window.addEventListener("scroll", onScroll, { capture: true, passive: true });
-  window.addEventListener("resize", scheduleReport, { passive: true });
+  window.addEventListener("resize", () => { scheduleReport(); followBar(); }, { passive: true });
   document.addEventListener("visibilitychange", scheduleReport);
 
   // ---------- translation ----------
@@ -534,15 +654,17 @@
   const blobToDataUrl = (blob) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(blob); });
   const loadImage = (dataUrl) => new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error("Could not decode image")); im.src = dataUrl; });
 
-  async function translateImage({ id, img, force = false, auto = false }) {
-    const entry = entries.get(img) || { status: "idle", hidden: false };
-    entry.status = "working"; entry.error = undefined; entry.src = srcOf(img);
-    entries.set(img, entry);
+  async function translateImage({ id, img, key = WHOLE, force = false, auto = false }) {
+    const entry = entryFor(img), unit = entry.units.get(key) || {};
+    entry.units.set(key, unit);
+    unit.status = "working"; unit.error = undefined;
+    settle(entry);
     refreshBar();
     try {
       const src = entry.src;
       keepLine();
-      const msg = { type: "TRANSLATE", force, page: pageToken, jobId: id, distance: priorityOf(img), onScreen: !document.hidden && onScreen(img) };
+      const ask = () => ({ type: "TRANSLATE", force, page: pageToken, jobId: id, distance: priorityOf(img, key), onScreen: !document.hidden && onScreen(img, key), ...(key !== WHOLE ? { part: key } : {}) });
+      const msg = ask();
       if (/^(blob|data):/i.test(src)) {
         const blob = await (await fetch(src)).blob(); // only the page can read its own blob: URLs
         msg.dataUrl = await blobToDataUrl(blob);
@@ -558,23 +680,29 @@
         try {
           const blob = await (await fetch(src)).blob();
           if (!blob.type.startsWith("image/")) throw new Error("not an image");
-          res = await chrome.runtime.sendMessage({ type: "TRANSLATE", force, page: pageToken, jobId: id, distance: priorityOf(img), onScreen: !document.hidden && onScreen(img), dataUrl: await blobToDataUrl(blob) });
+          res = await chrome.runtime.sendMessage({ ...ask(), dataUrl: await blobToDataUrl(blob) });
           if (!res) throw new Error("No response from background worker");
         } catch (e2) { console.info("Gytakusub: page-side fetch did not help either", e2?.message || e2); }
       }
-      if (res.cancelled) { putBack(img); refreshBar(); return; } // scrolled far past before Claude was asked
+      if (res.cancelled) { putBack(img, key); refreshBar(); return; } // scrolled far past before Claude was asked
       if (res.error) throw new Error(res.error);
       if (auto && !res.fromCache) autoSpent.push(performance.now()); // the spending guard counts what Claude answered
-      if (srcOf(img) !== src) { entries.delete(img); return; } // image changed while we worked
-      entry.result = res;
+      if (srcOf(img) !== src) { if (entries.get(img) === entry) { entry.canvas?.remove(); entries.delete(img); } return; } // image changed while we worked
+      // the erased areas only; the page's own image shows through everywhere else
+      unit.patches = await Promise.all(res.patches.map(async (p) => ({ ...p, img: await loadImage(p.dataUrl) })));
+      unit.result = res;
+      merge(entry);
       await render(img, entry);
-      entry.status = "done";
+      unit.status = "done";
+      settle(entry);
+      if (autoOn()) keepWarm();
       watchLayout();
     } catch (e) {
-      entry.status = "error";
-      entry.error = e.message || String(e);
-      entry.failures = (entry.failures || 0) + 1;
-      toast(/^Gytakusub\b/.test(entry.error) ? entry.error : T("content_error", { error: entry.error }), 6000, true);
+      unit.status = "error";
+      unit.error = e.message || String(e);
+      unit.failures = (unit.failures || 0) + 1;
+      settle(entry);
+      toast(/^Gytakusub\b/.test(unit.error) ? unit.error : T("content_error", { error: unit.error }), 6000, true);
       console.warn("Gytakusub", e);
     }
     refreshBar();
@@ -583,8 +711,6 @@
   async function render(img, entry) {
     await Promise.all([ensureFont(), ensureHyphenation()]);
     const res = entry.result;
-    // the erased areas only; the page's own image shows through everywhere else
-    entry.patches = await Promise.all(res.patches.map(async (p) => ({ ...p, img: await loadImage(p.dataUrl) })));
     const canvas = entry.canvas || document.createElement("canvas");
     canvas.className = "overlay";
     entry.img = img; entry.peek = -1;
@@ -632,7 +758,7 @@
   }
   // The area a peek reveals: the bubble when the line sits in one, else the text's footprint.
   function peekRect(p, res) {
-    const region = p.tag != null ? res.regions.find((r) => r.id === p.tag) : null;
+    const region = p.tag != null ? res.regions.find((r) => r.id === p.tag && r.part === p.part) : null; // (tags count from 1 in each part of a tall image)
     const r = region && region.kind === "bubble" ? region.box : p.rect;
     return { x: Math.max(0, r.x - 2), y: Math.max(0, r.y - 2), w: r.w + 4, h: r.h + 4 };
   }
@@ -643,7 +769,7 @@
   // bubbles are hit-tested from the pointer position instead.
   function hitTest(clientX, clientY) {
     for (const [img, e] of entries) {
-      if (e.status !== "done" || !e.canvas || e.canvas.style.display === "none" || !e.result) continue;
+      if (!e.result || !e.canvas || e.canvas.style.display === "none") continue;
       const r = contentRect(img, e.objectFit);
       if (clientX < r.left || clientY < r.top || clientX > r.left + r.width || clientY > r.top + r.height) continue;
       const wx = (clientX - r.left) / r.width * e.result.work.W, wy = (clientY - r.top) / r.height * e.result.work.H;
@@ -755,9 +881,11 @@
     const text = editor.el.querySelector("textarea").value.trim();
     if (text && text !== p.text) {
       p.text = text;
+      if (p.own) p.own.text = text; // (a tall image's part keeps it for the next drawing)
       if (p.item != null && e.result.items[p.item]) e.result.items[p.item].text = text;
       drawOverlay(e);
-      if (p.item != null && e.result.cacheKey) chrome.runtime.sendMessage({ type: "EDIT_ITEM", cacheKey: e.result.cacheKey, item: p.item, text }).catch(() => {});
+      const cacheKey = p.cacheKey || e.result.cacheKey, item = p.own ? p.localItem : p.item;
+      if (item != null && cacheKey) chrome.runtime.sendMessage({ type: "EDIT_ITEM", cacheKey, item, text }).catch(() => {});
     }
     closeEditor();
   }
@@ -881,12 +1009,20 @@
   function translateVisible(force = false) {
     if (!active()) { toast(T("content_off_here")); return; }
     // a page auto-translate is holding (waiting to settle, or paused by the spending guard) counts as untranslated: asking takes it over
-    const autoQueued = (i) => entries.get(i)?.status === "queued" && queue.some((j) => j.img === i && j.auto);
     const skip = force ? ["working", "queued"] : ["done", "working", "queued"];
-    const imgs = visibleImages().filter((i) => !skip.includes(entries.get(i)?.status) || autoQueued(i));
-    if (!imgs.length) { toast(T("content_no_untranslated")); return; }
-    toast(TN("content_translating_n", imgs.length));
-    for (const img of imgs) enqueue(img, force);
+    const todo = [];
+    for (const img of visibleImages()) {
+      if (!img.naturalWidth) continue;
+      const e = entries.get(img), fresh = !e || e.src !== srcOf(img);
+      for (const key of shownUnits(img, 0.5)) {
+        const st = fresh ? undefined : e.units.get(key)?.status;
+        const autoQueued = st === "queued" && queue.some((j) => j.img === img && j.key === key && j.auto);
+        if (!skip.includes(st) || autoQueued) todo.push([img, key]);
+      }
+    }
+    if (!todo.length) { toast(T("content_no_untranslated")); return; }
+    toast(TN("content_translating_n", new Set(todo.map(([img]) => img)).size));
+    for (const [img, key] of todo) enqueue(img, force, false, key);
   }
 
   let io = null, mo = null;
@@ -896,9 +1032,8 @@
       io = new IntersectionObserver((recs) => {
         for (const r of recs) {
           if (!r.isIntersecting || !isEligible(r.target)) continue;
-          const e = entries.get(r.target);
           // an image that failed twice is left alone (a site that refuses the download will refuse again)
-          if (!e || e.status === "idle" || (e.status === "done" && srcOf(r.target) !== e.src) || (e.status === "error" && (e.failures || 0) < 2)) enqueue(r.target, false, true);
+          autoUnits(r.target, true);
         }
       }, { rootMargin: "200% 0px" });
       const observeAll = () => { for (const img of document.images) if (isEligible(img)) io.observe(img); };
@@ -912,7 +1047,9 @@
       document.removeEventListener("load", onImgLoad, true);
     }
   }
-  function onImgLoad(ev) { if (io && isEligible(ev.target)) io.observe(ev.target); }
+  // (a lazy image laid out only now: already observed, it gets no new intersection, so the pages
+  // near the screen are checked again)
+  function onImgLoad(ev) { if (io && isEligible(ev.target)) { io.observe(ev.target); scheduleReconcile(); } }
 
   // ---------- messages from background / popup ----------
 
@@ -924,13 +1061,14 @@
       case "TOGGLE_OVERLAYS": allHidden = !allHidden; layout(); refreshBar(); sendResponse({ hidden: allHidden }); break;
       case "EXPORT_REPORT": exportReport([...entries.keys()]).then(sendResponse, (e) => sendResponse({ error: e.message || String(e) })); return true;
       case "DEBUG_REPORT": {
-        const img = [...entries.keys()].find((i) => entries.get(i)?.status === "done" && (msg.src ? srcOf(i) === msg.src : true));
+        const img = [...entries.keys()].find((i) => entries.get(i)?.result && (msg.src ? srcOf(i) === msg.src : true));
         sendResponse(img ? buildReport(img, entries.get(img)) : { error: "No translated image" });
         break;
       }
       case "GET_STATE": {
         let done = 0, working = 0;
-        for (const e of entries.values()) { if (e.status === "done") done++; if (e.status === "working" || e.status === "queued") working++; }
+        // pages (a tall image counts once): translated, and in progress (a tall image can be both)
+        for (const e of entries.values()) { if (e.result) done++; if (e.status === "working" || e.status === "queued") working++; }
         sendResponse({ done, working, hidden: allHidden, host: hostname, autoOn: autoOn(), excluded: siteExcluded() });
         break;
       }

@@ -78,7 +78,7 @@ export function latticeFill(cv, rgb, hole, source = null, opts = {}) {
     if (all.length < 50) continue;
     // the score is an average: a scattered few thousand of the band's pixels estimate it closely
     const held = sample(all, 3000);
-    const guess = predict(px, rest, w, h, held, cand, reach(band, cand));
+    const guess = predict(px, rest, w, h, held, cand, reach(band, cand), depthTo(cv, rest, w, h));
     let err = 0, base = 0, seen = 0;
     for (let j = 0; j < held.length; j++) {
       if (Number.isNaN(guess[j * 3])) continue;
@@ -93,7 +93,7 @@ export function latticeFill(cv, rgb, hole, source = null, opts = {}) {
 
   // fill
   const holes = []; for (let i = 0; i < n; i++) if (hd[i]) holes.push(i);
-  const fill = predict(px, known, w, h, holes, lattice, reach(inradius, lattice));
+  const fill = predict(px, known, w, h, holes, lattice, reach(inradius, lattice), depthTo(cv, known, w, h));
   const out = img.clone(), od = out.data;
   const left = new cv.Mat(h, w, cv.CV_8UC1, new cv.Scalar(0)), ld = left.data;
   let missing = 0;
@@ -219,12 +219,26 @@ function refine(at, dx, dy) {
   return [dx + off(at(dx - 1, dy), at(dx + 1, dy)), dy + off(at(dx, dy - 1), at(dx, dy + 1))];
 }
 
+/** Each pixel's distance to the nearest known pixel (exact; 0 on known pixels). */
+function depthTo(cv, known, w, h) {
+  const m = new cv.Mat(h, w, cv.CV_8UC1), md = m.data;
+  for (let i = 0; i < md.length; i++) md[i] = known[i] ? 0 : 255;
+  const d = new cv.Mat();
+  cv.distanceTransform(m, d, cv.DIST_L2, cv.DIST_MASK_PRECISE);
+  const out = new Float32Array(d.data32F);
+  m.delete(); d.delete();
+  return out;
+}
+
 /**
  * For each target pixel, the average of its nearest lattice copies (up to 4, within `reach`
  * pixels) that land on known pixels, sampled between pixels. NaN where none is in reach.
+ * `depth` (depthTo) only saves time: a copy nearer than a pixel's distance to the known pixels,
+ * less the 1.42 px its four samples reach, can't land on them, so the search starts past those
+ * (on a big area at a page's own size, most of the copies tried; 2.12.0 tried them all).
  * @returns {Float32Array} 3 values per target
  */
-function predict(px, known, w, h, targets, [v1, v2], reach) {
+function predict(px, known, w, h, targets, [v1, v2], reach, depth = null) {
   const S = Math.min(24, Math.ceil(reach / Math.min(len(v1), len(v2))) + 1);
   const offs = [];
   for (let a = -S; a <= S; a++) for (let b = -S; b <= S; b++) {
@@ -233,15 +247,20 @@ function predict(px, known, w, h, targets, [v1, v2], reach) {
     if (d <= reach) offs.push([ox, oy, d]);
   }
   offs.sort((p, q) => p[2] - q[2]);
+  const OX = Float64Array.from(offs, (o) => o[0]), OY = Float64Array.from(offs, (o) => o[1]), OD = Float64Array.from(offs, (o) => o[2]);
+  // the four samples of a copy at once: all known
+  const quad = new Uint8Array(w * h);
+  for (let y = 0; y + 1 < h; y++) for (let x = 0, p = y * w; x + 1 < w; x++, p++) quad[p] = known[p] & known[p + 1] & known[p + w] & known[p + w + 1];
+  const firstPast = (dmin) => { let lo = 0, hi = OD.length; while (lo < hi) { const mid = (lo + hi) >> 1; if (OD[mid] < dmin) lo = mid + 1; else hi = mid; } return lo; };
   const out = new Float32Array(targets.length * 3).fill(NaN);
   for (let j = 0; j < targets.length; j++) {
     const i = targets[j], x = i % w, y = (i - x) / w;
     let r = 0, g = 0, b = 0, c = 0;
-    for (const [ox, oy] of offs) {
-      const qx = x + ox, qy = y + oy, x0 = Math.floor(qx), y0 = Math.floor(qy);
+    for (let k = depth && depth[i] > 3 ? firstPast(depth[i] - 2) : 0; k < OD.length; k++) {
+      const qx = x + OX[k], qy = y + OY[k], x0 = Math.floor(qx), y0 = Math.floor(qy);
       if (x0 < 0 || y0 < 0 || x0 + 1 >= w || y0 + 1 >= h) continue;
       const p00 = y0 * w + x0, p10 = p00 + 1, p01 = p00 + w, p11 = p01 + 1;
-      if (!known[p00] || !known[p10] || !known[p01] || !known[p11]) continue;
+      if (!quad[p00]) continue;
       const fx = qx - x0, fy = qy - y0, w00 = (1 - fx) * (1 - fy), w10 = fx * (1 - fy), w01 = (1 - fx) * fy, w11 = fx * fy;
       r += px[p00 * 3] * w00 + px[p10 * 3] * w10 + px[p01 * 3] * w01 + px[p11 * 3] * w11;
       g += px[p00 * 3 + 1] * w00 + px[p10 * 3 + 1] * w10 + px[p01 * 3 + 1] * w01 + px[p11 * 3 + 1] * w11;

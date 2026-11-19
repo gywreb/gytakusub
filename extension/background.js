@@ -4,7 +4,7 @@
 // layout after the model answers), call the Claude Messages API with vision,
 // cache translations, keep per-tab glossary context, relay keyboard commands.
 
-import { callClaude, mergeContext } from "./prompt.js";
+import { callClaude, mergeContext, sliceGeometry } from "./prompt.js";
 import { addCall, addPage, emptyLog } from "./usage.js";
 import { preparePage, prefillPage, finishPage, warmInpainter, inpainterWarm } from "./engine/page.js";
 import { DEFAULT_SETTINGS, getSettings, CS_FILES, ensureContentScript } from "./settings.js";
@@ -151,9 +151,25 @@ async function sha1(str) {
 
 // Returns slices with the image bytes Claude will see (bubbles stamped with
 // numbered marks) plus the detected bubble candidates in full-image fractions.
-async function decode(blob, checkpoint) {
-  const bitmap = await createImageBitmap(blob);
-  try { return await preparePage(bitmap, await getSettings(), { checkpoint }); } finally { bitmap.close(); }
+// The page analysed, and the page at its own size when it was analysed smaller (the erased areas
+// come back at its resolution; the caller closes it). A part of a tall image (`index`: one of its
+// slices, prompt.js sliceGeometry) keeps only its own rows.
+async function decode(blob, checkpoint, index = null) {
+  let bitmap = await createImageBitmap(blob), part = null;
+  const settings = await getSettings();
+  if (index != null) {
+    const geometry = sliceGeometry(bitmap.width, bitmap.height, settings), s = geometry.length > 1 ? geometry[index] : null;
+    if (!s) { bitmap.close(); throw new Error(`Gytakusub: this image has no part ${index}`); }
+    part = { W: bitmap.width, H: bitmap.height, index, y0: s.y };
+    const rows = await createImageBitmap(bitmap, 0, s.y, bitmap.width, s.h);
+    bitmap.close(); bitmap = rows;
+  }
+  let job;
+  try { job = await preparePage(bitmap, settings, { checkpoint, part }); }
+  catch (e) { bitmap.close(); throw e; }
+  if (job.scale < 0.999) return { job, natural: bitmap };
+  bitmap.close();
+  return { job, natural: null };
 }
 
 // ---------- per-tab chapter context (names + recent dialogue) ----------
@@ -238,6 +254,7 @@ function updateJobs(tabId, { page = "", update = [], cancel = [] } = {}) {
 chrome.runtime.onConnect.addListener((port) => {
   if (port.sender?.id !== chrome.runtime.id || !port.name.startsWith("gyt-page:")) return;
   const prefix = `${port.sender.tab?.id ?? -1}:${port.name.slice("gyt-page:".length)}:`;
+  port.onMessage.addListener(() => {}); // the page's word while you read: receiving it keeps this worker (and its models) alive
   port.onDisconnect.addListener(() => {
     for (const [key, j] of jobs) {
       if (!key.startsWith(prefix)) continue;
@@ -271,11 +288,27 @@ async function handleTranslate(msg, sender) {
   }
 }
 
+// Pages being analysed (or waiting to be). The learned fill's model loads and runs once
+// (engine/page.js warmInpainter) beside the lane, but its first run holds the engine's models for
+// its length (seconds, on a worker's first start): the pages near the screen are analysed first,
+// so their questions go out, unless that takes longer than 5 s. A page whose answer is in and
+// needs the model starts it at once.
+let analysing = 0, quiet = null;
+function warmWhenQuiet() {
+  if (inpainterWarm()) return warmInpainter();
+  return (quiet ??= (async () => {
+    const t = performance.now();
+    while (analysing && performance.now() - t < 5000) await new Promise((r) => setTimeout(r, 100));
+    return warmInpainter();
+  })());
+}
+
 async function translatePage(msg, settings, tabId, work) {
   const { signal } = work.ctl;
   const priority = () => work.distance;
   const held = heldFor(work);
-  const cacheKey = "cache:" + (await sha1(`${PROMPT_VERSION}|${settings.model}|${settings.targetLang}|${settings.includeSource}|${settings.useContext}|${msg.url || msg.dataUrl}`)); // the whole data URL: two images can share a beginning
+  const part = Number.isInteger(msg.part) && msg.part >= 0 && msg.part < 1000 ? msg.part : null; // one slice of a tall image
+  const cacheKey = "cache:" + (await sha1(`${PROMPT_VERSION}|${settings.model}|${settings.targetLang}|${settings.includeSource}|${settings.useContext}|${msg.url || msg.dataUrl}${part != null ? "#part" + part : ""}`)); // the whole data URL: two images can share a beginning
   const cached = (await chrome.storage.session.get(cacheKey))[cacheKey];
   const timing = {}; let t = performance.now();
   const lap = (k) => { const n = performance.now(); timing[k] = Math.round(n - t); t = n; };
@@ -286,11 +319,12 @@ async function translatePage(msg, settings, tabId, work) {
   // time spent waiting for the engine before the analysis and the finish could start (other pages first)
   let asked = performance.now();
   timing.wait = 0;
-  const job = await lane.run((checkpoint) => { timing.wait += Math.round(performance.now() - asked); return decode(blob, checkpoint); }, priority, signal, held); lap("analyze");
+  analysing++;
+  let job, natural;
+  try { ({ job, natural } = await lane.run((checkpoint) => { timing.wait += Math.round(performance.now() - asked); return decode(blob, checkpoint, part); }, priority, signal, held)); }
+  finally { analysing--; }
+  lap("analyze");
   engineOnCpu = !/detect:webgpu/.test(job.slices?.[0]?.analysis?.backend || "");
-  // the page at its own size again (when it was analysed smaller), so the erased areas come back
-  // with its own resolution: made once, for the prefill and the finish
-  const natural = job.scale < 0.999 ? await createImageBitmap(blob).catch(() => null) : null;
   try {
     return await answerPage(msg, settings, tabId, work, { job, natural, cached, cacheKey, timing, lap, priority, held });
   } finally { natural?.close(); }
@@ -346,7 +380,7 @@ async function answerPage(msg, settings, tabId, work, { job, natural, cached, ca
     const prefilled = (async () => {
       const { later } = await pass();
       if (!later) return;
-      await Promise.race([warmInpainter(), new Promise((r) => pre.signal.addEventListener("abort", r, { once: true }))]);
+      await Promise.race([warmWhenQuiet(), new Promise((r) => pre.signal.addEventListener("abort", r, { once: true }))]);
       if (!pre.signal.aborted) await pass();
     })().catch(() => {});
     let failed = null;
@@ -401,7 +435,7 @@ async function answerPage(msg, settings, tabId, work, { job, natural, cached, ca
     const patches = await Promise.all(page.patches.map(async (p) => ({ x: p.x, y: p.y, w: p.w, h: p.h, dataUrl: await blobToDataUrl(await p.canvas.convertToBlob({ type: "image/png" })) })));
     let cleanDataUrl = null;
     if (msg.wantClean) {
-      const big = page.work.W * page.work.H > 2.6e6;
+      const big = page.canvas.width * page.canvas.height > 2.6e6;
       cleanDataUrl = await blobToDataUrl(await page.canvas.convertToBlob(big ? { type: "image/jpeg", quality: 0.92 } : { type: "image/png" }));
     }
     return { page, patches, cleanDataUrl };
@@ -415,7 +449,7 @@ async function answerPage(msg, settings, tabId, work, { job, natural, cached, ca
   return {
     items: page.items, placements: page.placements, regions: page.regions, letter: page.letter, engine: page.engine,
     work: page.work, width: job.width, height: job.height, usage, timing,
-    patches, cleanDataUrl, fromCache: !!(cached && !msg.force), cacheKey,
+    patches, cleanDataUrl, cleanTop: page.canvasTop || 0, part: job.part, fromCache: !!(cached && !msg.force), cacheKey,
   };
 }
 
