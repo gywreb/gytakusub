@@ -62,7 +62,7 @@ self.onmessage = async (e) => {
       } finally { natural?.close(); }
       const patches = page.patches.map((p) => ({ x: p.x, y: p.y, w: p.w, h: p.h, bitmap: p.canvas.transferToImageBitmap() }));
       // (and what the debug report records: which engine, where the models ran, their times, how the areas were filled)
-      self.postMessage({ id, ok: true, items: page.items, placements: page.placements, regions: page.regions, work: page.work, letter: page.letter, patches, engine: page.engine, backend: page.backend, detectMs: page.detectMs, segmentMs: page.segmentMs, fill: page.fill, modelWait }, patches.map((p) => p.bitmap));
+      self.postMessage({ id, ok: true, items: page.items, placements: page.placements, regions: page.regions, work: page.work, letter: page.letter, patches, engine: page.engine, backend: page.backend, detectMs: page.detectMs, segmentMs: page.segmentMs, fill: page.fill, look: page.look, modelWait }, patches.map((p) => p.bitmap));
     } else if (type === "drop") {
       const job = jobs.get(e.data.jobId); jobs.delete(e.data.jobId);
       if (job) { await stopPrefill(job); for (const s of job.slices) s.analysis.dispose(); job.natural?.close(); }

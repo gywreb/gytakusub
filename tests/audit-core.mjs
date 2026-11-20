@@ -16,8 +16,9 @@ import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { createCanvas, loadImage } from "canvas";
-import { cv, analyzePage } from "./cv-node.mjs";
-import { layout } from "../extension/engine/layout.js";
+import { cv, detector, analyzePage } from "./cv-node.mjs";
+import { lookAgain } from "../extension/engine/page.js";
+import { layout, said } from "../extension/engine/layout.js";
 import { erase, fillTexture } from "../extension/engine/erase.js";
 import { getOrt, createSession, run as ortRun } from "../extension/engine/ort.js";
 import { loadLettering } from "./lettering-setup.mjs";
@@ -37,8 +38,17 @@ function rematch(an, rep, it) {
   if (it.tag == null) return null;
   const then = rep.regions.find((r) => r.id === it.tag);
   if (!then) return null;
-  const cx = then.box.x + then.box.w / 2, cy = then.box.y + then.box.h / 2;
-  let best = null;
+  // the region now that overlaps the region then the most (two bubbles' boxes can overlap, so the
+  // smallest box around the old centre can be the neighbour); the centre rule only for older
+  // reports whose regions no longer match any
+  const a = then.box, iou = (b) => {
+    const w = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x), h = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+    return w > 0 && h > 0 ? (w * h) / (a.w * a.h + b.w * b.h - w * h) : 0;
+  };
+  let best = null, bestIou = 0.3;
+  for (const r of an.regions) { const v = iou(r.box); if (v > bestIou) { best = r; bestIou = v; } }
+  if (best) return best.id;
+  const cx = a.x + a.w / 2, cy = a.y + a.h / 2;
   for (const r of an.regions) if (cx >= r.box.x && cy >= r.box.y && cx <= r.box.x + r.box.w && cy <= r.box.y + r.box.h && (!best || r.box.w * r.box.h < best.box.w * best.box.h)) best = r;
   return best ? best.id : null;
 }
@@ -111,6 +121,8 @@ for (const pg of summary.pages) {
     if (Array.isArray(box) && !box.every((v) => v <= 1.0001)) box = [box[0] / W, box[1] / H, box[2] / W, box[3] / H];
     return { tag: rematch(an, rep, it), box, text: it.text, size: it.size, kind: it.kind, index };
   });
+  // the second look at lettering Claude translated where the analysis found none (2.13; GYT_LOOK=0: without)
+  if (process.env.GYT_LOOK !== "0") await lookAgain(cv, pixels, an, items, detector);
   const { placements, regionIds } = layout(an, items);
   // GYT_ERASED=dir: measure pages erased by an earlier run (its p<id>-erased.png), without erasing again
   let clean;
@@ -122,6 +134,8 @@ for (const pg of summary.pages) {
   const after = clean.data;
 
   const untagged = placements.filter((p) => p.tag == null).length;
+  // drawn by its box alone, over whatever is there (nothing erased under it)
+  for (const p of placements) if (p.tag == null) cases.push({ page: pg.id, what: "untagged", text: p.text.slice(0, 40), at: [p.rect.x, p.rect.y, p.rect.w, p.rect.h].map(Math.round) });
   // marks left in each erased area (residue.mjs): bubbles against their interior, free text
   // against the page around it. The measure holds on a plain surround only; areas on a textured
   // one (screentone, art) are counted apart, and fill-truth.mjs measures their fill.
@@ -139,7 +153,8 @@ for (const pg of summary.pages) {
   const blocks = [...regionIds].filter((id) => an.regions.find((r) => r.id === id)?.kind !== "bubble").length;
 
   // Claude's box for each item, in work pixels
-  const seen = items.map((it) => (Array.isArray(it.box) ? { x: it.box[0] * W, y: it.box[1] * H, w: it.box[2] * W, h: it.box[3] * H } : null));
+  // (a line with nothing to translate, only marks, is left as drawn by design: not counted)
+  const seen = items.map((it) => (Array.isArray(it.box) && said(it.text) ? { x: it.box[0] * W, y: it.box[1] * H, w: it.box[2] * W, h: it.box[3] * H } : null));
   // lettering left (the witness): its text on the original inside a translated line's box, still there after erasing
   let lettering = 0, left = 0;
   if (rtdetr) {

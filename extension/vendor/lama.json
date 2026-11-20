@@ -1,0 +1,9 @@
+{
+  "source": "https://huggingface.co/ogkalu/lama-manga-onnx-dynamic/blob/ee4ed4a8447b6730fc41d34f90876b6c48af925a/lama-manga-dynamic.onnx",
+  "upstreamSha256": "de31ffa5ba26916b8ea35319f6c12151ff9654d4261bccf0583a69bb095315f9",
+  "made": "scripts/lama-static.py --side 512",
+  "license": "Apache-2.0 (the ONNX export; LaMa: Apache-2.0; the manga weights, dreMaz/AnimeMangaInpainting: MIT)",
+  "what": "LaMa finetuned on 300k manga and anime images, fixed at 512 x 512, float16 weights",
+  "bytes": 103040339,
+  "sha256": "6d6bd9fc1c1c3fb6377f204b8a77173f697069a6ab2df497f3729199b38caa42"
+}

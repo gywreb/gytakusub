@@ -10,6 +10,7 @@ following, each under its own licence; the licence texts ship next to the files.
 | PaddleOCR PP-OCRv6 (small) text detector | `vendor/ppocr-det.onnx`, `vendor/ppocr-det.json` | Apache-2.0 | `vendor/LICENSE-PaddleOCR.txt` |
 | Speech-bubble segmentation model (kitsumed, Ultralytics YOLOv8m-seg), int8 | `vendor/segment.onnx` (CPU), `vendor/segment-gpu.onnx` (WebGPU), `vendor/segment.json` | GPL-3.0 (model card) / Ultralytics AGPL-3.0 | `vendor/LICENSE-segment.txt` |
 | AOT-GAN inpainting model trained on manga (lemon-manga-translator), float32 | `vendor/inpaint.onnx`, `vendor/inpaint.json` (source and checksum) | GPL-3.0 | `vendor/LICENSE-inpaint.txt` |
+| LaMa inpainting finetuned on manga and anime (dreMaz/AnimeMangaInpainting, ONNX export by ogkalu), fixed at 512 px, float16 weights (extension only) | `vendor/lama.onnx`, `vendor/lama.json` (source and checksum) | Apache-2.0 (export, LaMa); MIT (weights) | `vendor/LICENSE-lama.txt` |
 | English hyphenation patterns (hyphen) | `vendor/hyphen-en.js` | ISC | `vendor/LICENSE-hyphen.txt` |
 | Comic Neue Bold | `fonts/ComicNeue-Bold.ttf` | SIL OFL 1.1 | `fonts/LICENSE-ComicNeue.txt` |
 

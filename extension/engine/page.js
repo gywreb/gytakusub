@@ -2,12 +2,12 @@
 // text regions for the model) and finish (place the translations, erase the
 // original lettering, hand back a cleaned page plus text placements).
 // Used by the extension's service worker and by the web app's Web Worker.
-import { getCV, getDetector, getSegmenter, getFallbackDetector, getInpainter, setEnginePrefs } from "./cv.js";
+import { getCV, getDetector, getSegmenter, getFallbackDetector, getInpainter, inpainterSide, setEnginePrefs } from "./cv.js";
 import { ortBroken, gpuIsSoftware } from "./ort.js";
 import { analyze } from "./analyze.js";
 import { segment } from "./segment.js";
-import { detectText, detectInEmptyBubbles, detectInDarkShapes } from "./detect.js";
-import { layout } from "./layout.js";
+import { detectText, detectInEmptyBubbles, detectInDarkShapes, detectInTranslatedBoxes } from "./detect.js";
+import { layout, said } from "./layout.js";
 import { erase, eraseFullSize, fillTexture, contextMargin, NotLoaded } from "./erase.js";
 import { aotInpaint, GPU_SIDE } from "./inpaint.js";
 
@@ -121,10 +121,13 @@ export async function finishPage(job, results, opts = {}) {
   // the learned eraser's model, loaded the first time an area needs it (white bubbles and
   // screentone don't); null when opts.learned is false: rules and Telea, as before 2.12
   const inpainter = opts.learned === false ? null : () => getInpainter();
+  const side = inpainter ? await inpainterSide() : 0; // LaMa sees the page around each area
   const items = [], placements = [], regions = [], rois = [], patches = [];
   // what erasing cost on this page (the debug report shows it): areas by how they were filled, and
   // the time the texture fills took (the part 2.12 added)
   const fill = { ms: 0, flat: 0, tone: 0, learned: 0, telea: 0, ready: 0 };
+  // the second look at translated lines with no lettering found under them: boxes looked at, lines found, time
+  const look = { boxes: 0, lines: 0, ms: 0 };
   // areas prefillPage() already filled while the translation was on the way (same inputs, same result)
   const cache = job.fills || null;
   // the cleaned page at work size; a part's own rows only (a whole tall image's would be tens of MB)
@@ -142,6 +145,8 @@ export async function finishPage(job, results, opts = {}) {
     items.push(...norm);
     // layout wants boxes as fractions of this slice; `index` ties a placement back to its item (edits)
     const local = norm.map((it, k) => ({ ...it, index: first + k, box: it.box ? [((it.box[0] * width) - s.x) / s.w, ((it.box[1] * height) - s.y) / s.h, (it.box[2] * width) / s.w, (it.box[3] * height) / s.h] : null }));
+    const seen = await lookAgain(cv, s.imageData, an, local);
+    for (const k of ["boxes", "lines", "ms"]) look[k] += seen[k];
     const { placements: pl, regionIds } = layout(an, local, { newId });
     for (const p of pl) placements.push({ ...p, rect: { x: p.rect.x + s.ox, y: p.rect.y + s.oy, w: p.rect.w, h: p.rect.h } });
     for (const r of an.regions) regions.push({ id: r.id, kind: r.kind, letter: r.letter, box: { x: r.box.x + s.ox, y: r.box.y + s.oy, w: r.box.w, h: r.box.h } });
@@ -150,11 +155,11 @@ export async function finishPage(job, results, opts = {}) {
       clean = erase(cv, s.imageData, an, regionIds, { keepMask: true, outline: OUTLINE });
       // textured areas at the size the page was analysed at (when that is its own size, the
       // patches come from here; else the full-size pass below does them)
-      if (!full) clean.image = await fillTexture(cv, inpainter, clean.image, clean, { cache });
+      if (!full) clean.image = await fillTexture(cv, inpainter, clean.image, clean, { cache, side });
     }
     ctx.putImageData(clean.image, s.ox, s.oy - top);
     if (full && clean.mask) {
-      for (const r of clean.rois) { const p = await fullSizePatch(cv, opts.natural, s, scale, clean.mask, r, inpainter, clean.surface, cache); if (p) patches.push(p); }
+      for (const r of clean.rois) { const p = await fullSizePatch(cv, opts.natural, s, scale, clean.mask, r, inpainter, clean.surface, cache, side); if (p) patches.push(p); }
     } else {
       for (const r of clean.rois) rois.push({ x: r.x + s.ox, y: r.y + s.oy, w: r.w, h: r.h });
     }
@@ -183,7 +188,32 @@ export async function finishPage(job, results, opts = {}) {
   if (job.prefillMs != null) fill.pre = job.prefillMs; // the time prefillPage() spent while the translation was on the way
   if (inpainterTimes.load != null) fill.model = { ...inpainterTimes }; // its load and first run, once per worker
   job.fills = null;
-  return { items, placements, regions, work, letter, canvas, canvasTop: top, patches, fullSize: full, engine, segmentMs, detectMs, backend, fill };
+  return { items, placements, regions, work, letter, canvas, canvasTop: top, patches, fullSize: full, engine, segmentMs, detectMs, backend, fill, look };
+}
+
+/**
+ * The second look (detect.js detectInTranslatedBoxes) at the lines Claude translated where the
+ * analysis found no lettering: what it finds joins the analysis's lines, for the layout to erase.
+ * Without a detector (or when it fails) the page goes on as it was.
+ * @param {Array<{box:(number[]|null), text:string}>} items boxes as fractions of the slice
+ */
+export async function lookAgain(cv, img, an, items, det = null) {
+  const look = { boxes: 0, lines: 0, ms: 0 };
+  if (!an.learned) return look;
+  const W = img.width, H = img.height;
+  const boxes = items.filter((it) => it.box && it.text && said(it.text)).map((it) => ({ x: it.box[0] * W, y: it.box[1] * H, w: it.box[2] * W, h: it.box[3] * H }));
+  if (!boxes.length) return look;
+  const t0 = Date.now();
+  try {
+    det = det || (ortBroken() ? await getFallbackDetector() : await getDetector());
+    if (det) {
+      const lines = await detectInTranslatedBoxes(cv, det, img, an.lines || [], boxes, look);
+      look.lines = lines.length - (an.lines || []).length;
+      an.lines = lines;
+    }
+  } catch (e) { console.warn("Gytakusub: second look failed", e); }
+  look.ms = Date.now() - t0;
+  return look;
 }
 
 /**
@@ -207,6 +237,7 @@ export function warmInpainter() {
         // The second run's time tells what was first-run cost. On the CPU, a small area (a fill
         // there costs ~40 µs a pixel, so a large one would cost seconds); on a GPU emulated on the
         // CPU (test machines), 128 px, which makes the same 33 programs.
+        // LaMa (on a graphics card only) takes one size, 512 px, whatever the area.
         const cv = await getCV(), side = model.ep === "wasm" ? 72 : gpuIsSoftware() ? 128 : GPU_SIDE;
         const rgb = new cv.Mat(side, side, cv.CV_8UC3, new cv.Scalar(200, 200, 200)), hole = cv.Mat.zeros(side, side, cv.CV_8UC1);
         cv.rectangle(hole, new cv.Point(side / 3, side / 3), new cv.Point((2 * side) / 3, (2 * side) / 3), new cv.Scalar(255), -1);
@@ -216,7 +247,7 @@ export function warmInpainter() {
         t1 = performance.now();
         (await aotInpaint(cv, model, rgb, hole)).delete();
         inpainterTimes.again = Math.round(performance.now() - t1);
-        inpainterTimes.side = side;
+        inpainterTimes.side = model.side || side; inpainterTimes.kind = model.kind;
         rgb.delete(); hole.delete();
       } catch (e) { console.warn("Gytakusub: inpainter warm-up failed", e); }
       return model;
@@ -228,7 +259,7 @@ let warming = null, warmed = null;
 /** Whether warmInpainter() is done (no page then waits for the model). */
 export const inpainterWarm = () => !!warmed;
 /** How long the inpainter took to load and to run first (ms; null until it has). */
-export const inpainterTimes = { load: null, warm: null, again: null, side: null };
+export const inpainterTimes = { load: null, warm: null, again: null, side: null, kind: null };
 
 /**
  * Fills a page's textured areas ahead of its translation, while the caller waits for Claude
@@ -254,6 +285,7 @@ export async function prefillPage(job, opts = {}) {
   const full = !!opts.natural && job.scale < 0.999;
   const cache = job.fills || (job.fills = new Map());
   const inpainter = () => { if (!warmed) throw new NotLoaded(); return warmed.model; };
+  const side = await inpainterSide();
   let later = 0;
   // the time spent filling, not waiting at checkpoints for other pages
   let waited = 0;
@@ -265,13 +297,13 @@ export async function prefillPage(job, opts = {}) {
       const clean = erase(cv, s.imageData, an, new Set(an.regions.map((r) => r.id)), { keepMask: true, outline: OUTLINE });
       try {
         if (!full) {
-          await fillTexture(cv, inpainter, clean.image, clean, { cache, checkpoint });
+          await fillTexture(cv, inpainter, clean.image, clean, { cache, checkpoint, side });
           later += clean.rois.filter((r) => r.filled === "later").length;
         } else {
           for (const r of clean.rois) {
             if (r.fill !== "texture") continue;
             if (checkpoint) await checkpoint();
-            try { await fullSizePatch(cv, opts.natural, s, job.scale, clean.mask, r, inpainter, clean.surface, cache); }
+            try { await fullSizePatch(cv, opts.natural, s, job.scale, clean.mask, r, inpainter, clean.surface, cache, side); }
             catch (e) { if (!(e instanceof NotLoaded)) throw e; later++; }
           }
         }
@@ -286,7 +318,7 @@ export async function prefillPage(job, opts = {}) {
  * One erased area again at the page's own size: the work-resolution area `r` (slice coordinates)
  * widened to whole page pixels, cut from the full-size page, inpainted with the work mask resampled.
  */
-async function fullSizePatch(cv, natural, s, scale, mask, r, model, surface, cache = null) {
+async function fullSizePatch(cv, natural, s, scale, mask, r, model, surface, cache = null, side = 0) {
   // a texture fill sees some of the page around the area (the patch is then that much larger;
   // outside the mask its pixels are the page's own)
   const m = r.fill === "texture" ? contextMargin(r.letter) : 0;
@@ -296,7 +328,16 @@ async function fullSizePatch(cv, natural, s, scale, mask, r, model, surface, cac
   if (nw < 1 || nh < 1) return null;
   const c = new OffscreenCanvas(nw, nh), cctx = c.getContext("2d", { willReadFrequently: true });
   cctx.drawImage(natural, nx, ny - (s.ny0 || 0), nw, nh, 0, 0, nw, nh);
-  const done = await eraseFullSize(cv, cctx.getImageData(0, 0, nw, nh), nx, ny, mask, scale, s.x, s.y, r, model, surface, cache);
+  // a learned inpainter of one size sees that much of the full-size page around the patch
+  let context = null;
+  if (side && r.fill === "texture" && nw <= side && nh <= side) {
+    const cx0 = Math.max(s.x, Math.min(s.x + s.w - Math.min(side, s.w), Math.round(nx + nw / 2 - side / 2))), cy0 = Math.max(s.y, Math.min(s.y + s.h - Math.min(side, s.h), Math.round(ny + nh / 2 - side / 2)));
+    const cw = Math.min(side, s.w), ch = Math.min(side, s.h);
+    const k = new OffscreenCanvas(cw, ch), kx = k.getContext("2d", { willReadFrequently: true });
+    kx.drawImage(natural, cx0, cy0 - (s.ny0 || 0), cw, ch, 0, 0, cw, ch);
+    context = { image: kx.getImageData(0, 0, cw, ch), x: nx - cx0, y: ny - cy0, side };
+  }
+  const done = await eraseFullSize(cv, cctx.getImageData(0, 0, nw, nh), nx, ny, mask, scale, s.x, s.y, r, model, surface, cache, context);
   if (!done) return null;
   cctx.putImageData(done, 0, 0);
   return { x: nx, y: ny, w: nw, h: nh, canvas: c };
