@@ -125,7 +125,7 @@ export async function finishPage(job, results, opts = {}) {
   const items = [], placements = [], regions = [], rois = [], patches = [];
   // what erasing cost on this page (the debug report shows it): areas by how they were filled, and
   // the time the texture fills took (the part 2.12 added)
-  const fill = { ms: 0, flat: 0, tone: 0, learned: 0, telea: 0, ready: 0 };
+  const fill = { ms: 0, flat: 0, tone: 0, learned: 0, telea: 0, ready: 0 }, runs = [];
   // the second look at translated lines with no lettering found under them: boxes looked at, lines found, time
   const look = { boxes: 0, lines: 0, ms: 0 };
   // areas prefillPage() already filled while the translation was on the way (same inputs, same result)
@@ -164,6 +164,7 @@ export async function finishPage(job, results, opts = {}) {
       for (const r of clean.rois) rois.push({ x: r.x + s.ox, y: r.y + s.oy, w: r.w, h: r.h });
     }
     for (const r of clean.rois) { const kind = r.fill === "texture" ? r.filled || "telea" : r.fill || "telea"; fill[kind]++; fill.ms += r.fillMs || 0; if (r.fillHit) fill.ready++; }
+    runs.push(...fillRuns(clean.rois));
     clean.mask?.delete(); clean.surface?.delete();
     an.dispose();
   }
@@ -186,6 +187,10 @@ export async function finishPage(job, results, opts = {}) {
   const backend = job.slices[0]?.analysis.backend || null;
   if (fill.learned) fill.ep = (await getInpainter())?.ep || null; // where the learned fill ran: webgpu / wasm
   if (job.prefillMs != null) fill.pre = job.prefillMs; // the time prefillPage() spent while the translation was on the way
+  // each textured area's fill, here and in the prefill: a slow one shows which (2.13.1: a page's
+  // prefill took 33 s for two areas, and nothing said which)
+  if (runs.length) fill.runs = runs;
+  if (job.preRuns?.length) fill.preRuns = job.preRuns;
   if (inpainterTimes.load != null) fill.model = { ...inpainterTimes }; // its load and first run, once per worker
   job.fills = null;
   return { items, placements, regions, work, letter, canvas, canvasTop: top, patches, fullSize: full, engine, segmentMs, detectMs, backend, fill, look };
@@ -262,6 +267,10 @@ export const inpainterWarm = () => !!warmed;
 /** How long the inpainter took to load and to run first (ms; null until it has). */
 export const inpainterTimes = { load: null, warm: null, again: null, side: null, kind: null };
 
+/** The debug report's record of a slice's textured areas just filled: how, in how long, how big. */
+const fillRuns = (rois) => rois.filter((r) => r.fill === "texture" && r.filled && r.filled !== "later")
+  .map((r) => ({ kind: r.filled, ms: Math.round(r.fillMs || 0), w: r.w, h: r.h, ...(r.fillHit ? { hit: true } : {}) }));
+
 /**
  * Fills a page's textured areas ahead of its translation, while the caller waits for Claude
  * (seconds in which the engine has nothing else to do for this page): every text region is
@@ -300,6 +309,7 @@ export async function prefillPage(job, opts = {}) {
         if (!full) {
           await fillTexture(cv, inpainter, clean.image, clean, { cache, checkpoint, side });
           later += clean.rois.filter((r) => r.filled === "later").length;
+          (job.preRuns ||= []).push(...fillRuns(clean.rois));
         } else {
           for (const r of clean.rois) {
             if (r.fill !== "texture") continue;
@@ -307,6 +317,7 @@ export async function prefillPage(job, opts = {}) {
             try { await fullSizePatch(cv, opts.natural, s, job.scale, clean.mask, r, inpainter, clean.surface, cache, side); }
             catch (e) { if (!(e instanceof NotLoaded)) throw e; later++; }
           }
+          (job.preRuns ||= []).push(...fillRuns(clean.rois));
         }
       } finally { clean.mask?.delete(); clean.surface?.delete(); }
     }

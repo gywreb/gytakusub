@@ -3,11 +3,8 @@
 // browser forbids it — so chapter links go through the fetcher, which opens the
 // page, lists its images and relays them. Setup happens in the Chapter link tab.
 
-// The fetcher code this app was built with (copied in by scripts/sync-shared.mjs).
-import { VERSION } from "./fetcher-worker.js";
 import { t, langTag } from "./i18n.js";
 
-export const FETCHER_VERSION = VERSION; // the newest fetcher: what "Sync fork" brings
 // The oldest fetcher the app works with. Raise it only when chapters can't work otherwise:
 // every user then has to update theirs. Newer features check their own version (USAGE_VERSION).
 export const MIN_FETCHER_VERSION = "2.1.0";

@@ -13,11 +13,54 @@ import { analyzeHeuristic, mergeParagraphs } from "./analyze-heuristic.js";
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const odd = (n) => (n % 2 ? n : n + 1);
 const median = (a) => { if (!a.length) return 0; const t = Float64Array.from(a).sort(); return t[t.length >> 1]; };
+
+/**
+ * The height of the glyphs in a box (ink mask, box x, y, w, h): the median of the taller half of
+ * its ink marks, so dashes, dots and accents (the shorter half) don't count, nor does one tall
+ * stray mark (a bubble's outline caught at the box's edge); 0 when there is no ink.
+ */
+export function glyphHeights(cv, ink, x, y, w, h) {
+  if (w < 2 || h < 2) return 0;
+  const roi = ink.roi(new cv.Rect(x, y, w, h)), lab = new cv.Mat(), st = new cv.Mat(), ce = new cv.Mat();
+  try {
+    const n = cv.connectedComponentsWithStats(roi, lab, st, ce, 8, cv.CV_32S), S = st.data32S;
+    const hs = [];
+    for (let i = 1; i < n; i++) if (S[i * 5 + 4] >= 4) hs.push(S[i * 5 + 3]);
+    hs.sort((a, b) => b - a);
+    return hs.length ? median(hs.slice(0, Math.ceil(hs.length / 2))) : 0;
+  } finally { roi.delete(); lab.delete(); st.delete(); ce.delete(); }
+}
+
+/**
+ * The letter size of a row of lettering (ink mask, box x0, y0 to x1, y1). The dense band of rows
+ * holding ≥30% of the peak row's ink is the letter bodies; accents, descenders and an opening ¿
+ * hang outside it. The band is the x-height for lowercase lines and the full height for capitals;
+ * 1.15× splits the difference (within ~15% either way).
+ * Lettering whose ink sits in a few heavy rows (thick bars at the foot of hand-drawn capitals, an
+ * "S" beside a dash) breaks that band into slivers: 4–7 px for letters 18 px tall, whose lettering
+ * then counted as art, was not erased, and got a tiny translation (2.13.1). The glyphs themselves
+ * say how tall they are, so when the band is under 40% of their height (slivers: 14–33% in those
+ * lines), they set the size. A lowercase line's band (its x-height, ~70% of its tall letters) and
+ * outlined capitals' (their horizontal strokes, ~45%) keep the band: the thresholds that tell
+ * dialogue from sound effects were set on it.
+ * Returns that size (`letter`) and the band's (`band`): whether a line is lettering at all (its
+ * marks strokes, not blobs) is judged on the band as before, since a face's eyes are glyph-sized
+ * by their own height too.
+ */
+export function rowLetter(cv, ink, x0, y0, x1, y1) {
+  const I = ink.data, W = ink.cols;
+  const prof = new Int32Array(y1 - y0); let peak = 0;
+  for (let y = y0; y < y1; y++) { let n = 0; for (let x = x0; x < x1; x++) if (I[y * W + x]) n++; prof[y - y0] = n; if (n > peak) peak = n; }
+  let best = 0, run = 0; for (const v of prof) { run = v >= 0.3 * peak ? run + 1 : 0; if (run > best) best = run; }
+  const band = Math.max(4, best * 1.15);
+  const glyphs = glyphHeights(cv, ink, x0, y0, x1 - x0, y1 - y0);
+  return { letter: glyphs && band < 0.4 * 1.15 * glyphs ? 1.15 * glyphs : band, band };
+}
 const trace = (...a) => { if (globalThis.GYT_TRACE) globalThis.GYT_TRACE(...a); };
 // The letter size of a group of paragraphs: that of most of its lettering, each
 // paragraph weighing as many glyphs as it holds (up to 40) — a speck the detector
 // returned beside the text, or a row of emphasis dots, is one glyph, not a vote.
-const letterOf = (ps) => median(ps.flatMap((p) => Array(Math.max(1, Math.min(40, p.glyphCount | 0))).fill(p.letter)));
+const letterOf = (ps, key = "letter") => median(ps.flatMap((p) => Array(Math.max(1, Math.min(40, p.glyphCount | 0))).fill(p[key] ?? p.letter)));
 
 /**
  * @param {typeof import("../vendor/opencv.js")} cv
@@ -139,16 +182,9 @@ export function analyze(cv, img, opts = {}) {
       g = 0; while (g < tail && y0 > 0 && rowOk(y0 - 1, x0, x1) && !rowBlocked(y0 - 1, x0, x1)) { y0--; g++; }
       g = 0; while (g < tail && y1 < H && rowOk(y1, x0, x1) && !rowBlocked(y1, x0, x1)) { y1++; g++; }
     }
-    // Cap height from the ink profile: the dense band of rows holding ≥30% of the
-    // peak row's ink is the letter bodies; accents, descenders and an opening ¿
-    // hang outside it. The band is the x-height for lowercase lines and the full
-    // height for capitals; 1.15× splits the difference (within ~15% either way).
-    let letter;
+    let letter, band;
     if (!ln.vertical) {
-      const prof = new Int32Array(y1 - y0); let peak = 0;
-      for (let y = y0; y < y1; y++) { let n = 0; for (let x = x0; x < x1; x++) if (I[y * W + x]) n++; prof[y - y0] = n; if (n > peak) peak = n; }
-      let best = 0, run = 0; for (const v of prof) { run = v >= 0.3 * peak ? run + 1 : 0; if (run > best) best = run; }
-      letter = Math.max(4, best * 1.15);
+      ({ letter, band } = rowLetter(cv, P.ink, x0, y0, x1, y1)); // (cap height from the ink profile, or the glyphs)
     } else {
       // A column of CJK: the glyphs' width, from the ink profile across the column.
       // Not the band near the peak as for rows of Latin: one stroke down the middle
@@ -179,7 +215,7 @@ export function analyze(cv, img, opts = {}) {
     const letters = Math.max(1, Math.round(ln.vertical ? (y1 - y0) / Math.max(letter, 0.5 * typicalW) : (x1 - x0) / (0.6 * letter)));
     const box = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
     // `line`: the detector's own box, which the snapping above may have cut to the letters' dark core
-    blocks.push({ box, gbox: { ...box }, line: { x: ln.x, y: ln.y, w: ln.w, h: ln.h }, pieces: ln.pieces || 1, letter, lineLetters: [letter], glyphCount: letters, components: letters, glyphs: [], inkArea, dark, vertical: ln.vertical, score: ln.score, bubble: null, region: null, lines: 1, lineWidth: box.w });
+    blocks.push({ box, gbox: { ...box }, line: { x: ln.x, y: ln.y, w: ln.w, h: ln.h }, pieces: ln.pieces || 1, letter, lineLetters: [letter], band: band ?? letter, lineBands: [band ?? letter], glyphCount: letters, components: letters, glyphs: [], inkArea, dark, vertical: ln.vertical, score: ln.score, bubble: null, region: null, lines: 1, lineWidth: box.w });
   }
   // Lines in different bubbles are different speakers: with the segmentation model's
   // masks, a line joins a paragraph only within its own bubble (or outside all of them)
@@ -193,7 +229,7 @@ export function analyze(cv, img, opts = {}) {
     for (const b of blocks) {
       // ruby is half the size of its kanji, set in a column (or one or two kana) — a
       // line of small horizontal text beside big lettering is a line of its own
-      if (b === r || b.dark !== r.dark || b.group !== r.group || r.letter > 0.7 * b.letter || r.letter < 0.3 * b.letter || r.gbox.h < 0.8 * r.gbox.w || !rubyBeside(r.gbox, { ...b.gbox, vertical: b.vertical }, b.letter, Infinity)) continue;
+      if (b === r || b.dark !== r.dark || b.group !== r.group || r.band > 0.7 * b.band || r.band < 0.3 * b.band || r.gbox.h < 0.8 * r.gbox.w || !rubyBeside(r.gbox, { ...b.gbox, vertical: b.vertical }, b.band, Infinity)) continue;
       const d = Math.abs(r.gbox.x + r.gbox.w / 2 - (b.gbox.x + b.gbox.w / 2));
       if (d < best) { best = d; base = b; }
     }
@@ -205,8 +241,11 @@ export function analyze(cv, img, opts = {}) {
 
   // ---- paragraphs ----
   const paragraphs = mergeParagraphs(blocks);
-  for (const p of paragraphs) if (p.lineLetters) p.letter = median(p.lineLetters);
+  for (const p of paragraphs) { if (p.lineLetters) p.letter = median(p.lineLetters); p.band = p.lineBands ? median(p.lineBands) : p.band ?? p.letter; }
   const pageLetter = letterOf(paragraphs) || Math.max(8, W / 60);
+  // what is lettering, and which lines group, is decided on the lines' bands as before 2.13.1
+  // (rowLetter); the sizes drawn and erased use the letters
+  const pageBand = letterOf(paragraphs, "band") || pageLetter;
 
   const band = Math.max(1, Math.round(H / 24));
   const order = (a, b) => (Math.floor(a.box.y / band) - Math.floor(b.box.y / band)) || (a.box.x - b.box.x);
@@ -221,12 +260,12 @@ export function analyze(cv, img, opts = {}) {
     for (let i = 1; i < n; i++) {
       const size = Math.max(S[i * 5 + 2], S[i * 5 + 3]), a = S[i * 5 + 4];
       longest = Math.max(longest, w >= h ? S[i * 5 + 2] / w : S[i * 5 + 3] / h); sizes.push(size);
-      ink += a; if (size >= 0.35 * p.letter) letterInk += a;
+      ink += a; if (size >= 0.35 * (p.band ?? p.letter)) letterInk += a;
     }
     roi.delete(); lab.delete(); st.delete(); ce.delete();
     // letter-sized marks: most components are, or (text over hatching or tone, whose
     // specks outnumber the glyphs) most of the ink is in them
-    const ok = n > 1 && longest <= 0.8 && (median(sizes) >= 0.35 * p.letter || letterInk >= 0.6 * ink) && !solidMarks(p);
+    const ok = n > 1 && longest <= 0.8 && (median(sizes) >= 0.35 * (p.band ?? p.letter) || letterInk >= 0.6 * ink) && !solidMarks(p);
     if (!ok) trace("block", p.gbox, "not lettered", { components: n - 1, longest, medianSize: median(sizes), letterInk: letterInk / Math.max(1, ink), letter: p.letter });
     return ok;
   };
@@ -248,13 +287,14 @@ export function analyze(cv, img, opts = {}) {
     for (let i = 1; i < n; i++) {
       const cx = S[i * 5], cy = S[i * 5 + 1], cw = S[i * 5 + 2], ch = S[i * 5 + 3], size = Math.max(cw, ch), a = S[i * 5 + 4];
       if ((cx <= 0 && x > 0) || (cy <= 0 && y > 0) || (cx + cw >= w && x + w < W) || (cy + ch >= h && y + h < H)) continue;
-      if (size < 0.35 * p.letter || size > 2 * p.letter) continue; // specks; outlines and art
+      const L = p.band ?? p.letter; // (the band, as before 2.13.1: see rowLetter)
+      if (size < 0.35 * L || size > 2 * L) continue; // specks; outlines and art
       glyphs++; glyphInk += a;
       // solid to its middle, and fat: a blob over half a letter across (the page's
       // letter, too — a line of dots measures its own "letter" from the dots), not a
       // bar (the stem of a bold "!", a long vowel mark)
       const lo = Math.min(cw, ch);
-      if (2 * core[i] >= 0.6 * lo && lo >= 0.6 * Math.max(p.letter, pageLetter) && size <= 2 * lo) solidInk += a;
+      if (2 * core[i] >= 0.6 * lo && lo >= 0.6 * Math.max(L, pageBand) && size <= 2 * lo) solidInk += a;
     }
     roi.delete(); lab.delete(); st.delete(); ce.delete(); dist.delete();
     return (p.marks = { glyphs, solid: glyphInk > 0 && solidInk >= 0.5 * glyphInk });
@@ -271,7 +311,7 @@ export function analyze(cv, img, opts = {}) {
   // reads as "ö" — not lettering. A caption or a sign filled by its text has many marks.
   const shapeAsGlyph = (p) => { if (marksOf(p).glyphs <= 2) p.shape = true; return p.shape; };
   // loose text is dialogue-sized (narration is never a third of the dialogue size: that is tone or detail)
-  const isFree = (p) => !p.bubble && !p.shape && p.score >= 0.6 && p.letter >= 0.6 * pageLetter && p.letter <= 2.5 * pageLetter && looksLettered(p);
+  const isFree = (p) => !p.bubble && !p.shape && p.score >= 0.6 && p.band >= 0.6 * pageBand && p.band <= 2.5 * pageBand && looksLettered(p);
   const finish = (kept) => {
     kept.sort(order);
     const free = paragraphs.filter(isFree).sort(order);
@@ -363,15 +403,15 @@ export function analyze(cv, img, opts = {}) {
       if (holesInText / holes < 0.45) { reject("content inside is not lettering", { inText: holesInText / holes }); continue; }
     }
     // the lettering is small relative to the shape that holds it
-    const letter = letterOf(inBlocks);
+    const letter = letterOf(inBlocks, "band");
     if (letter > 0.55 * Math.min(w, h)) { reject("marks too large for the shape", { letter }); continue; }
     // dialogue is not drawn at several times the page's dialogue size: that is a sound
     // effect over the panel's background (the bound loose text has, below)
-    if (letter > 2.5 * pageLetter) { reject("lettering too large for dialogue", { letter, pageLetter }); continue; }
+    if (letter > 2.5 * pageBand) { reject("lettering too large for dialogue", { letter, pageBand }); continue; }
     let r = 0, g = 0, bb = 0, n = 0;
     for (let yy = y; yy < y + h; yy += 3) for (let xx = x; xx < x + w; xx += 3) { const p = yy * W + xx; if (L[p] !== li) continue; r += srcData[p * 4]; g += srcData[p * 4 + 1]; bb += srcData[p * 4 + 2]; n++; }
     const color = n ? [Math.round(r / n), Math.round(g / n), Math.round(bb / n)] : (pi ? [0, 0, 0] : [255, 255, 255]);
-    const bubble = { id: 0, box: rbox, area: a, color, dark: !!pi, letter: bubbleLetter(inBlocks, pageLetter), blocks: inBlocks, labelId: li, labels: P.labels, fill };
+    const bubble = { id: 0, box: rbox, area: a, color, dark: !!pi, letter: bubbleLetter(inBlocks, pageLetter, rbox), blocks: inBlocks, labelId: li, labels: P.labels, fill };
     trace("bubble", rbox, "accepted", { frac, blocks: inBlocks.length, fill: a / (w * h), holeFrac: holes / Math.max(1, filled), solidity: hullArea ? a / hullArea : 1, inText: holes > 0 ? holesInText / holes : 1, letter });
     bubbles.push(bubble);
   }
@@ -393,11 +433,15 @@ export function analyze(cv, img, opts = {}) {
 /**
  * A bubble's letter size: its lettering's. A bubble holding only marks — "……",
  * "!?" — measures its "letter" from the dots, a fraction of any letter; its
- * translation ("...") is set at the page's size instead.
+ * translation ("...") is set at the page's size instead, but no larger than a
+ * quarter of the bubble across: on a page whose lettering is mostly huge sound
+ * effects the page's size is theirs (125 px), and a 109 px bubble's line was set
+ * at it, broken letter by letter (2.13.1).
  */
-function bubbleLetter(blocks, pageLetter) {
-  const letter = blocks.length ? letterOf(blocks) : pageLetter;
-  return letter < 0.4 * pageLetter ? pageLetter : letter;
+export function bubbleLetter(blocks, pageLetter, box) {
+  const fits = Math.max(8, 0.25 * Math.min(box.w, box.h));
+  const letter = blocks.length ? letterOf(blocks) : Math.min(pageLetter, fits);
+  return letter < 0.4 * pageLetter ? Math.max(letter, Math.min(pageLetter, fits)) : letter;
 }
 
 /** Index of the smallest bubble instance whose mask holds the point, -1 for none. */
@@ -465,7 +509,7 @@ function bubblesFromInstances(instances, bubbleClasses, paragraphs, pageLetter, 
     // surface luminance without the lettering: dark bubble when the mask is mostly dark
     let inkArea = 0; for (const p of blocks) inkArea += p.inkArea || 0;
     const dark = lum / Math.max(1, area) < 110;
-    const letter = bubbleLetter(blocks, pageLetter);
+    const letter = bubbleLetter(blocks, pageLetter, { w, h });
     const bubble = { id: 0, box: { x, y, w, h }, area, color: dark ? [0, 0, 0] : [255, 255, 255], dark, letter, blocks, labelId: 0, labels: null, fill: m, score: inst.score, segmented: true };
     for (const p of blocks) p.bubble = bubble;
     bubbles.push(bubble);
