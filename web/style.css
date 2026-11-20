@@ -130,10 +130,17 @@ main { padding: var(--s4) calc(var(--s3) + var(--safe-right)) calc(var(--s6) + v
   .pages.spread.rtl { direction: rtl; } .pages.spread.rtl .page { direction: ltr; }
 }
 .page { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r2); overflow: hidden; min-width: 0; }
-.page-media { position: relative; background: #fff; }
+.page-media { position: relative; background: #fff; container-type: inline-size; }
 .page-media canvas, .page-media img { display: block; width: 100%; height: auto; cursor: pointer; }
-.page.showing-original canvas.translated { display: none; }
+.page.showing-original canvas.translated, .page.showing-original .lines { display: none; }
 .page:not(.showing-original) canvas.original { display: none; }
+/* the translation as text over the drawing (app.js textLayer): invisible but read, found and copied */
+.lines { position: absolute; inset: 0; }
+.lines .line {
+  position: absolute; display: flex; align-items: center; justify-content: center; overflow: hidden;
+  text-align: center; line-height: 1.15; overflow-wrap: anywhere; color: transparent; cursor: pointer;
+}
+.lines .line::selection { color: transparent; background: color-mix(in srgb, var(--accent) 35%, transparent); }
 .page-bar { display: flex; align-items: center; gap: var(--s2); padding: var(--s1) var(--s1) var(--s1) var(--s3); border-top: 1px solid var(--border); min-height: 52px; }
 .page .status { flex: 1 1 auto; min-width: 0; font-size: var(--t-caption); color: var(--muted); overflow-wrap: anywhere; }
 .page .status.error { color: var(--danger); }

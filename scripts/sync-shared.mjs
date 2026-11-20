@@ -16,8 +16,6 @@ for (const dir of ["engine", "vendor", "fonts", "_locales"]) {
   fs.rmSync(web(dir), { recursive: true, force: true });
   fs.cpSync(ext(dir), web(dir), { recursive: true });
 }
-// the LaMa inpainter is the extension's (engine/cv.js prefs.lama): 103 MB the app never loads
-for (const f of ["lama.onnx", "lama.json", "LICENSE-lama.txt"]) fs.rmSync(web(path.join("vendor", f)), { force: true });
 fs.mkdirSync(web("icons"), { recursive: true });
 for (const f of fs.readdirSync(ext("icons"))) if (/^icon.*\.png$/.test(f)) fs.copyFileSync(ext(path.join("icons", f)), web(path.join("icons", f)));
 // the app's version, from the extension's manifest (one version for both): the debug report records it

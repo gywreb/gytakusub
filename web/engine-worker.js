@@ -1,6 +1,10 @@
 // Gytakusub Web – the page engine (OpenCV analysis, erase, layout) runs here,
 // off the main thread. Same engine modules as the extension's service worker.
 import { preparePage, prefillPage, finishPage, warmInpainter, inpainterWarm } from "./engine/page.js";
+import { setEnginePrefs, onLama } from "./engine/cv.js";
+
+// LaMa on a graphics card (ADR 0015), as the app says (translator.js: not after it ran out of memory)
+onLama((state) => self.postMessage({ event: "lama", state }));
 
 const jobs = new Map();
 let seq = 0;
@@ -13,7 +17,10 @@ self.onmessage = async (e) => {
   const work = type === "prepare" || type === "finish";
   if (work) busy++;
   try {
-    if (type === "prepare") {
+    if (type === "prefs") {
+      setEnginePrefs({ lama: !!e.data.lama });
+      self.postMessage({ id, ok: true });
+    } else if (type === "prepare") {
       const job = await preparePage(e.data.bitmap, e.data.settings);
       e.data.bitmap.close();
       const jobId = ++seq;

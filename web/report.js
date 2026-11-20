@@ -3,6 +3,7 @@
 // erased page with the regions boxed and the translations drawn). The same files as the
 // extension's "Export debug report" (extension/content.js), so the replay and audit tools read both.
 import { VERSION } from "./version.js";
+import { lamaState } from "./lama-guard.js";
 
 /**
  * @param {Array<object>} pages the app's pages that are translated (`result` set)
@@ -12,7 +13,8 @@ import { VERSION } from "./version.js";
 export async function buildReport(pages, settings) {
   const files = [];
   const when = new Date().toISOString();
-  const summary = { gytakusub: VERSION, app: "web", when, page: location.href, userAgent: navigator.userAgent, pages: [] };
+  // (lama: whether this device may use LaMa: untried, trying, again, ok, off after running out of memory; translator.js)
+  const summary = { gytakusub: VERSION, app: "web", when, page: location.href, userAgent: navigator.userAgent, lama: lamaState(), pages: [] };
   let n = 0;
   for (const page of pages) {
     const res = page.result, id = String(++n).padStart(2, "0");

@@ -81,6 +81,41 @@ if (errors.length) fail("console/page errors: " + errors.slice(0, 3).join(" | ")
 if (inked < 500) fail("translated canvas looks blank (dark samples: " + inked + ")");
 console.log(`API calls: ${JSON.stringify(calls)} status: ${JSON.stringify(status)} dark samples: ${inked}`);
 
+// 2.13: the translation as text over the drawing, as in the extension (2.12.1): read by screen
+// readers, found by Find in page, copied; the pictures hidden from screen readers; the toggle a switch
+const text = await page.evaluate(() => {
+  const el = document.querySelector(".page"), layer = el.querySelector(".lines");
+  const lines = [...(layer?.querySelectorAll(".line") || [])];
+  const box = (n) => n.getBoundingClientRect(), media = box(el.querySelector(".page-media"));
+  return {
+    label: layer?.getAttribute("aria-label"), role: layer?.getAttribute("role"), n: lines.length,
+    texts: lines.map((l) => l.textContent), hiddenWithOriginal: layer ? getComputedStyle(layer).display === "none" : null,
+    canvases: [...el.querySelectorAll("canvas")].map((c) => c.getAttribute("aria-hidden")),
+    switchRole: document.getElementById("showOriginal").getAttribute("role"),
+  };
+});
+if (text.role !== "group" || text.label !== "Translated text" || !text.n || text.texts.some((x) => !x.trim())) fail("the page should carry its translation as text: " + JSON.stringify(text));
+if (text.hiddenWithOriginal !== true) fail("the text layer should hide while the original shows (Find in page finds what is seen)");
+if (text.canvases.some((v) => v !== "true")) fail("the page's pictures should be hidden from screen readers: " + JSON.stringify(text.canvases));
+if (text.switchRole !== "switch") fail("the Originals toggle should be a switch");
+await page.click('[data-act="toggle"]'); await page.waitForTimeout(100); // back to the translation
+const inside = await page.evaluate(() => {
+  const media = document.querySelector(".page .page-media").getBoundingClientRect();
+  return [...document.querySelectorAll(".page .lines .line")].every((l) => { const b = l.getBoundingClientRect(); return b.width > 0 && b.height > 0 && b.left >= media.left - 1 && b.right <= media.right + 1 && b.top >= media.top - 1 && b.bottom <= media.bottom + 1; });
+});
+if (!inside) fail("the text layer's lines should lie on the page");
+const tree = await page.locator(".page .lines").ariaSnapshot();
+if (!tree.includes(text.texts[0].slice(0, 20))) fail("a screen reader should read the first line: " + tree.slice(0, 200));
+// a selection of the text (to copy it) does not flip the page to its original
+await page.evaluate(() => { const l = document.querySelector(".page .lines .line"); getSelection().selectAllChildren(l); l.click(); });
+const flipped = await page.$eval(".page", (el) => el.classList.contains("showing-original"));
+if (flipped) fail("selecting the translated text should not flip the page");
+// the shot shows the layer selected (it is invisible otherwise)
+await page.evaluate(() => getSelection().selectAllChildren(document.querySelector(".page .lines")));
+await page.screenshot({ path: path.join(out, "web-text-layer.png"), fullPage: false });
+await page.evaluate(() => getSelection().removeAllRanges());
+console.log(`text layer: ${text.n} lines, first ${JSON.stringify(text.texts[0])}`);
+
 // Claude usage: each answer is logged; Settings shows today, the model and the rate-limit headroom
 await page.click("#btnSettings");
 await page.waitForSelector("#settings[open]");
@@ -305,7 +340,7 @@ fetcherSrv.close(); oldSrv.close();
   await pg.goto(`http://127.0.0.1:${WEB_PORT}/`); await pg.waitForTimeout(400);
   const qr = await pg.$("#installQr svg");
   if (!(await pg.isVisible("#installCard")) || !qr || !(await pg.isVisible('[data-platform="desktop"]'))) fail("on a computer the install card should show a QR code for the phone");
-  if (!(await pg.isVisible("#settings"))) fail("on a computer the first visit should still ask for the Claude key");
+  if (!(await pg.waitForSelector("#settings", { state: "visible", timeout: 5000 }).catch(() => null))) fail("on a computer the first visit should still ask for the Claude key");
   await pg.keyboard.press("Escape");
   await pg.click("#btnInstallLater"); await pg.reload(); await pg.waitForTimeout(300);
   if (await pg.isVisible("#installCard")) fail("“Not now” should keep the install card closed");
@@ -326,6 +361,48 @@ fetcherSrv.close(); oldSrv.close();
   await pg.screenshot({ path: path.join(out, "web-install-iphone.png") });
   await ctx.close();
 }
+// 2.13: an engine that dies mid-page (out of memory on a phone) is started again and the page
+// finishes without Redo, with Claude's answer kept (no second call). The engine worker is served
+// once through a wrapper that throws, uncaught, on the first finish, as a dying engine would.
+{
+  await page.close(); // (its chapter's pages may still be asking Claude, which is counted below)
+  const p2 = await browser.newPage({ viewport: { width: 900, height: 1200 } });
+  const errs2 = [];
+  p2.on("pageerror", (e) => errs2.push(String(e)));
+  p2.on("console", (m) => errs2.push(m.type() + ": " + m.text()));
+  p2.on("worker", (w) => errs2.push("worker started " + w.url()));
+  let served = 0;
+  await p2.route(/engine-worker\.js(\?.*)?$/, async (route) => {
+    if (served++ || route.request().url().includes("?real")) return route.continue();
+    // (messages that come while the real engine loads are held, then handed to it)
+    await route.fulfill({ contentType: "text/javascript", body: `
+      let dead = false, ready = false;
+      const held = [];
+      self.addEventListener("message", (e) => {
+        if (!ready) { e.stopImmediatePropagation(); held.push(e); return; }
+        if (dead || e.data?.type !== "finish") return;
+        dead = true; e.stopImmediatePropagation();
+        setTimeout(() => { throw new Error("test: the engine died"); });
+      });
+      await import("./engine-worker.js?real");
+      ready = true;
+      for (const e of held) self.dispatchEvent(new MessageEvent("message", { data: e.data }));` });
+  });
+  await p2.addInitScript(() => localStorage.setItem("gytakusub.settings", JSON.stringify({ apiKey: "sk-ant-test", useContext: false })));
+  await p2.goto(`http://127.0.0.1:${WEB_PORT}/`);
+  let asked = 0; // Claude calls from this page only
+  p2.on("request", (r) => { if (r.url().startsWith(`http://127.0.0.1:${API_PORT}/v1/messages`) && r.method() === "POST") asked++; });
+  await p2.setInputFiles("#file", pageImage);
+  const done = await p2.waitForSelector(".page canvas.translated", { timeout: 90000 }).then(() => true, () => false);
+  const st = await p2.$eval(".page .status", (el) => ({ text: el.textContent, cls: el.className }));
+  if (!done || /error/.test(st.cls)) fail("a page whose engine died should finish on a fresh one: " + JSON.stringify(st) + " " + errs2.slice(-8).join(" | "));
+  const lost = errs2.some((m) => m.includes("Gytakusub: the engine failed"));
+  if (!lost) fail("the wrapped engine should have died under the page: " + errs2.slice(-6).join(" | "));
+  if (asked !== 1) fail(`Claude should be asked once for that page, not ${asked} times`);
+  console.log(`engine lost and restarted: page ${done ? "done" : "not done"}, engine lost ${lost}, Claude calls ${asked}`);
+  await p2.close();
+}
+
 console.log(failures ? `WEB BROWSER TEST FAILED (${failures})` : "WEB BROWSER TEST PASSED");
 await browser.close(); api.close(); statik.close();
 fs.rmSync(web, { recursive: true, force: true });

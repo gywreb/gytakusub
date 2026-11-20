@@ -30,9 +30,14 @@ export function getCV(overrides = {}) {
 }
 
 // Engine preferences that change which models load: `gpu` (run on WebGPU when
-// available), `lama` (the app ships the LaMa inpainter: the extension, ADR 0015). A
-// change drops the loaded models so the next page loads them again.
+// available), `lama` (LaMa on a graphics card, ADR 0015: the extension, and the web app unless it
+// ran out of memory on it before). A change drops the loaded models so the next page loads them again.
 const prefs = { gpu: true, lama: false };
+// told when LaMa starts loading ("loading") and once it has filled at full size ("ok"; page.js
+// warmInpainter): the web app keeps a phone that ran out of memory on it to AOT afterwards
+let lamaEvents = null;
+export function onLama(fn) { lamaEvents = fn; }
+export function lamaEvent(state) { try { lamaEvents?.(state); } catch {} }
 export function setEnginePrefs(next = {}) {
   const gpu = next.gpu !== false, lama = next.lama ?? prefs.lama;
   if (gpu !== prefs.gpu) { prefs.gpu = gpu; detectorReady = null; segmenterReady = null; inpainterReady = null; }
@@ -138,7 +143,8 @@ export function getInpainter(overrides = {}) {
   if (ortBroken()) return Promise.resolve(null);
   if (!inpainterReady) inpainterReady = (async () => {
     if ((overrides.lama ?? prefs.lama) && (overrides.gpu ?? prefs.gpu) && await gpuAvailable() && !gpuIsSoftware()) {
-      const lama = await loadModel("lama.onnx", { ...overrides, modelBytes: overrides.lamaBytes, strict: true });
+      // marked once downloaded, as the session is made: a download cut short is no sign the device can't run it
+      const lama = await loadModel("lama.onnx", { ...overrides, modelBytes: overrides.lamaBytes, strict: true, beforeSession: () => lamaEvent("loading") });
       if (lama) return { ...lama, kind: "lama", side: LAMA_SIDE };
     }
     const aot = await loadModel("inpaint.onnx", overrides);
@@ -167,6 +173,7 @@ async function loadModel(file, overrides) {
       bytes = new Uint8Array(await res.arrayBuffer());
     }
     const ort = getOrt(overrides.wasmBinary ? { wasmBinary: overrides.wasmBinary } : {});
+    overrides.beforeSession?.();
     const { session, ep } = await createSession(bytes, { gpu, strict: !!overrides.strict });
     return { ort, session, run, ep };
   } catch (e) { console.warn(`Gytakusub: ${file} unavailable`, e); return null; }

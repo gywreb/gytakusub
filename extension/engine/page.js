@@ -2,7 +2,7 @@
 // text regions for the model) and finish (place the translations, erase the
 // original lettering, hand back a cleaned page plus text placements).
 // Used by the extension's service worker and by the web app's Web Worker.
-import { getCV, getDetector, getSegmenter, getFallbackDetector, getInpainter, inpainterSide, setEnginePrefs } from "./cv.js";
+import { getCV, getDetector, getSegmenter, getFallbackDetector, getInpainter, inpainterSide, setEnginePrefs, lamaEvent } from "./cv.js";
 import { ortBroken, gpuIsSoftware } from "./ort.js";
 import { analyze } from "./analyze.js";
 import { segment } from "./segment.js";
@@ -248,6 +248,7 @@ export function warmInpainter() {
         (await aotInpaint(cv, model, rgb, hole)).delete();
         inpainterTimes.again = Math.round(performance.now() - t1);
         inpainterTimes.side = model.side || side; inpainterTimes.kind = model.kind;
+        if (model.kind === "lama") lamaEvent("ok");
         rgb.delete(); hole.delete();
       } catch (e) { console.warn("Gytakusub: inpainter warm-up failed", e); }
       return model;

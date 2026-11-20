@@ -2,7 +2,9 @@ name: Deploy web app to GitHub Pages
 on:
   push:
     branches: [main]
-    paths: ["web/**", "fetcher/worker.js", "fetcher/guide-sources.json", "extension/engine/**", "extension/vendor/**", "extension/prompt.js", "extension/usage.js", "extension/text.js", "extension/fonts/**", "extension/icons/**", ".github/workflows/pages.yml"]
+    # everything scripts/sync-shared.mjs copies into web/ (its strings and version too: 2.12.1 changed
+    # only those and was not deployed)
+    paths: ["web/**", "fetcher/worker.js", "fetcher/guide-sources.json", "extension/engine/**", "extension/vendor/**", "extension/prompt.js", "extension/usage.js", "extension/text.js", "extension/i18n.js", "extension/languages.js", "extension/_locales/**", "extension/manifest.json", "extension/fonts/**", "extension/icons/**", "extension/LICENSE", "extension/THIRD_PARTY.md", "scripts/sync-shared.mjs", "scripts/sync-shared.sh", ".github/workflows/pages.yml"]
   workflow_dispatch:
 permissions:
   contents: read
