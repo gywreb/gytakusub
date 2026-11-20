@@ -662,6 +662,12 @@
  "content_edit_dialog": {
   "message": "번역 수정"
  },
+ "content_edit": {
+  "message": "편집"
+ },
+ "content_lines_group": {
+  "message": "번역된 텍스트"
+ },
  "content_translated_line": {
   "message": "번역된 대사"
  },

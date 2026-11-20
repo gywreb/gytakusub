@@ -4,6 +4,22 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
 
 ## [Unreleased]
 
+## [2.12.1] — 2026-11-20
+
+The overlay without a mouse, and pages that survive the extension's background restarting.
+
+### Extension
+- **Pages ask again when the extension's background restarts.** Chrome stopped the background in the middle of a chapter (a report: the last two pages failed with "message channel closed", and worked when you pressed Translate). A page it had in progress is now asked again by itself, twice at most; one Claude had already answered comes from the cache.
+- **The translations are text the browser can read.** They're drawn on a canvas, which screen readers, find in page and the browser's own translation can't see. Each line is now also a transparent button over the drawn one, grouped per image ("Translated text"); the canvas is hidden from screen readers so nothing is read twice.
+- **Keyboard:** Tab reaches an image's lines (one stop per image), the arrow keys move between them without turning the page, Enter opens the editor.
+- **The editor is a real dialog** (a modal `<dialog>`): the keyboard stays in it, Esc or a click outside closes it, and the focus goes back to where it was. Ctrl+Enter saves; Enter in the glossary fields adds the term instead of saving the line.
+- **The readable view** (a small line shown at a readable size) also appears for the line the keyboard is on, and on a long press (touch) for any line, with an Edit button. It stays while the pointer moves onto it, and Esc puts it away until the pointer goes to another line (WCAG 1.4.13).
+- **The popup's and Options' toggles are switches** for screen readers (`role="switch"`), not checkboxes.
+
+### Development
+- `tests/browser/a11y.mjs` (21 checks): the accessibility tree, the keyboard, the editor, the readable view (focus, hover, Esc, long press) and the switches.
+- `tests/browser/startup.mjs` part 4: the worker is stopped while three pages are with Claude; all three finish on their own. 2.12.0 leaves all three failed.
+
 ## [2.12.0] — 2026-11-18
 
 Clean bubbles. Second step of the 3.0 plan: a robust core before new features.

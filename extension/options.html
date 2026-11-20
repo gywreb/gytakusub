@@ -78,7 +78,7 @@
         </div>
         <label class="option">
           <span class="option-text"><span class="option-title" data-i18n="opt_sync_the_key_to_my">Sync the key to my other browsers</span><span class="option-desc" data-i18n="opt_keeps_it_in_browser_sync">Keeps it in browser sync instead of only on this device</span></span>
-          <input type="checkbox" id="syncApiKey" class="switch" />
+          <input type="checkbox" switch role="switch" id="syncApiKey" class="switch" />
         </label>
         <div class="field">
           <label class="field-label" for="model" data-i18n="opt_model">Model</label>
@@ -136,15 +136,15 @@
         </div>
         <label class="option">
           <span class="option-text"><span class="option-title" data-i18n="opt_chapter_context">Chapter context</span><span class="option-desc" data-i18n="opt_sends_names_and_the_last">Sends names and the last ~40 translated lines of this tab with each page: better continuity, about 400 extra input tokens</span></span>
-          <input type="checkbox" id="useContext" class="switch" />
+          <input type="checkbox" switch role="switch" id="useContext" class="switch" />
         </label>
         <label class="option">
           <span class="option-text"><span class="option-title" data-i18n="opt_also_transcribe_the_original_text">Also transcribe the original text</span><span class="option-desc" data-i18n="opt_slower_slightly_more_careful_reading">Slower, slightly more careful reading; useful for debugging</span></span>
-          <input type="checkbox" id="includeSource" class="switch" />
+          <input type="checkbox" switch role="switch" id="includeSource" class="switch" />
         </label>
         <label class="option">
           <span class="option-text"><span class="option-title" data-i18n="opt_uppercase_lettering">UPPERCASE lettering</span><span class="option-desc" data-i18n="opt_comic_book_style">Comic-book style</span></span>
-          <input type="checkbox" id="uppercase" class="switch" />
+          <input type="checkbox" switch role="switch" id="uppercase" class="switch" />
         </label>
       </section>
 
@@ -177,11 +177,11 @@
         </div>
         <label class="option">
           <span class="option-text"><span class="option-title" data-i18n="opt_use_the_graphics_card_webgpu">Use the graphics card (WebGPU)</span><span class="option-desc" data-i18n="opt_finds_text_and_bubbles_much">Finds text and bubbles much faster. Turn off only if pages come out wrong or the browser misbehaves.</span></span>
-          <input type="checkbox" id="useGpu" class="switch" />
+          <input type="checkbox" switch role="switch" id="useGpu" class="switch" />
         </label>
         <label class="option">
           <span class="option-text"><span class="option-title" data-i18n="opt_peek_at_the_original_while">Peek at the original while hovering</span><span class="option-desc" data-i18n="opt_hovering_a_translated_bubble_shows">Hovering a translated bubble shows the original lettering. To fix a line, double-click its bubble.</span></span>
-          <input type="checkbox" id="peekOnHover" class="switch" />
+          <input type="checkbox" switch role="switch" id="peekOnHover" class="switch" />
         </label>
       </section>
 
@@ -189,7 +189,7 @@
         <h2 id="h-debug" data-i18n="opt_h_debug">Troubleshooting</h2>
         <label class="option">
           <span class="option-text"><span class="option-title" data-i18n="opt_debug_overlay">Debug overlay</span><span class="option-desc" data-i18n="opt_draws_the_detected_regions_and">Draws the detected regions and text areas on translated pages, and adds a Report button to the hover bar that downloads that page's original, debug render and JSON. "Export debug report" in the popup does every translated page on the tab.</span></span>
-          <input type="checkbox" id="debugOverlay" class="switch" />
+          <input type="checkbox" switch role="switch" id="debugOverlay" class="switch" />
         </label>
         <div class="option">
           <span class="option-text"><span class="option-title" data-i18n="opt_translation_cache">Translation cache</span><span class="option-desc" data-i18n="opt_translated_pages_the_names_found">Translated pages, the names found per tab and your edited lines are kept until the browser closes. Clear them to translate pages afresh.</span></span>

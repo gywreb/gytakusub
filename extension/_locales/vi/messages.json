@@ -659,6 +659,12 @@
  "content_edit_dialog": {
   "message": "Sửa bản dịch"
  },
+ "content_edit": {
+  "message": "Sửa"
+ },
+ "content_lines_group": {
+  "message": "Văn bản đã dịch"
+ },
  "content_translated_line": {
   "message": "Câu đã dịch"
  },

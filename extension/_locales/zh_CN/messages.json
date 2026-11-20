@@ -662,6 +662,12 @@
  "content_edit_dialog": {
   "message": "编辑翻译"
  },
+ "content_edit": {
+  "message": "编辑"
+ },
+ "content_lines_group": {
+  "message": "译文"
+ },
  "content_translated_line": {
   "message": "已翻译的台词"
  },
