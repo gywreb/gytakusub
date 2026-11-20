@@ -5,6 +5,8 @@
 //  2. the reader leaves while pages wait in the worker: those not yet sent to Claude never are
 //  3. the reader reloads while a page is with Claude: the reloaded page waits for that answer
 //     instead of asking (and paying) again
+//  4. the worker stops while pages are with Claude: they're asked again by themselves (2.12.0:
+//     they stayed failed until the reader pressed Translate)
 // Usage: node startup.mjs [--ext ../../extension] [--out /tmp/gyt-startup]
 import fs from "node:fs";
 import os from "node:os";
@@ -93,6 +95,22 @@ if (done.size < 3) fail(`only ${done.size} of 3 pages were translated after the 
 if (asked3 > 3) fail(`${asked3} questions for 3 pages: a page was asked twice across the reload`);
 else console.log(`3. reloaded mid-answer: ${asked3} question(s) for ${done.size} page(s) translated`);
 
-await context.close(); srv.close();
+// 4. the worker stops while pages are with Claude (Chrome stopped or restarted it; a user's report
+// showed the last two pages of a chapter failing so): the pages are asked again by themselves
+done.clear();
+const t4 = Date.now();
+await page.goto(`http://127.0.0.1:${PORT}/chapter?n=3&ch=4`);
+while (!arrived.some((a) => a >= t4) && Date.now() - t4 < 20000) await wait(100); // a question is on its way
+const cdp = await context.newCDPSession(page);
+const { targetInfos } = await cdp.send("Target.getTargets");
+const worker = targetInfos.find((x) => x.type === "service_worker" && x.url.startsWith("chrome-extension://"));
+await cdp.send("Target.closeTarget", { targetId: worker.targetId });
+const stopped = Date.now();
+console.log(`   (worker stopped at ${((stopped - t4) / 1000).toFixed(1)} s)`);
+while (done.size < 3 && Date.now() - stopped < 120000) await wait(250);
+if (done.size < 3) fail(`after the worker stopped, ${done.size} of 3 pages were translated without the reader doing anything`);
+else console.log(`4. worker stopped mid-chapter: all 3 pages translated by themselves, ${((Date.now() - stopped) / 1000).toFixed(1)} s later`);
+
+await Promise.race([context.close(), wait(10000)]); srv.close();
 console.log(failures ? `\n${failures} FAILED` : "\nSTARTUP TEST PASSED");
 process.exit(failures ? 1 : 0);

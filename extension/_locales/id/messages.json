@@ -662,6 +662,12 @@
  "content_edit_dialog": {
   "message": "Ubah terjemahan"
  },
+ "content_edit": {
+  "message": "Sunting"
+ },
+ "content_lines_group": {
+  "message": "Teks terjemahan"
+ },
  "content_translated_line": {
   "message": "Baris terjemahan"
  },

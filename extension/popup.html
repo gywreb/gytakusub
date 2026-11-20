@@ -44,7 +44,7 @@
   <header class="pop-head">
     <img src="icons/icon32.png" width="22" height="22" alt="" />
     <h1 class="pop-title">Gytakusub</h1>
-    <label class="master" title="Turn Gytakusub on or off on every site" data-i18n-attr="title=popup_turn_gytakusub_on_or_off"><span id="enabledText">On</span><input type="checkbox" id="enabled" class="switch" aria-label="Gytakusub on" data-i18n-attr="aria-label=popup_enabled_arialabel" /></label>
+    <label class="master" title="Turn Gytakusub on or off on every site" data-i18n-attr="title=popup_turn_gytakusub_on_or_off"><span id="enabledText">On</span><input type="checkbox" switch role="switch" id="enabled" class="switch" aria-label="Gytakusub on" data-i18n-attr="aria-label=popup_enabled_arialabel" /></label>
   </header>
 
   <div id="setupNote">
@@ -71,11 +71,11 @@
       <h2 id="siteHead" class="group-title" data-i18n-html="popup_siteHead">On <span id="host">this site</span></h2>
       <label class="option">
         <span class="option-text"><span class="option-title" data-i18n="popup_enable_here">Enable here</span><span class="option-desc" data-i18n="popup_hover_button_and_keyboard_shortcuts">Hover button and keyboard shortcuts</span></span>
-        <input type="checkbox" id="site" class="switch" />
+        <input type="checkbox" switch role="switch" id="site" class="switch" />
       </label>
       <label class="option">
         <span class="option-text"><span class="option-title" data-i18n="popup_auto_translate_while_scrolling">Auto-translate while scrolling</span><span class="option-desc" data-i18n="popup_sends_pages_to_claude_as">Sends pages to Claude as you scroll</span></span>
-        <input type="checkbox" id="auto" class="switch" />
+        <input type="checkbox" switch role="switch" id="auto" class="switch" />
       </label>
     </section>
 
@@ -95,7 +95,7 @@
       </label>
       <label class="option">
         <span class="option-text"><span class="option-title" data-i18n="popup_chapter_context">Chapter context</span><span class="option-desc" data-i18n="popup_names_recent_lines_for_continuity">Names + recent lines, for continuity</span></span>
-        <input type="checkbox" id="useContext" class="switch" />
+        <input type="checkbox" switch role="switch" id="useContext" class="switch" />
       </label>
     </section>
   </main>

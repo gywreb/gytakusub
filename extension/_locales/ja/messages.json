@@ -662,6 +662,12 @@
  "content_edit_dialog": {
   "message": "翻訳を編集"
  },
+ "content_edit": {
+  "message": "編集"
+ },
+ "content_lines_group": {
+  "message": "翻訳されたテキスト"
+ },
  "content_translated_line": {
   "message": "翻訳したセリフ"
  },

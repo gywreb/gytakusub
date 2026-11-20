@@ -662,6 +662,12 @@
  "content_edit_dialog": {
   "message": "Modifier la traduction"
  },
+ "content_edit": {
+  "message": "Modifier"
+ },
+ "content_lines_group": {
+  "message": "Texte traduit"
+ },
  "content_translated_line": {
   "message": "Réplique traduite"
  },

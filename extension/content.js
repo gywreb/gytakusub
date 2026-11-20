@@ -67,8 +67,13 @@
     .bar button:hover, .bar button:focus-visible { background: rgba(255,255,255,.2); outline: 2px solid #93c5fd; outline-offset: 1px; }
     .bar button[disabled] { opacity: .5; cursor: default; }
     .bar .status { padding: 6px 4px; opacity: .8; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .editor { position: fixed; z-index: 1; width: 300px; max-width: calc(100vw - 16px); padding: 10px; border-radius: 10px; background: rgba(17,24,39,.96);
-      color: #fff; box-shadow: 0 6px 24px rgba(0,0,0,.45); font: 13px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; pointer-events: auto; }
+    .editor { width: 300px; max-width: calc(100vw - 16px); padding: 10px; border: 0; border-radius: 10px; background: rgba(17,24,39,.96);
+      color: #fff; box-shadow: 0 6px 24px rgba(0,0,0,.45); font: 13px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; pointer-events: auto;
+      box-sizing: border-box; margin: 0; right: auto; bottom: auto; }
+    /* without these, scrolling over the backdrop or inside the editor scrolls the page behind it */
+    .editor:modal { overscroll-behavior: contain; }
+    .editor::backdrop { background: rgba(0,0,0,.2); overflow: hidden; overscroll-behavior: contain; }
+    .editor form { margin: 0; }
     .editor textarea, .editor input { all: unset; display: block; box-sizing: border-box; width: 100%; padding: 6px 8px; border-radius: 6px; background: rgba(255,255,255,.1);
       color: #fff; font: 13px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; white-space: pre-wrap; }
     .editor textarea { min-height: 64px; resize: vertical; }
@@ -81,8 +86,17 @@
     .editor button:hover, .editor button:focus-visible { outline: 2px solid #93c5fd; outline-offset: 1px; }
     .editor .hint { opacity: .6; font-size: 11px; margin-left: auto; }
     .readable { position: fixed; z-index: 1; max-width: min(320px, calc(100vw - 16px)); padding: 8px 11px; border-radius: 8px; background: rgba(17,24,39,.94);
-      color: #fff; font: 15px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; white-space: pre-wrap; box-shadow: 0 4px 16px rgba(0,0,0,.4); pointer-events: none; }
+      color: #fff; font: 15px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; white-space: pre-wrap; box-shadow: 0 4px 16px rgba(0,0,0,.4); pointer-events: auto; }
     .readable[hidden] { display: none; }
+    .readable button { all: unset; display: block; margin-top: 6px; cursor: pointer; padding: 5px 10px; border-radius: 6px; background: rgba(255,255,255,.12); color: #fff;
+      font: 12px/1 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+    .readable button:hover, .readable button:focus-visible { outline: 2px solid #93c5fd; outline-offset: 1px; }
+    /* the translations as text, over the drawn ones (transparent): for screen readers, find in page
+       and the keyboard; the pointer goes through to the page */
+    .lines { position: fixed; pointer-events: none; }
+    .line { all: unset; display: block; position: absolute; box-sizing: border-box; color: transparent; white-space: pre-wrap; overflow: hidden;
+      font-family: system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; line-height: 1.15; text-align: center; pointer-events: none; }
+    .line:focus-visible { outline: 3px solid #2563eb; outline-offset: 2px; border-radius: 4px; box-shadow: 0 0 0 5px rgba(255,255,255,.9); }
     .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); padding: 8px 14px; border-radius: 8px;
       background: rgba(17,24,39,.92); color: #fff; font: 13px/1.3 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
       box-shadow: 0 2px 10px rgba(0,0,0,.4); pointer-events: none; max-width: 80vw; }
@@ -122,7 +136,9 @@
     btnReport.textContent = T("content_report"); btnReport.title = T("content_report_title"); btnReport.setAttribute("aria-label", T("content_report_aria"));
     pauseBtn.textContent = T("content_continue");
     if (!pauseEl.hidden) pauseText.textContent = TN("content_paused", AUTO_BUDGET);
-    editor.el?.remove(); editor.el = null; editor.open = false; // rebuilt in the new language when next opened
+    if (editor.el?.open) editor.el.close();
+    editor.el?.remove(); editor.el = null; // rebuilt in the new language when next opened
+    for (const e of entries.values()) e.layer?.setAttribute("aria-label", T("content_lines_group"));
   }
 
   const mount = () => { if (document.documentElement && !host.isConnected) document.documentElement.append(host); };
@@ -215,10 +231,16 @@
     const k = r.height / img.naturalHeight;
     return { left: r.left, right: r.right, width: r.width, top: r.top + u.y * k, bottom: r.top + (u.y + u.h) * k, height: u.h * k };
   }
+  /** An image's overlay and its lines go, and the image is forgotten. */
+  function dropEntry(img, e = entries.get(img)) {
+    if (!e) return;
+    e.canvas?.remove(); e.layer?.remove();
+    if (entries.get(img) === e) entries.delete(img);
+  }
   /** The image's entry, new when there is none or the reader put another page in this <img>. */
   function entryFor(img) {
     let e = entries.get(img);
-    if (e && e.src !== srcOf(img)) { e.canvas?.remove(); entries.delete(img); e = null; }
+    if (e && e.src !== srcOf(img)) { dropEntry(img, e); e = null; }
     if (!e) { e = { src: srcOf(img), hidden: false, units: new Map(), status: "idle", result: null, patches: [] }; entries.set(img, e); }
     return e;
   }
@@ -550,7 +572,7 @@
   function pump() {
     for (let i = queue.length - 1; i >= 0; i--) {
       const job = queue[i];
-      if (!job.img.isConnected) { queue.splice(i, 1); entries.delete(job.img); }
+      if (!job.img.isConnected) { queue.splice(i, 1); dropEntry(job.img); }
       else if (job.auto && !nearScreen(job.img, 2, job.key)) { queue.splice(i, 1); putBack(job.img, job.key); }
     }
     queue.sort((a, b) => priorityOf(a.img, a.key) - priorityOf(b.img, b.key));
@@ -654,6 +676,9 @@
   const blobToDataUrl = (blob) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(blob); });
   const loadImage = (dataUrl) => new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error("Could not decode image")); im.src = dataUrl; });
 
+  // what a message to a worker that went away rejects with (an extension that was reloaded rejects
+  // with "Extension context invalidated": this script is then an orphan, and asking again is no use)
+  const WORKER_GONE = /message channel closed|message port closed|Receiving end does not exist|Could not establish connection/i;
   async function translateImage({ id, img, key = WHOLE, force = false, auto = false }) {
     const entry = entryFor(img), unit = entry.units.get(key) || {};
     entry.units.set(key, unit);
@@ -687,7 +712,7 @@
       if (res.cancelled) { putBack(img, key); refreshBar(); return; } // scrolled far past before Claude was asked
       if (res.error) throw new Error(res.error);
       if (auto && !res.fromCache) autoSpent.push(performance.now()); // the spending guard counts what Claude answered
-      if (srcOf(img) !== src) { if (entries.get(img) === entry) { entry.canvas?.remove(); entries.delete(img); } return; } // image changed while we worked
+      if (srcOf(img) !== src) { dropEntry(img, entry); return; } // image changed while we worked
       // the erased areas only; the page's own image shows through everywhere else
       unit.patches = await Promise.all(res.patches.map(async (p) => ({ ...p, img: await loadImage(p.dataUrl) })));
       unit.result = res;
@@ -698,6 +723,18 @@
       if (autoOn()) keepWarm();
       watchLayout();
     } catch (e) {
+      // The extension's worker went away while it had this page: Chrome stopped or restarted it
+      // (a user's report: the last pages of a chapter failed with "message channel closed", and
+      // worked when asked again). Asked again by itself, twice at most, without counting it
+      // against the page; a page Claude had already answered is in the worker's cache.
+      if (WORKER_GONE.test(e.message || "") && (unit.lost || 0) < 2 && entries.get(img) === entry && img.isConnected) {
+        unit.lost = (unit.lost || 0) + 1;
+        unit.status = "idle";
+        settle(entry);
+        refreshBar();
+        setTimeout(() => { if (entries.get(img) === entry && unit.status === "idle") enqueue(img, force, auto, key); }, 700);
+        return;
+      }
       unit.status = "error";
       unit.error = e.message || String(e);
       unit.failures = (unit.failures || 0) + 1;
@@ -715,9 +752,10 @@
     canvas.className = "overlay";
     entry.img = img; entry.peek = -1;
     entry.objectFit = getComputedStyle(img).objectFit;
-    if (!entry.canvas) { entry.canvas = canvas; root.append(canvas); }
+    if (!entry.canvas) { entry.canvas = canvas; canvas.setAttribute("aria-hidden", "true"); root.append(canvas); } // (the lines say it in text)
     sizeBacking(entry, backingFor(res, contentRect(img, entry.objectFit)));
     drawOverlay(entry);
+    fillLines(entry);
     if (settings.debugOverlay) console.info("Gytakusub debug", { src: entry.src, engine: res.engine, work: res.work, natural: [res.width, res.height], timing: res.timing, fromCache: res.fromCache, items: res.items, regions: res.regions, placements: res.placements, letter: res.letter });
     layout();
   }
@@ -780,22 +818,102 @@
     return null;
   }
 
+  // ---------- the lines as text: screen readers, find in page, the keyboard ----------
+  // The translations are drawn on a canvas, which the browser can't read. Each image's lines are
+  // also buttons, transparent, over the drawn text: a screen reader reads them, find in page
+  // finds them, and the keyboard reaches them (one stop per image, the arrow keys between its
+  // lines, Enter to edit one). The pointer goes through them to the page, as it does the canvas.
+  function fillLines(entry) {
+    const res = entry.result;
+    if (!entry.layer) {
+      entry.layer = document.createElement("div");
+      entry.layer.className = "lines"; entry.layer.setAttribute("role", "group");
+      entry.layer.addEventListener("keydown", onLinesKey);
+      entry.layer.addEventListener("focusin", (ev) => onLineFocus(entry, ev.target));
+      entry.layer.addEventListener("focusout", () => { if (readHit?.via === "focus") hideReadable(); });
+      entry.layer.addEventListener("click", (ev) => {
+        const i = [...entry.layer.children].indexOf(ev.target);
+        if (i >= 0) openEditor(lineHit(entry, i), ev.target.getBoundingClientRect());
+      });
+      // in the page's order, so Tab goes through the images as they come
+      const after = [...entries.values()].find((x) => x !== entry && x.layer?.isConnected && x.img && entry.img.compareDocumentPosition(x.img) & Node.DOCUMENT_POSITION_FOLLOWING);
+      root.insertBefore(entry.layer, after ? after.layer : null);
+    }
+    entry.layer.setAttribute("aria-label", T("content_lines_group"));
+    const was = entry.layer.querySelector('[tabindex="0"]'), keep = was ? [...entry.layer.children].indexOf(was) : 0;
+    const { W, H } = res.work;
+    entry.layer.replaceChildren(...res.placements.map((p, i) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "line"; b.textContent = p.text;
+      b.tabIndex = i === Math.min(keep, res.placements.length - 1) ? 0 : -1;
+      b.style.left = (100 * p.rect.x / W) + "%"; b.style.top = (100 * p.rect.y / H) + "%";
+      b.style.width = (100 * p.rect.w / W) + "%"; b.style.height = (100 * p.rect.h / H) + "%";
+      b.style.fontSize = `calc(var(--k, 1) * ${(entry.sizes?.[i] || p.letter || 12).toFixed(2)}px)`;
+      return b;
+    }));
+  }
+  /** A line as the pointer would hit it (for the editor and the readable view). */
+  function lineHit(entry, idx) { return { entry, img: entry.img, idx, rect: contentRect(entry.img, entry.objectFit) }; }
+  // (the reader's own keys, arrows above all, stay off while a line has the focus)
+  function onLinesKey(ev) {
+    const lines = [...ev.currentTarget.children], i = lines.indexOf(ev.target);
+    if (i < 0) return;
+    const to = { ArrowDown: i + 1, ArrowRight: i + 1, ArrowUp: i - 1, ArrowLeft: i - 1, Home: 0, End: lines.length - 1 }[ev.key];
+    if (to != null) {
+      ev.preventDefault();
+      const next = lines[Math.max(0, Math.min(lines.length - 1, to))];
+      for (const l of lines) l.tabIndex = l === next ? 0 : -1;
+      next.focus();
+    } else if (ev.key === "Escape" && readHit) { hideReadable(true); ev.preventDefault(); }
+    ev.stopPropagation();
+  }
+  function onLineFocus(entry, el) {
+    const i = [...entry.layer.children].indexOf(el);
+    if (i < 0) return;
+    for (const l of entry.layer.children) l.tabIndex = l === el ? 0 : -1;
+    // the lines sit over the page, not in it, so the browser doesn't bring a focused one into view
+    const r = el.getBoundingClientRect();
+    if (r.bottom < 0 || r.top > window.innerHeight) {
+      const by = r.top - window.innerHeight / 3;
+      let sc = entry.img.parentElement;
+      while (sc && !(sc.scrollHeight > sc.clientHeight && /auto|scroll/.test(getComputedStyle(sc).overflowY))) sc = sc.parentElement;
+      (sc || document.scrollingElement || document.documentElement).scrollBy({ top: by, behavior: "instant" });
+      layout();
+    }
+    const hit = lineHit(entry, i);
+    if (onScreenSize(hit) < READABLE_PX) { hideReadable(); showReadable(hit, "focus"); } else if (readHit?.via === "focus") hideReadable();
+  }
+
   // Readable view: a line drawn smaller than READABLE_PX on screen (a narrow window, a page
-  // shown small) appears at a readable size beside its bubble while the pointer rests on it.
+  // shown small) appears at a readable size beside its bubble while the pointer rests on it or
+  // the keyboard is on it, and any line on a long press (touch). It stays while the pointer
+  // moves onto it (its Edit button is there), and Esc puts it away (WCAG 1.4.13).
   // The lettering itself can't grow: it has to fit the bubble the artist drew.
   const READABLE_PX = 9;
   const readable = document.createElement("div"); readable.className = "readable"; readable.hidden = true; readable.setAttribute("role", "tooltip");
+  const readableText = document.createElement("div"), readableEdit = document.createElement("button");
+  readableEdit.type = "button";
+  readable.append(readableText, readableEdit);
   shadow.append(readable);
-  let readTimer = null, readHit = null;
+  let readTimer = null, readHit = null, leaveTimer = null, overReadable = false, dismissed = null;
+  readable.addEventListener("pointerenter", () => { overReadable = true; clearTimeout(leaveTimer); });
+  readable.addEventListener("pointerleave", () => { overReadable = false; if (readHit?.via === "pointer") { clearTimeout(leaveTimer); leaveTimer = setTimeout(hideReadable, 300); } });
+  readableEdit.addEventListener("click", (ev) => { if (ev.isTrusted && readHit) { const hit = readHit; hideReadable(); openEditor(hit, readable.getBoundingClientRect()); } });
+  for (const t of ["keydown", "mousedown", "mouseup", "click", "dblclick"]) readable.addEventListener(t, (ev) => ev.stopPropagation());
+  readable.addEventListener("keydown", (ev) => { if (ev.key === "Escape") hideReadable(true); });
   /** CSS pixels the hit line was drawn at (Infinity before it was drawn). */
   function onScreenSize(hit) {
     const size = hit.entry.sizes?.[hit.idx];
     return size ? size * hit.rect.width / hit.entry.result.work.W : Infinity;
   }
-  function showReadable(hit) {
+  const sameLine = (a, b) => !!a && !!b && a.entry === b.entry && a.idx === b.idx;
+  function showReadable(hit, via) {
     const p = hit.entry.result.placements[hit.idx];
     if (!p) return;
-    readable.textContent = p.text;
+    clearTimeout(leaveTimer); leaveTimer = null;
+    readHit = { ...hit, via };
+    readableText.textContent = p.text;
+    readableEdit.textContent = T("content_edit");
     readable.hidden = false;
     // under the line, or above it when the screen ends first
     const r = hit.rect, k = r.width / hit.entry.result.work.W;
@@ -806,23 +924,35 @@
     if (y + h > window.innerHeight - 8) y = Math.max(8, box.top - h - 6);
     readable.style.left = x + "px"; readable.style.top = y + "px";
   }
-  function hideReadable() { clearTimeout(readTimer); readable.hidden = true; readHit = null; }
-  window.addEventListener("scroll", () => { if (readHit) hideReadable(); }, { capture: true, passive: true });
+  /** `byUser`: put away with Esc, so it doesn't come back until the pointer moves to another line. */
+  function hideReadable(byUser = false) {
+    clearTimeout(readTimer); clearTimeout(leaveTimer); leaveTimer = null;
+    if (byUser && readHit) dismissed = readHit;
+    readable.hidden = true; readHit = null; overReadable = false;
+  }
+  window.addEventListener("scroll", () => { if (readHit && readHit.via !== "focus") hideReadable(); }, { capture: true, passive: true });
+  document.addEventListener("keydown", (ev) => { if (ev.key === "Escape" && readHit && ev.isTrusted) hideReadable(true); }, true);
 
-  let peekTimer = null, lastHit = null;
+  let peekTimer = null, lastHit = null, pendingHit = null;
   function setPeek(entry, idx) {
     if (entry.peek === idx) return;
     entry.peek = idx;
     drawOverlay(entry);
   }
   document.addEventListener("mousemove", (ev) => {
-    if (!ev.isTrusted || editor.open) return;
+    if (!ev.isTrusted || editor.el?.open || overReadable) return;
     const hit = hitTest(ev.clientX, ev.clientY);
-    const small = hit && hit.idx >= 0 && onScreenSize(hit) < READABLE_PX;
-    if (!small) { if (readHit) hideReadable(); }
-    else if (!readHit || readHit.entry !== hit.entry || readHit.idx !== hit.idx) {
-      hideReadable(); readHit = hit;
-      readTimer = setTimeout(() => showReadable(hit), 250); // a dwell, as for peeking
+    const line = hit && hit.idx >= 0 ? hit : null;
+    if (!sameLine(line, dismissed)) dismissed = null;
+    const small = line && !dismissed && onScreenSize(line) < READABLE_PX;
+    if (!small) {
+      clearTimeout(readTimer); pendingHit = null;
+      // a moment to reach it: moving onto the view keeps it (the gap between them is no exit)
+      if (readHit?.via === "pointer" && !leaveTimer) leaveTimer = setTimeout(() => { leaveTimer = null; if (!overReadable) hideReadable(); }, 300);
+    } else if (sameLine(line, readHit)) { clearTimeout(leaveTimer); leaveTimer = null; }
+    else if (!sameLine(line, pendingHit)) {
+      clearTimeout(readTimer); pendingHit = line;
+      readTimer = setTimeout(() => { pendingHit = null; hideReadable(); showReadable(line, "pointer"); }, 250); // a dwell, as for peeking
     }
     if (!settings.peekOnHover) return;
     const same = hit && lastHit && hit.entry === lastHit.entry && hit.idx === lastHit.idx;
@@ -833,61 +963,91 @@
     if (!hit || hit.idx < 0) { if (hit) setPeek(hit.entry, -1); return; }
     peekTimer = setTimeout(() => setPeek(hit.entry, hit.idx), 280); // a dwell, so passing over bubbles doesn't flicker
   }, { capture: true, passive: true });
-  document.addEventListener("mouseout", (ev) => { if (ev.relatedTarget) return; hideReadable(); clearTimeout(peekTimer); if (lastHit?.entry) setPeek(lastHit.entry, -1); lastHit = null; }, true); // pointer left the window
+  document.addEventListener("mouseout", (ev) => { if (ev.relatedTarget || overReadable) return; hideReadable(); clearTimeout(peekTimer); if (lastHit?.entry) setPeek(lastHit.entry, -1); lastHit = null; }, true); // pointer left the window
 
-  // Editor: double-click a translated line to correct it (and optionally teach the glossary).
-  const editor = { el: null, open: false, entry: null, idx: -1 };
+  // Touch: a long press on a translated line shows it at a readable size, with Edit (there is no
+  // hover, and a double tap isn't a double-click everywhere). The menu the press would open is not.
+  const LONG_PRESS_MS = 550;
+  let press = null, pressedAt = 0;
+  document.addEventListener("pointerdown", (ev) => {
+    if (!ev.isTrusted || ev.pointerType !== "touch" || !active()) return;
+    clearTimeout(press?.timer);
+    const at = { x: ev.clientX, y: ev.clientY };
+    press = { at, timer: setTimeout(() => {
+      press = null;
+      const hit = hitTest(at.x, at.y);
+      if (!hit || hit.idx < 0) return;
+      pressedAt = performance.now();
+      hideReadable(); showReadable(hit, "touch");
+    }, LONG_PRESS_MS) };
+  }, true);
+  const unpress = (ev) => { if (press && (ev.type !== "pointermove" || Math.hypot(ev.clientX - press.at.x, ev.clientY - press.at.y) > 10)) { clearTimeout(press.timer); press = null; } };
+  for (const t of ["pointermove", "pointerup", "pointercancel"]) document.addEventListener(t, unpress, { capture: true, passive: true });
+  document.addEventListener("contextmenu", (ev) => { if (performance.now() - pressedAt < 1500) { ev.preventDefault(); pressedAt = 0; } }, true);
+  document.addEventListener("pointerdown", (ev) => { if (readHit?.via === "touch" && ev.isTrusted && ev.composedPath()[0] === host) return; if (readHit?.via === "touch" && ev.isTrusted) hideReadable(); }, true);
+
+  // Editor: a native modal dialog (the browser keeps the keyboard in it, closes it with Esc or a
+  // click outside, and gives the focus back), opened by double-clicking a translated line, Enter
+  // on a line, or Edit in the readable view. Corrects the line, and can teach the glossary.
+  const editor = { el: null, entry: null, idx: -1 };
   function buildEditor() {
-    const el = document.createElement("div"); el.className = "editor"; el.setAttribute("role", "dialog"); el.setAttribute("aria-label", T("content_edit_dialog")); el.hidden = true;
-    // a fixed template; the only text in it is our own messages, escaped
-    el.innerHTML = `<textarea aria-label="${esc(T("content_translated_line"))}" spellcheck="true"></textarea>
-      <div class="row"><button class="primary" data-act="save">${esc(T("content_save"))}</button><button data-act="cancel">${esc(T("content_cancel"))}</button><span class="hint">Ctrl+Enter · Esc</span></div>
+    const el = document.createElement("dialog"); el.className = "editor"; el.setAttribute("aria-label", T("content_edit_dialog"));
+    el.setAttribute("closedby", "any");
+    // a fixed template; the only text in it is our own messages, escaped. The glossary row is
+    // outside the form: Enter there adds the term, it doesn't save the line.
+    el.innerHTML = `<form method="dialog"><textarea aria-label="${esc(T("content_translated_line"))}" spellcheck="true" autofocus></textarea>
+      <div class="row"><button class="primary" value="save">${esc(T("content_save"))}</button><button value="cancel">${esc(T("content_cancel"))}</button><span class="hint">Ctrl+Enter · Esc</span></div></form>
       <div class="label">${esc(T("content_teach"))}</div>
-      <div class="row gloss"><input data-f="from" placeholder="${esc(T("content_original_term_ph"))}" aria-label="${esc(T("content_original_term"))}" /><span>=</span><input data-f="to" placeholder="${esc(T("content_translation_ph"))}" aria-label="${esc(T("content_translation"))}" /><button data-act="gloss">${esc(T("content_add"))}</button></div>`;
+      <div class="row gloss"><input data-f="from" placeholder="${esc(T("content_original_term_ph"))}" aria-label="${esc(T("content_original_term"))}" /><span>=</span><input data-f="to" placeholder="${esc(T("content_translation_ph"))}" aria-label="${esc(T("content_translation"))}" /><button type="button" data-act="gloss">${esc(T("content_add"))}</button></div>`;
     // the reader must not see these keys (its hotkeys), and the page must not see the text
     for (const t of ["keydown", "keyup", "keypress", "mousedown", "mouseup", "click", "dblclick", "wheel"]) el.addEventListener(t, (ev) => ev.stopPropagation());
+    const form = el.querySelector("form"), saveBtn = form.querySelector('[value="save"]');
     el.addEventListener("keydown", (ev) => {
-      if (ev.key === "Escape") closeEditor();
-      else if (ev.key === "Enter" && (ev.ctrlKey || ev.metaKey)) saveEdit();
+      if (ev.key === "Enter" && (ev.ctrlKey || ev.metaKey)) { ev.preventDefault(); form.requestSubmit(saveBtn); }
+      else if (ev.key === "Enter" && ev.target.dataset?.f) { ev.preventDefault(); addGlossary(); }
     });
-    el.addEventListener("click", (ev) => {
-      if (!ev.isTrusted) return;
-      const act = ev.target?.dataset?.act;
-      if (act === "save") saveEdit(); else if (act === "cancel") closeEditor(); else if (act === "gloss") addGlossary();
+    el.addEventListener("click", (ev) => { if (ev.isTrusted && ev.target?.dataset?.act === "gloss") addGlossary(); });
+    el.addEventListener("close", () => {
+      if (el.returnValue === "save") saveEdit();
+      el.returnValue = ""; // (Esc and a click outside set none: dismissed)
+      editor.entry = null;
     });
     shadow.append(el);
     return el;
   }
-  function openEditor(hit, clientX, clientY) {
+  /** `near`: where to open it (a point, or a box to sit under). */
+  function openEditor(hit, near) {
     hideReadable();
+    if (!hit.entry.result?.placements[hit.idx]) return;
     editor.el ||= buildEditor();
+    if (editor.el.open) editor.el.close();
     const p = hit.entry.result.placements[hit.idx];
     const item = p.item != null ? hit.entry.result.items[p.item] : null;
-    editor.entry = hit.entry; editor.idx = hit.idx; editor.open = true;
+    editor.entry = hit.entry; editor.idx = hit.idx;
     const ta = editor.el.querySelector("textarea"); ta.value = p.text;
     editor.el.querySelector('[data-f="from"]').value = item?.source || "";
     editor.el.querySelector('[data-f="to"]').value = "";
-    editor.el.hidden = false;
-    const w = 300, h = editor.el.offsetHeight || 190;
-    editor.el.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, clientX + 12)) + "px";
-    editor.el.style.top = Math.max(8, Math.min(window.innerHeight - h - 8, clientY + 12)) + "px";
     clearTimeout(peekTimer); setPeek(hit.entry, -1);
-    ta.focus(); ta.select();
+    editor.el.showModal();
+    const w = editor.el.offsetWidth || 300, h = editor.el.offsetHeight || 190;
+    const x = near.left ?? near.x, y = near.bottom ?? near.y;
+    editor.el.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, x + 12)) + "px";
+    editor.el.style.top = Math.max(8, Math.min(window.innerHeight - h - 8, y + 12)) + "px";
+    ta.select();
   }
-  function closeEditor() { if (!editor.el) return; editor.el.hidden = true; editor.open = false; editor.entry = null; }
-  async function saveEdit() {
-    const e = editor.entry, p = e?.result.placements[editor.idx];
-    if (!p) return closeEditor();
+  function saveEdit() {
+    const e = editor.entry, p = e?.result?.placements[editor.idx];
+    if (!p) return;
     const text = editor.el.querySelector("textarea").value.trim();
-    if (text && text !== p.text) {
-      p.text = text;
-      if (p.own) p.own.text = text; // (a tall image's part keeps it for the next drawing)
-      if (p.item != null && e.result.items[p.item]) e.result.items[p.item].text = text;
-      drawOverlay(e);
-      const cacheKey = p.cacheKey || e.result.cacheKey, item = p.own ? p.localItem : p.item;
-      if (item != null && cacheKey) chrome.runtime.sendMessage({ type: "EDIT_ITEM", cacheKey, item, text }).catch(() => {});
-    }
-    closeEditor();
+    if (!text || text === p.text) return;
+    p.text = text;
+    if (p.own) p.own.text = text; // (a tall image's part keeps it for the next drawing)
+    if (p.item != null && e.result.items[p.item]) e.result.items[p.item].text = text;
+    drawOverlay(e);
+    const line = e.layer?.children[editor.idx];
+    if (line) line.textContent = text;
+    const cacheKey = p.cacheKey || e.result.cacheKey, item = p.own ? p.localItem : p.item;
+    if (item != null && cacheKey) chrome.runtime.sendMessage({ type: "EDIT_ITEM", cacheKey, item, text }).catch(() => {});
   }
   async function addGlossary() {
     const from = editor.el.querySelector('[data-f="from"]').value.trim(), to = editor.el.querySelector('[data-f="to"]').value.trim();
@@ -904,9 +1064,8 @@
     const hit = hitTest(ev.clientX, ev.clientY);
     if (!hit || hit.idx < 0) return;
     ev.preventDefault(); ev.stopPropagation();
-    openEditor(hit, ev.clientX, ev.clientY);
+    openEditor(hit, { x: ev.clientX, y: ev.clientY });
   }, true);
-  document.addEventListener("mousedown", (ev) => { if (editor.open && ev.isTrusted && ev.composedPath()[0] !== host) closeEditor(); }, true);
 
   // Debug overlay: text regions the engine found (red = bubble, blue = free
   // text, numbered as stamped for the model) and the final text areas (green).
@@ -939,19 +1098,20 @@
     for (const [img, e] of entries) {
       if (!e.canvas) continue;
       if (img.isConnected && srcOf(img) !== e.src) { // reader swapped this <img> to another page
-        e.canvas.remove();
-        entries.delete(img);
+        dropEntry(img, e);
         if (io) { io.unobserve(img); io.observe(img); }
         continue;
       }
       const r = img.isConnected ? contentRect(img, e.objectFit) : null;
       const show = r && r.width > 0 && r.height > 0 && !e.hidden && !allHidden;
       e.canvas.style.display = show ? "block" : "none";
+      if (e.layer) e.layer.hidden = !show;
       if (!show) continue;
-      e.canvas.style.left = r.left + "px";
-      e.canvas.style.top = r.top + "px";
-      e.canvas.style.width = r.width + "px";
-      e.canvas.style.height = r.height + "px";
+      for (const el of e.layer ? [e.canvas, e.layer] : [e.canvas]) {
+        el.style.left = r.left + "px"; el.style.top = r.top + "px";
+        el.style.width = r.width + "px"; el.style.height = r.height + "px";
+      }
+      if (e.layer && e.result) e.layer.style.setProperty("--k", r.width / e.result.work.W); // CSS px per work px
       keepBacking(e, r);
     }
     if (hoverImg && bar.classList.contains("visible")) positionBar();
