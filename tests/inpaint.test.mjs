@@ -1,4 +1,4 @@
-// The learned eraser's parts (2.12.0), with the vendored model on the CPU:
+// The learned eraser's parts (2.12.0; LaMa 2.13.0), with the vendored models on the CPU:
 //  - the learned fill continues screentone under removed lettering (no white cloud, no ghost),
 //    keeps a grey page grey, and changes nothing outside the mask;
 //  - a flat surface is recognised as flat, screentone and art are not.
@@ -8,7 +8,7 @@ import fs from "node:fs";
 import { createCanvas } from "canvas";
 import { cv } from "./cv-node.mjs";
 import { getOrt, createSession, run } from "../extension/engine/ort.js";
-import { aotInpaint } from "../extension/engine/inpaint.js";
+import { aotInpaint, LAMA_SIDE } from "../extension/engine/inpaint.js";
 import { flatSurface } from "../extension/engine/erase.js";
 
 let passed = 0;
@@ -65,6 +65,45 @@ test("nothing outside the mask changes", () => {
   const filled = await aotInpaint(cv, { ...model, ep: "wasm" }, srgb, sm);
   test("a long strip on the CPU's size budget is filled (the model needs 72 px across)", () => { assert.equal(filled.rows, SH); assert.equal(filled.cols, SW); });
   filled.delete(); srgb.delete(); sm.delete();
+}
+
+{
+  // LaMa finetuned on manga (2.13, on a graphics card in the extension; here on the CPU): one input
+  // size, 512 px, so this 200 × 120 area is padded to it; its own value range ([0, 1]). The same
+  // checks as AOT's, on the same area.
+  const lama = { ort, session: (await createSession(new Uint8Array(fs.readFileSync("../extension/vendor/lama.onnx")), { gpu: false })).session, run, kind: "lama", side: LAMA_SIDE };
+  const lo = await aotInpaint(cv, lama, rgb, mask);
+  const fill = [];
+  for (let i = 0; i < W * H; i++) if (mask.data[i]) fill.push(lo.data[i * 3]);
+  test("LaMa: the fill matches the tone's level and keeps its texture", () => {
+    assert.ok(Math.abs(mean(fill) - mean(toneIn)) < 15, `fill ${mean(fill).toFixed(1)} vs tone ${mean(toneIn).toFixed(1)}`);
+    assert.ok(sd(fill) > 0.35 * sd(toneIn), `fill spread ${sd(fill).toFixed(1)} vs tone ${sd(toneIn).toFixed(1)}`);
+    const dark = fill.filter((v) => v < 60).length, white = fill.filter((v) => v > 245).length;
+    assert.ok(dark / fill.length < 0.01 && white / fill.length < 0.02, `dark ${dark}, white ${white} of ${fill.length}`);
+  });
+  test("LaMa: the area comes back at its own size, unchanged outside the mask", () => {
+    assert.equal(lo.rows, H); assert.equal(lo.cols, W);
+    let changed = 0; for (let i = 0; i < W * H; i++) if (!mask.data[i] && lo.data[i * 3] !== rgb.data[i * 3]) changed++;
+    assert.equal(changed, 0);
+  });
+  lo.delete();
+  // with the page around the area (its window of the page, not a mirror image): the same checks,
+  // on the same area cut from a larger toned page
+  const PW = 640, PH = 420, AX = 230, AY = 150;
+  const pc = createCanvas(PW, PH), px = pc.getContext("2d");
+  px.fillStyle = "#d6d6d6"; px.fillRect(0, 0, PW, PH);
+  px.fillStyle = "#8a8a8a"; for (let yy = 2; yy < PH; yy += 6) for (let xx = (yy / 6) % 2 ? 5 : 2; xx < PW; xx += 6) { px.beginPath(); px.arc(xx, yy, 1.4, 0, 7); px.fill(); }
+  px.putImageData(page, AX, AY);
+  const pm = cv.matFromImageData(px.getImageData(0, 0, PW, PH)), prgb = new cv.Mat(); cv.cvtColor(pm, prgb, cv.COLOR_RGBA2RGB); pm.delete();
+  const lc = await aotInpaint(cv, lama, rgb, mask, { context: { image: prgb, x: AX, y: AY } });
+  const fc = []; for (let i = 0; i < W * H; i++) if (mask.data[i]) fc.push(lc.data[i * 3]);
+  test("LaMa with the page around the area: the fill matches the tone, unchanged outside the mask", () => {
+    assert.equal(lc.rows, H); assert.equal(lc.cols, W);
+    assert.ok(Math.abs(mean(fc) - mean(toneIn)) < 15 && sd(fc) > 0.35 * sd(toneIn), `fill ${mean(fc).toFixed(1)} ± ${sd(fc).toFixed(1)} vs tone ${mean(toneIn).toFixed(1)} ± ${sd(toneIn).toFixed(1)}`);
+    let changed = 0; for (let i = 0; i < W * H; i++) if (!mask.data[i] && lc.data[i * 3] !== rgb.data[i * 3]) changed++;
+    assert.equal(changed, 0);
+  });
+  lc.delete(); prgb.delete();
 }
 
 const mat = (img) => { const m = cv.matFromImageData(img), r = new cv.Mat(); cv.cvtColor(m, r, cv.COLOR_RGBA2RGB); m.delete(); return r; };

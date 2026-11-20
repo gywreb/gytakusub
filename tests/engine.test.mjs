@@ -105,6 +105,14 @@ test("normalizeItems maps slice pixels to page fractions and validates tags", ()
   assert.equal(b.tag, null, "tag outside the slice's range is dropped");
 });
 
+test("sound effects and logos are labelled, then left as drawn", () => {
+  const s = { x: 0, y: 0, w: 100, h: 100, cw: 100, ch: 100, tagFrom: 1, tagTo: 0 };
+  const kept = prompt.normalizeItems(["sign", "sfx", "logo", "narration"].map((kind) => ({ tag: null, box: [1, 1, 5, 5], kind, text: kind })), s, 100, 100);
+  assert.deepEqual(kept.map((it) => it.kind), ["sign", "narration"]);
+  assert.deepEqual(prompt.answerSchema(false).properties.items.items.properties.kind.enum, ["bubble", "narration", "sign", "sfx", "logo"]);
+  assert.match(prompt.buildPrompt({ glossary: "", useContext: false, customPrompt: "", targetLang: "English" }, { terms: [], recent: [] }, { cw: 10, ch: 10, tagFrom: 1, tagTo: 0 }), /"sfx" \(a sound effect\) or "logo"/);
+});
+
 // ---------- engine on the synthetic pages ----------
 // demo-page.png (hand-laid, with a joined bubble) plus the procedural gen-NN pages
 // (Latin and Japanese, light and dark bubbles, captions, free text, sound effects).

@@ -75,6 +75,69 @@ await test("a loose box straddling two regions does not override the stamp", () 
   assert.equal(placements[0].tag, 1);
 });
 
+await test("a line with nothing to translate (only dots or marks) is left as drawn: not erased, not drawn again", () => {
+  const dots = para(100, 100, 60, 20), marks = para(300, 100, 30, 40);
+  const words = { id: 1, kind: "bubble", ref: { blocks: [para(500, 400, 80, 30)], fill: null }, box: { x: 480, y: 380, w: 140, h: 80 }, letter: 24 };
+  const an = analysis([block(2, dots), words], [dots, marks]);
+  const { placements, regionIds } = layout(an, [item([95, 95, 70, 30], "……", 2), item([295, 95, 40, 50], "!?"), item([480, 390, 140, 50], "Wait…", 1, "bubble"), item([480, 430, 140, 20], "…♪", 1, "bubble")]);
+  assert.deepEqual([...regionIds], [1]);
+  assert.deepEqual(placements.map((p) => p.text), ["Wait…"]);
+  assert.equal(an.regions.length, 2, "the marks' lettering is not adopted");
+});
+
+// bubbles whose shape is their box
+const bubbleAt = (id, box, blocks) => ({ id, kind: "bubble", ref: { blocks, fill: null }, box, letter: 24, dark: false });
+const boxShapes = (an) => { an.insideOf = (id) => { const b = an.regions.find((q) => q.id === id).box; return (x, y) => x >= b.x && y >= b.y && x < b.x + b.w && y < b.y + b.h; }; return an; };
+
+await test("two lines given one bubble's stamp: the one boxed on a neighbour's lettering goes to that neighbour", () => {
+  const a = para(120, 110, 80, 40, { bubble: 1, region: 1 }), b = para(120, 230, 80, 40, { bubble: 2, region: 2 });
+  const an = boxShapes(analysis([bubbleAt(1, { x: 100, y: 90, w: 120, h: 100 }, [a]), bubbleAt(2, { x: 100, y: 210, w: 120, h: 100 }, [b])], [a, b]));
+  const { placements, regionIds } = layout(an, [item([110, 100, 100, 60], "Love stuff, coffee, milk", 1, "bubble"), item([110, 170, 100, 90], "Well then, make her buy them", 1, "bubble")]);
+  assert.deepEqual([...regionIds].sort(), [1, 2]);
+  assert.deepEqual(placements.map((p) => [p.tag, p.text.split(" ")[0]]).sort(), [[1, "Love"], [2, "Well"]]);
+});
+
+await test("two lines given one bubble's stamp, one boxed off the bubble: that one takes the lettering under its box", () => {
+  const own = para(400, 420, 80, 30, { bubble: 1, region: 1 }), shout = para(400, 300, 90, 40);
+  const an = boxShapes(analysis([bubbleAt(1, { x: 380, y: 400, w: 140, h: 80 }, [own])], [own, shout]));
+  const { placements, regionIds } = layout(an, [item([390, 415, 100, 40], "Ah, okay!", 1, "bubble"), item([395, 295, 100, 50], "Eh?!", 1, "bubble")]);
+  assert.equal(an.regions.length, 2);
+  const eh = placements.find((p) => p.text === "Eh?!");
+  assert.equal(eh.tag, an.regions[1].id);
+  assert.ok(regionIds.has(an.regions[1].id));
+  // one line alone with its box drifted off the bubble keeps the stamp, and takes nothing beside it
+  const an2 = boxShapes(analysis([bubbleAt(1, { x: 380, y: 400, w: 140, h: 80 }, [own])], [own, shout]));
+  layout(an2, [item([395, 295, 100, 50], "Eh?!", 1, "bubble")]);
+  assert.equal(an2.regions.length, 1);
+});
+
+await test("in a bubble with two lines, the one with nothing to translate keeps its lettering: the other's text keeps off it", () => {
+  const dots = para(450, 100, 40, 90, { bubble: 1, region: 1, vertical: true }), ah = para(430, 210, 50, 80, { bubble: 1, region: 1, vertical: true });
+  const an = boxShapes(analysis([bubbleAt(1, { x: 410, y: 85, w: 100, h: 230 }, [dots, ah])], [dots, ah]));
+  const { placements, regionIds } = layout(an, [item([460, 125, 40, 60], "......!", 1, "bubble"), item([425, 255, 60, 50], "Ah...", 1, "bubble")]);
+  assert.deepEqual([...regionIds], [1]);
+  assert.deepEqual(placements.map((p) => p.text), ["Ah..."]);
+  assert.deepEqual(an.regions[0].kept, [dots.gbox]);
+  const r = placements[0].rect, k = dots.gbox;
+  assert.ok(r.y >= k.y + k.h || r.x >= k.x + k.w || r.x + r.w <= k.x, `text ${JSON.stringify(r)} over the kept dots`);
+});
+
+await test("a tight box on the core of big lettering takes it; a small box in a large paragraph does not", () => {
+  const shout = para(100, 100, 110, 70, { letter: 60 });
+  const an = analysis([], [shout]);
+  layout(an, [item([115, 110, 80, 30], "Eh?!")]);
+  assert.equal(an.regions.length, 1);
+  const credits = para(100, 400, 400, 200);
+  const an2 = analysis([], [credits]);
+  layout(an2, [item([150, 450, 80, 30], "Translator")]);
+  assert.equal(an2.regions.length, 0);
+  // and a corner of a large box (the rest of a title not found) is not taken for the whole line
+  const corner = para(600, 100, 50, 45);
+  const an3 = analysis([], [corner]);
+  layout(an3, [item([500, 0, 250, 320], "The Tearing")]);
+  assert.equal(an3.regions.length, 0);
+});
+
 // ---- coloured lettering, through the real analysis and eraser ----
 loadLettering();
 const page = (draw) => { const c = createCanvas(900, 600), x = c.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0, 0, 900, 600); draw(x); return x.getImageData(0, 0, 900, 600); };

@@ -7,6 +7,7 @@
 import { callClaude, mergeContext, sliceGeometry } from "./prompt.js";
 import { addCall, addPage, emptyLog } from "./usage.js";
 import { preparePage, prefillPage, finishPage, warmInpainter, inpainterWarm } from "./engine/page.js";
+import { setEnginePrefs } from "./engine/cv.js";
 import { DEFAULT_SETTINGS, getSettings, CS_FILES, ensureContentScript } from "./settings.js";
 import { createLane, Cancelled } from "./lane.js";
 import { consentGiven, hasAccess, openWelcome, CONSENT_VERSION } from "./access.js";
@@ -34,7 +35,10 @@ function recordPage(raw) {
   }).catch((e) => console.warn("Gytakusub: usage log write failed", e));
 }
 
-const PROMPT_VERSION = 6; // bump when the prompt/coordinate format changes so old cache entries are ignored
+// The extension ships the LaMa inpainter (vendor/lama.onnx), used on a graphics card (ADR 0015)
+setEnginePrefs({ lama: true });
+
+const PROMPT_VERSION = 7; // bump when the prompt/coordinate format changes so old cache entries are ignored
 
 export { DEFAULT_SETTINGS }; // defined in settings.js, shared with the popup and options pages
 
@@ -446,6 +450,7 @@ async function answerPage(msg, settings, tabId, work, { job, natural, cached, ca
   if (page.segmentMs) timing.segment = page.segmentMs;
   if (page.backend) timing.backend = page.backend; // where the models ran: webgpu / wasm / opencv
   if (page.fill) timing.fill = page.fill; // part of "finish": the erased areas by fill, and the texture fills' time
+  if (page.look?.boxes) timing.look = page.look; // part of "finish": the second look at lines with no lettering found (boxes, lines found, ms)
   return {
     items: page.items, placements: page.placements, regions: page.regions, letter: page.letter, engine: page.engine,
     work: page.work, width: job.width, height: job.height, usage, timing,

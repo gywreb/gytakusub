@@ -1,6 +1,10 @@
 // Gytakusub Web – the page engine (OpenCV analysis, erase, layout) runs here,
 // off the main thread. Same engine modules as the extension's service worker.
 import { preparePage, prefillPage, finishPage, warmInpainter, inpainterWarm } from "./engine/page.js";
+import { setEnginePrefs, onLama } from "./engine/cv.js";
+
+// LaMa on a graphics card (ADR 0015), as the app says (translator.js: not after it ran out of memory)
+onLama((state) => self.postMessage({ event: "lama", state }));
 
 const jobs = new Map();
 let seq = 0;
@@ -13,7 +17,10 @@ self.onmessage = async (e) => {
   const work = type === "prepare" || type === "finish";
   if (work) busy++;
   try {
-    if (type === "prepare") {
+    if (type === "prefs") {
+      setEnginePrefs({ lama: !!e.data.lama });
+      self.postMessage({ id, ok: true });
+    } else if (type === "prepare") {
       const job = await preparePage(e.data.bitmap, e.data.settings);
       e.data.bitmap.close();
       const jobId = ++seq;
@@ -62,7 +69,7 @@ self.onmessage = async (e) => {
       } finally { natural?.close(); }
       const patches = page.patches.map((p) => ({ x: p.x, y: p.y, w: p.w, h: p.h, bitmap: p.canvas.transferToImageBitmap() }));
       // (and what the debug report records: which engine, where the models ran, their times, how the areas were filled)
-      self.postMessage({ id, ok: true, items: page.items, placements: page.placements, regions: page.regions, work: page.work, letter: page.letter, patches, engine: page.engine, backend: page.backend, detectMs: page.detectMs, segmentMs: page.segmentMs, fill: page.fill, modelWait }, patches.map((p) => p.bitmap));
+      self.postMessage({ id, ok: true, items: page.items, placements: page.placements, regions: page.regions, work: page.work, letter: page.letter, patches, engine: page.engine, backend: page.backend, detectMs: page.detectMs, segmentMs: page.segmentMs, fill: page.fill, look: page.look, modelWait }, patches.map((p) => p.bitmap));
     } else if (type === "drop") {
       const job = jobs.get(e.data.jobId); jobs.delete(e.data.jobId);
       if (job) { await stopPrefill(job); for (const s of job.slices) s.analysis.dispose(); job.natural?.close(); }

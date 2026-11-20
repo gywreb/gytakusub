@@ -4,6 +4,34 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
 
 ## [Unreleased]
 
+## [2.13.0] — 2026-11-20
+
+Clean art, first part. Third step of the 3.0 plan: what Claude reads is erased, or left exactly as drawn.
+
+### Pages
+- **"…" and "!" stay as drawn.** A line whose translation has no letters (only dots, marks or "♪") reads the same in any language. It was erased and drawn again, and dots too small to find came out doubled. In a bubble with other lines it keeps its lettering, and the other lines' text keeps off it.
+- **Sound effects and logos are left alone.** Claude was told to leave sound effects out but returned them anyway (at least 16 lines in 7 of 11 reports), and they were drawn over the unerased original. It now labels them, with series logos, magazine marks, scan credits and page numbers, and those are dropped. Chapter titles, blurbs and captions are still translated. Pages translated before are asked again once (the cache key changed).
+- **Lettering the detector missed is looked for again.** When nothing was found under a translated line, the detector looks at just Claude's box, zoomed in, and what it finds is erased like any other lettering. Big shouts beside a bubble and small print are found this way. The debug report records it (`timing.look`).
+- **Two lines given one bubble's number are sorted by their boxes.** The line lying on another bubble's lettering goes to that bubble, and a shout boxed outside the bubble takes the lettering under its box, instead of both translations crowding one bubble while the other's original stayed.
+- **No more white flecks around bubbles.** Lettering found by its colour in a bubble is now taken only when it lies wholly inside the bubble; tone and art just past the outline were painted with the bubble's white.
+- **Art and screentone are filled by LaMa on a graphics card.** A LaMa model finetuned on manga continues screentone under removed lettering where the previous model (AOT) left a blurred ghost of the letters. On a black-and-white chapter, with lettering drawn over real stretches of its pages, its fill came out closer to what was there in 10 of 12 areas (SSIM 0.47 → 0.59); on a colour chapter the two were about even. It sees the 512 px of page around each area. Without a graphics card AOT stays (LaMa costs several times as much). The debug report shows which one ran, with its load and first runs (`fill.model`).
+- The extension is about 103 MB larger (the LaMa model).
+- On 11 of the owner's chapters (they stay local), replayed with their saved answers: translations drawn over unerased lettering 29 → 16, and lines whose lettering is left 31 → 24 of 1,095 (not counting 10 that only the replay of old reports gets wrong). Most of what remains is what the new labels drop (drawn over: 6 sound effects and 5 logos, marks or page numbers; left: 11 logos and 2 sound effects), which shows only on a chapter read with them. Every changed area was compared by eye with 2.12.0.
+
+### Web app
+Everything above reaches the web app too (it runs the same engine), and it catches up with 2.12.1:
+- **LaMa on a graphics card**, iPhone included. Downloaded the first time a page needs it (103 MB, once; the browser keeps it). If the tab dies twice while it loads or first runs (a phone out of memory), the app keeps to AOT on that device; the debug report says which.
+- **The translation is text too.** It was only a picture: now it lies invisibly over the drawing, so screen readers read it, Find in page finds it and it can be selected and copied. Selecting it doesn't flip the page to its original.
+- **A page survives the engine dying.** When the engine stops with an error (a phone short of memory), the next page starts a fresh one; the page it was working on is done again on it, with Claude's answer kept rather than asked for (and paid) again. Pages failed until Redo before.
+- The Originals toggle is announced as a switch.
+- The models are no longer copied into the app's offline cache on every visit (the browser's own cache keeps them, once).
+- Changes to the shared strings and the version now redeploy the web app (2.12.1 changed only those, and was not deployed).
+
+### Development
+- `npm run audit`: overlapping bubbles are matched by overlap (the centre rule matched a neighbour), lines drawn without erasing are listed, and lines left as drawn are not counted.
+- `scripts/lama-static.py` makes `vendor/lama.onnx` from the pinned upstream export (`node scripts/vendor-inpaint.mjs lama`): fixed at 512 px, it loads in under 2 s instead of ~16 s. The GPU test runs it on WebGPU against the CPU.
+- ADR 0015.
+
 ## [2.12.1] — 2026-11-20
 
 The overlay without a mouse, and pages that survive the extension's background restarting.

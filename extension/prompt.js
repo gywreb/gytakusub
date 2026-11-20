@@ -8,6 +8,9 @@ export const MODELS = [
   { id: "claude-opus-5-5", label: "Claude Opus 5.5 — best quality, most expensive" },
 ];
 
+/** Kinds of lettering left as drawn: Claude labels them rather than leaving them out, which it does not reliably do. */
+export const LEFT_AS_DRAWN = new Set(["sfx", "logo"]);
+
 export function buildPrompt(settings, ctx, slice) {
   const glossary = settings.glossary.trim();
   const terms = ctx.terms.length
@@ -25,12 +28,12 @@ export function buildPrompt(settings, ctx, slice) {
 The image is exactly ${slice.cw} pixels wide and ${slice.ch} pixels tall. The origin (0,0) is the top-left corner; x grows to the right (max ${slice.cw}), y grows downward (max ${slice.ch}).
 ${tagLine}
 
-Find EVERY piece of dialogue and written text in the image: speech bubbles, thought bubbles, narration boxes, and signs. Do NOT include sound effects / onomatopoeia drawn as part of the artwork.
+Find EVERY piece of dialogue and written text in the image: speech bubbles, thought bubbles, narration boxes, and signs. Sound effects / onomatopoeia drawn as part of the artwork, series logos, publisher or magazine marks, scanlation credits and watermarks, and page numbers stay as they are drawn: if you return one, give it the kind "sfx" (a sound effect) or "logo" (the others), so it is left alone.
 
 For each item return:
 - "tag": the number of the stamped region the text is inside, or null if the text is not inside a stamped region. One tag per item; if one stamped bubble contains two separate pieces of text, return two items with the same tag.
 - "box": [x, y, w, h] in PIXELS of this image: x,y = top-left corner of the text, w = width, h = height. Measure x against the ${slice.cw}px width and y against the ${slice.ch}px height independently. The box must tightly enclose the TEXT itself, not the whole bubble. Required for every item, most important for items with tag null.
-- "kind": one of "bubble", "narration", "sign".
+- "kind": one of "bubble", "narration", "sign", "sfx", "logo". A chapter title, a cover blurb or a caption is "narration" or "sign", not "logo".
 - "size": the lettering size relative to normal dialogue on this page: "small" (whispers, asides, tiny notes), "normal", or "large" (shouting, big bold lettering).
 ${settings.includeSource ? `- "source": the original text, transcribed exactly (vertical Japanese: read top-to-bottom, right-to-left).\n` : ""}- "text": a natural, concise ${settings.targetLang} translation that matches the tone. Keep honorifics (-san, -kun) only where conventional. Never leave text untranslated. If the source is already in ${settings.targetLang}, copy it.
 
@@ -80,7 +83,7 @@ export function normalizeItems(rawItems, s, width, height) {
     let tag = Number(it.tag);
     if (!Number.isInteger(tag) || tag < s.tagFrom || tag > s.tagTo) tag = null;
     if (!box && tag === null) continue;
-    if (it.kind === "sfx" || !it.text) continue;
+    if (LEFT_AS_DRAWN.has(it.kind) || !it.text) continue;
     items.push({
       tag, box,
       kind: it.kind || "bubble",
@@ -129,7 +132,7 @@ export function answerSchema(includeSource) {
     properties: {
       tag: { type: ["integer", "null"] },
       box: { type: "array", items: { type: "number" } },
-      kind: { type: "string", enum: ["bubble", "narration", "sign"] },
+      kind: { type: "string", enum: ["bubble", "narration", "sign", ...LEFT_AS_DRAWN] },
       size: { type: "string", enum: ["small", "normal", "large"] },
       ...(includeSource ? { source: { type: "string" } } : {}),
       text: { type: "string" },

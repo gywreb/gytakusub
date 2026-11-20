@@ -1,4 +1,4 @@
-import { aotInpaint } from "./inpaint.js";
+import { aotInpaint, contextWindow } from "./inpaint.js";
 import { latticeFill } from "./tone.js";
 
 // A surround is plain when 9 in 10 of its pixels lie within COLOUR_PLAIN of their median in every
@@ -68,9 +68,9 @@ export function erase(cv, img, analysis, regionIds, opts = {}) {
       const l = b.line, cx0 = Math.max(0, Math.min(x0, l ? Math.floor(l.x) : x0)), cy0 = Math.max(0, Math.min(y0, l ? Math.floor(l.y) : y0));
       const cx1 = Math.min(W, Math.max(x1, l ? Math.ceil(l.x + l.w) : x1)), cy1 = Math.min(H, Math.max(y1, l ? Math.ceil(l.y + l.h) : y1));
       const colour = colourLettering(cx0, cy0, cx1 - cx0, cy1 - cy0, inside);
-      if (colour) masks.push({ roi: colour, x0: cx0, y0: cy0, w: cx1 - cx0, h: cy1 - cy0 });
+      if (colour) masks.push({ roi: colour, x0: cx0, y0: cy0, w: cx1 - cx0, h: cy1 - cy0, colour: true });
     }
-    for (const { roi, x0, y0, w, h } of masks) {
+    for (const { roi, x0, y0, w, h, colour } of masks) {
       const lab = new cv.Mat(), st = new cv.Mat(), ce = new cv.Mat();
       const n = cv.connectedComponentsWithStats(roi, lab, st, ce, 8, cv.CV_32S);
       const S = st.data32S, Lb = lab.data32S;
@@ -81,7 +81,12 @@ export function erase(cv, img, analysis, regionIds, opts = {}) {
         // size across the line only: along it a mark may be long (a wave dash, a
         // long vowel mark in a column) and still be lettering — a stroke of art or
         // an outline crossing the window touches its edge instead
-        if (!touches && (b.vertical ? cw : ch) <= 2.5 * letter) { keep[i] = 1; extend(x0 + cx, y0 + cy, x0 + cx + cw, y0 + cy + ch); }
+        // in a bubble, what stands apart in colour is lettering only wholly inside the interior (as in
+        // paintBubbleColour): past the outline it is the art around the bubble, which the bubble's
+        // own fill would paint over
+        const X0 = x0 + cx, Y0 = y0 + cy;
+        if (colour && inside && !(inside(X0 - 1, Y0 - 1) && inside(X0 + cw, Y0 - 1) && inside(X0 - 1, Y0 + ch) && inside(X0 + cw, Y0 + ch))) continue;
+        if (!touches && (b.vertical ? cw : ch) <= 2.5 * letter) { keep[i] = 1; extend(X0, Y0, X0 + cw, Y0 + ch); }
       }
       for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) { const l = Lb[yy * w + xx]; if (l && keep[l]) md[(y0 + yy) * W + x0 + xx] = 255; }
       roi.delete(); lab.delete(); st.delete(); ce.delete();
@@ -290,6 +295,14 @@ export function erase(cv, img, analysis, regionIds, opts = {}) {
     }
     grown.delete();
     if (opts.outline) growOutline(cv, mask, rois, W, opts.outline);
+    // lettering a line with nothing to translate claimed (layout.js: region.kept) stays as drawn
+    for (const r of analysis.regions) {
+      if (!regionIds.has(r.id) || !r.kept) continue;
+      for (const k of r.kept) {
+        const x0 = Math.max(0, Math.floor(k.x)), y0 = Math.max(0, Math.floor(k.y)), x1 = Math.min(W, Math.ceil(k.x + k.w)), y1 = Math.min(H, Math.ceil(k.y + k.h));
+        for (let yy = y0; yy < y1; yy++) md.fill(0, yy * W + x0, yy * W + x1);
+      }
+    }
     for (const r of rois) {
       const rect = new cv.Rect(r.x, r.y, r.w, r.h);
       const srcRoi = rgb.roi(rect), maskRoi = mask.roi(rect);
@@ -390,9 +403,11 @@ export function flatSurface(rgb, mask, inside) {
  * from the area's surface (`surface`, erase()'s, resampled the same way).
  * @param {{fill?: "flat"|"texture", color?: number[], radius?: number, label?: number, letter?: number}} area
  * @param {Map<string, object>|null} [cache] see fillArea
+ * @param {{image: ImageData, x: number, y: number, side: number}|null} [context] the full-size page around
+ *   `natural` (whose top-left is at x, y in it), for a learned inpainter of one input size (`side`)
  * @returns {Promise<ImageData|null>} the erased area, or null when no mask pixel falls inside it
  */
-export async function eraseFullSize(cv, natural, nx, ny, mask, scale, ox, oy, area = {}, model = null, surface = null, cache = null) {
+export async function eraseFullSize(cv, natural, nx, ny, mask, scale, ox, oy, area = {}, model = null, surface = null, cache = null, context = null) {
   const W = natural.width, H = natural.height;
   const M = cv.matFromArray(2, 3, cv.CV_64F, [scale, 0, (nx - ox + 0.5) * scale - 0.5, 0, scale, (ny - oy + 0.5) * scale - 0.5]);
   const m = new cv.Mat();
@@ -413,8 +428,12 @@ export async function eraseFullSize(cv, natural, nx, ny, mask, scale, ox, oy, ar
   if (area.fill === "flat" && area.color) { done = rgb.clone(); done.setTo(new cv.Scalar(area.color[0], area.color[1], area.color[2]), m); }
   else if (area.fill === "texture") {
     let f;
-    try { f = await fillArea(cv, model, rgb, m, on, { margin: Math.ceil(2 / scale), cache }); }
-    catch (e) { src.delete(); rgb.delete(); out.delete(); m.delete(); on?.delete(); throw e; } // (NotLoaded: the caller leaves it for later)
+    // (context: the full-size page around the patch, for a model of one size; see fillTexture)
+    let ctx = null;
+    if (context) { const c = cv.matFromImageData(context.image); ctx = { image: new cv.Mat(), x: context.x, y: context.y, side: context.side }; cv.cvtColor(c, ctx.image, cv.COLOR_RGBA2RGB); c.delete(); }
+    try { f = await fillArea(cv, model, rgb, m, on, { margin: Math.ceil(2 / scale), cache, context: ctx }); }
+    catch (e) { ctx?.image.delete(); src.delete(); rgb.delete(); out.delete(); m.delete(); on?.delete(); throw e; } // (NotLoaded: the caller leaves it for later)
+    ctx?.image.delete();
     done = f.mat; area.filled = f.kind; area.fillMs = f.ms; area.fillHit = !!f.hit;
   }
   if (!done) { done = new cv.Mat(); cv.inpaint(rgb, m, done, Math.max(3, Math.round((area.radius || 3) / scale)), cv.INPAINT_TELEA); }
@@ -442,7 +461,7 @@ export class NotLoaded extends Error {}
 
 export async function fillArea(cv, model, rgb, hole, source, opts = {}) {
   const t0 = performance.now(), ms = () => Math.round(performance.now() - t0);
-  const key = opts.cache ? fillKey(rgb, hole, source, opts.margin) : null;
+  const key = opts.cache ? fillKey(rgb, hole, source, opts.margin, opts.context) : null;
   const had = key && opts.cache.get(key);
   if (had) {
     const mat = had.data ? cv.matFromArray(had.rows, had.cols, had.type, had.data) : null;
@@ -459,7 +478,7 @@ async function fillAreaNow(cv, model, rgb, hole, source, opts) {
   // (the model may be given as a function that loads it: then it is loaded only when an area needs it)
   const m = typeof model === "function" ? await model() : model;
   if (m) {
-    try { const mat = await aotInpaint(cv, m, rgb, hole); return { mat, kind: "learned" }; }
+    try { const mat = await aotInpaint(cv, m, rgb, hole, { context: opts.context }); return { mat, kind: "learned" }; }
     catch (e) { console.warn("Gytakusub: learned inpainting failed, using Telea", e); }
   }
   return { mat: null, kind: "telea" };
@@ -470,10 +489,16 @@ async function fillAreaNow(cv, model, rgb, hole, source, opts) {
  * from, and the margin. Two 32-bit hashes over all of it (a wrong hit would need both to collide
  * on equal sizes) — a few milliseconds for a large area, against a fill's tens to hundreds.
  */
-export function fillKey(rgb, hole, source, margin = 0) {
+export function fillKey(rgb, hole, source, margin = 0, context = null) {
   let a = 0x811c9dc5, b = 0x9747b28c;
   const eat = (d) => { for (let i = 0; i < d.length; i++) { const v = d[i]; a = Math.imul(a ^ v, 0x01000193); b = Math.imul(b ^ v, 0x5bd1e995) ^ (b >>> 15); } };
   eat(rgb.data); eat(hole.data); if (source) eat(source.data);
+  if (context?.side) {
+    // the page around the area that a model of one size sees (inpaint.js), and where the area sits in it
+    const im = context.image, w = contextWindow(im.cols, im.rows, context.x, context.y, rgb.cols, rgb.rows, context.side);
+    for (let y = w.y; y < w.y + w.h; y++) eat(im.data.subarray((y * im.cols + w.x) * 3, (y * im.cols + w.x + w.w) * 3));
+    eat([context.x - w.x, context.y - w.y, w.w, w.h]);
+  }
   return `${rgb.cols}x${rgb.rows}:${margin}:${source ? 1 : 0}:${(a >>> 0).toString(36)}:${(b >>> 0).toString(36)}`;
 }
 
@@ -485,8 +510,9 @@ export function fillKey(rgb, hole, source, margin = 0) {
  * @param {any} model the learned inpainter (or a function resolving to it, or throwing NotLoaded to
  *   leave the areas that need it for later), or null (screentone fill, else Telea)
  * @param {{rois: any[], mask: any, surface?: any}} erased erase()'s answer with keepMask
- * @param {{cache?: Map<string, object>, checkpoint?: () => Promise<void>}} [opts] cache: see fillArea;
- *   checkpoint: awaited before each area (it throws to stop)
+ * @param {{cache?: Map<string, object>, checkpoint?: () => Promise<void>, side?: number}} [opts] cache: see
+ *   fillArea; checkpoint: awaited before each area (it throws to stop); side: the learned inpainter's one
+ *   input size, when it has one (LaMa): it then sees that much of the page around each area
  */
 export async function fillTexture(cv, model, img, erased, opts = {}) {
   const textured = erased.rois.filter((r) => r.fill === "texture");
@@ -503,7 +529,7 @@ export async function fillTexture(cv, model, img, erased, opts = {}) {
     if (erased.surface && r.label) { on = erased.surface.roi(rect).clone(); const od = on.data; for (let i = 0; i < od.length; i++) od[i] = od[i] === r.label ? 255 : 0; }
     try {
       if (cv.countNonZero(hole)) {
-        const f = await fillArea(cv, model, crop, hole, on, { cache: opts.cache });
+        const f = await fillArea(cv, model, crop, hole, on, { cache: opts.cache, context: opts.side ? { image: rgb, x: x0, y: y0, side: opts.side } : null });
         r.filled = f.kind; r.fillMs = f.ms; r.fillHit = !!f.hit;
         if (f.mat) { f.mat.copyTo(view); f.mat.delete(); }
       }

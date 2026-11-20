@@ -100,6 +100,17 @@ for (const f of pages) {
   let d = 0, n = 0; for (let i = 0; i < W * H; i++) if (hole.data[i]) { d += Math.abs(a.data[i * 3] - b.data[i * 3]); n++; }
   await test("the inpainting model starts on the GPU", () => assert.equal(gpuS.ep, "webgpu"));
   await test(`its fill matches the CPU's (mean difference ${(d / n).toFixed(2)} levels)`, () => assert.ok(d / n < 2));
+  // LaMa (2.13): the extension's fill on a graphics card. One size (512 px); on lavapipe a fill
+  // takes about a minute, so one area only.
+  const { LAMA_SIDE } = await import("../extension/engine/inpaint.js");
+  const lb = new Uint8Array(fs.readFileSync(path.join(here, "../extension/vendor/lama.onnx")));
+  const lg = await createSession(lb, { gpu: true, strict: true }), lc = await createSession(lb, { gpu: false });
+  const la = await aotInpaint(cv, { ort, session: lg.session, run, ep: lg.ep, kind: "lama", side: LAMA_SIDE }, rgb, hole);
+  const lcpu = await aotInpaint(cv, { ort, session: lc.session, run, ep: lc.ep, kind: "lama", side: LAMA_SIDE }, rgb, hole);
+  let ld = 0; for (let i = 0; i < W * H; i++) if (hole.data[i]) ld += Math.abs(la.data[i * 3] - lcpu.data[i * 3]);
+  await test("LaMa starts on the GPU", () => assert.equal(lg.ep, "webgpu"));
+  await test(`its fill matches the CPU's (mean difference ${(ld / n).toFixed(2)} levels)`, () => assert.ok(ld / n < 2));
+  la.delete(); lcpu.delete();
   a.delete(); b.delete(); rgb.delete(); hole.delete();
 }
 console.log(`GPU TESTS PASSED (${passed})`);

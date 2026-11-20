@@ -147,6 +147,44 @@ export async function detectInDarkShapes(cv, det, img, lines) {
   return out;
 }
 
+/**
+ * A second look at the lettering Claude translated where the page-wide pass found none: each
+ * such line's box (with half its size around it) is cropped and detected again, zoomed until the
+ * crop's long side is LOOK_SIDE (at most LOOK_ZOOM times). Lettering far from dialogue size — a
+ * shout drawn large across the art, a word in tiny print — is what the page-wide pass at 960 px
+ * misses; seen at the size the model reads best, it is found (19 of 22 lines on real chapters).
+ * Claude's box says lettering is there; the detector says where. Only lines whose centre lies in
+ * the box (grown by a quarter) are kept, marked `second`; layout.js decides what becomes of them.
+ * @param {Line[]} lines from the page-wide pass (with the other second looks)
+ * @param {Array<{x:number,y:number,w:number,h:number}>} boxes translated lines' boxes, image pixels
+ * @param {{boxes?: number}} [look] counts the boxes looked at
+ * @returns {Promise<Line[]>} the lines plus any found
+ */
+export async function detectInTranslatedBoxes(cv, det, img, lines, boxes, look = {}) {
+  const W = img.width, H = img.height, out = lines.slice();
+  const centreIn = (l, g) => { const cx = l.x + l.w / 2, cy = l.y + l.h / 2; return cx >= g.x && cy >= g.y && cx <= g.x + g.w && cy <= g.y + g.h; };
+  for (const b of boxes) {
+    if (b.w < 6 || b.h < 6) continue; // a degenerate box says nothing about where
+    const g = { x: b.x - 0.25 * b.w, y: b.y - 0.25 * b.h, w: 1.5 * b.w, h: 1.5 * b.h };
+    // lettering already found there: lines the layout would take (score 0.7 up) over a quarter of the box
+    if (out.reduce((n, l) => n + ((l.score ?? 1) >= 0.7 ? overlapArea(l, b) : 0), 0) >= 0.25 * b.w * b.h) continue;
+    const m = 0.5 * Math.max(b.w, b.h, 24);
+    const x = Math.max(0, Math.floor(b.x - m)), y = Math.max(0, Math.floor(b.y - m));
+    const w = Math.min(W, Math.ceil(b.x + b.w + m)) - x, h = Math.min(H, Math.ceil(b.y + b.h + m)) - y;
+    if (w < 8 || h < 8) continue;
+    look.boxes = (look.boxes || 0) + 1;
+    const crop = new ImageData(new Uint8ClampedArray(w * h * 4), w, h), cd = crop.data, sd = img.data;
+    for (let yy = 0; yy < h; yy++) cd.set(sd.subarray(((y + yy) * W + x) * 4, ((y + yy) * W + x + w) * 4), yy * w * 4);
+    for (const l of await detectText(cv, det, crop, { maxSide: LOOK_SIDE, maxScale: LOOK_ZOOM })) {
+      const p = { ...l, x: l.x + x, y: l.y + y, second: true };
+      if (centreIn(p, g)) out.push(p);
+    }
+  }
+  return out;
+}
+const LOOK_SIDE = 640, LOOK_ZOOM = 4;
+const overlapArea = (a, b) => Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+
 /** detectText for the OpenCV backend only, without a promise (analyze() is synchronous). */
 export function detectTextSync(cv, det, img, opts = {}) {
   if (det.kind === "ort") throw new Error("detectTextSync: the ONNX Runtime detector is asynchronous; pass `lines` to analyze()");

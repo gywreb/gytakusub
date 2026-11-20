@@ -2,7 +2,8 @@
 // (extension service worker, the web app's Web Worker, or Node in tests).
 import loadOpenCV from "../vendor/opencv.js";
 import { loadDetector } from "./detect.js"; // static: MV3 service workers do not support dynamic import()
-import { getOrt, gpuAvailable, ortBroken, createSession, run } from "./ort.js";
+import { getOrt, gpuAvailable, gpuIsSoftware, ortBroken, createSession, run } from "./ort.js";
+import { LAMA_SIDE } from "./inpaint.js";
 import { loadSegmenter } from "./segment.js";
 
 let ready = null;
@@ -29,11 +30,18 @@ export function getCV(overrides = {}) {
 }
 
 // Engine preferences that change which models load: `gpu` (run on WebGPU when
-// available). A change drops the loaded models so the next page loads them again.
-const prefs = { gpu: true };
+// available), `lama` (LaMa on a graphics card, ADR 0015: the extension, and the web app unless it
+// ran out of memory on it before). A change drops the loaded models so the next page loads them again.
+const prefs = { gpu: true, lama: false };
+// told when LaMa starts loading ("loading") and once it has filled at full size ("ok"; page.js
+// warmInpainter): the web app keeps a phone that ran out of memory on it to AOT afterwards
+let lamaEvents = null;
+export function onLama(fn) { lamaEvents = fn; }
+export function lamaEvent(state) { try { lamaEvents?.(state); } catch {} }
 export function setEnginePrefs(next = {}) {
-  const gpu = next.gpu !== false;
+  const gpu = next.gpu !== false, lama = next.lama ?? prefs.lama;
   if (gpu !== prefs.gpu) { prefs.gpu = gpu; detectorReady = null; segmenterReady = null; inpainterReady = null; }
+  if (lama !== prefs.lama) { prefs.lama = lama; inpainterReady = null; }
 }
 
 let detectorReady = null;
@@ -122,19 +130,39 @@ export function getSegmenter(overrides = {}) {
 
 let inpainterReady = null;
 /**
- * Resolves to the learned inpainter (engine/inpaint.js: AOT-GAN, vendor/inpaint.onnx), on the
- * GPU when there is one, else the CPU; null when the file is missing or fails to load (the
- * eraser then fills textured areas with Telea, as before 2.12).
- * @param {object} [overrides] tests pass `modelBytes`, `wasmBinary`, `gpu`
- * @returns {Promise<{ort, session, run, ep: "webgpu"|"wasm"}|null>}
+ * Resolves to the learned inpainter (engine/inpaint.js). On a graphics card, where the app ships
+ * it (`lama`), LaMa finetuned on manga (vendor/lama.onnx): it continues screentone that AOT
+ * leaves as a blurred ghost of the letters (ADR 0015). Otherwise AOT-GAN (vendor/inpaint.onnx),
+ * on the GPU when there is one, else the CPU; LaMa is several times AOT's cost, which a GPU
+ * emulated on the CPU (test machines) or the CPU itself cannot afford. Null when the files are
+ * missing or fail to load (the eraser then fills textured areas with Telea, as before 2.12).
+ * @param {object} [overrides] tests pass `modelBytes`, `lamaBytes`, `wasmBinary`, `gpu`, `lama`
+ * @returns {Promise<{ort, session, run, ep: "webgpu"|"wasm", kind: "lama"|"aot", side?: number}|null>}
  */
 export function getInpainter(overrides = {}) {
   if (ortBroken()) return Promise.resolve(null);
-  if (!inpainterReady) inpainterReady = loadModel("inpaint.onnx", overrides);
+  if (!inpainterReady) inpainterReady = (async () => {
+    if ((overrides.lama ?? prefs.lama) && (overrides.gpu ?? prefs.gpu) && await gpuAvailable() && !gpuIsSoftware()) {
+      // marked once downloaded, as the session is made: a download cut short is no sign the device can't run it
+      const lama = await loadModel("lama.onnx", { ...overrides, modelBytes: overrides.lamaBytes, strict: true, beforeSession: () => lamaEvent("loading") });
+      if (lama) return { ...lama, kind: "lama", side: LAMA_SIDE };
+    }
+    const aot = await loadModel("inpaint.onnx", overrides);
+    return aot && { ...aot, kind: "aot" };
+  })();
   return inpainterReady;
 }
 
-/** A vendored model on the GPU when there is one (else the CPU); null when missing or broken. */
+/**
+ * The learned inpainter's one input size when it is LaMa (it then sees that much of the page around
+ * each area, inpaint.js), else 0: decided as getInpainter() decides, without loading anything.
+ */
+export async function inpainterSide() {
+  if (inpainterReady) { const m = await inpainterReady; return m?.side || 0; }
+  return prefs.lama && prefs.gpu && !ortBroken() && await gpuAvailable() && !gpuIsSoftware() ? LAMA_SIDE : 0;
+}
+
+/** A vendored model on the GPU when there is one (else the CPU, unless `strict`); null when missing or broken. */
 async function loadModel(file, overrides) {
   try {
     const gpu = (overrides.gpu ?? prefs.gpu) && await gpuAvailable();
@@ -145,7 +173,8 @@ async function loadModel(file, overrides) {
       bytes = new Uint8Array(await res.arrayBuffer());
     }
     const ort = getOrt(overrides.wasmBinary ? { wasmBinary: overrides.wasmBinary } : {});
-    const { session, ep } = await createSession(bytes, { gpu });
+    overrides.beforeSession?.();
+    const { session, ep } = await createSession(bytes, { gpu, strict: !!overrides.strict });
     return { ort, session, run, ep };
   } catch (e) { console.warn(`Gytakusub: ${file} unavailable`, e); return null; }
 }

@@ -232,7 +232,8 @@ function addPage({ img, url, referer, file, mode = currentMode }) {
   const showOriginal = (on) => { el.classList.toggle("showing-original", on); toggle.setAttribute("aria-pressed", String(on)); };
   page.showOriginal = showOriginal;
   // tapping the page flips between translation and original, like the button
-  page.media.addEventListener("click", () => { if (page.status === "done") showOriginal(!el.classList.contains("showing-original")); });
+  // (not when the click ends a selection of the translated text, to copy it)
+  page.media.addEventListener("click", () => { if (page.status === "done" && !String(getSelection?.() || "")) showOriginal(!el.classList.contains("showing-original")); });
   toggle.onclick = () => showOriginal(!el.classList.contains("showing-original"));
   el.querySelector('[data-act="redo"]').onclick = () => enqueue(page, true);
   el.querySelector('[data-act="save"]').onclick = () => savePage(page);
@@ -294,12 +295,34 @@ async function processPage(page) {
 function drawPage(page) {
   const screenWidth = Math.round(page.media.clientWidth * (window.devicePixelRatio || 1));
   page.drawnFor = screenWidth;
-  const { original, translated, drawn } = renderPage(page.img, page.result, settings, page.look, { minWidth: screenWidth });
+  const { original, translated, drawn, sizes } = renderPage(page.img, page.result, settings, page.look, { minWidth: screenWidth });
   original.className = "original"; translated.className = "translated";
-  page.media.querySelectorAll("canvas").forEach((c) => c.remove());
+  // the pictures say nothing to a screen reader; the text layer below says it
+  original.setAttribute("aria-hidden", "true"); translated.setAttribute("aria-hidden", "true");
+  page.media.querySelectorAll("canvas, .lines").forEach((c) => c.remove());
   page.img.remove();
-  page.media.prepend(original, translated);
+  page.media.prepend(original, translated, textLayer(page.result, sizes));
   return drawn;
+}
+
+/**
+ * The translation as text, laid over the drawing where each line is drawn: invisible, but read by
+ * screen readers, found by Find in page, and selectable to copy (the extension's layer, 2.12.1).
+ * Sized against the page's width (container units), so it follows the page at any width.
+ */
+function textLayer(result, sizes) {
+  const layer = document.createElement("div");
+  layer.className = "lines"; layer.setAttribute("role", "group"); layer.setAttribute("aria-label", t("content_lines_group"));
+  const { W, H } = result.work;
+  layer.append(...result.placements.map((p, i) => {
+    const line = document.createElement("span");
+    line.className = "line"; line.textContent = p.text;
+    line.style.left = (100 * p.rect.x / W) + "%"; line.style.top = (100 * p.rect.y / H) + "%";
+    line.style.width = (100 * p.rect.w / W) + "%"; line.style.height = (100 * p.rect.h / H) + "%";
+    line.style.fontSize = `${(100 * (sizes[i] || p.letter || 12) / W).toFixed(3)}cqi`;
+    return line;
+  }));
+  return layer;
 }
 
 // Unfolding a foldable, turning a phone or a wider window can need more pixels than a page was
