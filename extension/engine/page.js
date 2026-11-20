@@ -268,8 +268,10 @@ export const inpainterWarm = () => !!warmed;
 export const inpainterTimes = { load: null, warm: null, again: null, side: null, kind: null };
 
 /** The debug report's record of a slice's textured areas just filled: how, in how long, how big. */
+// (ms: the whole fill; run: the model's own time in it; at: when it started, epoch ms, for a
+// timeline with the page's other steps, timing.start)
 const fillRuns = (rois) => rois.filter((r) => r.fill === "texture" && r.filled && r.filled !== "later")
-  .map((r) => ({ kind: r.filled, ms: Math.round(r.fillMs || 0), w: r.w, h: r.h, ...(r.fillHit ? { hit: true } : {}) }));
+  .map((r) => ({ kind: r.filled, ms: Math.round(r.fillMs || 0), ...(r.fillRunMs != null ? { run: r.fillRunMs } : {}), w: r.w, h: r.h, ...(r.fillAt ? { at: r.fillAt } : {}), ...(r.fillHit ? { hit: true } : {}) }));
 
 /**
  * Fills a page's textured areas ahead of its translation, while the caller waits for Claude

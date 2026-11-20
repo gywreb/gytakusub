@@ -95,7 +95,11 @@ test("nothing outside the mask changes", () => {
   px.fillStyle = "#8a8a8a"; for (let yy = 2; yy < PH; yy += 6) for (let xx = (yy / 6) % 2 ? 5 : 2; xx < PW; xx += 6) { px.beginPath(); px.arc(xx, yy, 1.4, 0, 7); px.fill(); }
   px.putImageData(page, AX, AY);
   const pm = cv.matFromImageData(px.getImageData(0, 0, PW, PH)), prgb = new cv.Mat(); cv.cvtColor(pm, prgb, cv.COLOR_RGBA2RGB); pm.delete();
-  const lc = await aotInpaint(cv, lama, rgb, mask, { context: { image: prgb, x: AX, y: AY } });
+  const timing = {};
+  const lc = await aotInpaint(cv, lama, rgb, mask, { context: { image: prgb, x: AX, y: AY }, timing });
+  test("the model's own run time is reported (the debug report's fill.runs[].run)", () => {
+    assert.ok(Number.isFinite(timing.run) && timing.run > 0, JSON.stringify(timing));
+  });
   const fc = []; for (let i = 0; i < W * H; i++) if (mask.data[i]) fc.push(lc.data[i * 3]);
   test("LaMa with the page around the area: the fill matches the tone, unchanged outside the mask", () => {
     assert.equal(lc.rows, H); assert.equal(lc.cols, W);

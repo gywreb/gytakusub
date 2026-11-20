@@ -14,7 +14,8 @@
  * @param {{ort: any, session: any, run: (session: any, feeds: object) => Promise<object>}} model
  * @param {any} rgb cv.Mat CV_8UC3, the area (with some context around the lettering)
  * @param {any} mask cv.Mat CV_8UC1, 255 where the lettering is
- * @param {{maxSide?: number, context?: {image: any, x: number, y: number}}} [opts] maxSide: areas larger
+ * @param {{maxSide?: number, context?: {image: any, x: number, y: number}, timing?: {run?: number}}} [opts] timing: gets the
+ *   model run's own time (ms) in `run`. maxSide: areas larger
  *   than this are inpainted at a smaller size and the fill scaled back up. context: the image the
  *   area was cut from (RGB cv.Mat; the area's top-left at x, y), for a model of one size. By default 768 px on the GPU and 384 on the CPU, where the model
  *   costs about 40 µs a pixel (a 768 × 512 area: 17 s; at 384 × 256: 4 s)
@@ -62,7 +63,9 @@ export async function aotInpaint(cv, model, rgb, mask, opts = {}) {
   }
   img.delete(); m.delete();
   const { ort, session, run } = model;
+  const t0 = performance.now();
   const out = await run(session, { image: new ort.Tensor("float32", image, [1, 3, ph, pw]), mask: new ort.Tensor("float32", maskT, [1, 1, ph, pw]) });
+  if (opts.timing) opts.timing.run = (opts.timing.run || 0) + Math.round(performance.now() - t0); // the model's own time (the debug report)
   const o = (out.inpainted || out[session.outputNames[0]]).data;
   // A grey page stays grey: the model can tint its fill (a pink cast on screentone was seen),
   // so where the area around the lettering has no colour, the fill keeps only its brightness.

@@ -12,19 +12,19 @@ Fixes from the first two chapters read with 2.13 (a romance chapter and Kamen Ri
 - **Hand-drawn capitals are measured right.** Where their ink sits in a few heavy rows (thick bars at the foot of the letters, an "S" beside a dash), letters about 18 px tall were measured at 4–7 px. Their lettering was then taken for art and partly left on the page ("QUE", "SEI DE", "EU" under the English), and the translation came out tiny. The letters' own height now sets the size when the old measure is under 40% of it. Whether a line is lettering at all, and which lines group together, is still decided on the old measure, so a face's eyes don't become a bubble and furigana stays with its line.
 - **Huge sound effects no longer set the size of a bubble's text.** On a page whose only lettering found was its sound effects, their size (125 px) was used for a bubble whose own lettering measured small: "There you are!" came out in 64 px letters, broken as "e / you / ar- / e!" and spilling out of the bubble. Such a bubble's size is now held to a quarter of the bubble across.
 - **A word is never cut letter by letter while a smaller size would fit.** The smallest size a line may take (a share of the original lettering's size) now gives way first when even that doesn't fit the box.
-- That page also took 36 s. Its two areas filled ahead of the translation were sized from those 125 px letters; the bubble's is now its usual size. The sound effects' own area is still most of the page (it is filled ahead in case Claude translates it), which normally costs one 0.2 s fill on your graphics card. Why each of those two fills took about 17 s is not known yet: see the debug report below.
+- **Not fixed: that page's 36 s wait.** While Claude answers, the engine fills a page's textured areas ahead; once the answer is in, it finishes the fill under way and stops. On that page the two areas filled ahead took 33.7 s together (the bubble's, sized from the 125 px letters, and the sound effects' block, most of the page), where your graphics card normally takes 0.2 s a fill. Why is not known, so nothing about it changes here: the debug report below now records what is needed to find out. (The bubble's area is its usual size again, from the fix above.)
 
 Measured on 13 of your debug reports (the 11 from 2.13 and the two read with it, replayed with their saved answers; they stay local): lettering left under translations 45 → 38 of 1,401 lines; translations drawn over unerased lettering 28 → 24; words cut letter by letter gone from the 5 pages that had them. All 188 areas whose render changed were compared by eye with 2.13.0. I found none worse; a few only changed size.
 
 ### Debug report
-- Each textured area's fill is listed (`fill.runs`, and `fill.preRuns` for the fills done while waiting for Claude): how, how long, how big. On that page two fills took about 17 s each where your graphics card normally takes 0.2 s, and the report could not say which or why.
+- **A timeline of each page.** When it started (`timing.start`), Claude's own time (`timing.claude`; "model" is that plus any wait for a fill under way), and each textured area's fill (`fill.runs`, and `fill.preRuns` for the fills done ahead): how, how big, when it started, its whole time and the model's own run in it. On that page the report gave only the 33.7 s total: not which fill, nor whether the model or something around it was slow, nor what else ran meanwhile.
 
 ### Web app
 - All of the above (same engine and text fitting).
 - Housekeeping: an unused constant removed (`FETCHER_VERSION`).
 
 ### Development
-- `tests/letter-size.test.mjs`: the letter measure on drawn capitals, an "S" beside a dash, a lowercase line and a stray outline; a bubble's size bound; the fit's floor giving way.
+- `tests/letter-size.test.mjs`: the letter measure on drawn capitals, an "S" beside a dash, a lowercase line and a stray outline; a bubble's size bound; the fit's floor giving way. `inpaint.test.mjs`: the model's run time is reported.
 
 ## [2.13.0] — 2026-11-20
 
