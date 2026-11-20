@@ -311,6 +311,9 @@
  "web_btnShowInstall": {
   "message": "安装到手机或电脑"
  },
+ "web_report_hint": {
+  "message": "某页翻译出错时使用：一个 .zip，包含已翻译的页面、原图、Claude 的回答和耗时。其中含有页面图片，请仅私下分享。"
+ },
  "web_free_software_under_the_gnu": {
   "message": "基于 <a href=\"LICENSE\" target=\"_blank\">GNU AGPL v3</a> 的自由软件 · <a href=\"https://github.com/gywreb/gytakusub\" target=\"_blank\" rel=\"noopener\">源代码</a> · <a href=\"THIRD_PARTY.md\" target=\"_blank\">第三方组件</a>"
  },

@@ -21,5 +21,6 @@ web/LICENSE
 web/THIRD_PARTY.md
 web/fetcher-worker.js
 web/fetcher-guide.json
+web/version.js
 # real manga pages for local tuning only — never committed
 tests/fixtures/real/

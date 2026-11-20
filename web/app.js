@@ -7,6 +7,7 @@ import { languageOptions, findLanguage, languageForLocale, uiLocaleFor } from ".
 import { summary, usageView, fmtUsd, dayStart, PRICES_CHECKED, PRICE_SOURCE } from "./usage.js";
 import { readClaudeUsage, onClaudeUsage, clearClaudeUsage } from "./claude-usage.js";
 import qrcode from "./lib/qrcode.mjs";
+import { buildReport } from "./report.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -268,6 +269,7 @@ async function processPage(page) {
   try {
     if (!page.img) {
       const blob = page.file || (await fetchPageImage(settings, page.url, page.referer));
+      page.blob = blob; // the image's own bytes, for the debug report
       page.img = await loadImage(await blobToDataUrl(blob));
       page.media.append(page.img);
     }
@@ -314,6 +316,24 @@ window.addEventListener("resize", () => {
   }, 250);
 });
 
+// Debug report (report.js): one .zip of the translated pages with their originals, Claude's answers,
+// the engine's regions and timings, and a render of each — to share with the developer, through the
+// share sheet on a phone (Save to Files), else as a download.
+async function exportReport() {
+  const done = pages.filter((p) => p.status === "done" && p.result);
+  if (!done.length) return toast(t("content_nothing_translated"));
+  toast(tn("content_preparing_report", done.length), 20000);
+  let file;
+  try { ({ file } = await buildReport(done, settings)); }
+  catch (e) { console.error(e); return toast("⚠ " + (e.message || e), 6000); }
+  toast(tn("content_report_done", done.length, { size: (file.size / 1e6).toFixed(1) }), 6000);
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: "Gytakusub debug report" }); return; } catch { /* cancelled: offer the download instead */ }
+  }
+  const a = document.createElement("a"); a.href = URL.createObjectURL(file); a.download = file.name; a.rel = "noopener"; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+}
+
 async function savePage(page) {
   const c = page.el.querySelector("canvas.translated");
   if (!c) return toast(t("web_not_translated_yet"));
@@ -334,7 +354,7 @@ async function addFiles(files) {
   if (!imgs.length) return toast(t("web_no_image"));
   for (const f of imgs) {
     const img = await loadImage(await blobToDataUrl(f));
-    enqueue(addPage({ img }));
+    enqueue(addPage({ img, file: f })); // (the file's bytes too: the debug report keeps the original)
   }
   $("pages").scrollIntoView({ behavior: "smooth", block: "start" });
 }
@@ -424,6 +444,7 @@ function clearPages(mode = currentMode) {
   for (let k = pages.length - 1; k >= 0; k--) if (pages[k].mode === mode) { pages[k].el.remove(); pages.splice(k, 1); }
   updateToolbar();
 }
+$("btnReport").onclick = () => exportReport();
 $("btnClear").onclick = () => { clearPages(); ctx = { terms: [], recent: [] }; if (currentMode === "chapter") { showNav({}); history.replaceState(null, "", location.pathname); } };
 $("showOriginal").onchange = (e) => modePages().forEach((p) => p.showOriginal(e.target.checked));
 

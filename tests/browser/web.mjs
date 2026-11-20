@@ -98,6 +98,29 @@ if (!/of 50 requests/.test(cu.limits)) fail("the rate-limit headroom from Claude
 if (!/Claude today ≈/.test(cu.progress)) fail("the toolbar should show today's Claude cost: " + cu.progress);
 console.log("claude usage:", JSON.stringify(cu));
 
+// Debug report (web/report.js): the extension's report format, from Settings → Export debug report
+// (a download here; the share sheet on a phone)
+await page.click("#btnSettings");
+await page.waitForSelector("#settings[open]");
+const [download] = await Promise.all([page.waitForEvent("download", { timeout: 20000 }), page.click("#btnReport")]);
+const zipPath = path.join(out, "web-report.zip");
+await download.saveAs(zipPath);
+await page.keyboard.press("Escape");
+try {
+  execFileSync("unzip", ["-tq", zipPath]);
+  const names = execFileSync("unzip", ["-Z1", zipPath], { encoding: "utf8" }).trim().split("\n");
+  const want = ["summary.json", "page-01.json", "page-01.original.png", "page-01.debug.png"];
+  if (!want.every((n) => names.includes(n))) fail("the report misses files: " + names.join(", "));
+  const rep = JSON.parse(execFileSync("unzip", ["-p", zipPath, "page-01.json"], { encoding: "utf8" }));
+  const version = JSON.parse(fs.readFileSync(path.join(root, "extension/manifest.json"), "utf8")).version;
+  const t = rep.timing || {};
+  if (rep.gytakusub !== version || rep.app !== "web") fail("the report's version or app is wrong: " + rep.gytakusub + " " + rep.app);
+  if (!rep.work?.W || !rep.items?.length || !rep.regions?.length || !rep.placements?.length) fail("the report lacks the page's answer, regions or placements");
+  if (![t.analyze, t.model, t.finish].every(Number.isFinite) || !t.fill || !Number.isFinite(t.fill.ready)) fail("the report lacks the timings: " + JSON.stringify(t));
+  if (JSON.stringify(rep).includes("sk-ant")) fail("the report must never hold the API key");
+  console.log(`web report: ${names.length} files, ${(fs.statSync(zipPath).size / 1e6).toFixed(1)} MB, timing ${JSON.stringify(t)}`);
+} catch (e) { fail("the debug report could not be read: " + e.message); }
+
 // ---------- chapter link mode through the real fetcher ----------
 // The fetcher's handler on a local port; its outbound fetch is a fake web: two chapter pages on
 // a MangaThemesia-style site and their images on a CDN (the demo page), plus a site with a bot check.

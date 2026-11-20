@@ -68,24 +68,37 @@ export function loadImage(src) {
  * @param {HTMLImageElement} img  decoded page
  * @param {object} settings
  * @param {{terms:Array, recent:Array}} ctx  chapter context (mutated via return)
- * @returns {{items, placements, regions, work, letter, patches:Array<{x,y,w,h,bitmap:ImageBitmap}>, width, height, usage, ctx}}
+ * @returns {{items, placements, regions, work, letter, patches:Array<{x,y,w,h,bitmap:ImageBitmap}>, width, height, usage, engine, timing, ctx}}
  *   patches: the erased areas in page pixels, at the page's own resolution
  */
 export async function translateImage(img, settings, ctx = { terms: [], recent: [] }) {
   if (!settings.apiKey) throw new Error(t("web_no_key"));
+  // the times of each step, as the extension's debug report has them (analyze, model, finish)
+  const timing = {}; let t0 = performance.now();
+  const lap = (k) => { const n = performance.now(); timing[k] = Math.round(n - t0); t0 = n; };
   const bitmap = await createImageBitmap(img);
   const prep = await rpc({ type: "prepare", bitmap, settings: { maxLongEdge: settings.maxLongEdge, stripWidth: settings.stripWidth, sliceHeight: settings.sliceHeight } }, [bitmap]);
+  lap("analyze");
+  // While Claude answers, the engine fills the page's textured areas ahead (the finish then finds
+  // them done). The page at its own size goes with it when the analysis worked on a smaller copy.
+  const natural = prep.work.W < prep.width ? await createImageBitmap(img) : null;
+  rpc({ type: "prefill", jobId: prep.jobId, natural }, natural ? [natural] : []).catch(() => {});
   let results;
   try { results = await Promise.all(prep.slices.map((s) => callAndRecord(settings, s, ctx))); }
   catch (e) { rpc({ type: "drop", jobId: prep.jobId }).catch(() => {}); throw e; }
+  lap("model");
   recordClaudePage(results);
   const terms = [];
   const usage = { input_tokens: 0, output_tokens: 0 };
   for (const r of results) { terms.push(...r.terms); if (r.usage) { usage.input_tokens += r.usage.input_tokens || 0; usage.output_tokens += r.usage.output_tokens || 0; } }
-  const downscaled = prep.work.W < prep.width;
-  const natural = downscaled ? await createImageBitmap(img) : null;
-  const fin = await rpc({ type: "finish", jobId: prep.jobId, results: results.map((r) => ({ items: r.items })), natural }, natural ? [natural] : []);
-  return { items: fin.items, placements: fin.placements, regions: fin.regions, work: fin.work, letter: fin.letter, patches: fin.patches, width: prep.width, height: prep.height, usage, ctx: mergeContext(ctx, terms, fin.items.map((i) => i.text)) };
+  const fin = await rpc({ type: "finish", jobId: prep.jobId, results: results.map((r) => ({ items: r.items })) });
+  lap("finish");
+  if (fin.detectMs) timing.detect = fin.detectMs;
+  if (fin.segmentMs) timing.segment = fin.segmentMs;
+  if (fin.backend) timing.backend = fin.backend;
+  if (fin.fill) timing.fill = fin.fill;
+  if (fin.modelWait != null) timing.modelWait = fin.modelWait; // (waiting for the learned fill's model to load)
+  return { items: fin.items, placements: fin.placements, regions: fin.regions, work: fin.work, letter: fin.letter, patches: fin.patches, width: prep.width, height: prep.height, usage, engine: fin.engine, timing, ctx: mergeContext(ctx, terms, fin.items.map((i) => i.text)) };
 }
 
 // Hyphenation for the target language: English's patterns load with the page

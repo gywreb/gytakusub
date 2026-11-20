@@ -4,6 +4,54 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
 
 ## [Unreleased]
 
+## [2.12.0] — 2026-11-18
+
+Clean bubbles. Second step of the 3.0 plan: a robust core before new features.
+
+### Extension
+- **Auto-translate starts on the first load.** A page asked the extension for its settings once; when that answer failed or came too late (the extension's background still starting), the page kept its defaults until reloaded: no auto-translate, and the button's raw label ("content_btn_translate"). It now asks again until it has them, and the background reloads its own words when reading them failed.
+- **A reload doesn't pay for its pages twice.** When a page goes away (reload, next chapter), its pictures not yet sent to Claude are dropped; one already on its way is waited for by the reloaded page instead of asked again.
+- **On the graphics card, pages ask Claude side by side.** Pages off screen were held back while the page on screen was in progress, so a chapter's questions went out one at a time, up to 20 s apart. The hold is for the CPU, where the models block everything else, and now applies only there.
+- **Only pages are translated.** An image counted by the size of its file, so a site's logo (shown 182×50), a cover thumbnail and reaction emoji (42×42) were translated, paid for and counted as pages. The logo, first on the page, also took the slow first fill below ahead of the chapter. Images now count by the size they're shown at (280 px each way, as before).
+- **A tall image goes part by part.** A chapter served as one image (800×17055 px in a report) was analysed, sent and drawn whole: about a minute before anything showed, and all of it paid for at once. Each of the slices the engine already reads it in is now a part with its own place in the queue, its own question and its own drawing, the part on screen first; auto-translate takes the parts near the screen as you scroll, as it does pages. The count, the button and the debug report treat the image as one page.
+- **The button follows its image.** It was placed only when the pointer entered an image: on a tall image it stayed behind as the page scrolled, and a wider label ran past the image's edge.
+- **The inpainting model's trial run is at full size.** In three reports from Windows, the first learned fill of 128 px or more took 14–20 s after each start of the extension's background, though the model loaded in 0.3–0.4 s and the 72 px trial run took under 0.1 s. Counted on Dawn here, the model makes 3 of its 33 GPU programs only from 128 px up; whether those are the 14–20 s on Windows isn't known yet. The trial run is now at 768 px, beside the queue, once a page has an area that needs the model and the pages near the screen are analysed; only pages that need it wait for it. The report records the load, the trial run and a second one (`fill.model`: a long first and short second run means the cost was the first run) and a page's wait (`timing.modelWait`).
+- **The background stays up while you read.** Chrome stops an extension's background after 30 s without an event, and the models went with it: reports 12 minutes apart each paid the load and the slow first fill again. While auto-translate is on and the tab is in front, the page sends a word every 20 s, for 10 minutes after its last translated page.
+- **Screentone fills at full size are about 2× faster overall, 5–9× on the slowest areas** (2 areas of a mangadex page: 1.6 s and 3.7 s, now 0.3 s and 0.4 s), with the same result to the pixel on 42 areas of two reports. The fill skips copies that can't land on known pixels.
+
+### Pages
+- **Pages appear as soon as the translation arrives.** The texture fills below now run while Claude is answering, not after. On an M4 MacBook they had added up to 1.7 s to each page (0.65 s on average on a black-and-white chapter); a page now waits for nothing but the answer. The page comes out exactly the same.
+- **Free text the detector missed or cut short is erased.** When Claude translates a line outside a bubble whose box holds lettering the analysis had set aside (a title too big for dialogue, small print, a line it dropped), that lettering is erased and the translation gets its room. A long caption's box no longer takes the credits beside it. Logos read as a stack of lines and lettering far above dialogue size are left alone. Lettering that can't be erased cleanly (outlined display letters) stays as it was rather than half-erased.
+- **Coloured lettering is erased whole.** Blue, orange and pink letters, in bubbles and on plain backgrounds, were found by their dark parts only, so most of each letter stayed. They are now read by colour against the plain surround. Screentone and art still use the old masks.
+- **A loose box no longer pulls a line out of its own region.** A line moves to another region only when its box lies mostly on that region and little on its own.
+- On seven chapters (they stay local), lines whose Japanese an independent detector still finds after erasing: 66 → 33 of 780; on a colour chapter 18 → 2. Marks left in bubbles: 16 → 6. Every erased area was compared with 2.12.0: none worse, 19 better, 13 newly erased (each checked by eye).
+- **No more white clouds on toned bubbles.** The eraser now covers the white outline round lettering, which it used to leave behind and smear over the tone.
+- **Screentone is continued dot for dot.** Where a bubble or a panel is screentone, the eraser measures its pattern and copies it into the hole in step with the dots around it. It only does this when the pattern really predicts the surrounding tone; otherwise the next fill takes over.
+- **Art and irregular tone are filled by a manga-trained inpainting model** (AOT-GAN), on the graphics card when there is one. On 150 stretches of real pages with lettering drawn over them, the fill came out closer to what was really there in 142 (SSIM 0.45 → 0.62).
+- **Narration over art no longer takes the art with it.** Free text is erased line by line. On a cover page where lines of text and strokes of the drawing were read as one block, the faces under it used to be erased too.
+- White bubbles are filled with their own white, as before.
+- Without a graphics card the inpainting model works at a smaller size (it costs seconds per area on a CPU). The model is loaded only when an area needs it.
+- The extension is about 23 MB larger (the inpainting model).
+
+### Web app
+- The same eraser, with the same fills ahead of the answer. The model is downloaded the first time a page needs it (white bubbles and screentone don't), then cached; as in the extension, it loads beside the pages' work.
+- **Export debug report** (Settings → App): one .zip of the translated pages, with the original images, Claude's answers, the regions, the timings and a render of each. It's the extension's format, so a problem seen on a phone can be replayed. On a phone it opens the share sheet (Save to Files); it holds the page images, so share it privately.
+
+### Development
+- `tests/browser/strip.mjs` (in `test:browser:extension`): a reader page with a logo, a cover, emoji and a chapter as one tall image. 2.12.0 as first built fails 7 of its 9 checks.
+- `tests/browser/startup.mjs` (in `test:browser:extension`): auto-translate when the first settings reads are turned away, pages left in the worker when the reader leaves (never sent), and a reload while a page is with Claude (asked once). 2.12.0 as first built fails the first and the last.
+- `npm run audit -- <report> <out> --rtdetr detector.onnx`: lines whose lettering survives erasing, by comic-translate's text detector as an independent witness; also translations drawn far from their text or shrunk for want of room, and every erased area's marks (`marks.json`) to compare two builds area by area.
+- `tests/freetext.test.mjs`: adopting set-aside lettering, which box gets it, the logo and bubble guards, the stamp rule, and blue and orange lettering erased whole. Added to `test:extension`.
+- `tests/tone.test.mjs` checks that a page filled ahead of the answer comes out identical, also when the inpainting model isn't loaded yet; the real-browser test checks the fills are done before the answer.
+- The debug report's timing adds `wait` (time waiting for the engine), `fill.ready` (areas filled ahead) and `fill.pre`.
+- ADR 0014.
+- `tests/fill-truth.mjs`: the eraser's fill against known backgrounds on real pages (they stay local).
+- `tests/lattice.test.mjs` (the screentone fill), `tests/inpaint.test.mjs` (the learned fill), `tests/tone.test.mjs` (a synthetic page with toned and gradient bubbles and narration on screentone, 2.11 vs 2.12). Added to `test:extension` with a check of the vendored model against its record.
+- `tests/residue.mjs`, the marks-left measure behind `npm run audit`: four faults fixed, and areas on a textured surround counted apart, since there it misjudges both ways. See ADR 0013.
+- The debug report's timing has `fill`: areas by how they were filled, and the time the texture fills took.
+- README rewritten for visitors; how it works moved to `docs/ARCHITECTURE.md`, development to `CONTRIBUTING.md`.
+- ADR 0013.
+
 ## [2.11.1] — 2026-11-17
 
 ### Pages

@@ -311,6 +311,9 @@
  "web_btnShowInstall": {
   "message": "Instalar en tu móvil u ordenador"
  },
+ "web_report_hint": {
+  "message": "Para una página que salió mal: un .zip con las páginas traducidas, sus imágenes originales, las respuestas de Claude y los tiempos. Compártelo en privado: contiene las imágenes de las páginas."
+ },
  "web_free_software_under_the_gnu": {
   "message": "Software libre bajo la <a href=\"LICENSE\" target=\"_blank\">GNU AGPL v3</a> · <a href=\"https://github.com/gywreb/gytakusub\" target=\"_blank\" rel=\"noopener\">código fuente</a> · <a href=\"THIRD_PARTY.md\" target=\"_blank\">componentes de terceros</a>"
  },

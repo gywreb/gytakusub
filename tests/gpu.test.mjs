@@ -84,5 +84,23 @@ for (const f of pages) {
     assert.ok(matched(a, b, 0.75) >= 0.9 && matched(b, a, 0.75) >= 0.9, `CPU→GPU ${matched(a, b, 0.75).toFixed(2)}, GPU→CPU ${matched(b, a, 0.75).toFixed(2)} (${a.length} vs ${b.length} confident bubbles)`);
   });
 }
+// The learned eraser's inpainting model (2.12): it must start on the GPU (strict: no quiet
+// fallback to the CPU) and fill a hole in screentone the way the CPU does.
+{
+  const { createSession, run } = await import("../extension/engine/ort.js");
+  const { aotInpaint } = await import("../extension/engine/inpaint.js");
+  const bytes = new Uint8Array(fs.readFileSync(path.join(here, "../extension/vendor/inpaint.onnx")));
+  const ort = getOrt();
+  const gpuS = await createSession(bytes, { gpu: true, strict: true }), cpuS = await createSession(bytes, { gpu: false });
+  const W = 240, H = 160, rgb = new cv.Mat(H, W, cv.CV_8UC3), hole = cv.Mat.zeros(H, W, cv.CV_8UC1);
+  for (let i = 0; i < W * H; i++) { const x = i % W, y = (i / W) | 0; rgb.data[i * 3] = rgb.data[i * 3 + 1] = rgb.data[i * 3 + 2] = x % 7 < 2 && y % 7 < 2 ? 90 : 210; }
+  cv.rectangle(hole, new cv.Point(60, 50), new cv.Point(180, 80), new cv.Scalar(255), -1);
+  const a = await aotInpaint(cv, { ort, session: gpuS.session, run, ep: gpuS.ep }, rgb, hole, { maxSide: 768 });
+  const b = await aotInpaint(cv, { ort, session: cpuS.session, run, ep: cpuS.ep }, rgb, hole, { maxSide: 768 });
+  let d = 0, n = 0; for (let i = 0; i < W * H; i++) if (hole.data[i]) { d += Math.abs(a.data[i * 3] - b.data[i * 3]); n++; }
+  await test("the inpainting model starts on the GPU", () => assert.equal(gpuS.ep, "webgpu"));
+  await test(`its fill matches the CPU's (mean difference ${(d / n).toFixed(2)} levels)`, () => assert.ok(d / n < 2));
+  a.delete(); b.delete(); rgb.delete(); hole.delete();
+}
 console.log(`GPU TESTS PASSED (${passed})`);
 process.exit(0); // Dawn keeps the event loop alive

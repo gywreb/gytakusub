@@ -33,7 +33,7 @@ function findStamps(px) {
 }
 
 export function startMock(port, pageImage, opts = {}) {
-  const calls = [], fetches = [];
+  const calls = [], fetches = [], arrived = []; // arrived: when each question came in (calls: once answered)
   const srv = http.createServer(async (req, res) => {
     const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "*", "Access-Control-Allow-Methods": "*" };
     if (req.method === "OPTIONS") { res.writeHead(204, cors); return res.end(); }
@@ -45,11 +45,21 @@ export function startMock(port, pageImage, opts = {}) {
         <div style="height:1200px">footer</div></body>`);
     }
     // a long chapter (queue test): n copies of the page, each its own address
+    // files a test made (opts.files: a directory): its pages and their images
+    if (opts.files && req.url.startsWith("/files/")) {
+      const name = path.basename(decodeURIComponent(req.url.slice(7).split("?")[0]));
+      const file = path.join(opts.files, name);
+      if (!fs.existsSync(file)) { res.writeHead(404); return res.end(); }
+      const type = { ".html": "text/html", ".png": "image/png", ".jpg": "image/jpeg" }[path.extname(name)] || "application/octet-stream";
+      res.writeHead(200, { "Content-Type": type }); return res.end(fs.readFileSync(file));
+    }
+    if (req.url === "/blank") { res.writeHead(200, { "Content-Type": "text/html" }); return res.end("<!doctype html><title>Elsewhere</title><p>No pages here."); }
     if (req.url.startsWith("/chapter")) {
-      const n = Math.min(60, Number(new URL(req.url, "http://x").searchParams.get("n")) || 12);
+      const q = new URL(req.url, "http://x").searchParams;
+      const n = Math.min(60, Number(q.get("n")) || 12), ch = q.get("ch") ? `ch=${encodeURIComponent(q.get("ch"))}&` : ""; // ch: another chapter's addresses (nothing cached)
       res.writeHead(200, { "Content-Type": "text/html" });
       return res.end(`<!doctype html><title>Chapter</title><body style="margin:0;background:#111">
-        ${Array.from({ length: n }, (_, k) => `<div style="display:flex;justify-content:center"><img id="p${k + 1}" src="/page.png?i=${k + 1}" style="width:720px;height:1020px;display:block;margin-bottom:12px"></div>`).join("\n")}
+        ${Array.from({ length: n }, (_, k) => `<div style="display:flex;justify-content:center"><img id="p${k + 1}" src="/page.png?${ch}i=${k + 1}" style="width:720px;height:1020px;display:block;margin-bottom:12px"></div>`).join("\n")}
         </body>`);
     }
     if (req.url === "/page.png" || req.url.startsWith("/page.png?")) {
@@ -58,6 +68,8 @@ export function startMock(port, pageImage, opts = {}) {
       res.writeHead(200, { "Content-Type": "image/png" }); return res.end(fs.readFileSync(pageImage));
     }
     if (req.url === "/v1/messages" && req.method === "POST") {
+      const asked = Date.now(); // when the question arrived (t: when it was answered)
+      arrived.push(asked);
       let body = ""; for await (const c of req) body += c;
       const j = JSON.parse(body);
       const content = j.messages[0].content;
@@ -95,7 +107,7 @@ export function startMock(port, pageImage, opts = {}) {
         };
       });
       if (opts.delayMs) await new Promise((r) => setTimeout(r, opts.delayMs)); // a real model takes seconds
-      calls.push({ w: img.width, h: img.height, n: items.length, t: Date.now() });
+      calls.push({ w: img.width, h: img.height, n: items.length, t: Date.now(), asked });
       // like the real API: the model that answered, its token usage and the rate-limit headers
       // (exposed to pages here, so the web app's rate-limit line can be tested)
       const limits = {
@@ -108,5 +120,5 @@ export function startMock(port, pageImage, opts = {}) {
     }
     res.writeHead(404); res.end();
   });
-  return new Promise((ok) => srv.listen(port, "127.0.0.1", () => ok({ srv, calls, fetches, url: `http://127.0.0.1:${port}` })));
+  return new Promise((ok) => srv.listen(port, "127.0.0.1", () => ok({ srv, calls, fetches, arrived, url: `http://127.0.0.1:${port}` })));
 }

@@ -30,6 +30,8 @@ export async function loadLocale(locale, read) {
 }
 
 export const currentLocale = () => current;
+/** Whether English (always underneath) has loaded: a failed read leaves it empty, to be tried again. */
+export const localeLoaded = () => Object.keys(fallback).length > 0;
 /** "pt_BR" → "pt-BR", for <html lang> and Intl. */
 export const langTag = (locale = current) => locale.replace("_", "-");
 

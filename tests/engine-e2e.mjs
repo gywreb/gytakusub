@@ -1,4 +1,4 @@
-// Whole engine in Node: analyze → layout → erase → draw, on a page with given
+// Whole engine in Node: analyze → layout → erase (and fill) → draw, on a page with given
 // items (demo-items.json: pixel boxes on the 1600-scaled page, tag null).
 //   node engine-e2e.mjs <page.png> <items.json> <out.png>
 import fs from "node:fs";
@@ -6,7 +6,9 @@ import { createCanvas, loadImage, registerFont } from "canvas";
 import { cv, detector, analyzePage } from "./cv-node.mjs";
 import { analyze } from "../extension/engine/analyze.js";
 import { layout } from "../extension/engine/layout.js";
-import { erase } from "../extension/engine/erase.js";
+import { erase, fillTexture } from "../extension/engine/erase.js";
+import { OUTLINE } from "../extension/engine/page.js";
+import { getOrt, createSession, run } from "../extension/engine/ort.js";
 import { loadLettering } from "./lettering-setup.mjs";
 loadLettering();
 const GyText = globalThis.GyText;
@@ -31,7 +33,11 @@ const items = raw.map((it) => {
 });
 const { placements, regionIds } = layout(an, items);
 const t2 = Date.now();
-const clean = erase(cv, pixels, an, regionIds).image;
+// the eraser as finishPage runs it (2.12: outline, flat / screentone / learned fill)
+const model = { ort: getOrt(), session: (await createSession(new Uint8Array(fs.readFileSync(new URL("../extension/vendor/inpaint.onnx", import.meta.url))), { gpu: false })).session, run };
+const erased = erase(cv, pixels, an, regionIds, { keepMask: true, outline: OUTLINE });
+const clean = await fillTexture(cv, model, erased.image, erased);
+erased.mask.delete(); erased.surface.delete();
 const t3 = Date.now();
 ctx.putImageData(clean, 0, 0);
 const drawn = GyText.draw(ctx, placements, {});

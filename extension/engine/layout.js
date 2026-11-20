@@ -10,16 +10,24 @@
 // Inside a region, each translation is anchored to the lettering it replaces:
 // it takes the largest rectangle of the shape around that lettering, never
 // another speaker's line.
+//
+// The box is also the second witness for free text: lettering the analysis
+// found but set aside (too small or too large for dialogue, strokes it took for
+// art, a line it dropped) becomes text to erase when a translated line's box
+// holds it — the two together are evidence neither is alone (adoptLettering).
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
 /**
- * @param {import("./analyze.js").Analysis} an
+ * @param {import("./analyze.js").Analysis} an (adoptLettering may add regions to it, or widen its free-text regions)
  * @param {Array<{tag:(number|null), box:(number[]|null), text:string, size:string, kind:string}>} items normalized items (box as fractions of the page)
+ * @param {{newId?: () => number}} [opts] newId: ids for regions made from adopted lettering (unique on the page;
+ *   by default above the analysis's own)
  * @returns {{placements: Placement[], regionIds: Set<number>}}
  */
-export function layout(an, items) {
+export function layout(an, items, opts = {}) {
   const { W, H } = an;
+  adoptLettering(an, items, opts.newId);
   const byId = new Map(an.regions.map((r) => [r.id, r]));
   const groups = new Map(); // region id → items
   const loose = [];
@@ -34,9 +42,11 @@ export function layout(an, items) {
         // The box's centre lies outside the stamped region. Inside another
         // region's shape it names that one; otherwise the box merely drifted,
         // unless it is nowhere near and the text length does not fit either.
+        // (only a box mostly on that region and little on the stamped one: a box between two
+        // regions — loose, as the model's boxes often are around free text — is no evidence)
         const alt = holder(an, px, region);
-        if (alt) region = alt;
-        else {
+        if (alt && overlap(px, alt.box) >= 0.5 * area(px) && overlap(px, region.box) < 0.25 * area(px)) region = alt;
+        else if (!alt) {
           const off = boxOffset(region.box, px);
           const letters = region.kind === "bubble" ? region.ref.blocks.reduce((n, b) => n + b.glyphCount, 0) : region.ref.glyphCount;
           const ratio = it.text.length / Math.max(1, letters); // translation length vs lettering found (≈1 for a right match)
@@ -125,6 +135,96 @@ const inBox = (b, x, y) => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + 
 const grow = (b, k) => ({ x: b.x - k, y: b.y - k, w: b.w + 2 * k, h: b.h + 2 * k });
 const area = (b) => b.w * b.h;
 const overlap = (a, b) => Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+
+const ADOPT_MAX_LETTER = 4; // a shout runs to three or four times the dialogue size; a drawn sound effect beyond
+
+/**
+ * Lettering the analysis set aside, which a translated line's box vouches for. The analysis drops
+ * a paragraph it cannot be sure is text — dialogue-sized marks only, no stroke spanning the line,
+ * not a closed shape read as a glyph — and a detector line with no lettering contrast in grey (a
+ * coloured line); each guard keeps art from being erased on a guess. When Claude's box for a line
+ * it translated holds such lettering, the two witnesses agree, and the lettering becomes text to
+ * erase: added to the free-text region the line was tagged to (the rest of a title the detector
+ * cut in two), or as a region of its own for an untagged line (text the analysis never offered).
+ * A line in a bubble takes nothing: a bubble's lettering is its own, and a loose box around it
+ * must not reach the narration beside it. Lettering over ADOPT_MAX_LETTER times the dialogue size
+ * (a sound effect drawn as art, which Claude is asked to leave alone) is never taken.
+ * Adds to `an.regions` (and widens free-text regions there) in place.
+ */
+export function adoptLettering(an, items, newId) {
+  const { W, H } = an;
+  if (!an.blocks || !items.some((it) => it.text && it.box)) return;
+  const byId = new Map(an.regions.map((r) => [r.id, r]));
+  let next = Math.max(0, ...an.regions.map((r) => r.id)) + 1;
+  const fresh = newId || (() => next++);
+  const held = (b) => an.regions.some((r) => overlap(r.box, b) > 0.5 * area(b)); // already some region's
+  // set-aside paragraphs, line by line (the lines of one paragraph may be several translated
+  // lines: a block of credits), then detector lines no paragraph came from
+  const pool = [];
+  for (const p of an.blocks) {
+    // (not lines the analysis guessed by slicing one tall box into three or more, then judged not
+    // lettering: a logo or a drawing read as a stack of lines — two signals against one loose box)
+    if (p.bubble || p.region != null || (p.score ?? 1) < 0.6 || (p.pieces || 1) >= 3) continue;
+    const parts = p.parts || [p.gbox];
+    parts.forEach((g, i) => {
+      if (held(g)) return;
+      const letter = p.lineLetters?.[i] || p.letter, line = p.lineBoxes?.[i] || (p.parts ? g : p.line || g);
+      pool.push({ ...p, box: { ...g }, gbox: { ...g }, parts: [g], lineLetters: [letter], lineBoxes: [line], line, letter, glyphCount: Math.max(1, Math.round((p.vertical ? g.h : g.w) / Math.max(1, p.vertical ? letter : 0.6 * letter))) });
+    });
+  }
+  for (const l of an.lines || []) {
+    if ((l.score ?? 1) < 0.7 || an.blocks.some((p) => overlap(p.gbox, l) > 0.5 * area(l)) || held(l)) continue;
+    const box = { x: Math.round(l.x), y: Math.round(l.y), w: Math.round(l.w), h: Math.round(l.h) };
+    const letter = Math.max(4, 0.85 * (l.vertical ? box.w : box.h));
+    // polarity unknown (no grey contrast): erase.js reads the lettering against its surround
+    pool.push({ box, gbox: { ...box }, parts: [{ ...box }], lineBoxes: [{ ...box }], letter, lineLetters: [letter], vertical: !!l.vertical, dark: null, score: l.score, glyphCount: Math.max(1, Math.round((l.vertical ? box.h : box.w) / letter)), lines: 1, glyphs: [] });
+  }
+  if (!pool.length) return;
+  // each piece of lettering goes to the one line whose box holds it best (several boxes may reach
+  // it: the model's boxes run loose, and a long caption's box can reach the credits beside it)
+  const boxes = items.map((it) => (it.text && it.box ? { x: it.box[0] * W, y: it.box[1] * H, w: it.box[2] * W, h: it.box[3] * H } : null));
+  const zones = boxes.map((px) => px && grow({ x: px.x - 0.1 * px.w, y: px.y - 0.1 * px.h, w: 1.2 * px.w, h: 1.2 * px.h }, 0.5 * an.letter));
+  const owner = new Map(); // pool entry → item index
+  for (const p of pool) {
+    if (p.letter > ADOPT_MAX_LETTER * an.letter) continue;
+    let best = -1, bestFit = 0;
+    boxes.forEach((px, k) => {
+      if (!px || overlap(p.gbox, zones[k]) < 0.7 * area(p.gbox)) return;
+      // the overlap against both sizes: a tight box round the lettering beats a long one reaching it
+      const fit = overlap(p.gbox, px) / Math.sqrt(area(p.gbox) * area(px));
+      if (best < 0 || fit > bestFit) { best = k; bestFit = fit; }
+    });
+    if (best >= 0) { owner.set(p, best); globalThis.GYT_TRACE?.("adopt", p.gbox, `for line ${best}`, { fit: bestFit, letter: p.letter, dark: p.dark }); }
+  }
+  for (const [k, it] of items.entries()) {
+    const px = boxes[k];
+    if (!px) continue;
+    const stamped = it.tag != null ? byId.get(it.tag) : null;
+    if (stamped && stamped.kind === "bubble") continue;
+    const zone = zones[k];
+    const picks = pool.filter((p) => owner.get(p) === k);
+    if (!picks.length) continue;
+    const lines = (p) => (p.parts || [p.gbox]).map((g, i) => ({ g, letter: p.lineLetters?.[i] || p.letter, line: p.lineBoxes?.[i] || (p.parts ? g : p.line || g) }));
+    if (stamped && stamped.kind === "block" && overlap(stamped.box, zone) > 0) {
+      // the rest of the tagged text: one region, its lines erased one by one (erase.js)
+      const ref = stamped.ref, all = [...lines(ref), ...picks.flatMap(lines)];
+      const box = union([ref.gbox, ...picks.map((p) => p.gbox)]);
+      const own = (ref.parts || [ref.gbox]).length;
+      stamped.ref = { ...ref, gbox: box, box: union([ref.box || ref.gbox, ...picks.map((p) => p.box || p.gbox)]), parts: all.map((l) => l.g), lineLetters: all.map((l) => l.letter), lineBoxes: all.map((l) => l.line), lineAdopted: all.map((_, i) => i >= own), glyphCount: (ref.glyphCount || 0) + picks.reduce((n, p) => n + (p.glyphCount || 0), 0), adopted: true };
+      stamped.box = box;
+      continue;
+    }
+    if (stamped) continue; // tagged to a region the box is nowhere near: the layout below decides
+    const all = picks.flatMap(lines), box = union(picks.map((p) => p.gbox));
+    const letter = Math.max(...picks.map((p) => p.letter)), dark = picks.every((p) => p.dark === picks[0].dark) ? picks[0].dark : null;
+    const ref = { ...picks[0], gbox: box, box, parts: all.map((l) => l.g), lineLetters: all.map((l) => l.letter), lineBoxes: all.map((l) => l.line), lineAdopted: all.map(() => true), letter, dark, vertical: picks.every((p) => p.vertical), glyphCount: picks.reduce((n, p) => n + (p.glyphCount || 0), 0), adopted: true };
+    const r = { id: fresh(), kind: "block", ref, box, letter, dark, adopted: true };
+    an.regions.push(r); byId.set(r.id, r);
+    ref.region = r.id;
+    // the line now has its region, so it is laid out (and erased) there
+    it.tag = r.id;
+  }
+}
 
 /** Whether the region's shape (its interior for a bubble, its box otherwise) holds the point. */
 function shapeHolds(an, r, x, y) {

@@ -70,7 +70,8 @@ export function analyze(cv, img, opts = {}) {
     const t = ln.vertical ? typicalW : typicalH, size = ln.vertical ? ln.w : ln.h, along = ln.vertical ? ln.h : ln.w;
     const n = t && size > 1.7 * t && along >= 2 * size ? Math.max(1, Math.round(size / t)) : 1;
     if (n === 1) { split.push(ln); continue; }
-    for (let i = 0; i < n; i++) split.push(ln.vertical ? { ...ln, x: Math.round(ln.x + (ln.w * i) / n), w: Math.round(ln.w / n) } : { ...ln, y: Math.round(ln.y + (ln.h * i) / n), h: Math.round(ln.h / n) });
+    // (`pieces`: how many lines this box was cut into — a guess, which layout.js weighs)
+    for (let i = 0; i < n; i++) split.push(ln.vertical ? { ...ln, x: Math.round(ln.x + (ln.w * i) / n), w: Math.round(ln.w / n), pieces: n } : { ...ln, y: Math.round(ln.y + (ln.h * i) / n), h: Math.round(ln.h / n), pieces: n });
   }
   // cores of all lines (inset 20%): snapping one line must not grow into a neighbour
   const cores = split.map((l) => ({ x: l.x + l.w * 0.2, y: l.y + l.h * 0.2, w: l.w * 0.6, h: l.h * 0.6 }));
@@ -177,7 +178,8 @@ export function analyze(cv, img, opts = {}) {
     // a glyph), not one per dot — or it would outvote the text in every size estimate.
     const letters = Math.max(1, Math.round(ln.vertical ? (y1 - y0) / Math.max(letter, 0.5 * typicalW) : (x1 - x0) / (0.6 * letter)));
     const box = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
-    blocks.push({ box, gbox: { ...box }, letter, lineLetters: [letter], glyphCount: letters, components: letters, glyphs: [], inkArea, dark, vertical: ln.vertical, score: ln.score, bubble: null, region: null, lines: 1, lineWidth: box.w });
+    // `line`: the detector's own box, which the snapping above may have cut to the letters' dark core
+    blocks.push({ box, gbox: { ...box }, line: { x: ln.x, y: ln.y, w: ln.w, h: ln.h }, pieces: ln.pieces || 1, letter, lineLetters: [letter], glyphCount: letters, components: letters, glyphs: [], inkArea, dark, vertical: ln.vertical, score: ln.score, bubble: null, region: null, lines: 1, lineWidth: box.w });
   }
   // Lines in different bubbles are different speakers: with the segmentation model's
   // masks, a line joins a paragraph only within its own bubble (or outside all of them)
