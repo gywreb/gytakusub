@@ -184,7 +184,7 @@ if (edit && pressed?.box) {
 
 // ---- 5. switches ----
 const extId = sw.url().split("/")[2];
-for (const [file, min] of [["popup.html", 4], ["options.html", 7]]) {
+for (const [file, min] of [["popup.html", 4], ["options.html", 6]]) { // (options: 6 since 2.14, the original-text option gone)
   const p = await context.newPage();
   await p.goto(`chrome-extension://${extId}/${file}`); await wait(600);
   const c2 = await context.newCDPSession(p);

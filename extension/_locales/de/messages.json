@@ -404,12 +404,6 @@
  "opt_sends_names_and_the_last": {
   "message": "Sendet mit jeder Seite die Namen und die letzten ~40 übersetzten Sätze aus diesem Tab: besserer roter Faden, etwa 400 Eingabe-Tokens mehr"
  },
- "opt_also_transcribe_the_original_text": {
-  "message": "Originaltext auch transkribieren"
- },
- "opt_slower_slightly_more_careful_reading": {
-  "message": "Langsamer, etwas sorgfältigeres Lesen; nützlich zur Fehlersuche"
- },
  "opt_uppercase_lettering": {
   "message": "Schrift in GROSSBUCHSTABEN"
  },

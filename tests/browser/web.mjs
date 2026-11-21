@@ -13,6 +13,7 @@ import http from "node:http";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { chromium, devices } from "playwright";
+import { createCanvas, loadImage } from "canvas";
 import { startMock } from "./mock-api.mjs";
 import { handle as fetcherHandle } from "../../fetcher/worker.js";
 import { fmtUsd } from "../../extension/usage.js";
@@ -361,6 +362,39 @@ fetcherSrv.close(); oldSrv.close();
   await pg.screenshot({ path: path.join(out, "web-install-iphone.png") });
   await ctx.close();
 }
+// 2.14: a long strip is done part by part, each part shown as it is finished (the extension's way;
+// the web app waited for the whole strip before). The strip: the demo page three times, 1200 × 5100.
+{
+  const im = await loadImage(pageImage), strip = createCanvas(im.width, im.height * 3);
+  for (let i = 0; i < 3; i++) strip.getContext("2d").drawImage(im, 0, i * im.height);
+  const stripFile = path.join(os.tmpdir(), "gyt-web-strip.png");
+  fs.writeFileSync(stripFile, strip.toBuffer("image/png"));
+  const p3 = await browser.newPage({ viewport: { width: 900, height: 1200 } });
+  await p3.addInitScript(() => localStorage.setItem("gytakusub.settings", JSON.stringify({ apiKey: "sk-ant-test", useContext: false })));
+  await p3.goto(`http://127.0.0.1:${WEB_PORT}/`);
+  let asked = 0;
+  p3.on("request", (r) => { if (r.url().startsWith(`http://127.0.0.1:${API_PORT}/v1/messages`) && r.method() === "POST") asked++; });
+  // every status the page shows, in order
+  await p3.evaluate(() => { window.seen = []; new MutationObserver(() => { const s = document.querySelector(".page .status"); if (s && s.textContent && window.seen.at(-1) !== s.textContent) window.seen.push(s.textContent); }).observe(document.body, { subtree: true, childList: true, characterData: true }); });
+  await p3.setInputFiles("#file", stripFile);
+  // (the PR's picture: the strip with its first part shown and the rest on the way)
+  if (await p3.waitForFunction(() => /parts done/.test(document.querySelector(".page .status")?.textContent || ""), null, { timeout: 120000 }).then(() => true, () => false)) {
+    await p3.evaluate(() => document.querySelector(".page").scrollIntoView({ block: "end" }));
+    await p3.screenshot({ path: path.join(out, "web-strip-partial.png") });
+  }
+  await p3.waitForFunction(() => document.querySelector(".page")?.querySelector(".status")?.textContent === "" || /error|no text/.test(document.querySelector(".page .status")?.className + document.querySelector(".page .status")?.textContent), null, { timeout: 120000 }).catch(() => {});
+  const seen = await p3.evaluate(() => window.seen);
+  const st = await p3.$eval(".page .status", (el) => ({ text: el.textContent, cls: el.className }));
+  const lines = await p3.$$eval(".page .lines .line", (ls) => ls.length);
+  if (/error/.test(st.cls)) fail("the strip ended in an error: " + st.text);
+  if (!seen.some((t) => /1 of 3 parts done/.test(t))) fail("a long strip should show its parts as they finish: " + JSON.stringify(seen));
+  if (asked !== 3) fail(`a strip of 3 parts should ask Claude 3 times, not ${asked}`);
+  if (lines < 3) fail(`the strip's three parts should all be lettered (${lines} lines)`);
+  console.log(`strip: statuses ${JSON.stringify(seen)}, Claude calls ${asked}, lines ${lines}`);
+  await p3.screenshot({ path: path.join(out, "web-strip-done.png"), fullPage: false });
+  await p3.close();
+}
+
 // 2.13: an engine that dies mid-page (out of memory on a phone) is started again and the page
 // finishes without Redo, with Claude's answer kept (no second call). The engine worker is served
 // once through a wrapper that throws, uncaught, on the first finish, as a dying engine would.

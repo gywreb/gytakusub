@@ -10,7 +10,7 @@ import path from "node:path";
 import { createCanvas, loadImage } from "canvas";
 import { cv, analyzePage } from "./cv-node.mjs";
 import { layout } from "../extension/engine/layout.js";
-import { erase, fillTexture, NotLoaded } from "../extension/engine/erase.js";
+import { erase, fillTexture, fillArea, NotLoaded, teleaRadius, TELEA_MAX } from "../extension/engine/erase.js";
 import { OUTLINE } from "../extension/engine/page.js";
 import { getOrt, createSession, run } from "../extension/engine/ort.js";
 import { marksLeft } from "./residue.mjs";
@@ -108,6 +108,38 @@ for (const [label, ids] of [["every region translated", regionIds], ["one region
     assert.equal(fin.hits, fin.textured);
     assert.ok(same(plain.im, fin.im), "the page differs from the one filled without the prefill");
   });
+}
+
+// Telea's neighbourhood is capped: at 0.3 letter, a sound effect of 125 px letters (radius 38) took
+// 35.6 s on one area, holding the engine's thread (2.14); dialogue up to 20 px letters is unchanged.
+test("Telea's radius: 0.3 letter, 3 to TELEA_MAX", () => {
+  assert.equal(TELEA_MAX, 6);
+  assert.equal(teleaRadius(8), 3);
+  assert.equal(teleaRadius(17), 5);
+  assert.equal(teleaRadius(20), 6);
+  assert.equal(teleaRadius(125), 6);
+});
+
+// A fill not found among those done ahead says why (the debug report's fill.runs[].miss): the very
+// area was there with other pixels around it, or the area itself differs (2.14).
+{
+  const grey = (w, h, v) => { const m = new cv.Mat(h, w, cv.CV_8UC3); m.setTo(new cv.Scalar(v, v, v)); return m; };
+  const crop = grey(20, 20, 120), hole = cv.Mat.zeros(20, 20, cv.CV_8UC1);
+  for (let y = 8; y < 12; y++) for (let x = 8; x < 12; x++) hole.data[y * 20 + x] = 255;
+  const pageA = grey(64, 64, 120), pageB = grey(64, 64, 120); pageB.data[0] = 7; // differs only away from the area
+  const cache = new Map();
+  const ahead = await fillArea(cv, null, crop, hole, null, { cache, context: { image: pageA, x: 20, y: 20, side: 64 } });
+  const around = await fillArea(cv, null, crop, hole, null, { cache, context: { image: pageB, x: 20, y: 20, side: 64 } });
+  const other = grey(20, 20, 90);
+  const area = await fillArea(cv, null, other, hole, null, { cache, context: { image: pageA, x: 20, y: 20, side: 64 } });
+  const again = await fillArea(cv, null, crop, hole, null, { cache, context: { image: pageA, x: 20, y: 20, side: 64 } });
+  test("a miss says whether the area was filled ahead with other pixels around it, or differs itself", () => {
+    assert.equal(ahead.miss, "area");
+    assert.equal(around.miss, "around");
+    assert.equal(area.miss, "area");
+    assert.ok(again.hit && !again.miss);
+  });
+  for (const m of [crop, hole, pageA, pageB, other]) m.delete();
 }
 
 an.dispose();

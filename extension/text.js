@@ -34,11 +34,27 @@
   const englishHyphenator = () => (root.GyHyphen && root.GyHyphen.hyphenateEn) || null;
   const segmenters = new Map();
 
-  /** Split `word` at its hyphenation points: ["im","pos","si","ble"]; [word] if none. */
+  // A word is split only when it has 8 letters or more, with 3 letters at least on each side
+  // (punctuation not counted): "CY-CLONE!", "TRIG-GER!", "ex-pect-ed..." and "un-deresti-mate" read
+  // badly; a letterer would sooner set the line a little smaller (2.14).
+  const HYPHEN_MIN_WORD = 8, HYPHEN_MIN_SIDE = 3;
+  const lettersIn = (s) => [...s].filter((c) => LETTER_RE.test(c)).length;
+
+  /** Split `word` at its hyphenation points: ["impos","si","ble"]; [word] if none. */
   function syllables(word, hyphenate = englishHyphenator()) {
-    if (!hyphenate || [...word].length < 6 || !WORD_RE.test(word)) return [word];
+    if (!hyphenate || !WORD_RE.test(word)) return [word];
+    const total = lettersIn(word);
+    if (total < HYPHEN_MIN_WORD) return [word];
     const parts = hyphenate(word).split(SHY).filter(Boolean);
-    return parts.length > 1 ? parts : [word];
+    // join the pieces across points that would leave fewer than 3 letters on a side
+    const out = [];
+    let before = 0;
+    for (const p of parts) {
+      if (out.length && (before < HYPHEN_MIN_SIDE || total - before < HYPHEN_MIN_SIDE)) out[out.length - 1] += p;
+      else out.push(p);
+      before += lettersIn(p);
+    }
+    return out.length > 1 ? out : [word];
   }
 
   /** The language Intl.Segmenter should read a run of `text` as. */

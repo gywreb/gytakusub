@@ -38,7 +38,7 @@ function recordPage(raw) {
 // The extension ships the LaMa inpainter (vendor/lama.onnx), used on a graphics card (ADR 0015)
 setEnginePrefs({ lama: true });
 
-const PROMPT_VERSION = 7; // bump when the prompt/coordinate format changes so old cache entries are ignored
+const PROMPT_VERSION = 8; // bump when the prompt/coordinate format changes so old cache entries are ignored
 
 export { DEFAULT_SETTINGS }; // defined in settings.js, shared with the popup and options pages
 
@@ -312,7 +312,7 @@ async function translatePage(msg, settings, tabId, work) {
   const priority = () => work.distance;
   const held = heldFor(work);
   const part = Number.isInteger(msg.part) && msg.part >= 0 && msg.part < 1000 ? msg.part : null; // one slice of a tall image
-  const cacheKey = "cache:" + (await sha1(`${PROMPT_VERSION}|${settings.model}|${settings.targetLang}|${settings.includeSource}|${settings.useContext}|${msg.url || msg.dataUrl}${part != null ? "#part" + part : ""}`)); // the whole data URL: two images can share a beginning
+  const cacheKey = "cache:" + (await sha1(`${PROMPT_VERSION}|${settings.model}|${settings.targetLang}|${settings.useContext}|${msg.url || msg.dataUrl}${part != null ? "#part" + part : ""}`)); // the whole data URL: two images can share a beginning
   const cached = (await chrome.storage.session.get(cacheKey))[cacheKey];
   // start: when the page began (epoch ms); with the steps' durations below and each fill's own
   // start (fill.runs), the debug report lays the pages' work out on one timeline

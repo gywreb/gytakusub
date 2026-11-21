@@ -19,6 +19,9 @@
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 /** Whether a translation says anything in words or numbers (not only punctuation and symbols). */
 export const said = (text) => /[\p{L}\p{N}]/u.test(text);
+/** A line to translate and draw: it says something, and Claude did not give it back as it is drawn
+ * (`same`, prompt.js checkCopies): those stay as drawn, like a line of only punctuation. */
+export const tells = (it) => said(it.text) && !it.same;
 
 /**
  * @param {import("./analyze.js").Analysis} an (adoptLettering may add regions to it, or widen its free-text regions)
@@ -34,7 +37,7 @@ export function layout(an, items, opts = {}) {
   // only to draw it again loses the letterer's marks (dots too small to be found came out doubled).
   // It still takes its place among a bubble's lines, so the others keep off its lettering, which
   // the eraser then leaves (region.kept); a region given nothing else is not erased at all.
-  adoptLettering(an, items.filter((it) => !it.text || said(it.text)), opts.newId);
+  adoptLettering(an, items.filter((it) => !it.text || tells(it)), opts.newId);
   const byId = new Map(an.regions.map((r) => [r.id, r]));
   const groups = new Map(); // region id → items
   const loose = [];
@@ -72,7 +75,7 @@ export function layout(an, items, opts = {}) {
     else if (px) loose.push({ it, px });
   }
   shareStamp(an, groups);
-  for (const [id, members] of groups) if (!members.some((m) => said(m.it.text))) groups.delete(id);
+  for (const [id, members] of groups) if (!members.some((m) => tells(m.it))) groups.delete(id);
 
   const placements = [];
   for (const [id, members] of groups) {
@@ -93,13 +96,13 @@ export function layout(an, items, opts = {}) {
       // bubble); the lines to draw are anchored among the rest, and keep off it.
       const kept = [];
       for (const m of members) {
-        if (said(m.it.text) || !m.px) continue;
+        if (tells(m.it) || !m.px) continue;
         let best = null, most = 0;
         for (const b of lettering) { const o = overlap(m.px, b.gbox); if (o > most) { most = o; best = b; } }
         if (best) { kept.push({ ...best.gbox }); lettering = lettering.filter((b) => b !== best); }
         else if (inBox(bbox, m.px.x + m.px.w / 2, m.px.y + m.px.h / 2)) kept.push(clip(m.px, bbox));
       }
-      const told = members.filter((m) => said(m.it.text));
+      const told = members.filter((m) => tells(m.it));
       const anchors = lettering.length ? assignAnchors(lettering, told, bbox, letter) : told.map((m) => (m.px && inBox(bbox, m.px.x + m.px.w / 2, m.px.y + m.px.h / 2) ? m.px : { x: bbox.x + bbox.w / 2 - letter, y: bbox.y + bbox.h / 2 - letter, w: 2 * letter, h: 2 * letter }));
       const anchoredToLettering = anchors.map((a) => a.fromLettering === true);
       // Smaller regions lying within this shape are never written over: the
@@ -140,13 +143,13 @@ export function layout(an, items, opts = {}) {
           if (!others.some((o) => overlap(o, cand) > 0.05 * Math.min(area(o), area(cand)))) { rect = cand; break; }
         }
       }
-      const told = members.filter((m) => said(m.it.text));
+      const told = members.filter((m) => tells(m.it));
       const text = told.map((m) => m.it.text).join(" ");
       placements.push({ text, size: told[0].it.size, rect, letter, color: r.dark ? "#fff" : "#000", halo: true, tag: id, item: told.length === 1 ? told[0].it.index ?? null : null });
     }
   }
   for (const { it, px } of loose) {
-    if (!said(it.text)) continue;
+    if (!tells(it)) continue;
     placements.push({ text: it.text, size: it.size, rect: clampRect(px, W, H), letter: an.letter, color: "#000", halo: true, tag: null, item: it.index ?? null });
   }
 
@@ -282,7 +285,7 @@ function shareStamp(an, groups) {
     // the stamp is the line's that lies most on the bubble's lettering; the others may have misread it
     const own = members.map((m) => (m.px ? on(m.px, r) : 0)), keeper = own.indexOf(Math.max(...own));
     members.forEach((m, i) => {
-      if (!m.px || i === keeper || !said(m.it.text)) return;
+      if (!m.px || i === keeper || !tells(m.it)) return;
       let best = null, most = 0;
       for (const q of an.regions) {
         if (groups.has(q.id) || moves.some((v) => v.to === q)) continue;

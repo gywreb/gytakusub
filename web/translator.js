@@ -1,7 +1,7 @@
 // Gytakusub Web – translation pipeline. The page engine (OpenCV analysis,
 // stamps, erase, layout) runs in engine-worker.js; this module calls Claude
 // and draws the text, mirroring the extension's service worker + content script.
-import { callClaude, mergeContext, apiHeaders, API_URL } from "./prompt.js";
+import { callClaude, mergeContext, apiHeaders, API_URL, sliceGeometry } from "./prompt.js";
 import { limitsOf, explainApiError } from "./usage.js";
 import { recordClaudeUsage, recordClaudePage } from "./claude-usage.js";
 import { letteringFor } from "./languages.js";
@@ -53,7 +53,6 @@ export const DEFAULT_SETTINGS = {
   glossary: "",
   customPrompt: "",
   useContext: true,
-  includeSource: false,
   uppercase: false,
   fontFamily: "",
   rtlSpreads: true,
@@ -90,24 +89,63 @@ export function loadImage(src) {
  * @param {HTMLImageElement} img  decoded page
  * @param {object} settings
  * @param {{terms:Array, recent:Array}} ctx  chapter context (mutated via return)
+ * @param {(partial: object, done: number, total: number) => void} [onPart] a long strip is done part by
+ *   part (the extension's way): each finished part is shown at once (`partial`, the parts so far)
  * @returns {{items, placements, regions, work, letter, patches:Array<{x,y,w,h,bitmap:ImageBitmap}>, width, height, usage, engine, timing, ctx}}
  *   patches: the erased areas in page pixels, at the page's own resolution
  */
-export async function translateImage(img, settings, ctx = { terms: [], recent: [] }) {
+export async function translateImage(img, settings, ctx = { terms: [], recent: [] }, onPart = null) {
   if (!settings.apiKey) throw new Error(t("web_no_key"));
+  const W = img.naturalWidth || img.width, H = img.naturalHeight || img.height;
+  const parts = sliceGeometry(W, H, settings);
+  if (parts.length < 2) {
+    const one = await translateRows(img, settings, ctx, null);
+    return { ...one.page, usage: one.usage, ctx: mergeContext(ctx, one.terms, one.page.items.map((i) => i.text)) };
+  }
+  // A long strip, part by part (2.14; the web app waited for the whole strip before): every part is
+  // analysed and asked about at once (the engine takes them one at a time), and each is shown as it
+  // is finished, in whatever order that is.
+  const done = [];
+  const merged = () => {
+    const page = { items: [], placements: [], regions: [], patches: [], width: W, height: H, work: done[0].page.work, letter: done[0].page.letter, engine: done[0].page.engine };
+    for (const d of [...done].sort((a, b) => a.index - b.index)) {
+      const base = page.items.length;
+      page.items.push(...d.page.items);
+      page.placements.push(...d.page.placements.map((p) => ({ ...p, item: p.item != null ? p.item + base : p.item, part: d.index })));
+      page.regions.push(...d.page.regions.map((r) => ({ ...r, part: d.index })));
+      page.patches.push(...d.page.patches);
+    }
+    const ts = done.map((d) => d.page.timing).sort((a, b) => a.start - b.start);
+    page.timing = { start: ts[0].start, parts: [...done].sort((a, b) => a.index - b.index).map((d) => ({ part: d.index, ...d.page.timing })) };
+    return page;
+  };
+  await Promise.all(parts.map((_, index) => translateRows(img, settings, ctx, { W, H, index, y0: parts[index].y, h: parts[index].h }).then((d) => {
+    done.push({ index, ...d });
+    if (onPart && done.length < parts.length) onPart(merged(), done.length, parts.length);
+  })));
+  const page = merged();
+  const terms = done.sort((a, b) => a.index - b.index).flatMap((d) => d.terms);
+  const usage = { input_tokens: 0, output_tokens: 0 };
+  for (const d of done) { usage.input_tokens += d.usage.input_tokens; usage.output_tokens += d.usage.output_tokens; }
+  return { ...page, usage, ctx: mergeContext(ctx, terms, page.items.map((i) => i.text)) };
+}
+
+/** The page, or one part of a long strip (`part`: {W, H, index, y0, h}: its rows), translated. */
+async function translateRows(img, settings, ctx, part) {
   // the times of each step, as the extension's debug report has them (analyze, model, finish)
   // (start: epoch ms, for a timeline with each fill's own start, fill.runs; "model" is Claude's time)
   const timing = { start: Date.now() }; let t0 = performance.now();
   const lap = (k) => { const n = performance.now(); timing[k] = Math.round(n - t0); t0 = n; };
+  const rows = () => (part ? createImageBitmap(img, 0, part.y0, part.W, part.h) : createImageBitmap(img));
   const prepare = async () => {
-    const bitmap = await createImageBitmap(img);
-    return rpc({ type: "prepare", bitmap, settings: { maxLongEdge: settings.maxLongEdge, stripWidth: settings.stripWidth, sliceHeight: settings.sliceHeight } }, [bitmap]);
+    const bitmap = await rows();
+    return rpc({ type: "prepare", bitmap, settings: { maxLongEdge: settings.maxLongEdge, stripWidth: settings.stripWidth, sliceHeight: settings.sliceHeight }, ...(part ? { part: { W: part.W, H: part.H, index: part.index, y0: part.y0 } } : {}) }, [bitmap]);
   };
   let prep = await onFreshEngine(prepare);
   lap("analyze");
   // While Claude answers, the engine fills the page's textured areas ahead (the finish then finds
   // them done). The page at its own size goes with it when the analysis worked on a smaller copy.
-  const natural = prep.work.W < prep.width ? await createImageBitmap(img) : null;
+  const natural = prep.work.W < prep.width ? await rows() : null;
   rpc({ type: "prefill", jobId: prep.jobId, natural }, natural ? [natural] : []).catch(() => {});
   let results;
   try { results = await Promise.all(prep.slices.map((s) => callAndRecord(settings, s, ctx))); }
@@ -132,7 +170,8 @@ export async function translateImage(img, settings, ctx = { terms: [], recent: [
   if (fin.fill) timing.fill = fin.fill;
   if (fin.look?.boxes) timing.look = fin.look;
   if (fin.modelWait != null) timing.modelWait = fin.modelWait; // (waiting for the learned fill's model to load)
-  return { items: fin.items, placements: fin.placements, regions: fin.regions, work: fin.work, letter: fin.letter, patches: fin.patches, width: prep.width, height: prep.height, usage, engine: fin.engine, timing, ctx: mergeContext(ctx, terms, fin.items.map((i) => i.text)) };
+  const page = { items: fin.items, placements: fin.placements, regions: fin.regions, work: fin.work, letter: fin.letter, patches: fin.patches, width: prep.width, height: prep.height, engine: fin.engine, timing };
+  return { page, usage, terms };
 }
 
 // Hyphenation for the target language: English's patterns load with the page

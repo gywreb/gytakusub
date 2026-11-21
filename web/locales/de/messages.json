@@ -461,6 +461,9 @@
  "web_status_translating": {
   "message": "übersetzt…"
  },
+ "web_status_parts": {
+  "message": "wird übersetzt… {done} von {total} Teilen fertig"
+ },
  "web_status_no_text": {
   "message": "kein Text gefunden"
  },

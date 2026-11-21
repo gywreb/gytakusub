@@ -7,7 +7,7 @@ import { ortBroken, gpuIsSoftware } from "./ort.js";
 import { analyze } from "./analyze.js";
 import { segment } from "./segment.js";
 import { detectText, detectInEmptyBubbles, detectInDarkShapes, detectInTranslatedBoxes } from "./detect.js";
-import { layout, said } from "./layout.js";
+import { layout, tells } from "./layout.js";
 import { erase, eraseFullSize, fillTexture, contextMargin, NotLoaded } from "./erase.js";
 import { aotInpaint, GPU_SIDE } from "./inpaint.js";
 
@@ -164,7 +164,7 @@ export async function finishPage(job, results, opts = {}) {
       for (const r of clean.rois) rois.push({ x: r.x + s.ox, y: r.y + s.oy, w: r.w, h: r.h });
     }
     for (const r of clean.rois) { const kind = r.fill === "texture" ? r.filled || "telea" : r.fill || "telea"; fill[kind]++; fill.ms += r.fillMs || 0; if (r.fillHit) fill.ready++; }
-    runs.push(...fillRuns(clean.rois));
+    runs.push(...fillRuns(clean.rois, !!cache));
     clean.mask?.delete(); clean.surface?.delete();
     an.dispose();
   }
@@ -206,7 +206,7 @@ export async function lookAgain(cv, img, an, items, det = null) {
   const look = { boxes: 0, lines: 0, ms: 0 };
   if (!an.learned) return look;
   const W = img.width, H = img.height;
-  const boxes = items.filter((it) => it.box && it.text && said(it.text)).map((it) => ({ x: it.box[0] * W, y: it.box[1] * H, w: it.box[2] * W, h: it.box[3] * H }));
+  const boxes = items.filter((it) => it.box && it.text && tells(it)).map((it) => ({ x: it.box[0] * W, y: it.box[1] * H, w: it.box[2] * W, h: it.box[3] * H }));
   if (!boxes.length) return look;
   const t0 = Date.now();
   try {
@@ -270,8 +270,9 @@ export const inpainterTimes = { load: null, warm: null, again: null, side: null,
 /** The debug report's record of a slice's textured areas just filled: how, in how long, how big. */
 // (ms: the whole fill; run: the model's own time in it; at: when it started, epoch ms, for a
 // timeline with the page's other steps, timing.start)
-const fillRuns = (rois) => rois.filter((r) => r.fill === "texture" && r.filled && r.filled !== "later")
-  .map((r) => ({ kind: r.filled, ms: Math.round(r.fillMs || 0), ...(r.fillRunMs != null ? { run: r.fillRunMs } : {}), w: r.w, h: r.h, ...(r.fillAt ? { at: r.fillAt } : {}), ...(r.fillHit ? { hit: true } : {}) }));
+// (miss, at the finish: why it was not found among the fills done ahead; see erase.js fillArea)
+const fillRuns = (rois, misses = false) => rois.filter((r) => r.fill === "texture" && r.filled && r.filled !== "later")
+  .map((r) => ({ kind: r.filled, ms: Math.round(r.fillMs || 0), ...(r.fillRunMs != null ? { run: r.fillRunMs } : {}), w: r.w, h: r.h, ...(r.fillAt ? { at: r.fillAt } : {}), ...(r.fillHit ? { hit: true } : {}), ...(misses && r.fillMiss ? { miss: r.fillMiss } : {}) }));
 
 /**
  * Fills a page's textured areas ahead of its translation, while the caller waits for Claude

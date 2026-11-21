@@ -404,12 +404,6 @@
  "opt_sends_names_and_the_last": {
   "message": "Mengirim nama dan ~40 baris terakhir yang diterjemahkan di tab ini bersama setiap halaman: lebih nyambung, sekitar 400 token input tambahan"
  },
- "opt_also_transcribe_the_original_text": {
-  "message": "Tulis ulang juga teks aslinya"
- },
- "opt_slower_slightly_more_careful_reading": {
-  "message": "Lebih lambat, membaca sedikit lebih teliti; berguna untuk debug"
- },
  "opt_uppercase_lettering": {
   "message": "Huruf KAPITAL"
  },

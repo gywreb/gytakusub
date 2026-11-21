@@ -18,7 +18,6 @@ export const DEFAULT_SETTINGS = {
   enabledSites: [], // hostnames where the content script is injected (hover button + hotkeys)
   autoSites: [], // hostnames where auto-translate-on-scroll is on (implies enabled)
   useContext: true, // feed recent dialogue from this tab into each request
-  includeSource: false, // ask the model to transcribe the original too (slower)
   uppercase: false,
   fontFamily: "",
   syncApiKey: false,

@@ -461,6 +461,9 @@
  "web_status_translating": {
   "message": "menerjemahkan…"
  },
+ "web_status_parts": {
+  "message": "menerjemahkan… {done} dari {total} bagian selesai"
+ },
  "web_status_no_text": {
   "message": "tidak ada teks"
  },

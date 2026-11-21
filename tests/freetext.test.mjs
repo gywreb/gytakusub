@@ -122,6 +122,19 @@ await test("in a bubble with two lines, the one with nothing to translate keeps 
   assert.ok(r.y >= k.y + k.h || r.x >= k.x + k.w || r.x + r.w <= k.x, `text ${JSON.stringify(r)} over the kept dots`);
 });
 
+await test("a line Claude gave back as drawn (`same`: a name, credits) keeps its lettering like a line of only marks", () => {
+  const name = para(450, 100, 40, 90, { bubble: 1, region: 1, vertical: true }), ah = para(430, 210, 50, 80, { bubble: 1, region: 1, vertical: true });
+  const an = boxShapes(analysis([bubbleAt(1, { x: 410, y: 85, w: 100, h: 230 }, [name, ah])], [name, ah]));
+  const { placements, regionIds } = layout(an, [{ ...item([460, 125, 40, 60], "Luke...", 1, "bubble"), same: true }, item([425, 255, 60, 50], "Ah...", 1, "bubble")]);
+  assert.deepEqual([...regionIds], [1]);
+  assert.deepEqual(placements.map((p) => p.text), ["Ah..."]);
+  assert.deepEqual(an.regions[0].kept, [name.gbox]);
+  // alone in its bubble: the bubble is not translated at all
+  const an2 = boxShapes(analysis([bubbleAt(1, { x: 410, y: 85, w: 100, h: 230 }, [name])], [name]));
+  const two = layout(an2, [{ ...item([460, 125, 40, 60], "TRANSLATOR Sebasdgd", 1, "bubble"), same: true }]);
+  assert.equal(two.regionIds.size, 0); assert.equal(two.placements.length, 0);
+});
+
 await test("a tight box on the core of big lettering takes it; a small box in a large paragraph does not", () => {
   const shout = para(100, 100, 110, 70, { letter: 60 });
   const an = analysis([], [shout]);

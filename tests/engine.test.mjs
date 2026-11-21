@@ -5,7 +5,7 @@ import fs from "node:fs";
 import { createCanvas, loadImage, registerFont } from "canvas";
 import { cv, detector, analyzePage } from "./cv-node.mjs";
 import { analyze } from "../extension/engine/analyze.js";
-import { layout } from "../extension/engine/layout.js";
+import { layout, tells } from "../extension/engine/layout.js";
 import { erase } from "../extension/engine/erase.js";
 import * as prompt from "../extension/prompt.js";
 import { loadLettering } from "./lettering-setup.mjs";
@@ -54,7 +54,7 @@ test("extractJson tolerates fences and prose", () => {
 });
 // callClaude against a fake API: what is asked for, and what each kind of answer becomes
 {
-  const settings = { model: "m", apiKey: "k", targetLang: "English", glossary: "", customPrompt: "", useContext: false, includeSource: false };
+  const settings = { model: "m", apiKey: "k", targetLang: "English", glossary: "", customPrompt: "", useContext: false };
   const slice = { b64: "x", mediaType: "image/jpeg", cw: 10, ch: 10, tagFrom: 1, tagTo: 2 };
   const ctx = { terms: [], recent: [] };
   const sent = [];
@@ -63,7 +63,7 @@ test("extractJson tolerates fences and prose", () => {
     const [status, reply] = replies.length > 1 ? replies.shift() : replies[0];
     return { ok: status === 200, status, json: async () => reply, text: async () => JSON.stringify(reply) };
   };
-  const answer = { items: [{ tag: 1, box: [1, 2, 3, 4], kind: "bubble", size: "normal", text: 'He said "stop" — twice' }], terms: [] };
+  const answer = { items: [{ tag: 1, box: [1, 2, 3, 4], kind: "bubble", size: "normal", source: "Dijo «basta» — dos veces", text: 'He said "stop" — twice' }], terms: [] };
   const good = [200, { content: [{ type: "text", text: JSON.stringify(answer) }], stop_reason: "end_turn" }];
   const ok = await prompt.callClaude(settings, slice, ctx, fake(good));
   test("callClaude asks for structured output: a closed schema, every property required", () => {
@@ -74,10 +74,45 @@ test("extractJson tolerates fences and prose", () => {
       if (o.type === "array") walk(o.items);
     };
     walk(f.schema);
-    assert.ok(!("source" in f.schema.properties.items.items.properties));
-    assert.ok("source" in prompt.answerSchema(true).properties.items.items.properties);
+    assert.ok("source" in f.schema.properties.items.items.properties, "every line's original is asked for (2.14)");
     assert.equal(ok.items[0].text, 'He said "stop" — twice');
+    assert.equal(sent.length, 1, "a translated line is not asked about again");
   });
+  // A line given back as it is drawn (2.14): asked again on its own; translated, or kept as drawn
+  {
+    const page = (items) => [200, { content: [{ type: "text", text: JSON.stringify({ items, terms: [] }) }], stop_reason: "end_turn", usage: { input_tokens: 100, output_tokens: 50 } }];
+    const lines = (texts) => [200, { content: [{ type: "text", text: JSON.stringify({ texts }) }], stop_reason: "end_turn", usage: { input_tokens: 20, output_tokens: 10 } }];
+    const line = (source, text, kind = "bubble") => ({ tag: 1, box: [1, 2, 3, 4], kind, size: "normal", source, text });
+    sent.length = 0;
+    const copied = await prompt.callClaude(settings, slice, ctx, fake(page([line("No hay nada que no pueda crear!", "No hay nada que no pueda crear!"), line("TRANSLATOR\nSebasdgd", "TRANSLATOR Sebasdgd"), line("Luke...", "Luke..."), line("¡Ahí estás!", "There you are!"), line("BAM", "BAM", "sfx")]), lines(["There's nothing I can't create!", "TRANSLATOR Sebasdgd"])));
+    test("a line given back untranslated is asked again and takes the translation", () => {
+      assert.equal(copied.items[0].text, "There's nothing I can't create!");
+      assert.ok(!copied.items[0].same);
+    });
+    test("a line given back the same twice is already in the target language: kept as drawn", () => {
+      assert.equal(copied.items[1].same, true);
+    });
+    test("a single word given back (a name, an interjection) is kept as drawn without asking", () => {
+      assert.equal(copied.items[2].same, true);
+      assert.deepEqual(sent[1].messages[0].content.match(/Lines \(JSON\):\n(.*)\n/)[1], JSON.stringify(["No hay nada que no pueda crear!", "TRANSLATOR\nSebasdgd"]), "one call for the page's longer lines only");
+    });
+    test("translated lines and sound effects are left alone; the second call's tokens are counted", () => {
+      assert.equal(copied.items[3].text, "There you are!"); assert.ok(!copied.items[3].same && !copied.items[4].same);
+      assert.equal(sent.length, 2);
+      assert.deepEqual(copied.usage, { input_tokens: 120, output_tokens: 60 });
+    });
+    sent.length = 0;
+    const failed = await prompt.callClaude(settings, slice, ctx, fake(page([line("No hay nada que no pueda crear!", "No hay nada que no pueda crear!")]), [529, { error: { message: "Overloaded" } }]));
+    test("asking again failing changes nothing: the page goes on", () => {
+      assert.equal(failed.items[0].text, "No hay nada que no pueda crear!"); assert.ok(!failed.items[0].same);
+    });
+    test("normalizeItems keeps `same`; the layout leaves such a line as drawn", () => {
+      const s2 = { x: 0, y: 0, w: 100, h: 100, cw: 100, ch: 100, tagFrom: 1, tagTo: 1 };
+      const [a, b] = prompt.normalizeItems([{ ...line("Luke...", "Luke..."), same: true }, line("¡Ahí estás!", "There you are!")], s2, 100, 100);
+      assert.equal(a.same, true); assert.ok(!b.same);
+      assert.equal(tells(a), false); assert.equal(tells(b), true);
+    });
+  }
   const fails = async (...replies) => { try { await prompt.callClaude(settings, slice, ctx, fake(...replies)); return "no error"; } catch (e) { return e.message; } };
   const refusal = await fails([200, { content: [], stop_reason: "refusal" }]);
   const cut = await fails([200, { content: [{ type: "text", text: '{"items":[{"tag":1,' }], stop_reason: "max_tokens", usage: { output_tokens: 8192 } }]);
@@ -109,7 +144,7 @@ test("sound effects and logos are labelled, then left as drawn", () => {
   const s = { x: 0, y: 0, w: 100, h: 100, cw: 100, ch: 100, tagFrom: 1, tagTo: 0 };
   const kept = prompt.normalizeItems(["sign", "sfx", "logo", "narration"].map((kind) => ({ tag: null, box: [1, 1, 5, 5], kind, text: kind })), s, 100, 100);
   assert.deepEqual(kept.map((it) => it.kind), ["sign", "narration"]);
-  assert.deepEqual(prompt.answerSchema(false).properties.items.items.properties.kind.enum, ["bubble", "narration", "sign", "sfx", "logo"]);
+  assert.deepEqual(prompt.answerSchema().properties.items.items.properties.kind.enum, ["bubble", "narration", "sign", "sfx", "logo"]);
   assert.match(prompt.buildPrompt({ glossary: "", useContext: false, customPrompt: "", targetLang: "English" }, { terms: [], recent: [] }, { cw: 10, ch: 10, tagFrom: 1, tagTo: 0 }), /"sfx" \(a sound effect\) or "logo"/);
 });
 

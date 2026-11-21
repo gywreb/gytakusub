@@ -461,6 +461,9 @@
  "web_status_translating": {
   "message": "翻訳中…"
  },
+ "web_status_parts": {
+  "message": "翻訳中… {total} 部分中 {done} 部分完了"
+ },
  "web_status_no_text": {
   "message": "文字が見つかりません"
  },
