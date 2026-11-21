@@ -58,62 +58,75 @@ export function erase(cv, img, analysis, regionIds, opts = {}) {
   // the extent of what the current region's lettering painted: the area to fill must hold all of it
   let painted = null;
   const extend = (x0, y0, x1, y1) => { painted = painted ? { x0: Math.min(painted.x0, x0), y0: Math.min(painted.y0, y0), x1: Math.max(painted.x1, x1), y1: Math.max(painted.y1, y1) } : { x0, y0, x1, y1 }; };
-  const paintTextBox = (pol, b, letter, inside = null, withColour = true) => {
+  const paintTextBox = (pols, b, letter, inside = null, withColour = true) => {
+    pols = (Array.isArray(pols) ? pols : [pols]).filter(Boolean);
     const across = Math.max(2, Math.round(letter * 0.35)), along = Math.max(3, Math.round(letter * 0.7));
     const padX = b.vertical ? across : along, padY = b.vertical ? along : across;
     const x0 = Math.max(0, b.gbox.x - padX), y0 = Math.max(0, b.gbox.y - padY), x1 = Math.min(W, b.gbox.x + b.gbox.w + padX), y1 = Math.min(H, b.gbox.y + b.gbox.h + padY);
     const w = x1 - x0, h = y1 - y0; if (w < 2 || h < 2) return;
-    // lettering the analysis had set aside (layout.js adoptLettering) is erased all or nothing: when
-    // most of the ink on its line is not taken (outlined display lettering, a logo), the line stays
-    // as it was — half a word and a smudge read worse than the original under the translation
-    const saved = b.adopted ? [] : null;
-    if (saved) for (let yy = y0; yy < y1; yy++) saved.push(md.slice(yy * W + x0, yy * W + x1));
-    // the lettering is ink of its polarity (pol), and — on a plain surround — whatever stands out
-    // from that surround in colour, which is how coloured lettering is found (blue, orange: neither
-    // dark nor light enough for the polarity masks). The colour window also takes in the detector's
-    // own box for the line (`line`): the analysis sizes a line by its dark ink, which in a coloured
+    // the lettering is ink of its polarity, and — on a plain surround — whatever stands out from
+    // that surround in colour, which is how coloured lettering is found (blue, orange: neither dark
+    // nor light enough for the polarity masks). The colour window also takes in the detector's own
+    // box for the line (`line`): the analysis sizes a line by its dark ink, which in a coloured
     // letter is a thin core.
-    const masks = [];
-    if (pol) masks.push({ roi: pol.inkMask.roi(new cv.Rect(x0, y0, w, h)), x0, y0, w, h });
-    if (withColour) {
-      const l = b.line, cx0 = Math.max(0, Math.min(x0, l ? Math.floor(l.x) : x0)), cy0 = Math.max(0, Math.min(y0, l ? Math.floor(l.y) : y0));
-      const cx1 = Math.min(W, Math.max(x1, l ? Math.ceil(l.x + l.w) : x1)), cy1 = Math.min(H, Math.max(y1, l ? Math.ceil(l.y + l.h) : y1));
-      const colour = colourLettering(cx0, cy0, cx1 - cx0, cy1 - cy0, inside);
-      if (colour) masks.push({ roi: colour, x0: cx0, y0: cy0, w: cx1 - cx0, h: cy1 - cy0, colour: true });
-    }
-    for (const { roi, x0, y0, w, h, colour } of masks) {
-      const lab = new cv.Mat(), st = new cv.Mat(), ce = new cv.Mat();
-      const n = cv.connectedComponentsWithStats(roi, lab, st, ce, 8, cv.CV_32S);
-      const S = st.data32S, Lb = lab.data32S;
-      const keep = new Uint8Array(n);
-      for (let i = 1; i < n; i++) {
-        const cx = S[i * 5], cy = S[i * 5 + 1], cw = S[i * 5 + 2], ch = S[i * 5 + 3];
-        const touches = cx <= 0 || cy <= 0 || cx + cw >= w || cy + ch >= h;
-        // size across the line only: along it a mark may be long (a wave dash, a
-        // long vowel mark in a column) and still be lettering — a stroke of art or
-        // an outline crossing the window touches its edge instead
-        // in a bubble, what stands apart in colour is lettering only wholly inside the interior (as in
-        // paintBubbleColour): past the outline it is the art around the bubble, which the bubble's
-        // own fill would paint over
-        const X0 = x0 + cx, Y0 = y0 + cy;
-        if (colour && inside && !(inside(X0 - 1, Y0 - 1) && inside(X0 + cw, Y0 - 1) && inside(X0 - 1, Y0 + ch) && inside(X0 + cw, Y0 + ch))) continue;
-        if (!touches && (b.vertical ? cw : ch) <= 2.5 * letter) { keep[i] = 1; extend(X0, Y0, X0 + cw, Y0 + ch); }
+    const paint = (ps, colourToo = true) => {
+      const masks = [];
+      for (const pol of ps) masks.push({ roi: pol.inkMask.roi(new cv.Rect(x0, y0, w, h)), x0, y0, w, h });
+      if (withColour && colourToo) {
+        const l = b.line, cx0 = Math.max(0, Math.min(x0, l ? Math.floor(l.x) : x0)), cy0 = Math.max(0, Math.min(y0, l ? Math.floor(l.y) : y0));
+        const cx1 = Math.min(W, Math.max(x1, l ? Math.ceil(l.x + l.w) : x1)), cy1 = Math.min(H, Math.max(y1, l ? Math.ceil(l.y + l.h) : y1));
+        const colour = colourLettering(cx0, cy0, cx1 - cx0, cy1 - cy0, inside);
+        if (colour) masks.push({ roi: colour, x0: cx0, y0: cy0, w: cx1 - cx0, h: cy1 - cy0, colour: true });
       }
-      for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) { const l = Lb[yy * w + xx]; if (l && keep[l]) md[(y0 + yy) * W + x0 + xx] = 255; }
-      roi.delete(); lab.delete(); st.delete(); ce.delete();
-    }
-    if (saved) {
-      // the line's ink (its polarity's, else what stands apart from the window's median) against what was taken
-      const g = b.gbox, I = pol ? pol.inkMask.data : null;
+      for (const { roi, x0, y0, w, h, colour } of masks) {
+        const lab = new cv.Mat(), st = new cv.Mat(), ce = new cv.Mat();
+        const n = cv.connectedComponentsWithStats(roi, lab, st, ce, 8, cv.CV_32S);
+        const S = st.data32S, Lb = lab.data32S;
+        const keep = new Uint8Array(n);
+        for (let i = 1; i < n; i++) {
+          const cx = S[i * 5], cy = S[i * 5 + 1], cw = S[i * 5 + 2], ch = S[i * 5 + 3];
+          const touches = cx <= 0 || cy <= 0 || cx + cw >= w || cy + ch >= h;
+          // size across the line only: along it a mark may be long (a wave dash, a
+          // long vowel mark in a column) and still be lettering — a stroke of art or
+          // an outline crossing the window touches its edge instead
+          // in a bubble, what stands apart in colour is lettering only wholly inside the interior (as in
+          // paintBubbleColour): past the outline it is the art around the bubble, which the bubble's
+          // own fill would paint over
+          const X0 = x0 + cx, Y0 = y0 + cy;
+          if (colour && inside && !(inside(X0 - 1, Y0 - 1) && inside(X0 + cw, Y0 - 1) && inside(X0 - 1, Y0 + ch) && inside(X0 + cw, Y0 + ch))) continue;
+          if (!touches && (b.vertical ? cw : ch) <= 2.5 * letter) { keep[i] = 1; extend(X0, Y0, X0 + cw, Y0 + ch); }
+        }
+        for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) { const l = Lb[yy * w + xx]; if (l && keep[l]) md[(y0 + yy) * W + x0 + xx] = 255; }
+        roi.delete(); lab.delete(); st.delete(); ce.delete();
+      }
+    };
+    // Lettering the analysis had set aside (layout.js adoptLettering) is erased all or nothing: when
+    // most of the ink on its line is not taken (outlined display lettering, a logo), the line stays
+    // as it was — half a word and a smudge read worse than the original under the translation.
+    if (!b.adopted) { paint(pols); return; }
+    const saved = [];
+    for (let yy = y0; yy < y1; yy++) saved.push(md.slice(yy * W + x0, yy * W + x1));
+    const restore = () => saved.forEach((row, i) => md.set(row, (y0 + i) * W + x0));
+    // the share of the line's ink (its polarity's, else what stands apart from the window's median) taken
+    const g = b.gbox;
+    const share = (ps) => {
+      const Is = ps.map((P) => P.inkMask.data);
+      const mid = Is.length ? null : (() => { const v = []; for (let yy = y0; yy < y1; yy += 2) for (let xx = x0; xx < x1; xx += 2) { const p = (yy * W + xx) * 4; v.push((pix[p] + pix[p + 1] + pix[p + 2]) / 3); } v.sort((p, q) => p - q); return v[v.length >> 1]; })();
       let ink = 0, taken = 0;
-      const mid = I ? null : (() => { const v = []; for (let yy = y0; yy < y1; yy += 2) for (let xx = x0; xx < x1; xx += 2) { const p = (yy * W + xx) * 4; v.push((pix[p] + pix[p + 1] + pix[p + 2]) / 3); } v.sort((p, q) => p - q); return v[v.length >> 1]; })();
       for (let yy = Math.max(0, g.y); yy < Math.min(H, g.y + g.h); yy++) for (let xx = Math.max(0, g.x); xx < Math.min(W, g.x + g.w); xx++) {
         const q = yy * W + xx, p = q * 4;
-        if (I ? !I[q] : Math.abs((pix[p] + pix[p + 1] + pix[p + 2]) / 3 - mid) <= COLOUR_APART) continue;
+        if (Is.length ? !Is.some((d) => d[q]) : Math.abs((pix[p] + pix[p + 1] + pix[p + 2]) / 3 - mid) <= COLOUR_APART) continue;
         ink++; if (md[q]) taken++;
       }
-      if (ink && taken < ADOPTED_TAKEN * ink) saved.forEach((row, i) => md.set(row, (y0 + i) * W + x0));
-    }
+      return ink ? taken / ink : 1;
+    };
+    // each polarity judged on its own ink (of unknown polarity, both are read: lettering found on
+    // Claude's box), the colour with the first
+    (pols.length ? pols.map((P) => [P]) : [[]]).forEach((t, k) => {
+      for (let yy = y0; yy < y1; yy++) saved[yy - y0] = md.slice(yy * W + x0, yy * W + x1);
+      paint(t, k === 0);
+      if (share(t) < ADOPTED_TAKEN) restore();
+    });
   };
 
   // What stands out in colour from the window's surround, as a mask of the window (null when the
@@ -144,44 +157,90 @@ export function erase(cv, img, analysis, regionIds, opts = {}) {
   // but the analysis sizes it by its dark ink, which in a blue or orange letter is a thin core; this
   // takes the whole letter. Marks touching the interior's edge (the outline) and specks far from the
   // text (decoration) stay.
-  const paintBubbleColour = (r, blocks, letter, inside) => {
-    const { x, y, w, h } = r.box;
-    if (w < 4 || h < 4) return;
-    // near the lettering: the lines as the analysis sized them and as the detector boxed them (a
-    // coloured line it sized by its dark core, or dropped for having none, is still the detector's)
+  // The zone a bubble's lettering lies in: its lines as the analysis sized them and as the detector
+  // boxed them (a coloured line it sized by its dark core, or dropped for having none, is still the
+  // detector's), each grown by a letter.
+  const bubbleZone = (blocks, letter, inside) => {
     const cxIn = (l) => inside(l.x + l.w / 2, l.y + l.h / 2);
     const lines = blocks.flatMap((b) => [b.gbox, b.line, ...(b.lineBoxes || [])]).concat((analysis.lines || []).filter(cxIn)).filter(Boolean);
-    const zone = lines.map((b) => ({ x: b.x - letter, y: b.y - letter, w: b.w + 2 * letter, h: b.h + 2 * letter }));
-    const inZone = (xx, yy) => zone.some((z) => xx >= z.x && xx < z.x + z.w && yy >= z.y && yy < z.y + z.h);
-    // the surface: the interior away from its edge and from the lettering
-    const e = 3, deep = (xx, yy) => inside(xx, yy) && inside(xx - e, yy) && inside(xx + e, yy) && inside(xx, yy - e) && inside(xx, yy + e);
-    const rs = [], gs = [], bs = [];
-    for (let yy = y; yy < y + h; yy += 2) for (let xx = x; xx < x + w; xx += 2) if (deep(xx, yy) && !inZone(xx, yy)) { const p = (yy * W + xx) * 4; rs.push(pix[p]); gs.push(pix[p + 1]); bs.push(pix[p + 2]); }
-    if (rs.length < 50) return;
-    const med = (a) => a.slice().sort((p, q) => p - q)[a.length >> 1];
-    const c = [med(rs), med(gs), med(bs)];
-    let near = 0;
-    for (let i = 0; i < rs.length; i++) if (Math.max(Math.abs(rs[i] - c[0]), Math.abs(gs[i] - c[1]), Math.abs(bs[i] - c[2])) <= COLOUR_PLAIN) near++;
-    if (near < PLAIN_SHARE * rs.length) return; // the surface is not one colour: tone, a gradient, art
-    const m = cv.Mat.zeros(h, w, cv.CV_8UC1), d = m.data;
-    for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) {
-      const X = x + xx, Y = y + yy, p = (Y * W + X) * 4;
-      if (inside(X, Y) && Math.max(Math.abs(pix[p] - c[0]), Math.abs(pix[p + 1] - c[1]), Math.abs(pix[p + 2] - c[2])) > COLOUR_APART) d[yy * w + xx] = 255;
-    }
+    return lines.map((b) => ({ x: b.x - letter, y: b.y - letter, w: b.w + 2 * letter, h: b.h + 2 * letter, v: b.vertical ?? b.h > b.w }));
+  };
+  // Marks of a mask over a bubble's box (`m`, w × h at x, y) that are the bubble's lettering: wholly
+  // inside the interior (never the outline, nor art past it), reaching into the lettering's zone,
+  // and letter-sized — or a stroke as thin as a letter, however long (a stretched long vowel mark,
+  // a wave dash running past the detector's box). Painted into the page's mask.
+  const keepLettering = (m, x, y, w, h, zone, letter, inside, e = 1) => {
     const lab = new cv.Mat(), st = new cv.Mat(), ce = new cv.Mat();
     const n = cv.connectedComponentsWithStats(m, lab, st, ce, 8, cv.CV_32S);
     const S = st.data32S, Lb = lab.data32S, keep = new Uint8Array(n);
     for (let i = 1; i < n; i++) {
       const cx = x + S[i * 5], cy = y + S[i * 5 + 1], cw = S[i * 5 + 2], ch = S[i * 5 + 3];
       // not a letter (a drawing) — but a long stroke as thin as one is: a stretched long vowel mark
-      if ((cw > 3 * letter || ch > 3 * letter) && !(Math.min(cw, ch) <= 1.2 * letter && Math.max(cw, ch) <= 0.9 * Math.max(w, h))) continue;
-      // wholly inside: the corners of its box, a pixel in from each, on the interior
-      if (!(inside(cx - 1, cy - 1) && inside(cx + cw, cy - 1) && inside(cx - 1, cy + ch) && inside(cx + cw, cy + ch))) continue;
-      if (!zone.some((z) => cx < z.x + z.w && cx + cw > z.x && cy < z.y + z.h && cy + ch > z.y)) continue;
+      const long = cw > 3 * letter || ch > 3 * letter;
+      if (long && !(Math.min(cw, ch) <= 1.2 * letter && Math.max(cw, ch) <= 0.9 * Math.max(w, h))) continue;
+      // wholly inside: the corners of its box, `e` pixels in from each, on the interior
+      if (!(inside(cx - e, cy - e) && inside(cx + cw - 1 + e, cy - e) && inside(cx - e, cy + ch - 1 + e) && inside(cx + cw - 1 + e, cy + ch - 1 + e))) continue;
+      // in the lettering's zone; a long stroke within one line's band, along it (the line's own
+      // long vowel mark run past its box, never an arc of the outline that the zone reaches)
+      if (long ? !zone.some((z) => (z.v ? ch > cw && cx >= z.x && cx + cw <= z.x + z.w : cw > ch && cy >= z.y && cy + ch <= z.y + z.h))
+        : !zone.some((z) => cx < z.x + z.w && cx + cw > z.x && cy < z.y + z.h && cy + ch > z.y)) continue;
       keep[i] = 1; extend(cx, cy, cx + cw, cy + ch);
     }
     for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) { const l = Lb[yy * w + xx]; if (l && keep[l]) md[(y + yy) * W + x + xx] = 255; }
-    m.delete(); lab.delete(); st.delete(); ce.delete();
+    lab.delete(); st.delete(); ce.delete();
+  };
+
+  // A bubble's surface colour when it is plain (the interior away from its edge and from the
+  // lettering, nearly all one colour), else null: tone, a gradient, or art taken for a bubble.
+  const plainSurface = (r, zone, inside) => {
+    const { x, y, w, h } = r.box;
+    const inZone = (xx, yy) => zone.some((z) => xx >= z.x && xx < z.x + z.w && yy >= z.y && yy < z.y + z.h);
+    const e = 3, deep = (xx, yy) => inside(xx, yy) && inside(xx - e, yy) && inside(xx + e, yy) && inside(xx, yy - e) && inside(xx, yy + e);
+    const rs = [], gs = [], bs = [];
+    for (let yy = y; yy < y + h; yy += 2) for (let xx = x; xx < x + w; xx += 2) if (deep(xx, yy) && !inZone(xx, yy)) { const p = (yy * W + xx) * 4; rs.push(pix[p]); gs.push(pix[p + 1]); bs.push(pix[p + 2]); }
+    if (rs.length < 50) return null;
+    const med = (a) => a.slice().sort((p, q) => p - q)[a.length >> 1];
+    const c = [med(rs), med(gs), med(bs)];
+    let near = 0;
+    for (let i = 0; i < rs.length; i++) if (Math.max(Math.abs(rs[i] - c[0]), Math.abs(gs[i] - c[1]), Math.abs(bs[i] - c[2])) <= COLOUR_PLAIN) near++;
+    return near >= PLAIN_SHARE * rs.length ? c : null;
+  };
+
+  // In a bubble with a plain surface: whatever stands out from the surface near the lettering, in
+  // marks wholly inside the interior. The text detector finds a line of coloured (or faint) lettering,
+  // but the analysis sizes it by its dark ink, which in a blue or orange letter is a thin core; this
+  // takes the whole letter. Marks touching the interior's edge (the outline) and specks far from the
+  // text (decoration) stay.
+  const paintBubbleColour = (r, blocks, letter, inside) => {
+    const { x, y, w, h } = r.box;
+    if (w < 4 || h < 4) return;
+    const zone = bubbleZone(blocks, letter, inside), c = plainSurface(r, zone, inside);
+    if (!c) return; // the surface is not one colour: tone, a gradient, art
+    const m = cv.Mat.zeros(h, w, cv.CV_8UC1), d = m.data;
+    for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) {
+      const X = x + xx, Y = y + yy, p = (Y * W + X) * 4;
+      if (inside(X, Y) && Math.max(Math.abs(pix[p] - c[0]), Math.abs(pix[p + 1] - c[1]), Math.abs(pix[p + 2] - c[2])) > COLOUR_APART) d[yy * w + xx] = 255;
+    }
+    keepLettering(m, x, y, w, h, zone, letter, inside);
+    m.delete();
+  };
+
+  // In any bubble: the lettering's own ink (its polarity's mask), by the same rule. A detected line
+  // is erased within a window around its box, and a mark running past the window (a long dash, a
+  // wave dash, the tail of a column the detector stopped short of) was taken for art and left, the
+  // part of the line most often still seen after erasing on researcher-marked pages (2.14.2).
+  // Only in a plain bubble, where every mark near the lettering is lettering: a "bubble" over art (a
+  // title over foliage the bubble model took for one) holds strokes of the art in its zone.
+  const paintBubbleInk = (P, r, blocks, letter, inside) => {
+    const { x, y, w, h } = r.box;
+    if (w < 4 || h < 4 || !P) return;
+    const zone = bubbleZone(blocks, letter, inside);
+    if (!plainSurface(r, zone, inside)) return;
+    // its own ink only that far from the interior's edge which the outline's would be (an interior
+    // drawn a little past the outline holds pieces of it)
+    const roi = P.inkMask.roi(new cv.Rect(x, y, w, h));
+    keepLettering(roi, x, y, w, h, zone, letter, inside, Math.max(3, Math.round(0.3 * letter)));
+    roi.delete();
   };
 
   // A bubble the segmentation model found but the text detector left empty: the
@@ -220,12 +279,11 @@ export function erase(cv, img, analysis, regionIds, opts = {}) {
         // the paragraph's whole box: lines chained across a picture make a box that holds the art
         // between them, and every small stroke in it would pass for lettering.
         for (const b of blocks) {
-          pols.forEach((P, k) => {
-            if (r.kind !== "bubble" && b.parts) b.parts.forEach((g, i) => paintTextBox(P, { ...b, gbox: g, line: b.lineBoxes?.[i], adopted: !!b.lineAdopted?.[i] }, b.lineLetters?.[i] || b.letter || letter, null, k === 0));
-            else paintTextBox(P, b, b.letter || letter, inside, k === 0);
-          });
+          if (r.kind !== "bubble" && b.parts) b.parts.forEach((g, i) => paintTextBox(pols, { ...b, gbox: g, line: b.lineBoxes?.[i], adopted: !!b.lineAdopted?.[i] }, b.lineLetters?.[i] || b.letter || letter, null, true));
+          else paintTextBox(pols, b, b.letter || letter, inside, true);
         }
         if (inside) {
+          pols.forEach((P) => paintBubbleInk(P, r, blocks, letter, inside));
           paintBubbleColour(r, blocks, letter, inside);
           // and along each of the detector's lines in the bubble, its window's own surround: a
           // coloured line the analysis sized by its dark core (or dropped) is read whole there,
