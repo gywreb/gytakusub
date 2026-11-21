@@ -100,7 +100,7 @@ western comic images. It is not part of Gytakusub.
 - **Textured areas are filled by Telea**, not by the inpainting models the extension runs (AOT on
   the CPU, LaMa on a graphics card). Art damage and the look of fills over art are worse here than
   in use. `--fill aot` fills them as on the CPU: on printed and slanted lettering it cut art damage
-  by 15 to 25%, at four to six times the time. Most of the damage that remains there is the
+  by 13 to 26% (three pages), at four to six times the time. Most of the damage that remains there is the
   eraser's mask, which takes a line's whole box over tone or an object's surface, not only its
   letters; any fill then changes those pixels.
 - **"Set under 0.7 of its size" counts lines the bubble can't hold at that size.** English runs 2.3

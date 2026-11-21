@@ -21,7 +21,7 @@ The second step of 3.0: the bench now says where text size is lost, stage by sta
     - art damage +7%.
 
     The measure and the eraser's growth have to change together, the growth following the outline's own thickness. That is now part of 3.0.
-- **Art damage on printed and slanted lettering is mostly the eraser's mask.** Over tone or an object's surface, the mask takes the line's whole box, not only its letters, so any fill changes those pixels. Filled by the model the extension runs on the CPU (`--fill aot`, new in both bench scripts) instead of Telea, the damage fell by 15–25% on three such pages, at four to six times the time.
+- **Art damage on printed and slanted lettering is mostly the eraser's mask.** Over tone or an object's surface, the mask takes the line's whole box, not only its letters, so any fill changes those pixels. Filled by the model the extension runs on the CPU (`--fill aot`, new in both bench scripts) instead of Telea, the damage fell by 13–26% on three such pages, at four to six times the time.
 - **QUALITY.md now counts the whole looked-at half of the real pages**: 321 pages, up from 176. The held-out numbers are unchanged.
 
 ## [2.14.3] — 2026-11-22
