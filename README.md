@@ -1,6 +1,5 @@
 # Gytakusub
 
-[![Latest release](https://img.shields.io/github/v/release/gywreb/gytakusub?label=release)](https://github.com/gywreb/gytakusub/releases/latest)
 [![Tests](https://github.com/gywreb/gytakusub/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/gywreb/gytakusub/actions/workflows/test.yml)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 
@@ -39,7 +38,7 @@ Gytakusub finds the text and the speech bubbles on a page, asks Claude to transl
 - **On your phone too.** The web app translates screenshots, or a whole chapter from a link through a free fetcher you run on your own Cloudflare account.
 - **Analysed on your device.** Text and bubbles are found in your browser, on the graphics card when there is one. Only the page image goes to Claude.
 
-![The same screentone bubble and narration erased by the old eraser (white clouds) and by the current one (continued screentone)](docs/media/erasing.png)
+![A screentone bubble and a caption before and after erasing: the screentone continues where the letters were](docs/media/erasing.png)
 
 ## Screenshots
 
@@ -168,7 +167,7 @@ Load `extension/` unpacked to try your changes. The web app is `web/`, a static 
 
 ## Contributing
 
-Pull requests are welcome. Every pull request carries a version and a changelog entry, shows screenshots when it changes what people see, and passes the tests. The details are in [`CONTRIBUTING.md`](CONTRIBUTING.md). Gytakusub is maintained by [@gywreb](https://github.com/gywreb), who reviews and merges every change.
+Pull requests are welcome. [`CONTRIBUTING.md`](CONTRIBUTING.md) has what a pull request needs (tests, a changelog entry, screenshots when it changes what people see). Gytakusub is maintained by [@gywreb](https://github.com/gywreb), who reviews and merges every change.
 
 ## Security
 
@@ -189,4 +188,4 @@ The quality measurements run on the maintainer's machine and use:
 
 ## License
 
-[AGPL-3.0-only](LICENSE) © 2026 gywreb. Versions up to and including 1.1.0 were released under the MIT License. Bundled components keep their own licences ([`THIRD_PARTY.md`](THIRD_PARTY.md)).
+[AGPL-3.0-only](LICENSE) © 2026 gywreb. Bundled components keep their own licences ([`THIRD_PARTY.md`](THIRD_PARTY.md)).
