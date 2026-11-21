@@ -4,6 +4,29 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
 
 ## [Unreleased]
 
+## [2.14.1] — 2026-11-21
+
+Fixes from your Portuguese chapter read with 2.14.0, and text set to the bubble's shape (the start of the 2.14 step's layout goal).
+
+### Pages
+- **A line left as drawn keeps its lettering.** Page 5's "AH..." (given back as drawn) was erased, and its part of the bubble left empty. Claude's box for it lay a few pixels beside the lettering, a piece too small to anchor a translation to, so the two were never matched. A line left as drawn now keeps the piece of lettering its box lies on, or failing that the one nearest it within a letter, among all of the bubble's lettering.
+- **Capitals stacked in a narrow bubble are measured right.** The text detector took "O QUE / QUER / DIZER / COM / ISSO?" for one column, and its width (62 px) was taken for the size of letters 14 px tall. The eraser, which grows by that size, ate into the bubble's outline (grey smudges), and the translation was aimed at it and ran to the outline. A column whose rows of ink are far shorter than it is wide, each with several marks across it, is a stack of rows, and the height of those rows now sets the size. Real columns keep their width, including ones with "…" down them and glyphs made of bars (テ).
+- **Text follows the bubble's shape.** Each line can be as wide as the bubble is at its height, at least a fifth of a letter clear of the outline, instead of all lines keeping to one rectangle inside it. The shape is used where it gives larger text than the rectangle. In ovals the text comes out larger and in fewer lines. On 15 of your reports, lines set under 0.7 of their original size went from 173 to 157 of 1,714 (10.1% → 9.2%), and lines under 12 px on a page 1,000 px wide from 25 to 22. The goal for the 2.14 step is under 3%: most of what is left is English set in Japanese bubbles that are tall and narrow, or in two narrow columns of one bubble (one per line Claude gave).
+- **No extra call to Claude for names with a hyphen or links.** "S-SENPAI?", "P~HAAAH!!", "HARU-CHAN." and "HTTPS://BIT.LY/…" given back as drawn count as one word (no space in them), and stay as drawn straight away. On that chapter they made 5 pages wait for a second call.
+- Measured on 15 of your debug reports (the 14 used for 2.14.0 and the Portuguese chapter, replayed with their saved answers; they stay local): lettering left (40 of 1,690) and translations drawn over unerased lettering unchanged; lines drawn under 0.6 of their original size in bubbles 101 → 91. 582 areas changed. I compared about 140 of them by eye (from 7 of the 15 reports, and every one outside Claude's boxes): in most the text is larger and in fewer lines, and the outline smudges and the empty "AH..." are gone. I found none worse; some ovals now have a single short word on their top line ("I / need to / polish my…"), where the shape narrows.
+
+### Debug report
+- **Lines dropped as sound effects or logos are listed** (`timing.dropped`, with their original and translation). On page 7, "ESTRANHO..." ("Strange...") and on page 8 "Tão num encontro?" ("Are they on a date?") were not translated, and the report couldn't tell whether Claude skipped them or labelled them sound effects. The next report will show which. If it's the label, the prompt is next.
+- Why areas filled ahead were filled again, from your report: all 17 misses were `"area"`. While Claude answers, every piece of lettering found is erased ahead. After the answer, sound effects and lines left as drawn are not erased, so the areas around them differ (my reading of the code; it fits the 10 pages concerned). It costs about 0.2–0.5 s per such area on your graphics card, and that chapter's pages finished in 2 s at most. Left as it is.
+
+### Web app
+- All of the above (same engine, text fitting and prompt).
+
+### Development
+- `layout-score.mjs` fits text as `draw()` does (the shape too); the audit and `layout-score.mjs` replay lines given back as drawn (`same`).
+- The accessibility test shows its page 280 px wide (the narrowest translated) for the readable view: at 330 px the larger text no longer came out under 9 px.
+- Tests: a line left as drawn keeps its small piece of lettering (Claude's box grazing it, or missing it); stacked rows measured as rows, and real columns (square glyphs, glyphs in pieces, an ellipsis, bars) keeping their width; a line's room in an oval row by row; text set to an oval larger than in its rectangle, every line inside; links and hyphenated names as one word; dropped lines listed.
+
 ## [2.14.0] — 2026-11-21
 
 Fixes from the Kamen Rider W chapter read with 2.13.1, and long strips in the web app shown part by part.
