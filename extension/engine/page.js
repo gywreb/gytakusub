@@ -10,10 +10,11 @@ import { detectText, detectInEmptyBubbles, detectInDarkShapes, detectInTranslate
 import { layout, tells } from "./layout.js";
 import { erase, eraseFullSize, fillTexture, contextMargin, NotLoaded } from "./erase.js";
 import { aotInpaint, GPU_SIDE } from "./inpaint.js";
+import { PAGE } from "./tuning.js";
 
 // How far the mask grows over a lettering's outline, as a share of its letter size (ADR 0013).
-export const OUTLINE = 0.3;
-import { sliceGeometry, normalizeItems } from "../prompt.js";
+export const OUTLINE = PAGE.outline;
+import { sliceGeometry, normalizeItems } from "./contract.js";
 
 /**
  * Text lines (and bubbles, with a segmenter) for one slice, then the analysis.
@@ -85,7 +86,7 @@ export async function preparePage(bitmap, settings, opts = {}) {
       for (const r of analysis.regions) r.id = nextId++; // page-wide numbering
       const tagTo = nextId - 1;
       stampMarks(ctx, analysis.regions, cw);
-      const jpeg = await canvas.convertToBlob({ type: "image/jpeg", quality: 0.85 });
+      const jpeg = await canvas.convertToBlob({ type: "image/jpeg", quality: PAGE.jpegQuality });
       const b64 = await blobToBase64(jpeg);
       slices.push({
         // for the model
@@ -361,9 +362,9 @@ async function fullSizePatch(cv, natural, s, scale, mask, r, model, surface, cac
 
 /** Red numbered stamps at the top-left of each text region. */
 export function stampMarks(ctx, regions, cw) {
-  const r = Math.max(9, Math.round(cw / 70));
+  const r = Math.max(PAGE.stampMinPx, Math.round(cw / PAGE.stampDiv));
   ctx.save();
-  ctx.font = `bold ${Math.round(r * 1.25)}px sans-serif`;
+  ctx.font = `bold ${Math.round(r * PAGE.stampFont)}px sans-serif`;
   ctx.textAlign = "center"; ctx.textBaseline = "middle";
   for (const reg of regions) {
     const cx = reg.box.x + r + 1, cy = reg.box.y + r + 1;

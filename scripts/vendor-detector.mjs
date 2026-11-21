@@ -17,6 +17,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { DETECT } from "../extension/engine/tuning.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
@@ -73,7 +74,7 @@ const info = {
   rewrite: "HardSigmoid → Mul/Add/Clip, Erf → tanh form, ReduceMean(H,W) → GlobalAveragePool, MaxPool SAME_UPPER → explicit pads (for OpenCV 4.5 dnn)",
   sourceSha256: sha(src), bytes: bytes.length, sha256: sha(bytes),
   // input size (the page's longest side) and DB post-processing (engine/detect.js): probability threshold, minimum box score, unclip ratio
-  post: { maxSide: 960, thresh: 0.3, boxThresh: 0.5, unclip: 1.6 },
+  post: { maxSide: DETECT.maxSide, thresh: DETECT.thresh, boxThresh: DETECT.boxThresh, unclip: DETECT.unclip }, // from engine/tuning.js
 };
 fs.writeFileSync(path.join(root, "extension", "vendor", "ppocr-det.json"), JSON.stringify(info, null, 2) + "\n");
 console.log(`vendored ${path.basename(file)} as extension/vendor/ppocr-det.onnx (${(bytes.length / 1e6).toFixed(1)} MB, sha256 ${info.sha256.slice(0, 12)}…)`);

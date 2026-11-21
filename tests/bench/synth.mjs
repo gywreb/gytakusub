@@ -34,8 +34,14 @@ function rng(seed) {
 
 const W = 1000, H = 1420;
 
-/** One page: { W, H, script, input, truth, bubbles: [{id, box, inside, outline}], blocks: [...] } */
-export function makePage(seed) {
+/**
+ * One page: { W, H, script, input, truth, bubbles: [{id, box, inside, outline}], blocks: [...] }
+ * opts.printed: also lettering that real chapters showed the bench lacked (a debug report, 2.14.2):
+ * text printed on an object in the art (a sheet of paper, a label, a book cover), tilted, sometimes
+ * white on a dark emblem for part of the line; and free text set at a slant. Drawn from a random
+ * stream of their own, so a seed's other blocks stay as they were without it.
+ */
+export function makePage(seed, opts = {}) {
   const r = rng(seed * 7919 + 17);
   const script = SCRIPTS[seed % SCRIPTS.length];
   const colour = r() < 0.15;
@@ -108,6 +114,8 @@ export function makePage(seed) {
       });
     }
   }
+  const ink2 = createCanvas(W, H), k2 = ink2.getContext("2d"); // printed lettering (light glyphs count too)
+  if (opts.printed) printed(rng(seed * 104729 + 3), { t, k, k2, panels, occupied, blocks, script, vertical, colour });
   // a sound effect over the art (stays as drawn), on a third of the pages
   const sfx = [];
   if (r() < 0.33 && panels.length) {
@@ -120,15 +128,66 @@ export function makePage(seed) {
   }
   // input = truth + the lettering
   const input = createCanvas(W, H), ix = input.getContext("2d");
-  ix.drawImage(truth, 0, 0); ix.drawImage(ink, 0, 0);
-  const inkData = k.getImageData(0, 0, W, H).data;
+  ix.drawImage(truth, 0, 0); ix.drawImage(ink, 0, 0); ix.drawImage(ink2, 0, 0);
+  const inkData = k.getImageData(0, 0, W, H).data, ink2Data = k2.getImageData(0, 0, W, H).data;
   for (const b of blocks) { // each block's pixels: its glyphs (core) and its whole footprint (halo too)
-    const core = [], foot = [];
+    const core = [], foot = [], d = b.printed ? ink2Data : inkData;
     const x0 = Math.max(0, Math.floor(b.box.x - 8)), y0 = Math.max(0, Math.floor(b.box.y - 8)), x1 = Math.min(W, Math.ceil(b.box.x + b.box.w + 8)), y1 = Math.min(H, Math.ceil(b.box.y + b.box.h + 8));
-    for (let yy = y0; yy < y1; yy++) for (let xx = x0; xx < x1; xx++) { const q = yy * W + xx, a = inkData[q * 4 + 3]; if (a > 30) foot.push(q); if (a > 140 && inkData[q * 4] + inkData[q * 4 + 1] + inkData[q * 4 + 2] < 450) core.push(q); }
+    for (let yy = y0; yy < y1; yy++) for (let xx = x0; xx < x1; xx++) { const q = yy * W + xx, a = d[q * 4 + 3]; if (a > 30) foot.push(q); if (a > 140 && (b.printed || d[q * 4] + d[q * 4 + 1] + d[q * 4 + 2] < 450)) core.push(q); }
     b.core = Int32Array.from(core); b.foot = Int32Array.from(foot);
   }
   return { W, H, seed, script, colour, input: ix.getImageData(0, 0, W, H), truth: t.getImageData(0, 0, W, H), bubbles, blocks, kept, sfx };
+}
+
+// ---------- lettering printed on things, and slanted free text (opts.printed) ----------
+function printed(r, { t, k, k2, panels, occupied, blocks, script, vertical, colour }) {
+  const rotBox = (cx, cy, w, h, a) => { const c = Math.abs(Math.cos(a)), s = Math.abs(Math.sin(a)), bw = w * c + h * s, bh = w * s + h * c; return { x: cx - bw / 2, y: cy - bh / 2, w: bw, h: bh }; };
+  const spotFor = (p, w, h) => {
+    for (let tries = 0; tries < 25; tries++) {
+      const cand = { x: p.x + r.range(5, Math.max(6, p.w - w - 5)), y: p.y + r.range(5, Math.max(6, p.h - h - 5)), w, h };
+      if (cand.x + w < p.x + p.w && cand.y + h < p.y + p.h && !occupied.some((o) => overlaps(o, cand, 8))) return cand;
+    }
+    return null;
+  };
+  const printOne = (p) => { // text printed on an object: a sheet, a label, a book cover
+      const a = r() < 0.3 ? 0 : (r() < 0.5 ? -1 : 1) * r.range(0.05, 0.4);
+      const size = Math.round(r.range(12, 24) * (vertical ? 1.1 : 1));
+      const l = lettering(r, script, vertical && r() < 0.5, size, "sign");
+      const pad = size * r.range(0.6, 1.2), ow = l.w + 2 * pad, oh = l.h + 2 * pad;
+      const bb = rotBox(0, 0, ow, oh, a), spot = spotFor(p, bb.w, bb.h);
+      if (!spot) return;
+      occupied.push(spot);
+      const cx = spot.x + spot.w / 2, cy = spot.y + spot.h / 2;
+      // the object, in the art: light paper with a rule or two, its edge drawn
+      t.save(); t.translate(cx, cy); t.rotate(a);
+      t.fillStyle = colour && r() < 0.4 ? r.pick(["#f6ead2", "#e6eef8"]) : r.pick(["#fff", "#f4f1ea", "#ececec"]);
+      t.fillRect(-ow / 2, -oh / 2, ow, oh); t.lineWidth = r.range(1, 2.5); t.strokeStyle = "#222"; t.strokeRect(-ow / 2, -oh / 2, ow, oh);
+      t.strokeStyle = "#999"; t.lineWidth = 1;
+      for (let i = 0, n = r.int(0, 3); i < n; i++) { const yy = -oh / 2 + r.range(0.1, 0.9) * oh; t.beginPath(); t.moveTo(-ow / 2 + 6, yy); t.lineTo(ow / 2 - 6, yy); t.stroke(); }
+      // part of the line white on a dark emblem (a book title over a printed seal)
+      const emblem = r() < 0.35 ? { x: -l.w / 2 - size * 0.3, y: -l.h / 2 - size * 0.3, w: l.w * r.range(0.3, 0.6) + size * 0.3, h: l.h + size * 0.6 } : null;
+      if (emblem) { t.fillStyle = r.pick(["#222", "#3a3a3a", "#1d3f6a"]); t.beginPath(); t.ellipse(emblem.x + emblem.w / 2, emblem.y + emblem.h / 2, emblem.w / 2 + size * 0.2, emblem.h / 2, 0, 0, Math.PI * 2); t.fill(); }
+      t.restore();
+      for (const [c, col, clip] of [[k2, "#151515", null], ...(emblem ? [[k2, "#fff", emblem]] : [])]) {
+        c.save(); c.translate(cx, cy); c.rotate(a);
+        if (clip) { c.beginPath(); c.ellipse(clip.x + clip.w / 2, clip.y + clip.h / 2, clip.w / 2 + size * 0.2, clip.h / 2, 0, 0, Math.PI * 2); c.clip(); }
+        drawLettering(c, l, -l.w / 2, -l.h / 2, col, false);
+        c.restore();
+      }
+      blocks.push({ id: blocks.length, kind: "sign", script, vertical: l.vertical, letter: l.letter, size: l.size, box: rotBox(cx, cy, l.w, l.h, a), text: l.text, bubble: null, two: false, shape: "printed", printed: true, tilt: +a.toFixed(2), emblem: !!emblem });
+  };
+  const slantOne = (p) => { // free text over the art, at a slant
+      const a = (r() < 0.5 ? -1 : 1) * r.range(0.1, 0.4);
+      const size = Math.round(r.range(14, 28));
+      const l = lettering(r, script, false, size, "free");
+      const bb = rotBox(0, 0, l.w + size, l.h + size, a), spot = spotFor(p, bb.w, bb.h);
+      if (!spot) return;
+      occupied.push(spot);
+      const cx = spot.x + spot.w / 2, cy = spot.y + spot.h / 2;
+      k.save(); k.translate(cx, cy); k.rotate(a); drawLettering(k, l, -l.w / 2, -l.h / 2, "#111", true); k.restore();
+      blocks.push({ id: blocks.length, kind: "free", script, vertical: false, letter: l.letter, size: l.size, box: rotBox(cx, cy, l.w, l.h, a), text: l.text, bubble: null, two: false, shape: "slanted", tilt: +a.toFixed(2) });
+  };
+  for (const p of panels) { if (r() < 0.5) printOne(p); if (r() < 0.35) slantOne(p); }
 }
 
 // ---------- art ----------

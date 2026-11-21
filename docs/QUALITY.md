@@ -108,6 +108,14 @@ node bench/report.mjs --real 'bench/runs/m109*.jsonl' --generated 'bench/runs/sy
 `--dump <dir>` writes each looked-at page's render and details for examining failures. A run can
 be stopped and started again: pages already counted are skipped. `--max N` stops after N pages
 (node's memory grows over a long run; a loop that restarts it is in the bench's header).
+`--printed` adds lettering printed on objects and slanted free text to the generated pages.
+
+The numbers the engine decides with are in `extension/engine/tuning.js`. `GYT_TUNE` changes some
+for one run, to see what a result hangs on; a name that is not a tuning value stops the run:
+
+```sh
+GYT_TUNE='{"LAYOUT":{"adoptMaxLetter":5}}' node bench/synth-run.mjs bench/runs/syn-adopt5.jsonl 0 150
+```
 
 Manga109-s is used under its terms, which ask that work using it cite: J. Baek, A. Miyai,
 S. Onohara, H. Ikuta, K. Aizawa, *Manga109-v2026: Revisiting Manga109 Annotations for Modern Manga

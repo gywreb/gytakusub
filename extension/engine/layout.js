@@ -16,6 +16,8 @@
 // art, a line it dropped) becomes text to erase when a translated line's box
 // holds it — the two together are evidence neither is alone (adoptLettering).
 
+import { LAYOUT } from "./tuning.js";
+
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 /** Whether a translation says anything in words or numbers (not only punctuation and symbols). */
 export const said = (text) => /[\p{L}\p{N}]/u.test(text);
@@ -55,22 +57,22 @@ export function layout(an, items, opts = {}) {
         // (only a box mostly on that region and little on the stamped one: a box between two
         // regions — loose, as the model's boxes often are around free text — is no evidence)
         const alt = holder(an, px, region);
-        if (alt && overlap(px, alt.box) >= 0.5 * area(px) && overlap(px, region.box) < 0.25 * area(px)) region = alt;
+        if (alt && overlap(px, alt.box) >= LAYOUT.most * area(px) && overlap(px, region.box) < LAYOUT.strayOnStamp * area(px)) region = alt;
         else if (!alt) {
           const off = boxOffset(region.box, px);
           const letters = region.kind === "bubble" ? region.ref.blocks.reduce((n, b) => n + b.glyphCount, 0) : region.ref.glyphCount;
           const ratio = it.text.length / Math.max(1, letters); // translation length vs lettering found (≈1 for a right match)
-          if (off > 1 || (off > 0.5 && (ratio < 0.4 || ratio > 4))) region = null;
+          if (off > LAYOUT.driftFar || (off > LAYOUT.driftNear && (ratio < LAYOUT.lengthLow || ratio > LAYOUT.lengthHigh))) region = null;
         }
       }
     }
     // A shape too narrow for the line (one letter per row) is not where it goes.
-    if (region && region.kind === "bubble" && px && region.box.w < 3 * region.letter && it.text.length > 4) region = null;
+    if (region && region.kind === "bubble" && px && region.box.w < LAYOUT.narrowLetters * region.letter && it.text.length > LAYOUT.narrowChars) region = null;
     if (!region && px) region = nearestRegion(an, px);
     // A distrusted tag is overruled only by a box that points at some other region;
     // a box pointing nowhere (drifted off the shape, clipped at the page edge) is
     // weaker evidence than the stamp, so the stamp stands.
-    if (!region && stamped && !(stamped.kind === "bubble" && stamped.box.w < 3 * stamped.letter && it.text.length > 4)) region = stamped;
+    if (!region && stamped && !(stamped.kind === "bubble" && stamped.box.w < LAYOUT.narrowLetters * stamped.letter && it.text.length > LAYOUT.narrowChars)) region = stamped;
     if (region) (groups.get(region.id) || groups.set(region.id, []).get(region.id)).push({ it, px });
     else if (px) loose.push({ it, px });
   }
@@ -90,7 +92,7 @@ export function layout(an, items, opts = {}) {
     if (!tells(m.it) || !m.px) continue;
     for (const q of an.regions) {
       if (q.kind === "bubble" || groups.has(q.id) || named.has(q.id) || claimed.has(q.id)) continue;
-      if (overlap(q.box, m.px) >= 0.5 * area(q.box)) claimed.set(q.id, id);
+      if (overlap(q.box, m.px) >= LAYOUT.most * area(q.box)) claimed.set(q.id, id);
     }
   }
 
@@ -107,7 +109,7 @@ export function layout(an, items, opts = {}) {
       // The lettering to anchor to: the bubble's text blocks, minus specks (a row
       // of tone dots the detector read as a 4 px line next to the real text).
       const blocks = r.ref.blocks, biggest = Math.max(...blocks.map((b) => area(b.gbox)));
-      let lettering = blocks.filter((b) => b.letter >= 0.5 * letter && area(b.gbox) >= 0.1 * biggest);
+      let lettering = blocks.filter((b) => b.letter >= LAYOUT.anchorLetter * letter && area(b.gbox) >= LAYOUT.anchorArea * biggest);
       if (!lettering.length) lettering = blocks;
       // A line left as drawn keeps the block of lettering its box lies on (the largest share of
       // a block under the box), else the block nearest it within a letter, else its own box in the
@@ -129,19 +131,19 @@ export function layout(an, items, opts = {}) {
       const anchoredToLettering = anchors.map((a) => a.fromLettering === true);
       // Smaller regions lying within this shape are never written over: the
       // bubbles inside a light background that passed as a bubble, say.
-      const foreign = an.regions.filter((q) => q.id !== id && area(q.box) < area(bbox) && overlap(q.box, bbox) >= 0.5 * area(q.box)).map((q) => grow(q.box, letter * 0.3));
+      const foreign = an.regions.filter((q) => q.id !== id && area(q.box) < area(bbox) && overlap(q.box, bbox) >= LAYOUT.most * area(q.box)).map((q) => grow(q.box, letter * LAYOUT.keepClear));
       told.forEach((m, i) => {
         const a = anchors[i];
         // off limits: the other speakers' lettering, and everything past the cut
         // between the two (the waist of a joined bubble, else midway between them),
         // and lettering left as drawn
-        const others = [...foreign, ...kept.map((k) => grow(k, letter * 0.3))];
-        anchors.forEach((o, j) => { if (j !== i) others.push(grow(o, letter * 0.5), beyondCut(inside, bbox, a, o)); });
-        const slack = Math.max(1.5 * letter, 0.15 * Math.min(bbox.w, bbox.h));
+        const others = [...foreign, ...kept.map((k) => grow(k, letter * LAYOUT.keepClear))];
+        anchors.forEach((o, j) => { if (j !== i) others.push(grow(o, letter * LAYOUT.speakerClear), beyondCut(inside, bbox, a, o)); });
+        const slack = Math.max(LAYOUT.slackLetters * letter, LAYOUT.slackShare * Math.min(bbox.w, bbox.h));
         let rect = inscribedRect(inside, bbox, { anchor: a, exclude: others, slack })
           || inscribedRect(inside, bbox, { exclude: others })
           || inscribedRect(inside, bbox)
-          || inset(bbox, 0.78);
+          || inset(bbox, LAYOUT.fallbackInset);
         // Invariant: the translation never gets less room than the lettering it
         // replaces — that area is erased and is, by definition, inside the bubble.
         // Whatever the shape analysis got wrong, the text cannot come out smaller
@@ -149,24 +151,24 @@ export function layout(an, items, opts = {}) {
         if (anchoredToLettering[i]) rect = union([rect, clip(a, bbox)]);
         // The room row by row, for text.js to set each line as wide as the bubble is there: a
         // rectangle in an oval leaves its widest rows unused, and the text came out small (2.14.1).
-        const own = anchoredToLettering[i] ? lettering.filter((b) => overlap(b.gbox, a) >= 0.5 * area(b.gbox)).map((b) => b.gbox) : [];
-        const shape = roomShape(inside, bbox, rect, own, others, Math.max(2, 0.2 * letter));
+        const own = anchoredToLettering[i] ? lettering.filter((b) => overlap(b.gbox, a) >= LAYOUT.most * area(b.gbox)).map((b) => b.gbox) : [];
+        const shape = roomShape(inside, bbox, rect, own, others, Math.max(LAYOUT.edgeMinPx, LAYOUT.edgeLetters * letter));
         placements.push({ text: m.it.text, size: m.it.size, rect, letter, color, halo: false, tag: id, item: m.it.index ?? null, ...(shape ? { shape } : {}) });
       });
       r.kept = kept.length ? kept : null;
     } else {
       // Free text block: the translation takes the block's own footprint, with
       // a little room, and is drawn with a halo since it sits on artwork.
-      const b = r.box, pad = letter * 0.5;
+      const b = r.box, pad = letter * LAYOUT.freePad;
       let rect = clampRect({ x: b.x - pad, y: b.y - pad, w: b.w + 2 * pad, h: b.h + 2 * pad }, W, H);
       // Lettering set in a column or two: the translation runs in rows and needs
       // a width the column does not have. Widen it about its centre (to 0.6 of its
       // height) as far as the other regions and the page allow.
-      if (r.ref.vertical && rect.h > 1.7 * rect.w) {
+      if (r.ref.vertical && rect.h > LAYOUT.columnTall * rect.w) {
         const others = an.regions.filter((q) => q.id !== id).map((q) => q.box);
-        for (const f of [1, 0.75, 0.5, 0.25]) {
-          const w = rect.w + (0.6 * rect.h - rect.w) * f, cand = clampRect({ x: rect.x + rect.w / 2 - w / 2, y: rect.y, w, h: rect.h }, W, H);
-          if (!others.some((o) => overlap(o, cand) > 0.05 * Math.min(area(o), area(cand)))) { rect = cand; break; }
+        for (const f of LAYOUT.widenTries) {
+          const w = rect.w + (LAYOUT.columnWidth * rect.h - rect.w) * f, cand = clampRect({ x: rect.x + rect.w / 2 - w / 2, y: rect.y, w, h: rect.h }, W, H);
+          if (!others.some((o) => overlap(o, cand) > LAYOUT.widenClash * Math.min(area(o), area(cand)))) { rect = cand; break; }
         }
       }
       const told = members.filter((m) => tells(m.it));
@@ -202,7 +204,7 @@ export function roomShape(inside, bbox, rect, own, exclude, edge = 0) {
   if (!inside) return null;
   const cx = rect.x + rect.w / 2;
   const ok = (x, y) => (inside(x, y) || own.some((b) => inBox(b, x, y))) && !exclude.some((e) => inBox(e, x, y));
-  const step = Math.max(1, Math.round(Math.min(bbox.w, bbox.h) / 100));
+  const step = Math.max(1, Math.round(Math.min(bbox.w, bbox.h) / LAYOUT.shapeRows));
   const y0 = Math.floor(bbox.y), reach = Math.ceil(bbox.w);
   const half = [];
   for (let y = y0; y < bbox.y + bbox.h; y += step) {
@@ -224,7 +226,7 @@ export function roomShape(inside, bbox, rect, own, exclude, edge = 0) {
 const gap = (a, b) => Math.max(0, Math.max(a.x, b.x) - Math.min(a.x + a.w, b.x + b.w), Math.max(a.y, b.y) - Math.min(a.y + a.h, b.y + b.h));
 const overlap = (a, b) => Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
 
-const ADOPT_MAX_LETTER = 4; // a shout runs to three or four times the dialogue size; a drawn sound effect beyond
+// (LAYOUT.adoptMaxLetter, tuning.js: a shout runs to three or four times the dialogue size; a drawn sound effect beyond)
 
 /**
  * Lettering the analysis set aside, which a translated line's box vouches for. The analysis drops
@@ -235,7 +237,7 @@ const ADOPT_MAX_LETTER = 4; // a shout runs to three or four times the dialogue 
  * erase: added to the free-text region the line was tagged to (the rest of a title the detector
  * cut in two), or as a region of its own for an untagged line (text the analysis never offered).
  * A line in a bubble takes nothing: a bubble's lettering is its own, and a loose box around it
- * must not reach the narration beside it. Lettering over ADOPT_MAX_LETTER times the dialogue size
+ * must not reach the narration beside it. Lettering over LAYOUT.adoptMaxLetter times the dialogue size
  * (a sound effect drawn as art, which Claude is asked to leave alone) is never taken.
  * Adds to `an.regions` (and widens free-text regions there) in place.
  */
@@ -245,26 +247,26 @@ export function adoptLettering(an, items, newId) {
   const byId = new Map(an.regions.map((r) => [r.id, r]));
   let next = Math.max(0, ...an.regions.map((r) => r.id)) + 1;
   const fresh = newId || (() => next++);
-  const held = (b) => an.regions.some((r) => overlap(r.box, b) > 0.5 * area(b)); // already some region's
+  const held = (b) => an.regions.some((r) => overlap(r.box, b) > LAYOUT.most * area(b)); // already some region's
   // set-aside paragraphs, line by line (the lines of one paragraph may be several translated
   // lines: a block of credits), then detector lines no paragraph came from
   const pool = [];
   for (const p of an.blocks) {
     // (not lines the analysis guessed by slicing one tall box into three or more, then judged not
     // lettering: a logo or a drawing read as a stack of lines — two signals against one loose box)
-    if (p.bubble || p.region != null || (p.score ?? 1) < 0.6 || (p.pieces || 1) >= 3) continue;
+    if (p.bubble || p.region != null || (p.score ?? 1) < LAYOUT.adoptScore || (p.pieces || 1) >= LAYOUT.adoptPieces) continue;
     const parts = p.parts || [p.gbox];
     parts.forEach((g, i) => {
       if (held(g)) return;
       const letter = p.lineLetters?.[i] || p.letter, line = p.lineBoxes?.[i] || (p.parts ? g : p.line || g);
-      pool.push({ ...p, box: { ...g }, gbox: { ...g }, parts: [g], lineLetters: [letter], lineBoxes: [line], line, letter, glyphCount: Math.max(1, Math.round((p.vertical ? g.h : g.w) / Math.max(1, p.vertical ? letter : 0.6 * letter))) });
+      pool.push({ ...p, box: { ...g }, gbox: { ...g }, parts: [g], lineLetters: [letter], lineBoxes: [line], line, letter, glyphCount: Math.max(1, Math.round((p.vertical ? g.h : g.w) / Math.max(1, p.vertical ? letter : LAYOUT.glyphWidth * letter))) });
     });
   }
   for (const l of an.lines || []) {
     // (a line the second look found on Claude's box, zoomed in, at the detector's own threshold)
-    if ((l.score ?? 1) < (l.second ? 0.5 : 0.7) || an.blocks.some((p) => overlap(p.gbox, l) > 0.5 * area(l)) || held(l)) continue;
+    if ((l.score ?? 1) < (l.second ? LAYOUT.secondLookScore : LAYOUT.lineScore) || an.blocks.some((p) => overlap(p.gbox, l) > LAYOUT.most * area(l)) || held(l)) continue;
     const box = { x: Math.round(l.x), y: Math.round(l.y), w: Math.round(l.w), h: Math.round(l.h) };
-    const letter = Math.max(4, 0.85 * (l.vertical ? box.w : box.h));
+    const letter = Math.max(LAYOUT.minLetterPx, LAYOUT.lineLetter * (l.vertical ? box.w : box.h));
     // polarity unknown (no grey contrast): erase.js reads the lettering against its surround
     pool.push({ box, gbox: { ...box }, parts: [{ ...box }], lineBoxes: [{ ...box }], letter, lineLetters: [letter], vertical: !!l.vertical, dark: null, score: l.score, glyphCount: Math.max(1, Math.round((l.vertical ? box.h : box.w) / letter)), lines: 1, glyphs: [] });
   }
@@ -272,15 +274,15 @@ export function adoptLettering(an, items, newId) {
   // each piece of lettering goes to the one line whose box holds it best (several boxes may reach
   // it: the model's boxes run loose, and a long caption's box can reach the credits beside it)
   const boxes = items.map((it) => (it.text && it.box ? { x: it.box[0] * W, y: it.box[1] * H, w: it.box[2] * W, h: it.box[3] * H } : null));
-  const zones = boxes.map((px) => px && grow({ x: px.x - 0.1 * px.w, y: px.y - 0.1 * px.h, w: 1.2 * px.w, h: 1.2 * px.h }, 0.5 * an.letter));
+  const zones = boxes.map((px) => px && grow({ x: px.x - LAYOUT.adoptZone * px.w, y: px.y - LAYOUT.adoptZone * px.h, w: (1 + 2 * LAYOUT.adoptZone) * px.w, h: (1 + 2 * LAYOUT.adoptZone) * px.h }, LAYOUT.adoptZoneLetters * an.letter));
   const owner = new Map(); // pool entry → item index
   for (const p of pool) {
-    if (p.letter > ADOPT_MAX_LETTER * an.letter) continue;
+    if (p.letter > LAYOUT.adoptMaxLetter * an.letter) continue;
     let best = -1, bestFit = 0;
     boxes.forEach((px, k) => {
       // the lettering inside the box (with some slack), or the box on the lettering's core: a tight
       // box round big lettering covers a part of it only (not more than a quarter, though)
-      if (!px || (overlap(p.gbox, zones[k]) < 0.7 * area(p.gbox) && !(overlap(p.gbox, px) >= 0.8 * area(px) && area(p.gbox) <= 4 * area(px)))) return;
+      if (!px || (overlap(p.gbox, zones[k]) < LAYOUT.adoptInside * area(p.gbox) && !(overlap(p.gbox, px) >= LAYOUT.adoptCore * area(px) && area(p.gbox) <= LAYOUT.adoptCoreMax * area(px)))) return;
       // the overlap against both sizes: a tight box round the lettering beats a long one reaching it
       const fit = overlap(p.gbox, px) / Math.sqrt(area(p.gbox) * area(px));
       if (best < 0 || fit > bestFit) { best = k; bestFit = fit; }
@@ -317,7 +319,7 @@ export function adoptLettering(an, items, newId) {
     const all = picks.flatMap(lines), box = union(picks.map((p) => p.gbox));
     // a sliver of a large box (a corner of a title whose rest could not be taken) is not the line's
     // lettering: the translation would shrink into it while the rest stays
-    if (overlap(box, px) < 0.25 * Math.sqrt(area(box) * area(px))) continue;
+    if (overlap(box, px) < LAYOUT.adoptSliver * Math.sqrt(area(box) * area(px))) continue;
     const letter = Math.max(...picks.map((p) => p.letter)), dark = picks.every((p) => p.dark === picks[0].dark) ? picks[0].dark : null;
     const ref = { ...picks[0], gbox: box, box, parts: all.map((l) => l.g), lineLetters: all.map((l) => l.letter), lineBoxes: all.map((l) => l.line), lineAdopted: all.map(() => true), letter, dark, vertical: picks.every((p) => p.vertical), glyphCount: picks.reduce((n, p) => n + (p.glyphCount || 0), 0), adopted: true };
     const r = { id: fresh(), kind: "block", ref, box, letter, dark, adopted: true };
@@ -352,7 +354,7 @@ function shareStamp(an, groups) {
         const o = on(m.px, q);
         if (o > most) { most = o; best = q; }
       }
-      if (best && most > own[i] && most >= 0.1 * area(m.px)) moves.push({ m, from: members, to: best });
+      if (best && most > own[i] && most >= LAYOUT.moveMin * area(m.px)) moves.push({ m, from: members, to: best });
     });
   }
   for (const { m, from, to } of moves) {
@@ -370,7 +372,7 @@ function shapeHolds(an, r, x, y) {
 }
 
 /** Whether a region is big enough to hold the text the model boxed (a speck of a region never is). */
-const canHold = (r, px) => area(r.box) >= 0.25 * area(px);
+const canHold = (r, px) => area(r.box) >= LAYOUT.canHold * area(px);
 
 /** The smallest region other than `not` whose shape holds the box's centre, if any. */
 function holder(an, px, not) {
@@ -392,10 +394,10 @@ function nearestRegion(an, px) {
   let best = null, bestScore = 0;
   for (const r of an.regions) {
     if (!canHold(r, px)) continue;
-    const score = overlap(px, r.box) / Math.max(1, area(px)) + (shapeHolds(an, r, cx, cy) ? 0.5 : 0);
+    const score = overlap(px, r.box) / Math.max(1, area(px)) + (shapeHolds(an, r, cx, cy) ? LAYOUT.shapeBonus : 0);
     if (score > bestScore + 1e-6 || (Math.abs(score - bestScore) <= 1e-6 && best && area(r.box) < area(best.box))) { bestScore = score; best = r; }
   }
-  return bestScore >= 0.5 ? best : null;
+  return bestScore >= LAYOUT.holderScore ? best : null;
 }
 
 /**
@@ -439,7 +441,7 @@ function shareBlocks(anchors, members) {
     if (anchors[i] || !m.px) return;
     let best = null, most = 0;
     for (const g of anchors) if (g && g.fromLettering) { const o = overlap(m.px, g); if (o > most) { most = o; best = g; } }
-    if (!best || most < 0.3 * area(m.px)) return;
+    if (!best || most < LAYOUT.joinShare * area(m.px)) return;
     if (!groups.has(best)) groups.set(best, [anchors.indexOf(best)]);
     groups.get(best).push(i);
   });
@@ -447,7 +449,7 @@ function shareBlocks(anchors, members) {
     const across = g.vertical ? "x" : "y", len = g.vertical ? "w" : "h";
     const at = (i) => members[i].px[across] + members[i].px[len] / 2;
     idx.sort((a, b) => at(a) - at(b));
-    const lo = g[across], hi = g[across] + g[len], margin = 0.1 * g[len];
+    const lo = g[across], hi = g[across] + g[len], margin = LAYOUT.cutMargin * g[len];
     let start = lo;
     // the cut: midway between the two boxes' facing edges (between their centres if they overlap)
     const cut = (a, b) => { const pa = members[a].px, pb = members[b].px, e = pa[across] + pa[len], f = pb[across]; return e <= f ? (e + f) / 2 : (at(a) + at(b)) / 2; };
@@ -485,19 +487,19 @@ export function beyondCut(inside, bbox, mine, other) {
 
 /** Row (or column) between lo and hi where the shape is clearly narrowest — a joined bubble's waist — or null when there is none. */
 export function waist(inside, bbox, lo, hi, rows) {
-  if (hi - lo < 6) return null;
-  const step = Math.max(1, Math.round((hi - lo) / 40)), cross = Math.max(1, Math.round((rows ? bbox.w : bbox.h) / 80));
+  if (hi - lo < LAYOUT.waistMinPx) return null;
+  const step = Math.max(1, Math.round((hi - lo) / LAYOUT.waistRows)), cross = Math.max(1, Math.round((rows ? bbox.w : bbox.h) / LAYOUT.waistCross));
   const width = (p) => { let n = 0; if (rows) { for (let x = bbox.x; x < bbox.x + bbox.w; x += cross) if (inside(x, p)) n++; } else { for (let y = bbox.y; y < bbox.y + bbox.h; y += cross) if (inside(p, y)) n++; } return n; };
   let best = null, bestW = Infinity;
   for (let p = lo; p <= hi; p += step) { const w = width(p); if (w < bestW) { bestW = w; best = p; } }
   const ends = Math.min(width(lo), width(hi));
-  return ends > 0 && bestW < 0.8 * ends ? best : null;
+  return ends > 0 && bestW < LAYOUT.waistNarrow * ends ? best : null;
 }
 
 function inset(b, k) { return { x: b.x + b.w * (1 - k) / 2, y: b.y + b.h * (1 - k) / 2, w: b.w * k, h: b.h * k }; }
 function clampRect(r, W, H) {
   const x = clamp(r.x, 0, W - 1), y = clamp(r.y, 0, H - 1);
-  return { x, y, w: clamp(r.w, 4, W - x), h: clamp(r.h, 4, H - y) };
+  return { x, y, w: clamp(r.w, LAYOUT.minRectPx, W - x), h: clamp(r.h, LAYOUT.minRectPx, H - y) };
 }
 
 /**
@@ -525,7 +527,7 @@ export function inscribedRect(inside, bbox, opts = {}) {
     const hw = Math.min(cx - x0, x1 - cx), hh = Math.min(cy - y0, y1 - cy);
     return { x: cx - hw, y: cy - hh, w: 2 * hw, h: 2 * hh };
   };
-  const step = Math.max(1, Math.round(Math.min(bbox.w, bbox.h) / 60));
+  const step = Math.max(1, Math.round(Math.min(bbox.w, bbox.h) / LAYOUT.rectRows));
   const ok = (x, y) => inside(x, y) && !exclude.some((e) => inBox(e, x, y));
   const rows = [];
   for (let y = Math.ceil(bbox.y); y < bbox.y + bbox.h; y += step) {
@@ -564,7 +566,7 @@ export function inscribedRect(inside, bbox, opts = {}) {
     }
   }
   if (!bestRect) return null;
-  return inset(bestRect, 0.92); // letters should not kiss the outline
+  return inset(bestRect, LAYOUT.airInset); // letters should not kiss the outline
 }
 
 /** Trim overlapping rectangles on the facing sides so no two texts share pixels. */
@@ -580,7 +582,7 @@ function separate(placements) {
     } else {
       if (a.y + a.h / 2 < b.y + b.h / 2) { a.h -= dy; b.y += dy; b.h -= dy; } else { b.h -= dy; a.y += dy; a.h -= dy; }
     }
-    a.w = Math.max(8, a.w); a.h = Math.max(8, a.h); b.w = Math.max(8, b.w); b.h = Math.max(8, b.h);
+    a.w = Math.max(LAYOUT.minSplitPx, a.w); a.h = Math.max(LAYOUT.minSplitPx, a.h); b.w = Math.max(LAYOUT.minSplitPx, b.w); b.h = Math.max(LAYOUT.minSplitPx, b.h);
   }
 }
 

@@ -1,14 +1,15 @@
 import { aotInpaint, contextWindow } from "./inpaint.js";
 import { latticeFill } from "./tone.js";
+import { ERASE } from "./tuning.js";
 
 // A surround is plain when 9 in 10 of its pixels lie within COLOUR_PLAIN of their median in every
 // channel (JPEG noise and a gentle gradient do; screentone, hatching and art do not); there,
 // lettering is what lies more than COLOUR_APART from it in some channel — black, white, or a
 // coloured letter alike, and well clear of the surround's own spread. Anything less plain keeps
 // to the polarity masks alone.
-const COLOUR_PLAIN = 40, COLOUR_APART = 64, PLAIN_SHARE = 0.9;
+const COLOUR_PLAIN = ERASE.colourPlain, COLOUR_APART = ERASE.colourApart, PLAIN_SHARE = ERASE.plainShare;
 // adopted lettering (layout.js) is erased only when this share of its line's ink is taken
-const ADOPTED_TAKEN = 0.6;
+const ADOPTED_TAKEN = ERASE.adoptedTaken;
 
 /**
  * Telea's neighbourhood (px) for an area's lettering size: 0.3 letter, 3 at least and TELEA_MAX at
@@ -18,8 +19,8 @@ const ADOPTED_TAKEN = 0.6;
  * always had. On textured areas Telea is the stand-in until fillTexture(), and stays only where
  * no learned model runs.
  */
-export const TELEA_MAX = 6;
-export const teleaRadius = (letter) => Math.min(TELEA_MAX, Math.max(3, Math.round(letter * 0.3)));
+export const TELEA_MAX = ERASE.teleaMax;
+export const teleaRadius = (letter) => Math.min(TELEA_MAX, Math.max(ERASE.teleaMin, Math.round(letter * ERASE.teleaLetters)));
 
 // Removes the original lettering from the regions that received a translation.
 // Inside a bubble: the glyph components (never the outline) are inpainted with
@@ -60,7 +61,7 @@ export function erase(cv, img, analysis, regionIds, opts = {}) {
   const extend = (x0, y0, x1, y1) => { painted = painted ? { x0: Math.min(painted.x0, x0), y0: Math.min(painted.y0, y0), x1: Math.max(painted.x1, x1), y1: Math.max(painted.y1, y1) } : { x0, y0, x1, y1 }; };
   const paintTextBox = (pols, b, letter, inside = null, withColour = true) => {
     pols = (Array.isArray(pols) ? pols : [pols]).filter(Boolean);
-    const across = Math.max(2, Math.round(letter * 0.35)), along = Math.max(3, Math.round(letter * 0.7));
+    const across = Math.max(ERASE.padAcrossMinPx, Math.round(letter * ERASE.padAcross)), along = Math.max(ERASE.padAlongMinPx, Math.round(letter * ERASE.padAlong));
     const padX = b.vertical ? across : along, padY = b.vertical ? along : across;
     const x0 = Math.max(0, b.gbox.x - padX), y0 = Math.max(0, b.gbox.y - padY), x1 = Math.min(W, b.gbox.x + b.gbox.w + padX), y1 = Math.min(H, b.gbox.y + b.gbox.h + padY);
     const w = x1 - x0, h = y1 - y0; if (w < 2 || h < 2) return;
@@ -94,7 +95,7 @@ export function erase(cv, img, analysis, regionIds, opts = {}) {
           // own fill would paint over
           const X0 = x0 + cx, Y0 = y0 + cy;
           if (colour && inside && !(inside(X0 - 1, Y0 - 1) && inside(X0 + cw, Y0 - 1) && inside(X0 - 1, Y0 + ch) && inside(X0 + cw, Y0 + ch))) continue;
-          if (!touches && (b.vertical ? cw : ch) <= 2.5 * letter) { keep[i] = 1; extend(X0, Y0, X0 + cw, Y0 + ch); }
+          if (!touches && (b.vertical ? cw : ch) <= ERASE.markLetters * letter) { keep[i] = 1; extend(X0, Y0, X0 + cw, Y0 + ch); }
         }
         for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) { const l = Lb[yy * w + xx]; if (l && keep[l]) md[(y0 + yy) * W + x0 + xx] = 255; }
         roi.delete(); lab.delete(); st.delete(); ce.delete();
@@ -138,7 +139,7 @@ export function erase(cv, img, analysis, regionIds, opts = {}) {
     const ring = (x, y) => { if (inside && !inside(x, y)) return; const p = (y * W + x) * 4; rs.push(pix[p]); gs.push(pix[p + 1]); bs.push(pix[p + 2]); };
     for (let x = x0; x < x0 + w; x++) for (const y of [y0, y0 + 1, y0 + h - 2, y0 + h - 1]) ring(x, y);
     for (let y = y0 + 2; y < y0 + h - 2; y++) for (const x of [x0, x0 + 1, x0 + w - 2, x0 + w - 1]) ring(x, y);
-    if (rs.length < 24) return null;
+    if (rs.length < ERASE.ringSamples) return null;
     const med = (a) => a.slice().sort((p, q) => p - q)[a.length >> 1];
     const c = [med(rs), med(gs), med(bs)];
     let near = 0;
@@ -176,8 +177,8 @@ export function erase(cv, img, analysis, regionIds, opts = {}) {
     for (let i = 1; i < n; i++) {
       const cx = x + S[i * 5], cy = y + S[i * 5 + 1], cw = S[i * 5 + 2], ch = S[i * 5 + 3];
       // not a letter (a drawing) — but a long stroke as thin as one is: a stretched long vowel mark
-      const long = cw > 3 * letter || ch > 3 * letter;
-      if (long && !(Math.min(cw, ch) <= 1.2 * letter && Math.max(cw, ch) <= 0.9 * Math.max(w, h))) continue;
+      const long = cw > ERASE.longLetters * letter || ch > ERASE.longLetters * letter;
+      if (long && !(Math.min(cw, ch) <= ERASE.strokeLetters * letter && Math.max(cw, ch) <= ERASE.strokeSpan * Math.max(w, h))) continue;
       // wholly inside: the corners of its box, `e` pixels in from each, on the interior
       if (!(inside(cx - e, cy - e) && inside(cx + cw - 1 + e, cy - e) && inside(cx - e, cy + ch - 1 + e) && inside(cx + cw - 1 + e, cy + ch - 1 + e))) continue;
       // in the lettering's zone; a long stroke within one line's band, along it (the line's own
@@ -195,10 +196,10 @@ export function erase(cv, img, analysis, regionIds, opts = {}) {
   const plainSurface = (r, zone, inside) => {
     const { x, y, w, h } = r.box;
     const inZone = (xx, yy) => zone.some((z) => xx >= z.x && xx < z.x + z.w && yy >= z.y && yy < z.y + z.h);
-    const e = 3, deep = (xx, yy) => inside(xx, yy) && inside(xx - e, yy) && inside(xx + e, yy) && inside(xx, yy - e) && inside(xx, yy + e);
+    const e = ERASE.depthPx, deep = (xx, yy) => inside(xx, yy) && inside(xx - e, yy) && inside(xx + e, yy) && inside(xx, yy - e) && inside(xx, yy + e);
     const rs = [], gs = [], bs = [];
     for (let yy = y; yy < y + h; yy += 2) for (let xx = x; xx < x + w; xx += 2) if (deep(xx, yy) && !inZone(xx, yy)) { const p = (yy * W + xx) * 4; rs.push(pix[p]); gs.push(pix[p + 1]); bs.push(pix[p + 2]); }
-    if (rs.length < 50) return null;
+    if (rs.length < ERASE.surfaceSamples) return null;
     const med = (a) => a.slice().sort((p, q) => p - q)[a.length >> 1];
     const c = [med(rs), med(gs), med(bs)];
     let near = 0;
@@ -213,7 +214,7 @@ export function erase(cv, img, analysis, regionIds, opts = {}) {
   // text (decoration) stay.
   const paintBubbleColour = (r, blocks, letter, inside) => {
     const { x, y, w, h } = r.box;
-    if (w < 4 || h < 4) return;
+    if (w < ERASE.minBoxPx || h < ERASE.minBoxPx) return;
     const zone = bubbleZone(blocks, letter, inside), c = plainSurface(r, zone, inside);
     if (!c) return; // the surface is not one colour: tone, a gradient, art
     const m = cv.Mat.zeros(h, w, cv.CV_8UC1), d = m.data;
@@ -233,13 +234,13 @@ export function erase(cv, img, analysis, regionIds, opts = {}) {
   // title over foliage the bubble model took for one) holds strokes of the art in its zone.
   const paintBubbleInk = (P, r, blocks, letter, inside) => {
     const { x, y, w, h } = r.box;
-    if (w < 4 || h < 4 || !P) return;
+    if (w < ERASE.minBoxPx || h < ERASE.minBoxPx || !P) return;
     const zone = bubbleZone(blocks, letter, inside);
     if (!plainSurface(r, zone, inside)) return;
     // its own ink only that far from the interior's edge which the outline's would be (an interior
     // drawn a little past the outline holds pieces of it)
     const roi = P.inkMask.roi(new cv.Rect(x, y, w, h));
-    keepLettering(roi, x, y, w, h, zone, letter, inside, Math.max(3, Math.round(0.3 * letter)));
+    keepLettering(roi, x, y, w, h, zone, letter, inside, Math.max(ERASE.keepDepthMinPx, Math.round(ERASE.keepDepthLetters * letter)));
     roi.delete();
   };
 
@@ -252,7 +253,7 @@ export function erase(cv, img, analysis, regionIds, opts = {}) {
     const S = st.data32S, Lb = lab.data32S, keep = new Uint8Array(n);
     for (let i = 1; i < n; i++) {
       const cx = S[i * 5], cy = S[i * 5 + 1], cw = S[i * 5 + 2], ch = S[i * 5 + 3];
-      if (ch > 3 * letter || cw > 0.9 * w) continue;
+      if (ch > ERASE.longLetters * letter || cw > ERASE.strokeSpan * w) continue;
       // all four corners of the component's box on the mask: it does not touch the outline
       if (m[cy * w + cx] && m[cy * w + Math.min(w - 1, cx + cw)] && m[Math.min(h - 1, cy + ch) * w + cx] && m[Math.min(h - 1, cy + ch) * w + Math.min(w - 1, cx + cw)]) keep[i] = 1;
     }
@@ -270,7 +271,7 @@ export function erase(cv, img, analysis, regionIds, opts = {}) {
       // adoptLettering): then both polarities' ink, besides its colour against the surround
       const pols = r.dark == null ? analysis.polarities : [pol];
       const inside = r.kind === "bubble" ? analysis.insideOf(r.id) : null;
-      const letter = Math.max(4, r.letter);
+      const letter = Math.max(ERASE.minLetterPx, r.letter);
       const blocks = r.kind === "bubble" ? r.ref.blocks : [r.ref];
       let roi;
       painted = null;
@@ -291,10 +292,10 @@ export function erase(cv, img, analysis, regionIds, opts = {}) {
           for (const l of analysis.lines || []) {
             if (!inside(l.x + l.w / 2, l.y + l.h / 2)) continue;
             const g = { x: Math.round(l.x), y: Math.round(l.y), w: Math.round(l.w), h: Math.round(l.h) };
-            paintTextBox(null, { gbox: g, line: g, vertical: !!l.vertical }, Math.max(letter, 0.85 * (l.vertical ? g.w : g.h)), inside, true);
+            paintTextBox(null, { gbox: g, line: g, vertical: !!l.vertical }, Math.max(letter, ERASE.lineLetter * (l.vertical ? g.w : g.h)), inside, true);
           }
         }
-        const pad = Math.round(letter * 0.8);
+        const pad = Math.round(letter * ERASE.fillPad);
         // around the lettering's boxes, and whatever of it the masks found beyond them (a coloured
         // line read whole, the rest of an adopted line)
         const P = painted || { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
@@ -305,12 +306,12 @@ export function erase(cv, img, analysis, regionIds, opts = {}) {
       } else if (r.kind === "bubble" && r.ref.fill && paintInsideMask(pol, r.ref, letter)) {
         roi = { ...r.box };
       } else continue;
-      if (r.kind === "bubble") rois.push({ ...roi, radius: 3, inside: analysis.insideOf(r.id), dark: r.dark, letter });
+      if (r.kind === "bubble") rois.push({ ...roi, radius: ERASE.bubbleRadius, inside: analysis.insideOf(r.id), dark: r.dark, letter });
       else rois.push({ ...roi, radius: teleaRadius(letter), letter });
       continue;
     }
     const glyphLabels = pol.glyphLabels.data32S, regionLabels = pol.regionLabels.data32S;
-    const letter = Math.max(4, r.letter);
+    const letter = Math.max(ERASE.minLetterPx, r.letter);
     if (r.kind === "bubble") {
       const b = r.ref, { x, y, w, h } = b.box;
       // Lettering = the detected text blocks' components, plus glyph-sized ink
@@ -323,7 +324,7 @@ export function erase(cv, img, analysis, regionIds, opts = {}) {
       for (let gi = 1; gi < pol.glyphs.length; gi++) {
         const g = pol.glyphs[gi]; if (!g || seen.has(gi)) continue;
         if (g.x < x + 1 || g.y < y + 1 || g.x + g.w > x + w - 1 || g.y + g.h > y + h - 1) continue;
-        if (g.a > 0.2 * b.area || g.h > 1.6 * letter || !nearText(g)) continue;
+        if (g.a > ERASE.glyphArea * b.area || g.h > ERASE.glyphLetters * letter || !nearText(g)) continue;
         // adjacent to the bubble surface?
         const cx = g.x + (g.w >> 1), cy = g.y + (g.h >> 1), d = 2;
         const near = [[g.x - d, cy], [g.x + g.w + d, cy], [cx, g.y - d], [cx, g.y + g.h + d]].some(([sx, sy]) => sx >= 0 && sy >= 0 && sx < W && sy < H && regionLabels[sy * W + sx] === b.labelId);
@@ -333,11 +334,11 @@ export function erase(cv, img, analysis, regionIds, opts = {}) {
       const tx0 = Math.max(x, Math.min(...b.blocks.map((bl) => bl.gbox.x)) - 2 * letter), ty0 = Math.max(y, Math.min(...b.blocks.map((bl) => bl.gbox.y)) - 2 * letter);
       const tx1 = Math.min(x + w, Math.max(...b.blocks.map((bl) => bl.gbox.x + bl.gbox.w)) + 2 * letter), ty1 = Math.min(y + h, Math.max(...b.blocks.map((bl) => bl.gbox.y + bl.gbox.h)) + 2 * letter);
       for (const gi of seen) paintGlyph(glyphLabels, gi, pol.glyphs[gi]);
-      rois.push({ x: Math.round(tx0), y: Math.round(ty0), w: Math.max(1, Math.round(tx1 - tx0)), h: Math.max(1, Math.round(ty1 - ty0)), radius: 3, inside: analysis.insideOf(r.id), dark: r.dark });
+      rois.push({ x: Math.round(tx0), y: Math.round(ty0), w: Math.max(1, Math.round(tx1 - tx0)), h: Math.max(1, Math.round(ty1 - ty0)), radius: ERASE.bubbleRadius, inside: analysis.insideOf(r.id), dark: r.dark });
     } else {
       const bl = r.ref, { x, y, w, h } = bl.box;
       for (const gi of bl.glyphs) paintGlyph(glyphLabels, gi, pol.glyphs[gi]);
-      const pad = Math.round(letter * 0.8);
+      const pad = Math.round(letter * ERASE.fillPad);
       rois.push({ x: Math.max(0, x - pad), y: Math.max(0, y - pad), w: Math.min(W, x + w + pad) - Math.max(0, x - pad), h: Math.min(H, y + h + pad) - Math.max(0, y - pad), radius: teleaRadius(letter) });
     }
   }
@@ -345,7 +346,7 @@ export function erase(cv, img, analysis, regionIds, opts = {}) {
   if (rois.length) {
     // Grow the mask over the anti-aliased fringe of each stroke; inside bubbles
     // never past the bubble's interior (so outlines stay crisp).
-    const grow = Math.max(2, Math.round(analysis.letter * 0.15));
+    const grow = Math.max(ERASE.fringeMinPx, Math.round(analysis.letter * ERASE.fringeLetters));
     const k = cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(2 * grow + 1, 2 * grow + 1));
     const grown = new cv.Mat(); cv.dilate(mask, grown, k); k.delete();
     const gd = grown.data, px = img.data;
@@ -357,7 +358,7 @@ export function erase(cv, img, analysis, regionIds, opts = {}) {
           // Not bubble surface: admit the anti-aliased fringe of a stroke, never
           // the outline itself (solid ink of the bubble's own colour polarity).
           const lum = (px[p * 4] + px[p * 4 + 1] + px[p * 4 + 2]) / 3;
-          if (r.dark ? lum > 200 : lum < 70) continue;
+          if (r.dark ? lum > ERASE.outlineLight : lum < ERASE.outlineDark) continue;
         }
         md[p] = 255;
       }
@@ -421,7 +422,7 @@ export function erase(cv, img, analysis, regionIds, opts = {}) {
  */
 function growOutline(cv, mask, rois, W, k) {
   for (const r of rois) {
-    const g = Math.max(1, Math.round((r.letter || 8) * k));
+    const g = Math.max(1, Math.round((r.letter || ERASE.defaultLetter) * k));
     const sub = mask.roi(new cv.Rect(r.x, r.y, r.w, r.h)), m = sub.clone(), grown = new cv.Mat(); // clones: continuous rows
     const kern = cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(2 * g + 1, 2 * g + 1));
     cv.dilate(m, grown, kern); kern.delete();
@@ -443,7 +444,7 @@ function growOutline(cv, mask, rois, W, k) {
  * "textured", while screentone (dots on a quarter or more of it) or a gradient is not flat.
  */
 export function flatSurface(rgb, mask, inside) {
-  const d = rgb.data, md = mask.data, w = rgb.cols, h = rgb.rows, e = 3;
+  const d = rgb.data, md = mask.data, w = rgb.cols, h = rgb.rows, e = ERASE.depthPx;
   const lums = [], rs = [], gs = [], bs = [];
   const deep = inside ? (x, y) => inside(x, y) && inside(x - e, y) && inside(x + e, y) && inside(x, y - e) && inside(x, y + e) : () => true;
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
@@ -451,11 +452,11 @@ export function flatSurface(rgb, mask, inside) {
     const p = (y * w + x) * 3;
     lums.push((d[p] + d[p + 1] + d[p + 2]) / 3); rs.push(d[p]); gs.push(d[p + 1]); bs.push(d[p + 2]);
   }
-  if (lums.length < 50) return null;
+  if (lums.length < ERASE.surfaceSamples) return null;
   const med = (a) => a.slice().sort((x, y) => x - y)[a.length >> 1];
   const m = med(lums);
-  const atLevel = lums.filter((l) => Math.abs(l - m) <= 8).length / lums.length;
-  if (atLevel < 0.95) return null;
+  const atLevel = lums.filter((l) => Math.abs(l - m) <= ERASE.flatLevel).length / lums.length;
+  if (atLevel < ERASE.flatShare) return null;
   return [med(rs), med(gs), med(bs)];
 }
 
@@ -482,7 +483,7 @@ export async function eraseFullSize(cv, natural, nx, ny, mask, scale, ox, oy, ar
   const m = new cv.Mat();
   cv.warpAffine(mask, m, M, new cv.Size(W, H), cv.INTER_LINEAR | cv.WARP_INVERSE_MAP, cv.BORDER_CONSTANT, new cv.Scalar(0));
   // a quarter of a work pixel's coverage counts: the work mask was already grown over each stroke's fringe
-  cv.threshold(m, m, 63, 255, cv.THRESH_BINARY);
+  cv.threshold(m, m, ERASE.fullSizeCut, 255, cv.THRESH_BINARY);
   if (!cv.countNonZero(m)) { M.delete(); m.delete(); return null; }
   let on = null;
   if (surface && area.label) {
@@ -506,7 +507,7 @@ export async function eraseFullSize(cv, natural, nx, ny, mask, scale, ox, oy, ar
     ctx?.image.delete();
     done = f.mat; area.filled = f.kind; area.fillMs = f.ms; area.fillRunMs = f.runMs; area.fillAt = at; area.fillHit = !!f.hit; area.fillMiss = f.miss;
   }
-  if (!done) { done = new cv.Mat(); cv.inpaint(rgb, m, done, Math.min(TELEA_MAX, Math.max(3, Math.round((area.radius || 3) / scale))), cv.INPAINT_TELEA); }
+  if (!done) { done = new cv.Mat(); cv.inpaint(rgb, m, done, Math.min(TELEA_MAX, Math.max(ERASE.teleaMin, Math.round((area.radius || ERASE.teleaMin) / scale))), cv.INPAINT_TELEA); }
   cv.cvtColor(done, out, cv.COLOR_RGB2RGBA);
   const result = new ImageData(new Uint8ClampedArray(out.data), W, H);
   src.delete(); rgb.delete(); done.delete(); out.delete(); m.delete(); on?.delete();
@@ -623,4 +624,4 @@ export async function fillTexture(cv, model, img, erased, opts = {}) {
 }
 
 /** How much of the page around an area the texture fill sees: two letters, at least 24 px. */
-export const contextMargin = (letter) => Math.max(24, Math.round((letter || 8) * 2));
+export const contextMargin = (letter) => Math.max(ERASE.contextMinPx, Math.round((letter || ERASE.defaultLetter) * ERASE.contextLetters));

@@ -10,6 +10,8 @@
 //    boxes) that it still finds on the erased page — Japanese left beside or under the English
 // and always
 //  - moved: translations drawn nowhere near where Claude saw their text
+//  - replay differs: lines the replay laid out unlike the user's own run (CPU here, often a graphics
+//    card there: a threshold decision can flip); listed, and left out of every count above
 //  - shrunk: translations drawn under 0.6 of their original letter size for want of room
 import fs from "node:fs";
 import os from "node:os";
@@ -136,9 +138,26 @@ for (const pg of summary.pages) {
   } else clean = NEW ? await eraseNew(an, pixels, regionIds) : erase(cv, pixels, an, regionIds).image;
   const after = clean.data;
 
-  const untagged = placements.filter((p) => p.tag == null).length;
+  // Lines the replay lays out unlike the user's own run did (its placement, in the report): the
+  // replay runs on the CPU, the user's run often on a graphics card, and a decision on a threshold
+  // can come out the other way (a page's letter size of 11 against the size limit on adopted
+  // lettering). Such a line measures the replay, not the build: listed apart, never counted.
+  const theirs = new Map((rep.placements || []).filter((p) => p.item != null).map((p) => [p.item, p]));
+  const differs = new Set();
+  for (const p of placements) {
+    const q = p.item != null ? theirs.get(p.item) : null;
+    if (!q || !q.rect || !q.letter) continue;
+    const r = p.letter / q.letter, a = p.rect, b = q.rect;
+    const w = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x), h = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+    const iou = w > 0 && h > 0 ? (w * h) / (a.w * a.h + b.w * b.h - w * h) : 0;
+    if (r < 0.67 || r > 1.5 || iou < 0.3 || (p.tag == null) !== (q.tag == null)) {
+      differs.add(p.item);
+      cases.push({ page: pg.id, what: "replay differs", text: p.text.slice(0, 40), replay: { letter: +p.letter.toFixed(1), tagged: p.tag != null }, run: { letter: +q.letter.toFixed(1), tagged: q.tag != null } });
+    }
+  }
+  const untagged = placements.filter((p) => p.tag == null && !differs.has(p.item)).length;
   // drawn by its box alone, over whatever is there (nothing erased under it)
-  for (const p of placements) if (p.tag == null) cases.push({ page: pg.id, what: "untagged", text: p.text.slice(0, 40), at: [p.rect.x, p.rect.y, p.rect.w, p.rect.h].map(Math.round) });
+  for (const p of placements) if (p.tag == null && !differs.has(p.item)) cases.push({ page: pg.id, what: "untagged", text: p.text.slice(0, 40), at: [p.rect.x, p.rect.y, p.rect.w, p.rect.h].map(Math.round) });
   // marks left in each erased area (residue.mjs): bubbles against their interior, free text
   // against the page around it. The measure holds on a plain surround only; areas on a textured
   // one (screentone, art) are counted apart, and fill-truth.mjs measures their fill.
@@ -164,7 +183,7 @@ for (const pg of summary.pages) {
     const was = await witnessText(new ImageData(before, W, H)), now = await witnessText(clean);
     for (const t of was) {
       const k = seen.findIndex((b) => b && cover(t, widen(b, 0.25)) >= 0.5);
-      if (k < 0) continue; // text Claude did not translate (or not text)
+      if (k < 0 || differs.has(k)) continue; // text Claude did not translate (or not text), or a line the replay could not reproduce
       lettering++;
       if (now.some((c) => cover(t, c) >= 0.5 || cover(c, t) >= 0.5)) { left++; cases.push({ page: pg.id, what: "left", text: items[k].text.slice(0, 40), at: [t.x, t.y, t.w, t.h].map(Math.round) }); }
     }
@@ -177,7 +196,7 @@ for (const pg of summary.pages) {
     const near = { x: b.x - p.letter, y: b.y - p.letter, w: b.w + 2 * p.letter, h: b.h + 2 * p.letter };
     if (cover(p.rect, widen(near, 0.5)) === 0) { moved++; cases.push({ page: pg.id, what: "moved", text: p.text.slice(0, 40) }); }
   }
-  rows.push({ page: pg.id, natural: rep.natural, work: [W, H], displayed: rep.displayed, items: items.length, placements: placements.length, untagged, bubbles, dirtyBubbles: dirty, freeText: blocks, dirtyFree: freeDirty, textured, lettering, left, moved });
+  rows.push({ page: pg.id, natural: rep.natural, work: [W, H], displayed: rep.displayed, items: items.length, placements: placements.length, untagged, bubbles, dirtyBubbles: dirty, freeText: blocks, dirtyFree: freeDirty, textured, lettering, left, moved, replayDiffers: differs.size });
 
   // renders: erased only, and final
   const o = createCanvas(W, H), octx = o.getContext("2d"); octx.putImageData(clean, 0, 0);
@@ -187,6 +206,7 @@ for (const pg of summary.pages) {
   // shrunk: drawn under 0.6 of the size it was aimed at (the original letter) for want of room
   let shrunkFree = 0, shrunkBubble = 0, free = 0;
   placements.forEach((p, i) => {
+    if (differs.has(p.item)) return;
     const aim = p.letter * 1.45 * (SIZE_MUL[p.size] || 1);
     if (p.halo) free++;
     if (sizes[i] < 0.6 * aim) { if (p.halo) shrunkFree++; else shrunkBubble++; cases.push({ page: pg.id, what: p.halo ? "shrunk free" : "shrunk bubble", text: p.text.slice(0, 40), size: sizes[i], aim: Math.round(aim) }); }
@@ -225,6 +245,6 @@ if (worst.length) {
 fs.writeFileSync(path.join(out, "audit.json"), JSON.stringify(rows, null, 1));
 fs.writeFileSync(path.join(out, "cases.json"), JSON.stringify(cases, null, 1));
 fs.writeFileSync(path.join(out, "marks.json"), JSON.stringify(marks));
-const tot = rows.reduce((a, r) => ({ items: a.items + r.items, untagged: a.untagged + r.untagged, bubbles: a.bubbles + r.bubbles, dirty: a.dirty + r.dirtyBubbles, free: a.free + r.freeText, freeDirty: a.freeDirty + r.dirtyFree, textured: a.textured + r.textured, moved: a.moved + r.moved, freeLines: a.freeLines + r.free, shrunkFree: a.shrunkFree + r.shrunkFree, shrunkBubble: a.shrunkBubble + r.shrunkBubble, ...(rtdetr ? { lettering: a.lettering + r.lettering, left: a.left + r.left } : {}) }), { items: 0, untagged: 0, bubbles: 0, dirty: 0, free: 0, freeDirty: 0, textured: 0, moved: 0, freeLines: 0, shrunkFree: 0, shrunkBubble: 0, ...(rtdetr ? { lettering: 0, left: 0 } : {}) });
+const tot = rows.reduce((a, r) => ({ items: a.items + r.items, untagged: a.untagged + r.untagged, bubbles: a.bubbles + r.bubbles, dirty: a.dirty + r.dirtyBubbles, free: a.free + r.freeText, freeDirty: a.freeDirty + r.dirtyFree, textured: a.textured + r.textured, moved: a.moved + r.moved, replayDiffers: a.replayDiffers + (r.replayDiffers || 0), freeLines: a.freeLines + r.free, shrunkFree: a.shrunkFree + r.shrunkFree, shrunkBubble: a.shrunkBubble + r.shrunkBubble, ...(rtdetr ? { lettering: a.lettering + r.lettering, left: a.left + r.left } : {}) }), { items: 0, untagged: 0, bubbles: 0, dirty: 0, free: 0, freeDirty: 0, textured: 0, moved: 0, replayDiffers: 0, freeLines: 0, shrunkFree: 0, shrunkBubble: 0, ...(rtdetr ? { lettering: 0, left: 0 } : {}) });
 console.log(JSON.stringify({ report: path.basename(zipPath), site: summary.page, pages: rows.length, ...tot, ...(NEW ? { fills, aotMsPerArea: Math.round(aotMs / Math.max(1, aotAreas)) } : {}) }));
 fs.rmSync(tmp, { recursive: true, force: true });

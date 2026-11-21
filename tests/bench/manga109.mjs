@@ -15,6 +15,7 @@
 //      small     the translation drawn under 0.7 of that estimated size (smallL: of the engine's own)
 // The books are split by a hash into "look" (failures there may be examined) and "held" (only
 // ever counted), so a change can't pass by fitting what was looked at.
+import "./tune-env.mjs"; // first: GYT_TUNE must be set before the engine loads
 import fs from "node:fs";
 import path from "node:path";
 import { createCanvas, loadImage, ImageData } from "canvas";
