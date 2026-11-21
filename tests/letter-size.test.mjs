@@ -3,7 +3,7 @@
 // so their lettering was left on the page and the translation drawn tiny.
 import assert from "node:assert/strict";
 import { cv } from "./cv-node.mjs";
-import { rowLetter, bubbleLetter } from "../extension/engine/analyze.js";
+import { rowLetter, bubbleLetter, columnLetter } from "../extension/engine/analyze.js";
 import { loadLettering } from "./lettering-setup.mjs";
 
 loadLettering();
@@ -99,5 +99,45 @@ test("an ordinary bubble keeps its measured size; one holding only dots takes th
     assert.ok(f.size < 64 && f.lines.every((l) => measure(l) <= 60), JSON.stringify(f));
   });
 }
+
+const column = (I, box) => { const m = cv.matFromArray(H, W, cv.CV_8UC1, I); try { return columnLetter(cv, m, box, box.x, box.y, box.x + box.w, box.y + box.h); } finally { m.delete(); } };
+test("a stack of short rows read as one column measures its letters, not its width (2.14.1)", () => {
+  // five rows of capitals 12 px tall, 40 to 70 px wide (Portuguese stacked in a narrow oval)
+  const I = page(), x = 100, y = 5;
+  [3, 4, 5, 3, 4].forEach((n, r) => { for (let i = 0; i < n; i++) { const cx = x + i * 14 + (5 - n) * 7; rect(I, cx, y + r * 21, 2, 12); rect(I, cx, y + r * 21, 9, 2); rect(I, cx, y + r * 21 + 10, 9, 2); } });
+  const { letter, band } = column(I, { x, y, w: 70, h: 104 });
+  assert.ok(band >= 50, "the guard: its width is " + band);
+  assert.ok(letter >= 12 && letter <= 17, "measured " + letter.toFixed(1));
+});
+test("a real column of square glyphs keeps its width", () => {
+  const I = page(), x = 30, y = 4;
+  for (let k = 0; k < 4; k++) { rect(I, x, y + k * 28, 22, 3); rect(I, x + 9, y + k * 28, 3, 22); rect(I, x, y + k * 28 + 19, 22, 3); }
+  const { letter, band } = column(I, { x, y, w: 22, h: 110 });
+  assert.equal(letter, band);
+  assert.ok(letter >= 20 && letter <= 23, "measured " + letter);
+});
+
+test("a column whose glyphs are in small pieces (kanji, coloured lettering) keeps its width", () => {
+  const I = page(), x = 60, y = 4;
+  for (let k = 0; k < 4; k++) for (const [dx, dy] of [[0, 0], [12, 2], [4, 9], [14, 12], [2, 17]]) rect(I, x + dx, y + k * 26 + dy, 6, 4);
+  const { letter, band } = column(I, { x, y, w: 20, h: 104 });
+  assert.equal(letter, band, "measured " + letter + " in a column " + band + " wide");
+});
+
+test("a column with an ellipsis down it (its dots make short rows) keeps its width", () => {
+  const I = page(), x = 120, y = 4;
+  rect(I, x, y, 22, 3); rect(I, x + 9, y, 3, 22); rect(I, x, y + 19, 22, 3); // a glyph 22 px
+  for (let k = 0; k < 3; k++) rect(I, x + 9, y + 30 + k * 9, 4, 4); // the dots
+  rect(I, x, y + 60, 22, 3); rect(I, x + 9, y + 60, 3, 22); rect(I, x, y + 79, 22, 3); // another glyph
+  const { letter, band } = column(I, { x, y, w: 22, h: 84 });
+  assert.equal(letter, band, "measured " + letter + " in a column " + band + " wide");
+});
+
+test("a column of glyphs made of bars (テ, 二) keeps its width", () => {
+  const I = page(), x = 170, y = 4;
+  for (let k = 0; k < 3; k++) { const t = y + k * 28; rect(I, x + 3, t, 16, 3); rect(I, x, t + 8, 22, 3); rect(I, x + 10, t + 14, 3, 8); } // テ: two bars, then a stroke down
+  const { letter, band } = column(I, { x, y, w: 22, h: 84 });
+  assert.equal(letter, band, "measured " + letter + " in a column " + band + " wide");
+});
 
 console.log(`\nLETTER SIZE TESTS PASSED (${passed})`);

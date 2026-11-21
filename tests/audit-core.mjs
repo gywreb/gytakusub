@@ -122,7 +122,7 @@ for (const pg of summary.pages) {
   const items = rep.items.map((it, index) => {
     let box = it.box;
     if (Array.isArray(box) && !box.every((v) => v <= 1.0001)) box = [box[0] / W, box[1] / H, box[2] / W, box[3] / H];
-    return { tag: rematch(an, rep, it), box, text: it.text, size: it.size, kind: it.kind, index };
+    return { tag: rematch(an, rep, it), box, text: it.text, size: it.size, kind: it.kind, index, ...(it.source ? { source: it.source } : {}), ...(it.same ? { same: true } : {}) };
   });
   // the second look at lettering Claude translated where the analysis found none (2.13; GYT_LOOK=0: without)
   if (process.env.GYT_LOOK !== "0") await lookAgain(cv, pixels, an, items, detector);

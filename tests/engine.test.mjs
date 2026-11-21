@@ -102,6 +102,12 @@ test("extractJson tolerates fences and prose", () => {
       assert.deepEqual(copied.usage, { input_tokens: 120, output_tokens: 60 });
     });
     sent.length = 0;
+    const joined = await prompt.callClaude(settings, slice, ctx, fake(page([line("S-SENPAI?", "S-senpai?"), line("HARU-CHAN.", "Haru-chan."), line("HTTPS://BIT.LY/ZAPAMA", "https://bit.ly/zapama", "sign")])));
+    test("a name with a hyphen or a link is one word: kept as drawn without asking (2.14.1)", () => {
+      assert.deepEqual(joined.items.map((i) => !!i.same), [true, true, true]);
+      assert.equal(sent.length, 1);
+    });
+    sent.length = 0;
     const failed = await prompt.callClaude(settings, slice, ctx, fake(page([line("No hay nada que no pueda crear!", "No hay nada que no pueda crear!")]), [529, { error: { message: "Overloaded" } }]));
     test("asking again failing changes nothing: the page goes on", () => {
       assert.equal(failed.items[0].text, "No hay nada que no pueda crear!"); assert.ok(!failed.items[0].same);
@@ -111,6 +117,12 @@ test("extractJson tolerates fences and prose", () => {
       const [a, b] = prompt.normalizeItems([{ ...line("Luke...", "Luke..."), same: true }, line("¡Ahí estás!", "There you are!")], s2, 100, 100);
       assert.equal(a.same, true); assert.ok(!b.same);
       assert.equal(tells(a), false); assert.equal(tells(b), true);
+    });
+    test("lines labelled sound effects or logos are left out, and listed for the debug report (2.14.1)", () => {
+      const s2 = { x: 0, y: 0, w: 100, h: 100, cw: 100, ch: 100, tagFrom: 1, tagTo: 1 }, dropped = [];
+      const kept = prompt.normalizeItems([line("ESTRANHO...", "Strange...", "sfx"), line("BAM", "BAM", "sfx"), line("¡Ahí estás!", "There you are!")], s2, 100, 100, dropped);
+      assert.deepEqual(kept.map((i) => i.text), ["There you are!"]);
+      assert.deepEqual(dropped, [{ kind: "sfx", source: "ESTRANHO...", text: "Strange..." }, { kind: "sfx", source: "BAM", text: "BAM" }]);
     });
   }
   const fails = async (...replies) => { try { await prompt.callClaude(settings, slice, ctx, fake(...replies)); return "no error"; } catch (e) { return e.message; } };

@@ -34,7 +34,7 @@ const SIZE_MUL = { small: 0.8, normal: 1, large: 1.3 };
 function rendered(p) {
   const target = p.letter * 1.45 * (SIZE_MUL[p.size] || 1), inBubble = p.tag != null && !p.halo;
   const setFont = (size) => { fitCtx.font = `bold ${size}px "Gytakusub Comic"`; }, measure = (t) => fitCtx.measureText(t).width;
-  const fit = GyText.fitText(p.text, p.rect, setFont, measure, { maxSize: inBubble ? target * 1.3 : target, minSize: Math.max(7, target * 0.35) });
+  const fit = GyText.fitText(p.text, p.rect, setFont, measure, { maxSize: inBubble ? target * 1.3 : target, minSize: Math.max(7, target * 0.35), shape: inBubble ? p.shape : null }); // as text.js draw() fits it
   return { ratio: fit.size / (p.letter * 1.45), px: fit.size, forced: !!fit.forced, overflow: !!fit.overflow, hyphens: fit.hyphens || 0 };
 }
 
@@ -77,7 +77,7 @@ for (const zipPath of zips) {
     const an = await analyzePage(ctx.getImageData(0, 0, W, H));
     tot.ms += Date.now() - t0;
     // re-match the report's tags to the regions found now (as replay-report.mjs does)
-    const items = rep.items.map((it, index) => ({ tag: rematch(an, rep, it), box: it.box, text: it.text, size: it.size, kind: it.kind, index }));
+    const items = rep.items.map((it, index) => ({ tag: rematch(an, rep, it), box: it.box, text: it.text, size: it.size, kind: it.kind, index, ...(it.same ? { same: true } : {}) }));
     const { placements, regionIds } = layout(an, items);
     // Original lettering left on the page: dark pixels inside each item's own box (where the
     // model saw the source text), before and after the eraser — independent of what the
@@ -102,7 +102,7 @@ for (const zipPath of zips) {
       const r0 = rendered(p);
       tot.ratios.push(r0.ratio); tot.px.push((r0.px * 1000) / W); if (r0.ratio < 0.7) tot.small++; if (r0.forced) tot.forced++; if (r0.overflow) tot.overflow++; tot.hyphens += r0.hyphens;
       if (verbose && (r0.px * 1000) / W < 12) console.log(`  ${path.basename(zipPath).slice(0, 8)} page ${pg.id} TINY ${((r0.px * 1000) / W).toFixed(1)}px rect=${JSON.stringify({ x: Math.round(p.rect.x), y: Math.round(p.rect.y), w: Math.round(p.rect.w), h: Math.round(p.rect.h) })} letter=${p.letter.toFixed(1)} tag=${p.tag} halo=${p.halo} "${p.text.slice(0, 40)}"`);
-      if (verbose && (r0.ratio < 0.7 || r0.forced)) console.log(`  ${path.basename(zipPath)} page ${pg.id} ${r0.forced ? "FORCED-BREAK" : "SMALL " + r0.ratio.toFixed(2)} rect=${JSON.stringify({ x: Math.round(p.rect.x), y: Math.round(p.rect.y), w: Math.round(p.rect.w), h: Math.round(p.rect.h) })} letter=${p.letter.toFixed(1)} "${p.text.slice(0, 40)}"`);
+      if (verbose && (r0.ratio < 0.7 || r0.forced)) console.log(`  ${path.basename(zipPath)} page ${pg.id} ${r0.forced ? "FORCED-BREAK" : "SMALL " + r0.ratio.toFixed(2)} rect=${JSON.stringify({ x: Math.round(p.rect.x), y: Math.round(p.rect.y), w: Math.round(p.rect.w), h: Math.round(p.rect.h) })} letter=${p.letter.toFixed(1)} region=${JSON.stringify(an.regions.find((q) => q.id === p.tag)?.box ?? null)} kind=${an.regions.find((q) => q.id === p.tag)?.kind ?? "loose"} "${p.text.slice(0, 40)}"`);
       if (p.covers = unerased.some((b) => inter(p.rect, b.gbox) > 0.2 * b.gbox.w * b.gbox.h)) tot.covers++;
       if (p.tag == null || p.halo) { tot.loose++; continue; }
       const r = an.regions.find((q) => q.id === p.tag);

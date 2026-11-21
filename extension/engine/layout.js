@@ -92,14 +92,19 @@ export function layout(an, items, opts = {}) {
       const blocks = r.ref.blocks, biggest = Math.max(...blocks.map((b) => area(b.gbox)));
       let lettering = blocks.filter((b) => b.letter >= 0.5 * letter && area(b.gbox) >= 0.1 * biggest);
       if (!lettering.length) lettering = blocks;
-      // A line left as drawn keeps the lettering its box lies on most (else its own box in the
-      // bubble); the lines to draw are anchored among the rest, and keep off it.
-      const kept = [];
+      // A line left as drawn keeps the block of lettering its box lies on (the largest share of
+      // a block under the box), else the block nearest it within a letter, else its own box in the
+      // bubble; the lines to draw are anchored among the rest, and keep off it. Any of the
+      // bubble's blocks: a short "Ah..." is often one too small to anchor a translation to, and
+      // Claude's box for it can miss it by a few pixels; it was erased, its lobe left empty (2.14.1).
+      const kept = [], taken = new Set();
       for (const m of members) {
         if (tells(m.it) || !m.px) continue;
+        const free = blocks.filter((b) => !taken.has(b));
         let best = null, most = 0;
-        for (const b of lettering) { const o = overlap(m.px, b.gbox); if (o > most) { most = o; best = b; } }
-        if (best) { kept.push({ ...best.gbox }); lettering = lettering.filter((b) => b !== best); }
+        for (const b of free) { const o = overlap(m.px, b.gbox) / Math.max(1, area(b.gbox)); if (o > most) { most = o; best = b; } }
+        if (!best) { let near = letter; for (const b of free) { const g = gap(m.px, b.gbox); if (g <= near) { near = g; best = b; } } }
+        if (best) { taken.add(best); kept.push({ ...best.gbox }); lettering = lettering.filter((b) => b !== best); }
         else if (inBox(bbox, m.px.x + m.px.w / 2, m.px.y + m.px.h / 2)) kept.push(clip(m.px, bbox));
       }
       const told = members.filter((m) => tells(m.it));
@@ -125,7 +130,11 @@ export function layout(an, items, opts = {}) {
         // Whatever the shape analysis got wrong, the text cannot come out smaller
         // than the original for lack of space.
         if (anchoredToLettering[i]) rect = union([rect, clip(a, bbox)]);
-        placements.push({ text: m.it.text, size: m.it.size, rect, letter, color, halo: false, tag: id, item: m.it.index ?? null });
+        // The room row by row, for text.js to set each line as wide as the bubble is there: a
+        // rectangle in an oval leaves its widest rows unused, and the text came out small (2.14.1).
+        const own = anchoredToLettering[i] ? lettering.filter((b) => overlap(b.gbox, a) >= 0.5 * area(b.gbox)).map((b) => b.gbox) : [];
+        const shape = roomShape(inside, bbox, rect, own, others, Math.max(2, 0.2 * letter));
+        placements.push({ text: m.it.text, size: m.it.size, rect, letter, color, halo: false, tag: id, item: m.it.index ?? null, ...(shape ? { shape } : {}) });
       });
       r.kept = kept.length ? kept : null;
     } else {
@@ -162,6 +171,40 @@ const clip = (b, to) => { const x0 = Math.max(b.x, to.x), y0 = Math.max(b.y, to.
 const inBox = (b, x, y) => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h;
 const grow = (b, k) => ({ x: b.x - k, y: b.y - k, w: b.w + 2 * k, h: b.h + 2 * k });
 const area = (b) => b.w * b.h;
+/**
+ * The room a bubble gives one line of translation, row by row: how far the bubble's interior
+ * (or the lettering the line replaces, erased) reaches on both sides of the text box's centre
+ * line, short of the parts kept for others (`exclude`: other speakers' lettering and the cut
+ * between them, lines left as drawn). Text centred on that line stays inside. `{dy, step, half}`:
+ * rows from rect.y + dy, one every `step` px, half[k] the half-width there (0: none), less `edge`:
+ * a bubble's shape from the segmentation model takes in its outline, and lines set to it touched
+ * the outline (2.14.1). Relative to the rect, so it moves with it. null without the bubble's shape,
+ * or when the centre line is out.
+ */
+export function roomShape(inside, bbox, rect, own, exclude, edge = 0) {
+  if (!inside) return null;
+  const cx = rect.x + rect.w / 2;
+  const ok = (x, y) => (inside(x, y) || own.some((b) => inBox(b, x, y))) && !exclude.some((e) => inBox(e, x, y));
+  const step = Math.max(1, Math.round(Math.min(bbox.w, bbox.h) / 100));
+  const y0 = Math.floor(bbox.y), reach = Math.ceil(bbox.w);
+  const half = [];
+  for (let y = y0; y < bbox.y + bbox.h; y += step) {
+    const yy = y + step / 2;
+    if (!ok(cx, yy)) { half.push(0); continue; }
+    let l = 0, r = 0;
+    while (l < reach && ok(cx - l - 1, yy)) l++;
+    while (r < reach && ok(cx + r + 1, yy)) r++;
+    half.push(Math.max(0, Math.round(Math.min(l, r) - edge)));
+  }
+  let a = 0, b = half.length;
+  while (a < b && !half[a]) a++;
+  while (b > a && !half[b - 1]) b--;
+  if (a >= b) return null;
+  return { dy: y0 + a * step - rect.y, step, half: half.slice(a, b) };
+}
+
+/** How far apart two boxes are (0 when they touch or overlap). */
+const gap = (a, b) => Math.max(0, Math.max(a.x, b.x) - Math.min(a.x + a.w, b.x + b.w), Math.max(a.y, b.y) - Math.min(a.y + a.h, b.y + b.h));
 const overlap = (a, b) => Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
 
 const ADOPT_MAX_LETTER = 4; // a shout runs to three or four times the dialogue size; a drawn sound effect beyond

@@ -128,6 +128,7 @@ export async function finishPage(job, results, opts = {}) {
   const fill = { ms: 0, flat: 0, tone: 0, learned: 0, telea: 0, ready: 0 }, runs = [];
   // the second look at translated lines with no lettering found under them: boxes looked at, lines found, time
   const look = { boxes: 0, lines: 0, ms: 0 };
+  const dropped = []; // lines Claude labelled sound effects or logos (left as drawn), for the debug report
   // areas prefillPage() already filled while the translation was on the way (same inputs, same result)
   const cache = job.fills || null;
   // the cleaned page at work size; a part's own rows only (a whole tall image's would be tens of MB)
@@ -140,7 +141,7 @@ export async function finishPage(job, results, opts = {}) {
   const newId = () => nextId++;
   for (const [idx, s] of job.slices.entries()) {
     const an = s.analysis;
-    const norm = normalizeItems(results[idx]?.items || [], s, width, height); // tag + box as page fractions
+    const norm = normalizeItems(results[idx]?.items || [], s, width, height, dropped); // tag + box as page fractions
     const first = items.length;
     items.push(...norm);
     // layout wants boxes as fractions of this slice; `index` ties a placement back to its item (edits)
@@ -193,7 +194,7 @@ export async function finishPage(job, results, opts = {}) {
   if (job.preRuns?.length) fill.preRuns = job.preRuns;
   if (inpainterTimes.load != null) fill.model = { ...inpainterTimes }; // its load and first run, once per worker
   job.fills = null;
-  return { items, placements, regions, work, letter, canvas, canvasTop: top, patches, fullSize: full, engine, segmentMs, detectMs, backend, fill, look };
+  return { items, placements, regions, work, letter, canvas, canvasTop: top, patches, fullSize: full, engine, segmentMs, detectMs, backend, fill, look, dropped };
 }
 
 /**

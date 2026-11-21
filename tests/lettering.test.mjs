@@ -170,4 +170,33 @@ test("draw() keeps one font for the page while a line is hidden (peeking)", () =
   assert.ok(fonts.every((f) => f.includes('"Gytakusub Mali"')), fonts.at(-1));
 });
 
+test("in an oval, lines are set to its shape: larger than in the inscribed rectangle, every line inside (2.14.1)", () => {
+  // an oval 120 × 180 (half-axes 60 and 90); its largest rectangle is 85 × 127
+  const A = 60, B = 90, step = 2, half = [];
+  for (let y = 0; y < 2 * B; y += step) { const d = (y + step / 2 - B) / B; half.push(Math.floor(A * Math.sqrt(Math.max(0, 1 - d * d)))); }
+  const rect = { x: A - A / Math.SQRT2, y: B - B / Math.SQRT2, w: A * Math.SQRT2, h: B * Math.SQRT2 };
+  const shape = { dy: -rect.y, step, half };
+  const text = "Does that mean it's because I'm an idiot?";
+  const look = GyText.lettering([text], { lang: "en" });
+  const setFont = (s) => { ctx.font = `bold ${s}px ${look.family}`; };
+  const measure = (s) => ctx.measureText(s).width;
+  const opts = { maxSize: 40, minSize: 8, lang: "en", hyphenator: GyHyphen.hyphenateEn };
+  const boxed = GyText.fitText(text, rect, setFont, measure, opts);
+  const shaped = GyText.fitText(text, rect, setFont, measure, { ...opts, shape });
+  assert.ok(shaped.shaped, "set to the shape");
+  assert.ok(shaped.size >= boxed.size * 1.1, `${shaped.size} px in the shape against ${boxed.size} px in the rectangle`);
+  // every line within the oval at its own height (centred on the box, as drawLines sets it)
+  setFont(shaped.size);
+  const top = rect.y + rect.h / 2 - (shaped.lines.length * shaped.lineHeight) / 2;
+  shaped.lines.forEach((line, k) => {
+    for (const y of [top + k * shaped.lineHeight, top + (k + 1) * shaped.lineHeight]) {
+      const d = (y - B) / B, room = 2 * A * Math.sqrt(Math.max(0, 1 - d * d));
+      assert.ok(measure(line) <= room, `"${line}" (${measure(line).toFixed(0)} px) at y ${y.toFixed(0)}, where the oval is ${room.toFixed(0)} px`);
+    }
+  });
+  // no room at all: the box is fitted as before
+  const none = GyText.fitText(text, rect, setFont, measure, { ...opts, shape: { dy: 0, step: 2, half: [1, 1] } });
+  assert.ok(!none.shaped && none.size === boxed.size);
+});
+
 console.log(`lettering: ${passed} checks passed`);

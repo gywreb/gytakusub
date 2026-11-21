@@ -108,6 +108,8 @@
    * `lang` (for line breaking), `force` (cut words that don't fit).
    */
   function wrapInfo(measure, text, maxW, opts = {}) {
+    // maxW: one width for every line, or each line's own (k) => width (a bubble's shape, 2.14.1)
+    const widthOf = typeof maxW === "function" ? maxW : () => maxW;
     const toks = tokens(text, opts.lang);
     const hyph = opts.hyphenator === undefined ? englishHyphenator() : opts.hyphenator;
     const lines = [];
@@ -117,14 +119,14 @@
     while (i < toks.length) {
       const tok = toks[i];
       const t = join(cur, tok);
-      if (measure(t) <= maxW) { cur = t; i++; continue; }
+      if (measure(t) <= widthOf(lines.length)) { cur = t; i++; continue; }
       // try to hyphenate the word across the line boundary
       const parts = opts.hyphenate === false || tok.tight ? [tok.t] : syllables(tok.t, hyph);
       if (parts.length > 1) {
         let best = 0;
         for (let k = 1; k < parts.length; k++) {
           const cand = join(cur, { t: parts.slice(0, k).join("") + "-", gap: tok.gap });
-          if (measure(cand) <= maxW) best = k; else break;
+          if (measure(cand) <= widthOf(lines.length)) best = k; else break;
         }
         if (best > 0) {
           lines.push(join(cur, { t: parts.slice(0, best).join("") + "-", gap: tok.gap }));
@@ -136,12 +138,12 @@
       if (cur) { lines.push(cur); cur = ""; continue; } // start a fresh line with this word
       // a lone word wider than the line
       if (tok.tight) { // Chinese, Japanese, Thai: any character boundary is a fair break
-        const pieces = cutWord(measure, tok.t, maxW, false);
+        const pieces = cutWord(measure, tok.t, widthOf(lines.length), false);
         lines.push(...pieces.slice(0, -1)); cur = pieces.at(-1) || ""; i++; continue;
       }
       broken = true;
       if (!opts.force) { lines.push(tok.t); i++; continue; } // report; fitText will try a smaller size
-      const pieces = cutWord(measure, tok.t, maxW, true);
+      const pieces = cutWord(measure, tok.t, widthOf(lines.length), true);
       lines.push(...pieces.slice(0, -1)); cur = pieces.at(-1) || ""; i++;
     }
     if (cur) lines.push(cur);
@@ -155,6 +157,15 @@
    * much smaller than the best hyphenated one.
    */
   function fitText(text, rect, setFont, measure, opts = {}) {
+    if (opts.shape) {
+      // the shape's fit when it is at least as large as the box's: a box anchored on the lettering
+      // it replaces may reach past the bubble's interior (that lettering is erased), and the text
+      // is never set smaller than it was for that
+      const shaped = fitShape(text, rect, opts.shape, setFont, measure, opts);
+      const boxed = fitText(text, rect, setFont, measure, { ...opts, shape: null });
+      if (shaped && shaped.size >= boxed.size) { setFont(shaped.size); return shaped; }
+      setFont(boxed.size); return boxed;
+    }
     const minSize = Math.max(6, Math.round(opts.minSize ?? 8));
     const maxSize = Math.max(minSize, Math.floor(Math.min(opts.maxSize ?? 72, rect.h)));
     const lh = opts.lineHeightRatio ?? 1.15;
@@ -191,6 +202,60 @@
     setFont(minSize);
     const { lines } = wrapInfo(measure, text, rect.w, { ...how, force: true });
     return { size: minSize, lines, lineHeight: minSize * lh, hyphens: 0, forced: true };
+  }
+
+  /**
+   * fitText() in a bubble's shape (engine/layout.js roomShape): each line as wide as the room on
+   * both sides of the box's centre line over that line's height (less a fifth of the size each
+   * side), the block centred on the box as drawLines() centres it. The largest size that fits,
+   * unhyphenated first as in fitText(); null when nothing fits at the floor (fitText then fits the
+   * box). A rectangle in an oval leaves its widest rows unused: 140 of the 171 lines set under 0.7
+   * of their original size sat in boxes under 5 letters wide (2.14.1).
+   */
+  function fitShape(text, rect, shape, setFont, measure, opts) {
+    const lh = opts.lineHeightRatio ?? 1.15;
+    const top0 = rect.y + shape.dy, bottom0 = top0 + shape.half.length * shape.step;
+    const cy = rect.y + rect.h / 2;
+    const tall = 2 * Math.min(cy - top0, bottom0 - cy); // the most a block centred on the box can take
+    const minSize = Math.max(6, Math.round(opts.minSize ?? 8));
+    const maxSize = Math.floor(Math.min(opts.maxSize ?? 72, tall / lh));
+    if (!(maxSize >= minSize)) return null;
+    const halfOver = (y0, y1) => {
+      if (y0 < top0 || y1 > bottom0) return 0;
+      let h = Infinity;
+      const k1 = Math.min(shape.half.length - 1, Math.floor((y1 - top0) / shape.step));
+      for (let k = Math.floor((y0 - top0) / shape.step); k <= k1; k++) h = Math.min(h, shape.half[k]);
+      return h === Infinity ? 0 : h;
+    };
+    const widths = (n, size) => {
+      const line = size * lh, top = cy - (n * line) / 2;
+      return Array.from({ length: n }, (_, k) => Math.max(0, 2 * (halfOver(top + k * line, top + (k + 1) * line) - size * 0.2)));
+    };
+    const how = { lang: opts.lang, hyphenator: opts.hyphenator };
+    const linesAt = (size, hyphenate) => {
+      setFont(size);
+      for (let n = 1; n * size * lh <= tall; n++) {
+        const ws = widths(n, size);
+        if (ws.some((w) => w <= 0)) break; // past the shape: more lines only reach further
+        const w = wrapInfo(measure, text, (k) => ws[Math.min(k, n - 1)], { ...how, hyphenate });
+        if (w.broken || w.lines.length > n) continue;
+        const got = w.lines.length === n ? ws : widths(w.lines.length, size); // fewer lines sit closer to the middle
+        if (w.lines.every((l, j) => measure(l) <= got[j])) return w;
+      }
+      return null;
+    };
+    // the largest size that fits, by halving (a smaller size fits wherever a larger one does, but
+    // for rare line-break accidents: then a size that would fit can be passed over)
+    const largest = (hyphenate) => {
+      let lo = minSize, hi = maxSize, found = null;
+      while (lo <= hi) { const mid = (lo + hi) >> 1; const w = linesAt(mid, hyphenate); if (w) { found = { size: mid, w }; lo = mid + 1; } else hi = mid - 1; }
+      return found;
+    };
+    const plain = largest(false), hy = largest(true);
+    const pick = (f, hyphens) => f && { size: f.size, lines: f.w.lines, lineHeight: f.size * lh, hyphens, shaped: true };
+    if (plain && (!hy || !hy.w.hyphens || plain.size >= hy.size * (opts.hyphenRatio ?? 0.75))) { setFont(plain.size); return pick(plain, 0); }
+    if (hy && hy.w.hyphens) { setFont(hy.size); return pick(hy, hy.w.hyphens); }
+    return null;
   }
 
   function drawLines(ctx, fit, rect, color, family, halo) {
@@ -286,7 +351,7 @@
       // (letterers fill a roomy bubble a little); over artwork it keeps the original size.
       const target = p.letter * 1.45 * (BASE_CAP / look.cap) * (SIZE_MUL[p.size] || 1);
       const inBubble = p.tag != null && !p.halo;
-      const fit = fitText(text, p.rect, setFont, measure, { maxSize: inBubble ? target * 1.3 : target, minSize: Math.max(7, target * 0.35), lang, hyphenator });
+      const fit = fitText(text, p.rect, setFont, measure, { maxSize: inBubble ? target * 1.3 : target, minSize: Math.max(7, target * 0.35), lang, hyphenator, shape: inBubble ? p.shape : null });
       drawLines(ctx, fit, p.rect, p.color, family, p.halo);
       if (opts.sizes) opts.sizes[i] = fit.size; // the size each line was drawn at, for callers that need it
       n++;

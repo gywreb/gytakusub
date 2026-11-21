@@ -135,6 +135,32 @@ await test("a line Claude gave back as drawn (`same`: a name, credits) keeps its
   assert.equal(two.regionIds.size, 0); assert.equal(two.placements.length, 0);
 });
 
+await test("a line kept as drawn keeps its own small block, even when Claude's box only grazes it or misses it", () => {
+  // a joined bubble as on a 2.14.0 page: "AH..." in a small lobe (a block too small to anchor a
+  // translation to) above the main lettering; Claude's box for "AH..." lies beside it
+  const ah = para(260, 115, 39, 14, { bubble: 1, region: 1, letter: 8 }), main = para(203, 149, 73, 98, { bubble: 1, region: 1, letter: 12 });
+  const bubble = () => ({ ...bubbleAt(1, { x: 183, y: 94, w: 128, h: 177 }, [ah, main]), letter: 12 });
+  for (const [label, box] of [["grazed", [213, 127, 50, 20]], ["missed", [210, 130, 45, 12]]]) {
+    const an = boxShapes(analysis([bubble()], [ah, main]));
+    const { placements } = layout(an, [{ ...item(box, "Ah...", 1, "bubble"), same: true }, item([188, 146, 75, 108], "Miss, bring another beer, please.", 1, "bubble")]);
+    assert.deepEqual(an.regions[0].kept, [ah.gbox], `${label}: the lettering kept is "AH..."'s own`);
+    assert.deepEqual(placements.map((p) => p.text), ["Miss, bring another beer, please."]);
+  }
+});
+
+await test("a line in an oval gets the oval's room row by row, short of its outline (2.14.1)", () => {
+  const box = { x: 100, y: 100, w: 120, h: 180 }, words = para(140, 150, 40, 80, { bubble: 1, region: 1 });
+  const an = analysis([bubbleAt(1, box, [words])], [words]);
+  an.insideOf = () => (x, y) => ((x - 160) / 60) ** 2 + ((y - 190) / 90) ** 2 <= 1;
+  const [p] = layout(an, [item([140, 150, 40, 80], "Does that mean it's because I'm an idiot?", 1, "bubble")]).placements;
+  assert.ok(p.shape, "a shape");
+  const row = (y) => p.shape.half[Math.floor((y - (p.rect.y + p.shape.dy)) / p.shape.step)];
+  const edge = Math.max(2, 0.2 * 24), cx = p.rect.x + p.rect.w / 2;
+  const inOval = (y) => Math.min(cx - (160 - 60 * Math.sqrt(1 - ((y - 190) / 90) ** 2)), 160 + 60 * Math.sqrt(1 - ((y - 190) / 90) ** 2) - cx);
+  for (const y of [130, 160, 190, 220, 250]) assert.ok(Math.abs(row(y) - (inOval(y) - edge)) <= 2.5, `row ${y}: ${row(y)} against ${(inOval(y) - edge).toFixed(1)}`);
+  assert.ok(row(190) > p.rect.w / 2, "wider than the box at the oval's middle");
+});
+
 await test("a tight box on the core of big lettering takes it; a small box in a large paragraph does not", () => {
   const shout = para(100, 100, 110, 70, { letter: 60 });
   const an = analysis([], [shout]);
