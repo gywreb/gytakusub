@@ -1,5 +1,6 @@
 // The engine on generated pages (bench/synth.mjs), scored against their exact answers.
-//   node bench/synth-run.mjs <out.jsonl> <first seed> <count> [--dump dir]
+//   node bench/synth-run.mjs <out.jsonl> <first seed> <count> [--dump dir] [--printed]
+// --printed: pages with lettering printed on objects and slanted free text too (synth.mjs opts.printed)
 // Seeds 0–9999 may be looked at when something fails; seeds from 100000 on are only ever counted.
 // Per line to translate:
 //   found     its centre lies in a region the engine found before any second look
@@ -23,7 +24,8 @@ const GyText = loadLettering();
 const { makePage, englishFor, rng } = await import("./synth.mjs");
 
 const argv = process.argv.slice(2), opt = (k) => { const i = argv.indexOf(k); return i >= 0 ? argv.splice(i, 2)[1] : null; };
-const dump = opt("--dump");
+const dump = opt("--dump"), printedPages = argv.includes("--printed");
+if (printedPages) argv.splice(argv.indexOf("--printed"), 1);
 const most = Number(opt("--max") || 0); let ran = 0; // (--max N: stop after N pages; rerun to go on)
 const [outFile, first, count] = argv;
 const done = new Set(fs.existsSync(outFile) ? fs.readFileSync(outFile, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l).seed) : []);
@@ -33,7 +35,7 @@ const lum = (d, q) => (d[q * 4] + d[q * 4 + 1] + d[q * 4 + 2]) / 3;
 
 for (let seed = +first; seed < +first + +count; seed++) {
   if (done.has(seed)) continue;
-  const pg = makePage(seed), { W, H } = pg, r = rng(seed + 99);
+  const pg = makePage(seed, { printed: printedPages }), { W, H } = pg, r = rng(seed + 99);
   const pixels = new ImageData(new Uint8ClampedArray(pg.input.data), W, H);
   const t0 = Date.now();
   const an = await analyzePage(pixels);
@@ -93,10 +95,16 @@ for (let seed = +first; seed < +first + +count; seed++) {
   const told = pg.blocks.map((b, i) => tells(items[i]));
   const n = told.filter(Boolean).length;
   const row = {
-    seed, script: pg.script, colour: pg.colour, ms, lines: n,
+    seed, script: pg.script, printed: printedPages, colour: pg.colour, ms, lines: n,
     found: found.filter((f, i) => f && told[i]).length,
     placed: pg.blocks.filter((b, i) => told[i] && per[i].letter != null).length,
     left: rows.filter((x, i) => told[i] && x.left).length, stays: rows.filter((x, i) => told[i] && x.stays).length,
+    // by kind of lettering: in bubbles (and captions), free over the art, printed on objects, slanted free
+    ...Object.fromEntries(["bubble", "free", "printed", "slanted"].flatMap((g) => {
+      const of = (b) => (g === "printed" ? b.printed : g === "slanted" ? b.shape === "slanted" : g === "free" ? b.kind === "free" && b.shape !== "slanted" : !!b.bubble);
+      const ids = pg.blocks.map((b, i) => (told[i] && of(b) ? i : -1)).filter((i) => i >= 0);
+      return [[`${g}Lines`, ids.length], [`${g}Stays`, ids.filter((i) => rows[i].stays).length]];
+    })),
     restore: +(rows.reduce((s, x, i) => s + (told[i] ? x.restore : 0), 0) / Math.max(1, n)).toFixed(2),
     letterFar: per.filter((e, i) => told[i] && e.letter != null && (e.letter < 0.6 || e.letter > 1.6)).length,
     small: per.filter((e, i) => told[i] && e.drawn != null && e.drawn < 0.7).length,
