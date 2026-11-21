@@ -4,6 +4,35 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
 
 ## [Unreleased]
 
+## [2.14.0] — 2026-11-21
+
+Fixes from the Kamen Rider W chapter read with 2.13.1, and long strips in the web app shown part by part.
+
+### Pages
+- **No more half-minute wait on a page with a huge sound effect.** 2.13.1's debug report showed the cause, and it was not the graphics card (its fills on that page took 0.4–0.5 s). It was the quick eraser (Telea) that covers a textured area until its fill is done. It looks around each pixel over 0.3 of the letter size, and its time grows about with the square of that reach: for the sound effect of 125 px letters, over most of the page, it reached 38 px and took 35.6 s here (about 31 s in your report: the page's fills ahead started 31 s late). It runs on the thread that also takes Claude's answers, so Claude's time read 35 s on that page and 34 s on the page before it. Its reach is now 6 px at most, what dialogue up to 20 px letters always had: erasing that area takes 3.2 s here instead of 36.7 s. Where the area is filled afterwards (LaMa, or AOT without a graphics card), the reach doesn't show; replayed with neither, the 106 areas it changed came out about the same (crude either way; compared by eye).
+- **A line Claude gives back untranslated is asked again.** Claude now gives every line's original text along with its translation (the "Also transcribe the original text" option is gone; it is always on). A line whose translation is its original, word for word, isn't drawn as given:
+  - a single word ("Ah!", a name) stays as drawn;
+  - a longer line is asked again, as text, in one short call for the page. Translated this time, its translation is drawn; given back the same again, it is already in your language and stays as drawn, rather than being erased and lettered again with the same words.
+
+  On the Kamen Rider chapter, "No hay nada que no pueda crear!" came back in Spanish on both readings, and its English credits page was lettered again over itself. Each answer is longer by the originals' text (not measured; Options → What translating costs shows it per page). Pages translated before are asked again once (the cache key changed).
+- **Fewer words broken with a hyphen.** A word is split only when it has 8 letters or more, with 3 letters at least on each side: "CY-CLONE!", "TRIG-GER!" and "ex-pect-ed..." are no longer cut, and the line is set a little smaller instead.
+- Measured on 14 of your debug reports (the 13 from 2.13.1's notes and the 2.13.1 chapter, replayed with their saved answers; they stay local): lettering left (38 of 1,520 lines) and translations drawn over unerased lettering unchanged. The new line breaks set 12 more lines under 0.6 of the original lettering's size (100 against 89 of the lines in bubbles), "As I expected..." in a narrow bubble the smallest at half; in return words like "Kam-abakka King-dom" stay whole, and "Pa-thet-ic——!!" no longer runs out of its bubble. All 145 changed areas were compared by eye with 2.13.1. I found none worse in a way that matters; the one I'd call a loss is that "As I expected...". The replay can't show the originals and the re-ask (those reports' answers have no originals); tests cover them, and your next report will show them.
+
+### Debug report
+- **Why an area filled ahead is filled again.** While Claude answers, the textured areas are filled ahead. In your 2.13.1 report, 14 pages needed fills after the answer and had some done ahead; on 6 of them none of those done ahead was used, and every area was filled again. I could not make that happen here. Each fill done again now says whether that same area was filled ahead with a different stretch of page around it (`fill.runs[].miss: "around"`) or not at all (`"area"`). Not fixed.
+
+### Options
+- "Also transcribe the original text" is gone (always on, above).
+
+### Web app
+- All of the above (same engine, prompt and text fitting).
+- **A long strip shows part by part.** A tall screenshot is translated in parts, as the extension does it: each part is analysed and sent to Claude at once, and drawn as soon as it is finished ("translating… 2 of 3 parts done"). The app waited for the whole strip before.
+
+### Development
+- ADR 0016 (lines given back as drawn).
+- `npm run audit`: `GYT_PAGES=03,07` replays only those pages.
+- Tests: Telea's reach; the fill's miss reason; every line's original asked for; lines given back word for word (one word, re-asked and translated, re-asked and the same, a failed re-ask); a line given back keeps its lettering; the hyphenation rule; a long strip in the web app, part by part (browser test).
+
 ## [2.13.1] — 2026-11-20
 
 Fixes from the first two chapters read with 2.13 (a romance chapter and Kamen Rider W).
