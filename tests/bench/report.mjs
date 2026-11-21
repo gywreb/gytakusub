@@ -56,6 +56,21 @@ const quality = [
   "|---|---|---|---|---|---|---|---|---|",
   genRow("all", generated),
   ...Object.entries(SCRIPTS).map(([k, name]) => genRow(name, generated.filter((r) => r.script === k))),
+  "",
+  "### Where text size is lost",
+  "",
+  "What holds each line set under 0.7 of its size small: the same line fitted again in a room a quarter wider, and a quarter taller (`bench/limits.mjs`).",
+  "",
+  "| Pages | Lines set small | Width (a long word across a narrow room) | Height | Either | Not the room |",
+  "|---|---|---|---|---|---|",
+  ...[["Real, held out", held, "smallL", "measured"], ["Real, looked at", look, "smallL", "measured"], ["Generated", generated, "small", "lines"]].map(([name, rs, k, of]) =>
+    `| ${name} | ${pct(sum(rs, k), sum(rs, of))} | ${pct(sum(rs, "smallWidth"), sum(rs, k))} | ${pct(sum(rs, "smallHeight"), sum(rs, k))} | ${pct(sum(rs, "smallBoth"), sum(rs, k))} | ${pct(sum(rs, "smallNeither"), sum(rs, k))} |`),
+  "",
+  "On generated pages, where every letter size and bubble is known exactly:",
+  "",
+  `- **The size estimate:** with the true letter size, ${pct(sum(generated, "smallLetter"), sum(generated, "lines"))} of lines are set small, against ${pct(sum(generated, "small"), sum(generated, "lines"))}.`,
+  `- **The translation's length:** of the lines set small that are alone in their bubble, ${pct(sum(generated, "smallGeometry"), sum(generated, "smallGeometry") + sum(generated, "smallAvoidable"))} could not be set at 0.7 of their size in that bubble however they were laid out, with no margin from the outline. The rest (${n(sum(generated, "smallAvoidable"))} lines) could have been.`,
+  `- Not judged: ${n(sum(generated, "smallShared"))} small lines that share their bubble with another line, and ${n(sum(generated, "smallFree"))} over the art.`,
 ].join("\n");
 
 const put = (file, tag, block) => {
