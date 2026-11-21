@@ -35,7 +35,7 @@ Work through this list on a chapter you know. Tick what passes; for anything tha
 
 Options → tick **Debug overlay** → *Save*. Then, with the chapter translated, click the toolbar icon → **Export debug report**. One `.zip` downloads with, for every translated page on that tab, the original image, the debug render (red = bubbles found, blue = loose text, green = where text went) and the report JSON. Attach the zip here — nothing to screenshot or copy. (The hover bar also has a **Report** button that exports just that one page.)
 
-On my side `npm run replay -- report.zip` reproduces every page offline, so the fix comes with a test against your actual page, and `node layout-score.mjs *.zip` (in `tests/`) measures where translations land over every page you have ever exported — a change ships only if those numbers do not go down.
+On my side `npm run replay -- report.zip` reproduces every page offline, so the fix comes with a test against your actual page. A change to the engine ships only with numbers from pages it was never tuned on, real pages marked by researchers and generated pages in seven scripts, no worse on the held-out half ([QUALITY.md](QUALITY.md), [ADR 0017](adr/0017-measured-on-pages-never-tuned-on.md)). Your reports are the final check (`node layout-score.mjs *.zip` in `tests/`), not what the rules are tuned on.
 
 The report's `summary.json` also lists images that failed (`failed`: URL, size, error), so a "Could not fetch image" toast is reproducible without a screenshot.
 

@@ -177,6 +177,24 @@ await test("a tight box on the core of big lettering takes it; a small box in a 
   assert.equal(an3.regions.length, 0);
 });
 
+await test("lettering a translated line's box holds, that no line names, is erased with it (one line found as two regions)", () => {
+  // a shout found as two columns, two regions; Claude's one line stamped on the first
+  const a = para(300, 100, 60, 200, { vertical: true }), b = para(230, 110, 60, 180, { vertical: true });
+  const an = analysis([block(1, a), block(2, b)], [a, b]);
+  const { placements, regionIds } = layout(an, [item([225, 95, 140, 210], "Ahem!! Ahem!!", 1)]);
+  assert.ok(regionIds.has(1) && regionIds.has(2), [...regionIds].join());
+  assert.equal(placements.length, 1);
+  // never a region another line names, nor one only grazed by the box
+  const c = para(230, 110, 60, 180, { vertical: true });
+  const an2 = analysis([block(1, a), block(2, c)], [a, c]);
+  const { regionIds: ids2 } = layout(an2, [item([225, 95, 140, 210], "Ahem!!", 1), { ...item([230, 110, 60, 180], "", 2), kind: "sfx" }]);
+  assert.ok(!ids2.has(2), "a sound effect's region stays");
+  const an3 = analysis([block(1, a), block(2, para(330, 110, 120, 180, { vertical: true }))], []);
+  const { regionIds: ids3 } = layout(an3, [item([295, 95, 70, 210], "Ahem!!", 1)]);
+  assert.ok(!ids3.has(2), "a region the box only grazes stays");
+});
+
+
 // ---- coloured lettering, through the real analysis and eraser ----
 loadLettering();
 const page = (draw) => { const c = createCanvas(900, 600), x = c.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0, 0, 900, 600); draw(x); return x.getImageData(0, 0, 900, 600); };
@@ -197,5 +215,42 @@ for (const [name, rgb] of [["blue", [60, 140, 230]], ["orange", [250, 140, 20]]]
     assert.ok(after < 0.05 * before, `${after} of ${before} ${name} pixels left`);
   });
 }
+
+await test("black lettering in a white outline over dark art, found only on Claude's box, is erased letter and outline", async () => {
+  const img = page((x) => {
+    x.fillStyle = "#111"; x.fillRect(300, 100, 400, 400); // dark art
+    x.font = "bold 40px 'Comic Neue', sans-serif"; x.lineJoin = "round";
+    x.strokeStyle = "#fff"; x.lineWidth = 8; x.strokeText("RUN NOW", 360, 320);
+    x.fillStyle = "#000"; x.fillText("RUN NOW", 360, 320);
+  });
+  const area = { x: 350, y: 280, w: 230, h: 55 };
+  const white = (im) => { let n = 0; for (let y = area.y; y < area.y + area.h; y++) for (let x = area.x; x < area.x + area.w; x++) { const p = (y * im.width + x) * 4; if (im.data[p] > 200) n++; } return n; };
+  const before = white(img);
+  const an = await analyzePage(img);
+  const items = [{ tag: null, box: [352 / 900, 282 / 600, 226 / 900, 50 / 600], text: "Corre ya", size: "normal", kind: "sign" }];
+  const { regionIds } = layout(an, items);
+  const out = erase(cv, img, an, regionIds, { outline: 0.3 }).image;
+  an.dispose();
+  assert.ok(before > 800, `the outline is there (${before} px)`);
+  assert.ok(white(out) < 0.25 * before, `${white(out)} of ${before} outline pixels left`);
+});
+
+await test("a long vowel mark run past the detector's box in a bubble is erased with its column", async () => {
+  const img = page((x) => {
+    x.fillStyle = "#fff"; x.strokeStyle = "#000"; x.lineWidth = 4;
+    x.beginPath(); x.ellipse(450, 300, 110, 230, 0, 0, 2 * Math.PI); x.fill(); x.stroke();
+    x.fillStyle = "#000"; x.font = "36px 'Noto Sans CJK JP', sans-serif";
+    ["え", "っ"].forEach((ch, i) => x.fillText(ch, 432, 150 + i * 42));
+    x.fillRect(447, 205, 6, 180); // the stretched mark (apart from the glyphs), far past two glyphs' length
+  });
+  const an = await analyzePage(img);
+  const bub = an.regions.find((r) => r.kind === "bubble");
+  assert.ok(bub, "the bubble is found");
+  const { regionIds } = layout(an, [{ tag: bub.id, box: [425 / 900, 115 / 600, 50 / 900, 280 / 600], text: "Ehhh?!", size: "normal", kind: "bubble" }]);
+  const out = erase(cv, img, an, regionIds).image;
+  an.dispose();
+  let dark = 0; for (let y = 300; y < 380; y++) for (let x = 444; x < 456; x++) if (out.data[(y * 900 + x) * 4] < 100) dark++;
+  assert.ok(dark < 40, `${dark} dark pixels of the mark's lower part left`);
+});
 
 console.log(`\nFREETEXT TESTS PASSED (${passed})`);

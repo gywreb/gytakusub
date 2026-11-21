@@ -76,6 +76,23 @@ export function layout(an, items, opts = {}) {
   }
   shareStamp(an, groups);
   for (const [id, members] of groups) if (!members.some((m) => tells(m.it))) groups.delete(id);
+  // Lettering a translated line's box holds that no line of its own names is part of that line:
+  // Claude read it there, and what Claude reads is erased (ADR 0015). The detector often splits one
+  // line of large lettering into two regions (a title and its reading, a column each), and the
+  // region no line was tagged with stayed on the page beside the translation (2.14.2; measured on
+  // researcher-marked pages, docs/QUALITY.md). Free text only (a bubble's lettering is its own
+  // region's), at least half of it under the box, and never a region any line names (a sound
+  // effect or a line left as drawn included). Erased only: the translation keeps its own region's
+  // room (lettering claimed across a page of notes made one wide strip of tiny text).
+  const named = new Set(items.map((it) => it.tag).filter((t) => t != null));
+  const claimed = new Map(); // region id → the region whose line holds it
+  for (const [id, members] of groups) for (const m of members) {
+    if (!tells(m.it) || !m.px) continue;
+    for (const q of an.regions) {
+      if (q.kind === "bubble" || groups.has(q.id) || named.has(q.id) || claimed.has(q.id)) continue;
+      if (overlap(q.box, m.px) >= 0.5 * area(q.box)) claimed.set(q.id, id);
+    }
+  }
 
   const placements = [];
   for (const [id, members] of groups) {
@@ -163,7 +180,7 @@ export function layout(an, items, opts = {}) {
   }
 
   separate(placements);
-  return { placements, regionIds: new Set(groups.keys()) };
+  return { placements, regionIds: new Set([...groups.keys(), ...claimed.keys()]) };
 }
 
 const union = (bs) => { const x0 = Math.min(...bs.map((b) => b.x)), y0 = Math.min(...bs.map((b) => b.y)); return { x: x0, y: y0, w: Math.max(...bs.map((b) => b.x + b.w)) - x0, h: Math.max(...bs.map((b) => b.y + b.h)) - y0 }; };

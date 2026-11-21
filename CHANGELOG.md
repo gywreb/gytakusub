@@ -4,6 +4,42 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
 
 ## [Unreleased]
 
+## [2.14.2] — 2026-11-21
+
+The first release measured on pages it was never tuned on, and more of each line's lettering erased.
+
+### Pages
+- **Lettering split into two pieces is erased whole.** The detector sometimes finds one line of large lettering as two pieces: a title and its small reading beside it, or two columns of one shout. Claude's line was tied to one piece, and the other stayed on the page next to the translation. Now any lettering under a translated line's box is erased with that line, unless another line claims it. This covers free text only, and never a sound effect or a line left as drawn. The translation stays where it was.
+- **Marks that run past the detector's box are erased in plain bubbles.** A long vowel mark (えーー), a wave dash or the end of a column could run past the box the text detector drew. It was then taken for art and left. In a bubble whose surface is one colour, every mark wholly inside the bubble that reaches the lettering is now erased. A long, thin mark counts only if it runs along its own line, never if it's an arc of the outline. Bubbles over tone or art keep the old rule: there, the same sweep also erased strands of hair and foliage.
+- **Measured on pages never tuned on** (see Development):
+  - **Real pages:** 333 pages from the 44 held-out Manga109-s books, which nobody looked at while making this change.
+    - Lettering the independent detector still sees after erasing: 57 → 50 of 2,839 pieces (2.0% → 1.8%). Better on 6 pages, worse on 1.
+    - Lines found: unchanged. Sound effects changed: unchanged.
+    - Pixels changed away from any text: 0.119% → 0.121% of a page (+1.7%), most of it on one page.
+  - **Generated pages:** 150 held-out pages in seven scripts.
+    - Lines whose lettering was left untouched: 44 → 39 of 810. Better on 5 pages, worse on none.
+    - Changes away from the text: +5.6%. Bubble outlines: unchanged.
+  - **The extra change to the art** is, as far as I can tell, the fill around the lettering now erased. The bench can't separate that from harm to the art.
+  - **A broader version was tried and dropped.** On the books looked at, it removed three times as much leftover lettering (36 → 23 lines of 1,514) but changed 13% more pixels away from text: hair and foliage that the bubble model took for bubbles.
+
+### Development
+- **The quality bench** (`tests/bench/`, [docs/QUALITY.md](docs/QUALITY.md), [ADR 0017](docs/adr/0017-measured-on-pages-never-tuned-on.md)). From now on, engine changes are measured on pages they were never tuned on, against answers the engine's rules can't bend:
+  - **Real pages:** 654 Manga109-s pages, four spreads from each of its 87 books. Researchers boxed every line and outlined every sound effect. The books are split by a hash into a half that's looked at and a half that's only counted.
+  - **Generated pages:** seven scripts (Japanese, Chinese, Korean, English, Spanish, Portuguese, Vietnamese), drawn with and without their lettering, so every glyph, bubble and letter size is known exactly.
+  - **An independent detector** (ogkalu's comic-text-and-bubble-detector, not part of Gytakusub) checks what is left after erasing.
+  - Claude's answers are simulated from the marked boxes.
+  - `bench/report.mjs` writes the numbers into QUALITY.md, and into the README from 3.0.
+- **2.14.1 checked the same way.** Against 2.14.0: no measure worse. Lines set under 0.7 of their size went 10.7% → 10.1% on the real pages looked at, and 31% → 24% for Japanese on generated pages.
+- **The first numbers show where the engine is weak:** free text over art (on generated pages, 29% of its lines are left partly unerased, against 0.4% of bubble lines), and small English from Japanese, Chinese and Korean.
+- **Legal:** Manga109-s may not be redistributed. Its pages stay on the machine running the bench (`tests/bench/data/`, ignored by git), and only the list of pages used is committed. Its terms ask that published results name it and cite its papers; QUALITY.md does.
+- Tests:
+  - lettering a translated line's box holds, that no other line claims, is erased with it (and never a region another line names, or one the box only grazes);
+  - a long vowel mark run past the detector's box in a bubble is erased with its column;
+  - black lettering in a white outline over dark art, found only on Claude's box, is erased letter and outline.
+
+### Web app
+- All of the above (same engine).
+
 ## [2.14.1] — 2026-11-21
 
 Fixes from your Portuguese chapter read with 2.14.0, and text set to the bubble's shape (the start of the 2.14 step's layout goal).
