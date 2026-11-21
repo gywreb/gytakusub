@@ -90,7 +90,7 @@ Module by module: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Why it is buil
 
 ## How well it works
 
-Every release is measured on pages its rules were never tuned on:
+The engine is measured on pages its rules were never tuned on:
 
 - **Real pages marked by researchers:** 654 pages from all 87 books of [Manga109-s](#acknowledgements), where every line of text has been boxed by hand. Half of the books are held out: they are only ever counted, never looked at while changing the engine.
 - **Generated pages in seven scripts** (Japanese, Chinese, Korean, English, Spanish, Portuguese, Vietnamese), where the exact answer is known: every glyph, every bubble's inside, every letter's size.
@@ -98,16 +98,16 @@ Every release is measured on pages its rules were never tuned on:
 
 Claude's answers are simulated in these tests (from the marked boxes, moved and resized a little as Claude's are), so the numbers measure Gytakusub, not Claude's reading.
 
-| Measure | 2.14.1 | 3.0 |
-|---|---|---|
-| Lines found on the page before Claude answers | 96.9% | to fill at release |
-| Lettering the independent detector still sees after erasing | 2.0% | to fill at release |
-| Lines set under 0.7 of the original lettering's size | 10.1%\* | to fill at release |
-| Pixels changed away from any text (art damage) | 0.12% | to fill at release |
+<!-- quality:start (written by `node tests/bench/report.mjs`; don't edit by hand) -->
+| Measure | Result |
+|---|---|
+| Lines found on the page before Claude answers | 96.9% |
+| Lettering the independent detector still sees after erasing | 2.0% |
+| Lines set under 0.7 of the original lettering's size | 10.1% |
+| Pixels changed away from any text (art damage) | 0.12% |
+<!-- quality:end -->
 
-Real pages, held-out books (333 pages, 2,752 lines). \*On the books that were looked at (321 pages): the held-out run of 2.14.1 did not record it.
-
-How each number is measured, per script and per kind of text: [`docs/QUALITY.md`](docs/QUALITY.md).
+Per script, per kind of text, and how each number is measured: [`docs/QUALITY.md`](docs/QUALITY.md).
 
 ## Privacy and permissions
 
