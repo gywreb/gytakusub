@@ -275,9 +275,17 @@ async function processPage(page) {
       page.media.append(page.img);
     }
     setStatus(page, t("web_status_translating"));
+    const lettering = prepareLettering(settings); // the bundled fonts and the target language's hyphenation
+    // a long strip is shown part by part, as each is finished (translator.js)
+    const shown = async (partial, done, total) => {
+      page.look = await lettering;
+      if (page.status !== "working") return;
+      page.result = partial; drawPage(page);
+      setStatus(page, t("web_status_parts", { done: n(done), total: n(total) }));
+    };
     const [result, look] = await Promise.all([
-      translateImage(page.img, settings, settings.useContext ? ctx : { terms: [], recent: [] }),
-      prepareLettering(settings), // the bundled fonts and the target language's hyphenation
+      translateImage(page.img, settings, settings.useContext ? ctx : { terms: [], recent: [] }, (p, d, tot) => { shown(p, d, tot).catch((e) => console.warn("Gytakusub: drawing a part failed", e)); }),
+      lettering,
     ]);
     if (settings.useContext) ctx = result.ctx;
     page.result = result; page.look = look;

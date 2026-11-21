@@ -461,6 +461,9 @@
  "web_status_translating": {
   "message": "traduciendo…"
  },
+ "web_status_parts": {
+  "message": "traduciendo… {done} de {total} partes listas"
+ },
  "web_status_no_text": {
   "message": "no se encontró texto"
  },

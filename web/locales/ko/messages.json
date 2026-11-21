@@ -461,6 +461,9 @@
  "web_status_translating": {
   "message": "번역 중…"
  },
+ "web_status_parts": {
+  "message": "번역 중… {total}개 중 {done}개 부분 완료"
+ },
  "web_status_no_text": {
   "message": "글자를 찾지 못함"
  },

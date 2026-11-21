@@ -21,7 +21,8 @@ self.onmessage = async (e) => {
       setEnginePrefs({ lama: !!e.data.lama });
       self.postMessage({ id, ok: true });
     } else if (type === "prepare") {
-      const job = await preparePage(e.data.bitmap, e.data.settings);
+      // (part: one part of a long strip, {W, H, index, y0}: the bitmap holds its rows; see translator.js)
+      const job = await preparePage(e.data.bitmap, e.data.settings, e.data.part ? { part: e.data.part } : {});
       e.data.bitmap.close();
       const jobId = ++seq;
       jobs.set(jobId, job);

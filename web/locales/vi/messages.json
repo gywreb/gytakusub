@@ -461,6 +461,9 @@
  "web_status_translating": {
   "message": "đang dịch…"
  },
+ "web_status_parts": {
+  "message": "đang dịch… xong {done}/{total} phần"
+ },
  "web_status_no_text": {
   "message": "không thấy chữ"
  },

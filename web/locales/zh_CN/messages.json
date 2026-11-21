@@ -461,6 +461,9 @@
  "web_status_translating": {
   "message": "翻译中…"
  },
+ "web_status_parts": {
+  "message": "正在翻译… 已完成 {done}/{total} 部分"
+ },
  "web_status_no_text": {
   "message": "未找到文字"
  },
