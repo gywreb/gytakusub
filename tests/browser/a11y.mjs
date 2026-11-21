@@ -125,7 +125,9 @@ check("Esc closes the editor without saving", !nodes.some((n) => name(n) === "NO
 await page.screenshot({ path: path.join(out, "1-keyboard.png") });
 
 // ---- 4. the readable view: the page shown small, so its lines are drawn under 9 px ----
-const small = await openReader(330);
+// (280 px, the narrowest image translated: since 2.14.1 sets text to the bubble's shape, larger,
+// the first line is 9.6 px at 330)
+const small = await openReader(280);
 await page.focus("#before"); await page.keyboard.press("Tab"); await wait(200);
 check("a small line with the keyboard on it shows the readable view", await shown("readable"), "");
 await page.keyboard.press("Escape"); await wait(150);

@@ -67,7 +67,12 @@ export function extractJson(text) {
  * Convert one slice's raw model items to full-image fractions.
  * @returns {{items:Array, terms:Array}}
  */
-export function normalizeItems(rawItems, s, width, height) {
+/**
+ * @param {Array<{kind: string, source: string, text: string}>|null} [dropped] the lines labelled sound
+ *   effect or logo are left as drawn; given, they are added to it (for the debug report: a line
+ *   Claude labelled "sfx" that a character says is lost, and the report showed nothing; 2.14.1)
+ */
+export function normalizeItems(rawItems, s, width, height, dropped = null) {
   const items = [];
   for (const it of rawItems) {
     let box = null;
@@ -84,6 +89,7 @@ export function normalizeItems(rawItems, s, width, height) {
     let tag = Number(it.tag);
     if (!Number.isInteger(tag) || tag < s.tagFrom || tag > s.tagTo) tag = null;
     if (!box && tag === null) continue;
+    if (LEFT_AS_DRAWN.has(it.kind) && it.text) dropped?.push({ kind: it.kind, source: String(it.source || ""), text: String(it.text) });
     if (LEFT_AS_DRAWN.has(it.kind) || !it.text) continue;
     items.push({
       tag, box,
@@ -220,7 +226,8 @@ export const wordsOf = (s) => String(s || "").normalize("NFKD").replace(/\p{M}/g
  */
 export async function checkCopies(settings, items, fetchFn = fetch) {
   const copied = items.filter((it) => !LEFT_AS_DRAWN.has(it.kind) && wordsOf(it.text) && wordsOf(it.text) === wordsOf(it.source));
-  for (const it of copied) if (!wordsOf(it.source).includes(" ")) it.same = true;
+  // one word as drawn: no space in it ("S-SENPAI?", "HARU-CHAN.", a link count as one; 2.14.1)
+  for (const it of copied) if (!/\s/u.test(String(it.source).trim())) it.same = true;
   const ask = copied.filter((it) => !it.same);
   if (!ask.length) return null;
   try {

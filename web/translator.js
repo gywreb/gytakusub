@@ -168,6 +168,7 @@ async function translateRows(img, settings, ctx, part) {
   if (fin.segmentMs) timing.segment = fin.segmentMs;
   if (fin.backend) timing.backend = fin.backend;
   if (fin.fill) timing.fill = fin.fill;
+  if (fin.dropped?.length) timing.dropped = fin.dropped; // the lines labelled sound effects or logos, left as drawn
   if (fin.look?.boxes) timing.look = fin.look;
   if (fin.modelWait != null) timing.modelWait = fin.modelWait; // (waiting for the learned fill's model to load)
   const page = { items: fin.items, placements: fin.placements, regions: fin.regions, work: fin.work, letter: fin.letter, patches: fin.patches, width: prep.width, height: prep.height, engine: fin.engine, timing };

@@ -56,6 +56,54 @@ export function rowLetter(cv, ink, x0, y0, x1, y1) {
   const glyphs = glyphHeights(cv, ink, x0, y0, x1 - x0, y1 - y0);
   return { letter: glyphs && band < 0.4 * 1.15 * glyphs ? 1.15 * glyphs : band, band };
 }
+/**
+ * The letter size of a column of lettering (ink mask; the detector's box `ln`, the snapped box x0,
+ * y0 to x1, y1): the glyphs' width, from the ink profile across the column. Not the band near the
+ * peak as for rows of Latin: one stroke down the middle (a long vowel mark, a run of dots) dwarfs
+ * the rest of the profile. The glyphs span the run of columns with any real share of ink, counting
+ * only the marks wholly inside the detector's box, since hatching, tone or a neighbouring column's
+ * strokes run across its edges and would widen the run.
+ * A stack of short rows the detector took for one column ("O QUE / QUER / DIZER / COM / ISSO?" in
+ * a narrow oval) measured a whole row's width, 62 px for letters 14 px tall: the translation was
+ * aimed at that size, and the outline eaten by an eraser grown by it (2.14.1). A column's glyphs
+ * make rows of ink about as tall as it is wide; when its rows are under 1/3.5 of its width, they
+ * are rows of letters, and their height sets the size (× 1.15, as for rows). Not the glyphs' own
+ * heights: a kanji is several marks, and coloured lettering only part of its ink, which measured
+ * 4 px letters in 14 px columns. `band` keeps the width: whether this is lettering at all is
+ * judged on it, as before.
+ */
+export function columnLetter(cv, ink, ln, x0, y0, x1, y1) {
+  const W = ink.cols, H = ink.rows;
+  const bx0 = clamp(ln.x, 0, W - 1), by0 = clamp(ln.y, 0, H - 1), bw = clamp(ln.x + ln.w, bx0 + 1, W) - bx0, bh = clamp(ln.y + ln.h, by0 + 1, H) - by0;
+  const roi = ink.roi(new cv.Rect(bx0, by0, bw, bh)), lab = new cv.Mat(), st = new cv.Mat(), ce = new cv.Mat();
+  const nc = cv.connectedComponentsWithStats(roi, lab, st, ce, 8, cv.CV_32S), S = st.data32S, Lc = lab.data32S;
+  const inner = new Uint8Array(nc);
+  for (let i = 1; i < nc; i++) inner[i] = S[i * 5] > 0 && S[i * 5 + 1] > 0 && S[i * 5] + S[i * 5 + 2] < bw && S[i * 5 + 1] + S[i * 5 + 3] < bh ? 1 : 0;
+  const prof = new Int32Array(bw); let peak = 0;
+  for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) if (inner[Lc[y * bw + x]]) prof[x]++;
+  for (const v of prof) if (v > peak) peak = v;
+  roi.delete(); lab.delete(); st.delete(); ce.delete();
+  let best = 0, run = 0; for (const v of prof) { run = peak && v >= 0.12 * peak ? run + 1 : 0; if (run > best) best = run; }
+  const band = Math.max(4, best || x1 - x0);
+  // the rows of ink down the box: a column's glyphs make rows about as tall as the column is wide
+  // (one per glyph, or a few close ones); a stack of Latin rows makes rows far shorter than it is wide
+  // Rows of letters only: at least half the column wide, and three marks or more across their
+  // middle, as a row of letters has. The dots of a "…" down a column and the bars of a テ make
+  // short rows too, and measured "あ…" at 5 px and "イテテ" at 6 (2.14.1).
+  const I = ink.data, rows = [];
+  const marksAcross = (y) => { let n = 0, on = false; for (let x = x0; x < x1; x++) { const v = !!I[y * W + x]; if (v && !on) n++; on = v; } return n; };
+  let runH = 0, lo = Infinity, hi = -1;
+  for (let y = y0; y <= y1; y++) {
+    let a = -1, b = -1;
+    if (y < y1) for (let x = x0; x < x1; x++) if (I[y * W + x]) { if (a < 0) a = x; b = x; }
+    if (a >= 0) { runH++; lo = Math.min(lo, a); hi = Math.max(hi, b); continue; }
+    if (runH >= 3 && hi - lo + 1 >= 0.5 * band && marksAcross(y - 1 - (runH >> 1)) >= 3) rows.push(runH);
+    runH = 0; lo = Infinity; hi = -1;
+  }
+  rows.sort((a, b) => a - b);
+  const rowH = rows.length >= 2 ? rows[rows.length >> 1] : 0;
+  return { letter: rowH && band > 3.5 * rowH ? 1.15 * rowH : band, band };
+}
 const trace = (...a) => { if (globalThis.GYT_TRACE) globalThis.GYT_TRACE(...a); };
 // The letter size of a group of paragraphs: that of most of its lettering, each
 // paragraph weighing as many glyphs as it holds (up to 40) — a speck the detector
@@ -186,23 +234,7 @@ export function analyze(cv, img, opts = {}) {
     if (!ln.vertical) {
       ({ letter, band } = rowLetter(cv, P.ink, x0, y0, x1, y1)); // (cap height from the ink profile, or the glyphs)
     } else {
-      // A column of CJK: the glyphs' width, from the ink profile across the column.
-      // Not the band near the peak as for rows of Latin: one stroke down the middle
-      // (a long vowel mark, a run of dots) dwarfs the rest of the profile. The
-      // glyphs span the run of columns with any real share of ink — counting only
-      // the marks wholly inside the detector's box, since hatching, tone or a
-      // neighbouring column's strokes run across its edges and would widen the run.
-      const bx0 = clamp(ln.x, 0, W - 1), by0 = clamp(ln.y, 0, H - 1), bw = clamp(ln.x + ln.w, bx0 + 1, W) - bx0, bh = clamp(ln.y + ln.h, by0 + 1, H) - by0;
-      const roi = P.ink.roi(new cv.Rect(bx0, by0, bw, bh)), lab = new cv.Mat(), st = new cv.Mat(), ce = new cv.Mat();
-      const nc = cv.connectedComponentsWithStats(roi, lab, st, ce, 8, cv.CV_32S), S = st.data32S, Lc = lab.data32S;
-      const inner = new Uint8Array(nc);
-      for (let i = 1; i < nc; i++) inner[i] = S[i * 5] > 0 && S[i * 5 + 1] > 0 && S[i * 5] + S[i * 5 + 2] < bw && S[i * 5 + 1] + S[i * 5 + 3] < bh ? 1 : 0;
-      const prof = new Int32Array(bw); let peak = 0;
-      for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) if (inner[Lc[y * bw + x]]) prof[x]++;
-      for (const v of prof) if (v > peak) peak = v;
-      roi.delete(); lab.delete(); st.delete(); ce.delete();
-      let best = 0, run = 0; for (const v of prof) { run = peak && v >= 0.12 * peak ? run + 1 : 0; if (run > best) best = run; }
-      letter = Math.max(4, best || x1 - x0);
+      ({ letter, band } = columnLetter(cv, P.ink, ln, x0, y0, x1, y1)); // (the column's width, or the glyphs)
     }
     if (x1 - x0 < 3 || y1 - y0 < 3) continue; // snapped down to nothing: no lettering there
     // ink pixels in the box = the lettering; a glyph count estimate for tag sanity and scoring
