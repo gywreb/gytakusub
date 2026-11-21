@@ -12,6 +12,7 @@
 // scripts/vendor-detector.mjs.
 
 import { createSession, run } from "./ort.js";
+import { DETECT } from "./tuning.js";
 
 const MEAN = [0.485, 0.456, 0.406], STD = [0.229, 0.224, 0.225];
 
@@ -31,7 +32,7 @@ export async function loadDetector(cv, modelBytes, opts = {}) {
 }
 
 /** The page's longest side at the model's input; DB post-processing: probability threshold, minimum mean score of a box, unclip ratio. */
-const DEFAULT_POST = { maxSide: 960, thresh: 0.3, boxThresh: 0.5, unclip: 1.6 };
+const DEFAULT_POST = { maxSide: DETECT.maxSide, thresh: DETECT.thresh, boxThresh: DETECT.boxThresh, unclip: DETECT.unclip };
 
 function loadDnn(cv, modelBytes) {
   const name = `ppocr-det-${Math.random().toString(36).slice(2)}.onnx`;
@@ -78,12 +79,12 @@ export async function detectInEmptyBubbles(cv, det, img, lines, instances, bubbl
   for (const inst of instances) {
     if (bubbleClasses && !bubbleClasses.has(inst.cls)) continue;
     const { x, y, w, h } = inst.box;
-    if (w < 12 || h < 12 || !inst.mask) continue;
+    if (w < DETECT.bubbleMinPx || h < DETECT.bubbleMinPx || !inst.mask) continue;
     const inMask = (px, py) => { const lx = Math.round(px) - x, ly = Math.round(py) - y; return lx >= 0 && ly >= 0 && lx < w && ly < h && inst.mask[ly * w + lx] !== 0; };
     if (out.some((l) => inMask(l.x + l.w / 2, l.y + l.h / 2))) continue;
     const crop = new ImageData(new Uint8ClampedArray(w * h * 4), w, h), cd = crop.data, sd = img.data, W = img.width;
     for (let yy = 0; yy < h; yy++) cd.set(sd.subarray(((y + yy) * W + x) * 4, ((y + yy) * W + x + w) * 4), yy * w * 4);
-    const found = await detectText(cv, det, crop, { maxSide: 960, maxScale: 2 });
+    const found = await detectText(cv, det, crop, { maxSide: DETECT.maxSide, maxScale: DETECT.cropZoom });
     for (const l of found) {
       const g = { ...l, x: l.x + x, y: l.y + y };
       if (inMask(g.x + g.w / 2, g.y + g.h / 2)) out.push(g);
@@ -106,14 +107,14 @@ export async function detectInDarkShapes(cv, det, img, lines) {
   const W = img.width, H = img.height;
   const src = cv.matFromImageData(img), gray = new cv.Mat(), dark = new cv.Mat();
   cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY); src.delete();
-  cv.threshold(gray, dark, 70, 255, cv.THRESH_BINARY_INV);
+  cv.threshold(gray, dark, DETECT.darkShape, 255, cv.THRESH_BINARY_INV);
   const labels = new cv.Mat(), stats = new cv.Mat(), cents = new cv.Mat();
   const n = cv.connectedComponentsWithStats(dark, labels, stats, cents, 8, cv.CV_32S);
   const S = stats.data32S, L = labels.data32S, G = gray.data, shapes = [];
   const hasLine = (r) => lines.some((l) => { const cx = l.x + l.w / 2, cy = l.y + l.h / 2; return cx >= r.x && cy >= r.y && cx < r.x + r.width && cy < r.y + r.height; });
   for (let i = 1; i < n; i++) {
     const r = { x: S[i * 5], y: S[i * 5 + 1], width: S[i * 5 + 2], height: S[i * 5 + 3] }, ink = S[i * 5 + 4];
-    if (ink < 0.002 * W * H || ink > 0.06 * W * H || ink < 0.45 * r.width * r.height || r.width > 4 * r.height || r.height > 4 * r.width || hasLine(r)) continue;
+    if (ink < DETECT.shapeMinArea * W * H || ink > DETECT.shapeMaxArea * W * H || ink < DETECT.shapeMinFill * r.width * r.height || r.width > DETECT.shapeMaxAspect * r.height || r.height > DETECT.shapeMaxAspect * r.width || hasLine(r)) continue;
     // the shape filled (lettering holes included), its convexity, and the light ink in it
     const m = new cv.Mat(r.height, r.width, cv.CV_8UC1), md = m.data;
     for (let y = 0; y < r.height; y++) for (let x = 0; x < r.width; x++) md[y * r.width + x] = L[(r.y + y) * W + r.x + x] === i ? 255 : 0;
@@ -124,11 +125,11 @@ export async function detectInDarkShapes(cv, det, img, lines) {
     if (best >= 0) {
       const ct = contours.get(best), hull = new cv.Mat(); cv.convexHull(ct, hull);
       const solidity = filled / Math.max(1, cv.contourArea(hull)); hull.delete(); ct.delete();
-      if (solidity >= 0.9 && filled >= 0.6 * r.width * r.height) {
+      if (solidity >= DETECT.shapeSolidity && filled >= DETECT.shapeFilled * r.width * r.height) {
         m.setTo(new cv.Scalar(0)); cv.drawContours(m, contours, best, new cv.Scalar(255), -1);
         let inside = 0, light = 0;
-        for (let y = 0; y < r.height; y++) for (let x = 0; x < r.width; x++) if (md[y * r.width + x]) { inside++; if (G[(r.y + y) * W + r.x + x] > 180) light++; }
-        if (light >= 0.01 * inside && light <= 0.35 * inside) shapes.push({ r, mask: new Uint8Array(md) });
+        for (let y = 0; y < r.height; y++) for (let x = 0; x < r.width; x++) if (md[y * r.width + x]) { inside++; if (G[(r.y + y) * W + r.x + x] > DETECT.shapeLightInk) light++; }
+        if (light >= DETECT.shapeLightMin * inside && light <= DETECT.shapeLightMax * inside) shapes.push({ r, mask: new Uint8Array(md) });
       }
     }
     contours.delete(); hier.delete(); m.delete();
@@ -139,7 +140,7 @@ export async function detectInDarkShapes(cv, det, img, lines) {
     const { x, y, width: w, height: h } = r;
     const crop = new ImageData(new Uint8ClampedArray(w * h * 4), w, h), cd = crop.data, sd = img.data;
     for (let yy = 0; yy < h; yy++) cd.set(sd.subarray(((y + yy) * W + x) * 4, ((y + yy) * W + x + w) * 4), yy * w * 4);
-    for (const l of await detectText(cv, det, crop, { maxSide: 960, maxScale: 2 })) {
+    for (const l of await detectText(cv, det, crop, { maxSide: DETECT.maxSide, maxScale: DETECT.cropZoom })) {
       const lx = Math.round(l.x + l.w / 2), ly = Math.round(l.y + l.h / 2);
       if (lx >= 0 && ly >= 0 && lx < w && ly < h && mask[ly * w + lx]) out.push({ ...l, x: l.x + x, y: l.y + y });
     }
@@ -164,14 +165,14 @@ export async function detectInTranslatedBoxes(cv, det, img, lines, boxes, look =
   const W = img.width, H = img.height, out = lines.slice();
   const centreIn = (l, g) => { const cx = l.x + l.w / 2, cy = l.y + l.h / 2; return cx >= g.x && cy >= g.y && cx <= g.x + g.w && cy <= g.y + g.h; };
   for (const b of boxes) {
-    if (b.w < 6 || b.h < 6) continue; // a degenerate box says nothing about where
-    const g = { x: b.x - 0.25 * b.w, y: b.y - 0.25 * b.h, w: 1.5 * b.w, h: 1.5 * b.h };
+    if (b.w < DETECT.lookMinPx || b.h < DETECT.lookMinPx) continue; // a degenerate box says nothing about where
+    const g = { x: b.x - DETECT.lookKeep * b.w, y: b.y - DETECT.lookKeep * b.h, w: (1 + 2 * DETECT.lookKeep) * b.w, h: (1 + 2 * DETECT.lookKeep) * b.h };
     // lettering already found there: lines the layout would take (score 0.7 up) over a quarter of the box
-    if (out.reduce((n, l) => n + ((l.score ?? 1) >= 0.7 ? overlapArea(l, b) : 0), 0) >= 0.25 * b.w * b.h) continue;
-    const m = 0.5 * Math.max(b.w, b.h, 24);
+    if (out.reduce((n, l) => n + ((l.score ?? 1) >= DETECT.lineScore ? overlapArea(l, b) : 0), 0) >= DETECT.lookCovered * b.w * b.h) continue;
+    const m = DETECT.lookMargin * Math.max(b.w, b.h, DETECT.lookMarginPx);
     const x = Math.max(0, Math.floor(b.x - m)), y = Math.max(0, Math.floor(b.y - m));
     const w = Math.min(W, Math.ceil(b.x + b.w + m)) - x, h = Math.min(H, Math.ceil(b.y + b.h + m)) - y;
-    if (w < 8 || h < 8) continue;
+    if (w < DETECT.lookMinCropPx || h < DETECT.lookMinCropPx) continue;
     look.boxes = (look.boxes || 0) + 1;
     const crop = new ImageData(new Uint8ClampedArray(w * h * 4), w, h), cd = crop.data, sd = img.data;
     for (let yy = 0; yy < h; yy++) cd.set(sd.subarray(((y + yy) * W + x) * 4, ((y + yy) * W + x + w) * 4), yy * w * 4);
@@ -182,7 +183,7 @@ export async function detectInTranslatedBoxes(cv, det, img, lines, boxes, look =
   }
   return out;
 }
-const LOOK_SIDE = 640, LOOK_ZOOM = 4;
+const LOOK_SIDE = DETECT.lookSide, LOOK_ZOOM = DETECT.lookZoom;
 const overlapArea = (a, b) => Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
 
 /** detectText for the OpenCV backend only, without a promise (analyze() is synchronous). */
@@ -196,7 +197,7 @@ export function detectTextSync(cv, det, img, opts = {}) {
 
 /** Resize to a multiple of 32 within maxSide and normalise to the model's input (CHW float). */
 function prepareInput(cv, img, opts) {
-  const maxSide = opts.maxSide ?? 960;
+  const maxSide = opts.maxSide ?? DETECT.maxSide;
   const W = img.width, H = img.height;
   const scale = Math.min(opts.maxScale ?? 1, maxSide / Math.max(W, H));
   const w = Math.max(32, Math.round((W * scale) / 32) * 32), h = Math.max(32, Math.round((H * scale) / 32) * 32);
@@ -239,7 +240,7 @@ function decodeOutput(cv, probData, inp, opts) {
   const lines = [];
   for (let i = 1; i < n; i++) {
     const x = S[i * 5], y = S[i * 5 + 1], bw = S[i * 5 + 2], bh = S[i * 5 + 3], a = S[i * 5 + 4];
-    if (a < 12 || bw < 3 || bh < 3) continue;
+    if (a < DETECT.minComponentPx || bw < DETECT.minSidePx || bh < DETECT.minSidePx) continue;
     // mean probability inside the component (DB's box score)
     let sum = 0; for (let yy = y; yy < y + bh; yy++) for (let xx = x; xx < x + bw; xx++) { const p = yy * w + xx; if (L[p] === i) sum += P[p]; }
     const score = sum / a;
@@ -249,7 +250,7 @@ function decodeOutput(cv, probData, inp, opts) {
     const ex = Math.max(1, dist), ey = Math.max(1, dist);
     const X = (x - ex) / sx, Y = (y - ey) / sy, Wd = (bw + 2 * ex) / sx, Hd = (bh + 2 * ey) / sy;
     const bx = Math.max(0, Math.round(X)), by = Math.max(0, Math.round(Y));
-    lines.push({ x: bx, y: by, w: Math.min(W - bx, Math.round(X + Wd) - bx), h: Math.min(H - by, Math.round(Y + Hd) - by), score, vertical: bh > 1.5 * bw });
+    lines.push({ x: bx, y: by, w: Math.min(W - bx, Math.round(X + Wd) - bx), h: Math.min(H - by, Math.round(Y + Hd) - by), score, vertical: bh > DETECT.verticalAspect * bw });
   }
   prob.delete(); bin.delete(); bin8.delete(); labels.delete(); stats.delete(); cents.delete();
   return lines;

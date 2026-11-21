@@ -8,6 +8,8 @@
 //    [0, 1] with the masked pixels zeroed, mask as above, output in [0, 1]; one size only
 //    (`side`, 512): the area is scaled to fit it and padded to it.
 
+import { FILL } from "./tuning.js";
+
 /**
  * Inpaints one area. Only masked pixels change in the result.
  * @param {typeof import("../vendor/opencv.js")} cv
@@ -87,7 +89,7 @@ export async function aotInpaint(cv, model, rgb, mask, opts = {}) {
 }
 
 /** The largest side the model inpaints at: on the GPU, and on the CPU (a time budget, see ADR 0013). */
-export const GPU_SIDE = 768, CPU_SIDE = 384;
+export const GPU_SIDE = FILL.gpuSide, CPU_SIDE = FILL.cpuSide;
 /** The one size the LaMa file takes (scripts/lama-static.py): what it was finetuned at. */
 export const LAMA_SIDE = 512;
 
@@ -112,7 +114,7 @@ function isGrey(rgb, mask) {
     if (m[i] > 127) continue;
     const r = d[i * 3], g = d[i * 3 + 1], b = d[i * 3 + 2];
     seen++;
-    if (Math.max(r, g, b) - Math.min(r, g, b) > 24) coloured++;
+    if (Math.max(r, g, b) - Math.min(r, g, b) > FILL.greySpread) coloured++;
   }
-  return seen > 0 && coloured / seen < 0.02;
+  return seen > 0 && coloured / seen < FILL.greyShare;
 }

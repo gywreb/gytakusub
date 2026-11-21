@@ -11,6 +11,7 @@
 //   overflow  over 3% of a bubble line's translation drawn outside its bubble
 // Per page: damage (pixels changed away from every line to translate), outline (bubble outline
 // pixels erased), kept (sound effects and lines left as drawn, changed).
+import "./tune-env.mjs"; // first: GYT_TUNE must be set before the engine loads
 import fs from "node:fs";
 import path from "node:path";
 import { createCanvas } from "canvas";

@@ -13,6 +13,7 @@
 // back to the pixels of the image given.
 
 import { createSession, run } from "./ort.js";
+import { SEGMENT } from "./tuning.js";
 
 const sigmoid = (v) => 1 / (1 + Math.exp(-v));
 
@@ -115,7 +116,7 @@ export function dedupe(instances) {
       const px = x + xx, py = y + yy;
       if (kept.some((k) => { const lx = px - k.box.x, ly = py - k.box.y; return lx >= 0 && ly >= 0 && lx < k.box.w && ly < k.box.h && k.mask[ly * k.box.w + lx]; })) covered++;
     }
-    if (total && covered / total >= 0.7) continue;
+    if (total && covered / total >= SEGMENT.dupCover) continue;
     kept.push(inst);
   }
   return kept;

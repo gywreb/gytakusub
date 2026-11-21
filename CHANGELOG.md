@@ -4,6 +4,21 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
 
 ## [Unreleased]
 
+## [2.14.3] — 2026-11-22
+
+The first step of 3.0, "Measured core": the engine gets one public entry point and one file for its numbers. Pages come out exactly as in 2.14.2.
+
+### Development
+- **One entry point to the engine.** The extension's service worker and the web app's worker now reach the engine only through `engine/index.js`. Any thread can load `engine/contract.js` without the models: it holds how a page is cut for the model and how the model's answer is checked. `prompt.js` re-exports it, and the engine no longer imports `prompt.js`. CI checks this boundary (`scripts/check-engine-contract.mjs`), so a stage can be replaced without touching a caller.
+- **The engine's numbers in one file.** `engine/tuning.js` holds 251 values by stage: layout, eraser, analysis, detector, screentone fill, learned fill, page. Each has its unit and what it bounds. Unless a line says otherwise, a value was set by hand before the bench existed. A test checks that each is a number the engine reads. Not moved: what belongs to a model (its input sizes, the bubble model's thresholds), and the rule-based analysis used only when no text detector loads.
+- **The bench can vary them.** `GYT_TUNE='{"LAYOUT":{"adoptMaxLetter":5}}'` changes values for one run, to see which ones a result hangs on (docs/QUALITY.md).
+- **Checked: nothing changed.** 176 real pages, 60 generated pages and 30 with printed and slanted lettering came out identical to 2.14.2: every count, and every pixel of each erased page.
+- **Generated pages with printed and slanted lettering** (`--printed`): lettering printed on tilted objects, sometimes white on a dark emblem, and free text slanted up to 0.4 rad. Your Portuguese chapter left lettering there, and the bench had neither. On 300 such pages (2.14.2), lines whose lettering stays: bubbles under 1%, printed on objects 18–20%, free text 22–25%, slanted 33–40%. These are the cases 3.0 works on.
+- **Report checks set apart what the replay can't reproduce.** A line placed differently in the replay than in your report (6 of 77 in the Portuguese chapter, run on your graphics card) is listed as "replay differs", not counted as a failure of the engine.
+
+### Web app
+- The offline cache now holds every engine module. It lacked four (the detector, the bubble model's code, the model runtime's loader, and the rule-based analysis), which loaded only from the network.
+
 ## [2.14.2] — 2026-11-21
 
 The first release measured on pages it was never tuned on, and more of each line's lettering erased.
