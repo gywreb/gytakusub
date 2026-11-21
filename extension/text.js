@@ -162,6 +162,17 @@
     setFont(minSize);
     const whole = wrapInfo(measure, text, rect.w, { ...how, hyphenate: false });
     if (Math.max(0, ...whole.lines.map(measure)) <= rect.w * 1.3) return { size: minSize, lines: whole.lines, lineHeight: minSize * lh, hyphens: 0, overflow: true };
+    // Still too big: the floor (a share of the original lettering's size) is wrong for this box,
+    // so it gives way before any word is cut. A floor of 64 px set "There you are!" in a 97 px
+    // bubble as "e / you / ar- / e!" (2.13.1).
+    for (size = minSize - 1; size >= (opts.lowest ?? 6); size--) {
+      setFont(size);
+      const plain = wrapInfo(measure, text, rect.w, { ...how, hyphenate: false });
+      if (fits(plain)) return { size, lines: plain.lines, lineHeight: size * lh, hyphens: 0, below: true };
+      const h = wrapInfo(measure, text, rect.w, how);
+      if (h.hyphens && fits(h)) return { size, lines: h.lines, lineHeight: size * lh, hyphens: h.hyphens, below: true };
+    }
+    setFont(minSize);
     const { lines } = wrapInfo(measure, text, rect.w, { ...how, force: true });
     return { size: minSize, lines, lineHeight: minSize * lh, hyphens: 0, forced: true };
   }

@@ -314,7 +314,9 @@ async function translatePage(msg, settings, tabId, work) {
   const part = Number.isInteger(msg.part) && msg.part >= 0 && msg.part < 1000 ? msg.part : null; // one slice of a tall image
   const cacheKey = "cache:" + (await sha1(`${PROMPT_VERSION}|${settings.model}|${settings.targetLang}|${settings.includeSource}|${settings.useContext}|${msg.url || msg.dataUrl}${part != null ? "#part" + part : ""}`)); // the whole data URL: two images can share a beginning
   const cached = (await chrome.storage.session.get(cacheKey))[cacheKey];
-  const timing = {}; let t = performance.now();
+  // start: when the page began (epoch ms); with the steps' durations below and each fill's own
+  // start (fill.runs), the debug report lays the pages' work out on one timeline
+  const timing = { start: Date.now() }; let t = performance.now();
   const lap = (k) => { const n = performance.now(); timing[k] = Math.round(n - t); t = n; };
 
   // Cache holds the model's answer only (not image bytes, which would exhaust
@@ -388,6 +390,7 @@ async function answerPage(msg, settings, tabId, work, { job, natural, cached, ca
       if (!pre.signal.aborted) await pass();
     })().catch(() => {});
     let failed = null;
+    const c0 = performance.now();
     try {
       // the same page already on its way to Claude (the reader reloaded, or opened it twice): wait
       // for that answer rather than pay for a second
@@ -402,6 +405,8 @@ async function answerPage(msg, settings, tabId, work, { job, natural, cached, ca
         try { ({ results, usage, newTerms } = await asking); }
         finally { if (answering.get(cacheKey) === asking) answering.delete(cacheKey); }
       }
+      // Claude's own time: "model" is this plus the wait for a fill under way ahead of the answer
+      timing.claude = Math.round(performance.now() - c0);
     } catch (e) { failed = e; }
     finally { pre.abort(); await prefilled; } // (stopped before the analyses are used or freed)
     if (failed) { disposeJob(job); throw failed; }

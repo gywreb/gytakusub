@@ -96,7 +96,8 @@ export function loadImage(src) {
 export async function translateImage(img, settings, ctx = { terms: [], recent: [] }) {
   if (!settings.apiKey) throw new Error(t("web_no_key"));
   // the times of each step, as the extension's debug report has them (analyze, model, finish)
-  const timing = {}; let t0 = performance.now();
+  // (start: epoch ms, for a timeline with each fill's own start, fill.runs; "model" is Claude's time)
+  const timing = { start: Date.now() }; let t0 = performance.now();
   const lap = (k) => { const n = performance.now(); timing[k] = Math.round(n - t0); t0 = n; };
   const prepare = async () => {
     const bitmap = await createImageBitmap(img);

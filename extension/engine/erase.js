@@ -430,11 +430,12 @@ export async function eraseFullSize(cv, natural, nx, ny, mask, scale, ox, oy, ar
     let f;
     // (context: the full-size page around the patch, for a model of one size; see fillTexture)
     let ctx = null;
+    const at = Date.now(); // (when it started: the debug report's timeline)
     if (context) { const c = cv.matFromImageData(context.image); ctx = { image: new cv.Mat(), x: context.x, y: context.y, side: context.side }; cv.cvtColor(c, ctx.image, cv.COLOR_RGBA2RGB); c.delete(); }
     try { f = await fillArea(cv, model, rgb, m, on, { margin: Math.ceil(2 / scale), cache, context: ctx }); }
     catch (e) { ctx?.image.delete(); src.delete(); rgb.delete(); out.delete(); m.delete(); on?.delete(); throw e; } // (NotLoaded: the caller leaves it for later)
     ctx?.image.delete();
-    done = f.mat; area.filled = f.kind; area.fillMs = f.ms; area.fillHit = !!f.hit;
+    done = f.mat; area.filled = f.kind; area.fillMs = f.ms; area.fillRunMs = f.runMs; area.fillAt = at; area.fillHit = !!f.hit;
   }
   if (!done) { done = new cv.Mat(); cv.inpaint(rgb, m, done, Math.max(3, Math.round((area.radius || 3) / scale)), cv.INPAINT_TELEA); }
   cv.cvtColor(done, out, cv.COLOR_RGB2RGBA);
@@ -450,7 +451,8 @@ export async function eraseFullSize(cv, natural, nx, ny, mask, scale, ox, oy, ar
  * surface is not filled again — prefillPage() fills a page's areas while its translation is on the
  * way, and finishPage() then finds them there. A changed input is a new key, so the cache can
  * only ever save time, never change a result.
- * @returns {Promise<{mat: any|null, kind: "tone"|"learned"|"telea", ms: number, hit?: boolean}>} ms: the time it took
+ * @returns {Promise<{mat: any|null, kind: "tone"|"learned"|"telea", ms: number, runMs?: number, hit?: boolean}>} ms: the time it
+ *   took; runMs: the learned model's own run within it
  */
 /**
  * Thrown by a model function (see fillArea) whose model isn't loaded yet, for a caller that
@@ -468,7 +470,7 @@ export async function fillArea(cv, model, rgb, hole, source, opts = {}) {
     return { mat, kind: had.kind, ms: ms(), hit: true };
   }
   const done = await fillAreaNow(cv, model, rgb, hole, source, opts);
-  if (key) opts.cache.set(key, { kind: done.kind, ms: done.ms ?? ms(), ...(done.mat ? { data: new Uint8Array(done.mat.data), rows: done.mat.rows, cols: done.mat.cols, type: done.mat.type() } : {}) });
+  if (key) opts.cache.set(key, { kind: done.kind, ms: done.ms ?? ms(), runMs: done.runMs, ...(done.mat ? { data: new Uint8Array(done.mat.data), rows: done.mat.rows, cols: done.mat.cols, type: done.mat.type() } : {}) });
   return { ...done, ms: ms() };
 }
 
@@ -478,7 +480,7 @@ async function fillAreaNow(cv, model, rgb, hole, source, opts) {
   // (the model may be given as a function that loads it: then it is loaded only when an area needs it)
   const m = typeof model === "function" ? await model() : model;
   if (m) {
-    try { const mat = await aotInpaint(cv, m, rgb, hole, { context: opts.context }); return { mat, kind: "learned" }; }
+    try { const timing = {}; const mat = await aotInpaint(cv, m, rgb, hole, { context: opts.context, timing }); return { mat, kind: "learned", runMs: timing.run }; }
     catch (e) { console.warn("Gytakusub: learned inpainting failed, using Telea", e); }
   }
   return { mat: null, kind: "telea" };
@@ -529,8 +531,9 @@ export async function fillTexture(cv, model, img, erased, opts = {}) {
     if (erased.surface && r.label) { on = erased.surface.roi(rect).clone(); const od = on.data; for (let i = 0; i < od.length; i++) od[i] = od[i] === r.label ? 255 : 0; }
     try {
       if (cv.countNonZero(hole)) {
+        const at = Date.now();
         const f = await fillArea(cv, model, crop, hole, on, { cache: opts.cache, context: opts.side ? { image: rgb, x: x0, y: y0, side: opts.side } : null });
-        r.filled = f.kind; r.fillMs = f.ms; r.fillHit = !!f.hit;
+        r.filled = f.kind; r.fillMs = f.ms; r.fillRunMs = f.runMs; r.fillAt = at; r.fillHit = !!f.hit;
         if (f.mat) { f.mat.copyTo(view); f.mat.delete(); }
       }
     } catch (e) {

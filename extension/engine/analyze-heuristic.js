@@ -143,15 +143,16 @@ export function mergeParagraphs(lines) {
     outer: for (let i = 0; i < out.length; i++) for (let j = i + 1; j < out.length; j++) {
       const a = out[i], b = out[j];
       if (a.dark !== b.dark || a.group !== b.group) continue; // group: the bubble each line lies in, when known
-      const L = Math.max(a.letter, b.letter);
-      if (Math.min(a.letter, b.letter) < 0.5 * L) continue;
+      // (on the lines' bands where measured: analyze.js rowLetter)
+      const la = a.band ?? a.letter, lb = b.band ?? b.letter, L = Math.max(la, lb);
+      if (Math.min(la, lb) < 0.5 * L) continue;
       const A = a.gbox, B = b.gbox;
       const stacked = overlapFrac(A.x, A.x + A.w, B.x, B.x + B.w) >= 0.4 && gap(A.y, A.y + A.h, B.y, B.y + B.h) <= 1.3 * L;
       const beside = overlapFrac(A.y, A.y + A.h, B.y, B.y + B.h) >= 0.4 && gap(A.x, A.x + A.w, B.x, B.x + B.w) <= 0.8 * L;
       if (!stacked && !beside) continue;
       const ux0 = Math.min(A.x, B.x), uy0 = Math.min(A.y, B.y), ux1 = Math.max(A.x + A.w, B.x + B.w), uy1 = Math.max(A.y + A.h, B.y + B.h);
       const bx0 = Math.min(a.box.x, b.box.x), by0 = Math.min(a.box.y, b.box.y), bx1 = Math.max(a.box.x + a.box.w, b.box.x + b.box.w), by1 = Math.max(a.box.y + a.box.h, b.box.y + b.box.h);
-      out[i] = { ...a, gbox: { x: ux0, y: uy0, w: ux1 - ux0, h: uy1 - uy0 }, box: { x: bx0, y: by0, w: bx1 - bx0, h: by1 - by0 }, glyphs: a.glyphs.concat(b.glyphs), glyphCount: a.glyphCount + b.glyphCount, components: a.components + b.components, inkArea: a.inkArea + b.inkArea, letter: Math.max(a.letter, b.letter), lines: (a.lines || 1) + (b.lines || 1), lineWidth: (a.lineWidth || a.gbox.w) + (b.lineWidth || b.gbox.w), lineLetters: (a.lineLetters || [a.letter]).concat(b.lineLetters || [b.letter]), parts: (a.parts || [a.gbox]).concat(b.parts || [b.gbox]), lineBoxes: (a.lineBoxes || [a.line || a.gbox]).concat(b.lineBoxes || [b.line || b.gbox]), pieces: Math.max(a.pieces || 1, b.pieces || 1) };
+      out[i] = { ...a, gbox: { x: ux0, y: uy0, w: ux1 - ux0, h: uy1 - uy0 }, box: { x: bx0, y: by0, w: bx1 - bx0, h: by1 - by0 }, glyphs: a.glyphs.concat(b.glyphs), glyphCount: a.glyphCount + b.glyphCount, components: a.components + b.components, inkArea: a.inkArea + b.inkArea, letter: Math.max(a.letter, b.letter), band: Math.max(la, lb), lines: (a.lines || 1) + (b.lines || 1), lineWidth: (a.lineWidth || a.gbox.w) + (b.lineWidth || b.gbox.w), lineLetters: (a.lineLetters || [a.letter]).concat(b.lineLetters || [b.letter]), lineBands: (a.lineBands || [a.band ?? a.letter]).concat(b.lineBands || [b.band ?? b.letter]), parts: (a.parts || [a.gbox]).concat(b.parts || [b.gbox]), lineBoxes: (a.lineBoxes || [a.line || a.gbox]).concat(b.lineBoxes || [b.line || b.gbox]), pieces: Math.max(a.pieces || 1, b.pieces || 1) };
       out.splice(j, 1); merged = true; break outer;
     }
   }
