@@ -24,3 +24,7 @@ web/fetcher-guide.json
 web/version.js
 # real manga pages for local tuning only — never committed
 tests/fixtures/real/
+# the quality bench: the independent detector, Manga109-s and the runs stay on the machine (docs/QUALITY.md)
+tests/bench/models/
+tests/bench/runs/
+tests/bench/data/
