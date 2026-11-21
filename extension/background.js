@@ -6,8 +6,7 @@
 
 import { callClaude, mergeContext, sliceGeometry } from "./prompt.js";
 import { addCall, addPage, emptyLog } from "./usage.js";
-import { preparePage, prefillPage, finishPage, warmInpainter, inpainterWarm } from "./engine/page.js";
-import { setEnginePrefs } from "./engine/cv.js";
+import { preparePage, prefillPage, finishPage, warmInpainter, inpainterWarm, setEnginePrefs } from "./engine/index.js";
 import { DEFAULT_SETTINGS, getSettings, CS_FILES, ensureContentScript } from "./settings.js";
 import { createLane, Cancelled } from "./lane.js";
 import { consentGiven, hasAccess, openWelcome, CONSENT_VERSION } from "./access.js";

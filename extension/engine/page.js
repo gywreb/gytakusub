@@ -13,7 +13,7 @@ import { aotInpaint, GPU_SIDE } from "./inpaint.js";
 
 // How far the mask grows over a lettering's outline, as a share of its letter size (ADR 0013).
 export const OUTLINE = 0.3;
-import { sliceGeometry, normalizeItems } from "../prompt.js";
+import { sliceGeometry, normalizeItems } from "./contract.js";
 
 /**
  * Text lines (and bubbles, with a segmenter) for one slice, then the analysis.
