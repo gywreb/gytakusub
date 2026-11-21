@@ -13,7 +13,7 @@ the engine's rules cannot bend.
 | Books | Pages | Lines | Found before Claude answers | Lettering still seen | Set under 0.7 of its size | Art damage | Sound effects changed |
 |---|---|---|---|---|---|---|---|
 | held out | 333 | 2,752 | 96.9% | 1.8% | 10.3% | 0.12% | 0.29% |
-| looked at | 176 | 1,489 | 96.4% | 2.1% | 10.7% | 0.10% | 0.25% |
+| looked at | 321 | 2,572 | 96.7% | 1.7% | 10.1% | 0.17% | 0.64% |
 
 ### Generated pages
 
@@ -27,6 +27,22 @@ the engine's rules cannot bend.
 | Spanish | 38 | 223 | 95.1% | 2.7% | 1.8% | 2.7% | 2.2% | 0.050% |
 | Portuguese | 36 | 194 | 94.8% | 3.1% | 0.0% | 2.1% | 0.0% | 0.020% |
 | Vietnamese | 36 | 205 | 94.1% | 5.4% | 1.5% | 5.4% | 2.2% | 0.098% |
+
+### Where text size is lost
+
+What holds each line set under 0.7 of its size small: the same line fitted again in a room a quarter wider, and a quarter taller (`bench/limits.mjs`).
+
+| Pages | Lines set small | Width (a long word across a narrow room) | Height | Either | Not the room |
+|---|---|---|---|---|---|
+| Real, held out | 10.3% | 58.7% | 5.7% | 31.7% | 4.3% |
+| Real, looked at | 10.1% | 60.1% | 6.2% | 30.6% | 3.1% |
+| Generated | 11.8% | 61.8% | 2.1% | 27.2% | 8.9% |
+
+On generated pages, where every letter size and bubble is known exactly:
+
+- **The size estimate:** with the true letter size, 11.2% of lines are set small, against 11.8%.
+- **The translation's length:** of the lines set small that are alone in their bubble, 72.1% could not be set at 0.7 of their size in that bubble however they were laid out, with no margin from the outline. The rest (39 lines) could have been.
+- Not judged: 22 small lines that share their bubble with another line, and 29 over the art.
 <!-- results:end -->
 
 ## What is measured
