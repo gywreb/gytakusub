@@ -404,12 +404,6 @@
  "opt_sends_names_and_the_last": {
   "message": "Envoie avec chaque page les noms et les ~40 dernières répliques traduites dans cet onglet : meilleure continuité, environ 400 tokens d'entrée en plus"
  },
- "opt_also_transcribe_the_original_text": {
-  "message": "Transcrire aussi le texte d'origine"
- },
- "opt_slower_slightly_more_careful_reading": {
-  "message": "Plus lent, lecture un peu plus attentive ; utile pour le débogage"
- },
  "opt_uppercase_lettering": {
   "message": "Lettrage en MAJUSCULES"
  },

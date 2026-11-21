@@ -404,12 +404,6 @@
  "opt_sends_names_and_the_last": {
   "message": "이 탭의 이름과 최근 번역한 대사 약 40줄을 페이지마다 함께 보냅니다. 일관성이 좋아지고 입력 토큰이 약 400개 늘어납니다"
  },
- "opt_also_transcribe_the_original_text": {
-  "message": "원문도 받아 적기"
- },
- "opt_slower_slightly_more_careful_reading": {
-  "message": "더 느리지만 조금 더 꼼꼼하게 읽습니다. 디버깅에 유용합니다"
- },
  "opt_uppercase_lettering": {
   "message": "영문 대문자로 쓰기"
  },

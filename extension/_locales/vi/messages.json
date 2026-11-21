@@ -404,12 +404,6 @@
  "opt_sends_names_and_the_last": {
   "message": "Gửi kèm các tên và khoảng 40 câu đã dịch gần nhất của thẻ này với mỗi trang: dịch liền mạch hơn, thêm khoảng 400 token đầu vào"
  },
- "opt_also_transcribe_the_original_text": {
-  "message": "Chép lại cả văn bản gốc"
- },
- "opt_slower_slightly_more_careful_reading": {
-  "message": "Chậm hơn, đọc kỹ hơn một chút; hữu ích khi gỡ lỗi"
- },
  "opt_uppercase_lettering": {
   "message": "Chữ IN HOA"
  },

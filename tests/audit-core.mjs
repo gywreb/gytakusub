@@ -18,7 +18,7 @@ import { execFileSync } from "node:child_process";
 import { createCanvas, loadImage } from "canvas";
 import { cv, detector, analyzePage } from "./cv-node.mjs";
 import { lookAgain } from "../extension/engine/page.js";
-import { layout, said } from "../extension/engine/layout.js";
+import { layout, tells } from "../extension/engine/layout.js";
 import { erase, fillTexture } from "../extension/engine/erase.js";
 import { getOrt, createSession, run as ortRun } from "../extension/engine/ort.js";
 import { loadLettering } from "./lettering-setup.mjs";
@@ -104,7 +104,10 @@ async function eraseNew(an, pixels, regionIds) {
 
 const rows = [];
 const crops = [];
+// GYT_PAGES=03,07: only those pages (to look at a few closely)
+const only = process.env.GYT_PAGES ? new Set(process.env.GYT_PAGES.split(",")) : null;
 for (const pg of summary.pages) {
+  if (only && !only.has(pg.id)) continue;
   const rep = JSON.parse(fs.readFileSync(path.join(tmp, `page-${pg.id}.json`), "utf8"));
   const orig = fs.readdirSync(tmp).find((f) => f.startsWith(`page-${pg.id}.original.`));
   if (!orig || !rep.work || !rep.items?.length) continue;
@@ -154,7 +157,7 @@ for (const pg of summary.pages) {
 
   // Claude's box for each item, in work pixels
   // (a line with nothing to translate, only marks, is left as drawn by design: not counted)
-  const seen = items.map((it) => (Array.isArray(it.box) && said(it.text) ? { x: it.box[0] * W, y: it.box[1] * H, w: it.box[2] * W, h: it.box[3] * H } : null));
+  const seen = items.map((it) => (Array.isArray(it.box) && tells(it) ? { x: it.box[0] * W, y: it.box[1] * H, w: it.box[2] * W, h: it.box[3] * H } : null));
   // lettering left (the witness): its text on the original inside a translated line's box, still there after erasing
   let lettering = 0, left = 0;
   if (rtdetr) {

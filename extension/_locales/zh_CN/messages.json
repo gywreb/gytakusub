@@ -404,12 +404,6 @@
  "opt_sends_names_and_the_last": {
   "message": "每页都附带此标签页中的人名和最近约 40 句已翻译的台词：更连贯，约多 400 个输入 token"
  },
- "opt_also_transcribe_the_original_text": {
-  "message": "同时转写原文"
- },
- "opt_slower_slightly_more_careful_reading": {
-  "message": "更慢，阅读稍微更仔细；便于调试"
- },
  "opt_uppercase_lettering": {
   "message": "大写字母（拉丁字母）"
  },

@@ -404,12 +404,6 @@
  "opt_sends_names_and_the_last": {
   "message": "Envía con cada página los nombres y las ~40 últimas frases traducidas de esta pestaña: más continuidad, unos 400 tokens de entrada más"
  },
- "opt_also_transcribe_the_original_text": {
-  "message": "Transcribir también el texto original"
- },
- "opt_slower_slightly_more_careful_reading": {
-  "message": "Más lento, lectura algo más cuidadosa; útil para depurar"
- },
  "opt_uppercase_lettering": {
   "message": "Rotulación en MAYÚSCULAS"
  },

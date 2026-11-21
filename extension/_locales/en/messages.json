@@ -404,12 +404,6 @@
  "opt_sends_names_and_the_last": {
   "message": "Sends names and the last ~40 translated lines of this tab with each page: better continuity, about 400 extra input tokens"
  },
- "opt_also_transcribe_the_original_text": {
-  "message": "Also transcribe the original text"
- },
- "opt_slower_slightly_more_careful_reading": {
-  "message": "Slower, slightly more careful reading; useful for debugging"
- },
  "opt_uppercase_lettering": {
   "message": "UPPERCASE lettering"
  },

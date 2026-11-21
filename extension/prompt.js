@@ -35,7 +35,8 @@ For each item return:
 - "box": [x, y, w, h] in PIXELS of this image: x,y = top-left corner of the text, w = width, h = height. Measure x against the ${slice.cw}px width and y against the ${slice.ch}px height independently. The box must tightly enclose the TEXT itself, not the whole bubble. Required for every item, most important for items with tag null.
 - "kind": one of "bubble", "narration", "sign", "sfx", "logo". A chapter title, a cover blurb or a caption is "narration" or "sign", not "logo".
 - "size": the lettering size relative to normal dialogue on this page: "small" (whispers, asides, tiny notes), "normal", or "large" (shouting, big bold lettering).
-${settings.includeSource ? `- "source": the original text, transcribed exactly (vertical Japanese: read top-to-bottom, right-to-left).\n` : ""}- "text": a natural, concise ${settings.targetLang} translation that matches the tone. Keep honorifics (-san, -kun) only where conventional. Never leave text untranslated. If the source is already in ${settings.targetLang}, copy it.
+- "source": the original text, transcribed exactly (vertical Japanese: read top-to-bottom, right-to-left).
+- "text": a natural, concise ${settings.targetLang} translation that matches the tone. Keep honorifics (-san, -kun) only where conventional. Text in any language other than ${settings.targetLang} is translated, however short, stylised or large it is drawn; only text already in ${settings.targetLang} is copied as it is.
 
 Order the items in natural reading order for the page (manga: right-to-left, top-to-bottom).
 
@@ -48,7 +49,7 @@ Terms already used on earlier pages (stay consistent with these):
 ${terms}
 ${recent}${settings.customPrompt.trim() ? `\nExtra instructions from the user:\n${settings.customPrompt.trim()}\n` : ""}
 Respond with ONLY a JSON object, no prose, in this exact shape:
-{"items":[{"tag":1,"box":[x,y,w,h],"kind":"bubble","size":"normal",${settings.includeSource ? `"source":"...",` : ""}"text":"..."}],"terms":[{"source":"...","translation":"..."}]}`;
+{"items":[{"tag":1,"box":[x,y,w,h],"kind":"bubble","size":"normal","source":"...","text":"..."}],"terms":[{"source":"...","translation":"..."}]}`;
 }
 
 // Extract the first JSON object from a model reply (tolerates code fences / prose).
@@ -90,6 +91,7 @@ export function normalizeItems(rawItems, s, width, height) {
       size: ["small", "normal", "large"].includes(it.size) ? it.size : "normal",
       source: String(it.source || ""),
       text: String(it.text || ""),
+      ...(it.same ? { same: true } : {}), // as drawn already (checkCopies)
     });
   }
   return items;
@@ -126,7 +128,7 @@ export function apiHeaders(apiKey) {
  * longer break the parse. Every property is required and objects are closed,
  * as structured outputs require.
  */
-export function answerSchema(includeSource) {
+export function answerSchema() {
   const item = {
     type: "object", additionalProperties: false,
     properties: {
@@ -134,10 +136,10 @@ export function answerSchema(includeSource) {
       box: { type: "array", items: { type: "number" } },
       kind: { type: "string", enum: ["bubble", "narration", "sign", ...LEFT_AS_DRAWN] },
       size: { type: "string", enum: ["small", "normal", "large"] },
-      ...(includeSource ? { source: { type: "string" } } : {}),
+      source: { type: "string" },
       text: { type: "string" },
     },
-    required: ["tag", "box", "kind", "size", ...(includeSource ? ["source"] : []), "text"],
+    required: ["tag", "box", "kind", "size", "source", "text"],
   };
   const term = { type: "object", additionalProperties: false, properties: { source: { type: "string" }, translation: { type: "string" } }, required: ["source", "translation"] };
   return { type: "object", additionalProperties: false, properties: { items: { type: "array", items: item }, terms: { type: "array", items: term } }, required: ["items", "terms"] };
@@ -164,7 +166,7 @@ export async function callClaude(settings, slice, ctx, fetchFn = fetch) {
     }],
   };
   const structured = !structuredRejected;
-  if (structured) body.output_config = { format: { type: "json_schema", schema: answerSchema(!!settings.includeSource) } };
+  if (structured) body.output_config = { format: { type: "json_schema", schema: answerSchema() } };
   const res = await fetchFn(API_URL, { method: "POST", headers: apiHeaders(settings.apiKey), body: JSON.stringify(body) });
   if (!res.ok) {
     let detail = "", hint = "";
@@ -189,13 +191,71 @@ export async function callClaude(settings, slice, ctx, fetchFn = fetch) {
     console.warn("Gytakusub: unreadable model answer:", text.slice(0, 4000));
     throw new Error(`Unreadable model answer (${e.message}; stop_reason: ${data.stop_reason ?? "none"})`);
   }
+  const items = Array.isArray(parsed.items) ? parsed.items : [];
+  const again = await checkCopies(settings, items, fetchFn);
   return {
-    items: Array.isArray(parsed.items) ? parsed.items : [],
+    items,
     terms: Array.isArray(parsed.terms) ? parsed.terms : [],
-    usage: data.usage || null,
+    usage: addUsage(data.usage || null, again),
     model: data.model || settings.model,
     limits: limitsOf(res.headers),
   };
+}
+
+const addUsage = (a, b) => (!b ? a : { ...(a || {}), input_tokens: (a?.input_tokens || 0) + (b.input_tokens || 0), output_tokens: (a?.output_tokens || 0) + (b.output_tokens || 0) });
+
+/** A line's words for comparing a translation with its original: letters and digits, lower case, no accents. */
+export const wordsOf = (s) => String(s || "").normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase().match(/[\p{L}\p{N}]+/gu)?.join(" ") || "";
+
+/**
+ * Lines Claude returned word for word as they are drawn (its "text" is its "source"). Haiku left a
+ * Spanish line untranslated on two readings of the same page, though told never to; and a credits
+ * page, already in English, was erased and lettered again with the same words (2.14). A single
+ * word given back as drawn (a name, "Ah!") is marked `same` and stays as drawn (engine/layout.js:
+ * like a line of only punctuation); asking about each would add a call to many pages. Longer lines
+ * are asked again on their own, as text, in one call for the page: a line that comes back translated
+ * takes the translation; one that comes back the same is already in the target language and is
+ * marked `same`. A failed re-ask changes nothing.
+ * @returns the re-ask's token usage, or null when there was nothing to ask
+ */
+export async function checkCopies(settings, items, fetchFn = fetch) {
+  const copied = items.filter((it) => !LEFT_AS_DRAWN.has(it.kind) && wordsOf(it.text) && wordsOf(it.text) === wordsOf(it.source));
+  for (const it of copied) if (!wordsOf(it.source).includes(" ")) it.same = true;
+  const ask = copied.filter((it) => !it.same);
+  if (!ask.length) return null;
+  try {
+    const { texts, usage } = await translateLines(settings, ask.map((it) => String(it.source)), fetchFn);
+    ask.forEach((it, i) => {
+      const t = texts[i];
+      if (typeof t === "string" && wordsOf(t) && wordsOf(t) !== wordsOf(it.source)) it.text = t;
+      else it.same = true;
+    });
+    return usage;
+  } catch (e) {
+    console.warn("Gytakusub: asking again for lines left untranslated failed", e);
+    return null;
+  }
+}
+
+/** One text-only call: each line translated, in order ({texts, usage}). */
+async function translateLines(settings, lines, fetchFn) {
+  const prompt = `Translate each of these lines from a comic page into ${settings.targetLang}. A line in any other language is translated, however short or stylised; a line already in ${settings.targetLang}, a name, or a sound written the same in ${settings.targetLang} stays exactly as it is.
+
+Lines (JSON):
+${JSON.stringify(lines)}
+
+Respond with ONLY a JSON object: {"texts":["...", ...]}, one entry per line, in the same order.`;
+  const body = {
+    model: settings.model,
+    max_tokens: 2048,
+    messages: [{ role: "user", content: prompt }],
+    ...(structuredRejected ? {} : { output_config: { format: { type: "json_schema", schema: { type: "object", additionalProperties: false, properties: { texts: { type: "array", items: { type: "string" } } }, required: ["texts"] } } } }),
+  };
+  const res = await fetchFn(API_URL, { method: "POST", headers: apiHeaders(settings.apiKey), body: JSON.stringify(body) });
+  if (!res.ok) throw new Error(`Claude API ${res.status}`);
+  const data = await res.json();
+  const parsed = extractJson((data.content || []).filter((c) => c.type === "text").map((c) => c.text).join("\n"));
+  return { texts: Array.isArray(parsed.texts) ? parsed.texts : [], usage: data.usage || null };
 }
 
 /** Merge new terms / lines into a chapter context object (pure). */

@@ -404,12 +404,6 @@
  "opt_sends_names_and_the_last": {
   "message": "Envia com cada página os nomes e as ~40 últimas falas traduzidas desta aba: mais continuidade, cerca de 400 tokens de entrada a mais"
  },
- "opt_also_transcribe_the_original_text": {
-  "message": "Transcrever também o texto original"
- },
- "opt_slower_slightly_more_careful_reading": {
-  "message": "Mais lento, leitura um pouco mais cuidadosa; útil para depurar"
- },
  "opt_uppercase_lettering": {
   "message": "Letras em MAIÚSCULAS"
  },

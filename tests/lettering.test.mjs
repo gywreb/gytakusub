@@ -117,6 +117,25 @@ test("German hyphenates with German patterns", () => {
   let at = 0;
   for (const l of r.lines.filter((x) => x.endsWith("-"))) { at += l.length - 1; assert.ok(allowed.has(at), `break after "${word.slice(0, at)}"`); }
 });
+// Short words are not split, nor are two letters left on a side (2.14: "CY-CLONE!", "TRIG-GER!",
+// "ex-pect-ed...", "un-deresti-mate" on a Kamen Rider chapter).
+test("words under 8 letters are never split; every split leaves 3 letters at least on each side", () => {
+  const en = GyHyphen.hyphenateEn;
+  for (const w of ["CYCLONE!", "TRIGGER!", "MAXIMUM", "expected...", "Kyoko!"]) assert.deepEqual(GyText.syllables(w, en), [w], w);
+  for (const w of ["underestimate", "impossible", "unbelievable!", "Kyoko-san's"]) {
+    const parts = GyText.syllables(w, en), letters = (x) => [...x].filter((c) => /\p{L}/u.test(c)).length, total = letters(w);
+    let before = 0;
+    for (const p of parts.slice(0, -1)) { before += letters(p); assert.ok(before >= 3 && total - before >= 3, `${w}: ${parts.join("-")}`); }
+    assert.equal(parts.join(""), w);
+  }
+  assert.ok(GyText.syllables("underestimate", en).length > 1, "a long word still splits");
+});
+test("a short shout in a narrow box stays whole (set smaller rather than split)", () => {
+  for (const w of ["CYCLONE!", "TRIGGER!"]) {
+    const r = fit(w, "en", 52, 120);
+    assert.equal(r.hyphens, 0, JSON.stringify(r.lines)); assert.equal(r.lines.join(""), w);
+  }
+});
 test("every bundled pattern file loads and splits a long word of its language", () => {
   const words = { "de-1996": "Geschwindigkeitsbegrenzung", es: "desafortunadamente", fr: "malheureusement", it: "sfortunatamente", nl: "onvoorstelbaar", pl: "niewiarygodnie", pt: "infelizmente", uk: "неймовірно" };
   for (const [name, word] of Object.entries(words)) assert.ok(GyText.syllables(word, patterns(name)).length > 1, name);

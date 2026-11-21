@@ -404,12 +404,6 @@
  "opt_sends_names_and_the_last": {
   "message": "このタブの名前と、直近に翻訳したセリフ約 40 行を各ページと一緒に送ります。一貫性が上がり、入力トークンが約 400 増えます"
  },
- "opt_also_transcribe_the_original_text": {
-  "message": "原文の書き起こしも行う"
- },
- "opt_slower_slightly_more_careful_reading": {
-  "message": "遅くなりますが、少し丁寧に読み取ります。デバッグに便利です"
- },
  "opt_uppercase_lettering": {
   "message": "英字を大文字にする"
  },

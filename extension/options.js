@@ -13,7 +13,7 @@ import { languageOptions, findLanguage } from "./languages.js";
 const $ = (id) => document.getElementById(id);
 const FIELDS = ["model", "glossary", "customPrompt", "fontFamily", "excludedSites"];
 const OTHER = "__other";
-const CHECKS = ["useContext", "includeSource", "uppercase", "syncApiKey", "debugOverlay", "peekOnHover", "useGpu"];
+const CHECKS = ["useContext", "uppercase", "syncApiKey", "debugOverlay", "peekOnHover", "useGpu"];
 
 function show(kind, text) {
   const m = $("msg");

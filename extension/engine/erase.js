@@ -10,6 +10,17 @@ const COLOUR_PLAIN = 40, COLOUR_APART = 64, PLAIN_SHARE = 0.9;
 // adopted lettering (layout.js) is erased only when this share of its line's ink is taken
 const ADOPTED_TAKEN = 0.6;
 
+/**
+ * Telea's neighbourhood (px) for an area's lettering size: 0.3 letter, 3 at least and TELEA_MAX at
+ * most. Its time grows about with the square of the radius: at 0.3 letter, a sound effect of 125 px
+ * letters (radius 38) took 35.6 s on one area, holding the engine's thread meanwhile (Claude's
+ * answers, the other pages), where 6 takes 1.1 s (2.14). 6 is what dialogue up to 20 px letters
+ * always had. On textured areas Telea is the stand-in until fillTexture(), and stays only where
+ * no learned model runs.
+ */
+export const TELEA_MAX = 6;
+export const teleaRadius = (letter) => Math.min(TELEA_MAX, Math.max(3, Math.round(letter * 0.3)));
+
 // Removes the original lettering from the regions that received a translation.
 // Inside a bubble: the glyph components (never the outline) are inpainted with
 // the bubble's own surface. Free text over artwork: the glyphs are inpainted
@@ -237,7 +248,7 @@ export function erase(cv, img, analysis, regionIds, opts = {}) {
         roi = { ...r.box };
       } else continue;
       if (r.kind === "bubble") rois.push({ ...roi, radius: 3, inside: analysis.insideOf(r.id), dark: r.dark, letter });
-      else rois.push({ ...roi, radius: Math.max(3, Math.round(letter * 0.3)), letter });
+      else rois.push({ ...roi, radius: teleaRadius(letter), letter });
       continue;
     }
     const glyphLabels = pol.glyphLabels.data32S, regionLabels = pol.regionLabels.data32S;
@@ -269,7 +280,7 @@ export function erase(cv, img, analysis, regionIds, opts = {}) {
       const bl = r.ref, { x, y, w, h } = bl.box;
       for (const gi of bl.glyphs) paintGlyph(glyphLabels, gi, pol.glyphs[gi]);
       const pad = Math.round(letter * 0.8);
-      rois.push({ x: Math.max(0, x - pad), y: Math.max(0, y - pad), w: Math.min(W, x + w + pad) - Math.max(0, x - pad), h: Math.min(H, y + h + pad) - Math.max(0, y - pad), radius: Math.max(3, Math.round(letter * 0.3)) });
+      rois.push({ x: Math.max(0, x - pad), y: Math.max(0, y - pad), w: Math.min(W, x + w + pad) - Math.max(0, x - pad), h: Math.min(H, y + h + pad) - Math.max(0, y - pad), radius: teleaRadius(letter) });
     }
   }
 
@@ -435,9 +446,9 @@ export async function eraseFullSize(cv, natural, nx, ny, mask, scale, ox, oy, ar
     try { f = await fillArea(cv, model, rgb, m, on, { margin: Math.ceil(2 / scale), cache, context: ctx }); }
     catch (e) { ctx?.image.delete(); src.delete(); rgb.delete(); out.delete(); m.delete(); on?.delete(); throw e; } // (NotLoaded: the caller leaves it for later)
     ctx?.image.delete();
-    done = f.mat; area.filled = f.kind; area.fillMs = f.ms; area.fillRunMs = f.runMs; area.fillAt = at; area.fillHit = !!f.hit;
+    done = f.mat; area.filled = f.kind; area.fillMs = f.ms; area.fillRunMs = f.runMs; area.fillAt = at; area.fillHit = !!f.hit; area.fillMiss = f.miss;
   }
-  if (!done) { done = new cv.Mat(); cv.inpaint(rgb, m, done, Math.max(3, Math.round((area.radius || 3) / scale)), cv.INPAINT_TELEA); }
+  if (!done) { done = new cv.Mat(); cv.inpaint(rgb, m, done, Math.min(TELEA_MAX, Math.max(3, Math.round((area.radius || 3) / scale))), cv.INPAINT_TELEA); }
   cv.cvtColor(done, out, cv.COLOR_RGB2RGBA);
   const result = new ImageData(new Uint8ClampedArray(out.data), W, H);
   src.delete(); rgb.delete(); done.delete(); out.delete(); m.delete(); on?.delete();
@@ -469,9 +480,15 @@ export async function fillArea(cv, model, rgb, hole, source, opts = {}) {
     const mat = had.data ? cv.matFromArray(had.rows, had.cols, had.type, had.data) : null;
     return { mat, kind: had.kind, ms: ms(), hit: true };
   }
+  // A miss where the page filled ahead (prefillPage) had this very area, only with other pixels
+  // around it ("around"), or not ("area"): the debug report says which. On 6 of 14 pages with
+  // fills both ahead and after the answer, none done ahead was used (2.13.1), and nothing said why.
+  const own = key && opts.context?.side ? "area:" + fillKey(rgb, hole, source, opts.margin) : null;
+  const miss = key ? (own && opts.cache.has(own) ? "around" : "area") : undefined;
   const done = await fillAreaNow(cv, model, rgb, hole, source, opts);
   if (key) opts.cache.set(key, { kind: done.kind, ms: done.ms ?? ms(), runMs: done.runMs, ...(done.mat ? { data: new Uint8Array(done.mat.data), rows: done.mat.rows, cols: done.mat.cols, type: done.mat.type() } : {}) });
-  return { ...done, ms: ms() };
+  if (own) opts.cache.set(own, true);
+  return { ...done, ms: ms(), ...(miss ? { miss } : {}) };
 }
 
 async function fillAreaNow(cv, model, rgb, hole, source, opts) {
@@ -533,7 +550,7 @@ export async function fillTexture(cv, model, img, erased, opts = {}) {
       if (cv.countNonZero(hole)) {
         const at = Date.now();
         const f = await fillArea(cv, model, crop, hole, on, { cache: opts.cache, context: opts.side ? { image: rgb, x: x0, y: y0, side: opts.side } : null });
-        r.filled = f.kind; r.fillMs = f.ms; r.fillRunMs = f.runMs; r.fillAt = at; r.fillHit = !!f.hit;
+        r.filled = f.kind; r.fillMs = f.ms; r.fillRunMs = f.runMs; r.fillAt = at; r.fillHit = !!f.hit; r.fillMiss = f.miss;
         if (f.mat) { f.mat.copyTo(view); f.mat.delete(); }
       }
     } catch (e) {
