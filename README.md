@@ -13,6 +13,7 @@ Gytakusub finds the text and the speech bubbles on a page, asks Claude to transl
 ## Contents
 
 - [Features](#features)
+- [Screenshots](#screenshots)
 - [Install](#install)
 - [Quick start](#quick-start)
 - [How it works](#how-it-works)
@@ -39,6 +40,15 @@ Gytakusub finds the text and the speech bubbles on a page, asks Claude to transl
 - **Analysed on your device.** Text and bubbles are found in your browser, on the graphics card when there is one. Only the page image goes to Claude.
 
 ![The same screentone bubble and narration erased by the old eraser (white clouds) and by the current one (continued screentone)](docs/media/erasing.png)
+
+## Screenshots
+
+| | |
+|---|---|
+| ![A Japanese test page with vertical lettering, and the same page lettered in English](store/assets/screenshot-4-japanese.png) | ![The extension's popup with its per-site switches, and the cost page](store/assets/screenshot-5-controls.png) |
+| Japanese, vertical lettering included | The popup and what translating costs |
+
+All pictures here are of test pages made for Gytakusub; no published manga is shown.
 
 ## Install
 
