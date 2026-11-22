@@ -163,7 +163,8 @@
       // slanted side, where its lines crossed the outline (2.15, the owner's French chapter)
       const shaped = fitShape(text, rect, opts.shape, setFont, measure, opts);
       const boxed = fitText(text, rect, setFont, measure, { ...opts, shape: null });
-      const pick = shaped && shaped.size >= boxed.size ? shaped : !shaped ? boxed : (setFont(boxed.size), outsideRoom(boxed, rect, opts.shape, measure, true) <= (opts.outsideOk ?? 0.03)) ? boxed : shaped;
+      // (judged on the room as the bubble's ink bounds it, when the layout gives it: `bound`)
+      const pick = shaped && shaped.size >= boxed.size ? shaped : !shaped ? boxed : (setFont(boxed.size), outsideRoom(boxed, rect, opts.bound || opts.shape, measure, true) <= (opts.outsideOk ?? 0.03)) ? boxed : shaped;
       setFont(pick.size); return pick;
     }
     const minSize = Math.max(6, Math.round(opts.minSize ?? 8));
@@ -350,7 +351,7 @@
    *   only `hyphenator` hyphenates (English's is built in). Without `lang`: English rules.
    *   `pageTexts`: every line of the page, when drawing only some, so the font stays the same.
    *   `skip`: a placement fitted but not drawn (the line peeked at: its bubble's other lines keep
-   *   the size they share with it). `sizes`, `fits`: filled per placement, drawn or not.
+   *   their size, which depends on it). `sizes`, `fits`: filled per placement, drawn or not.
    * @returns {number} count drawn
    */
   function draw(ctx, placements, opts = {}) {
@@ -363,10 +364,12 @@
     const family = look.family;
     const setFont = (size) => { ctx.font = `bold ${size}px ${family}`; };
     const measure = (s) => ctx.measureText(s).width;
-    // Each line's fit: the size its room allows (`plans`), then one size for the lines of one bubble
-    // whose lettering was one size, as the letterer set them (2.15: in a two-lobe bubble of the owner's
-    // French chapter, one translation came out at 31 px and the other at 20). Never below 0.7 of a
-    // line's own lettering for that: when one line can only be set smaller, the others don't follow it.
+    // Each line's fit: the size its room allows (`plans`), then the lines of one bubble whose
+    // lettering was one size kept within 20% of each other's size, as the letterer set them alike
+    // (2.15: in a two-lobe bubble of the owner's French chapter, one translation came out at 31 px and
+    // the other at 20). Never below 0.7 of a line's own lettering for that: when one line can only be
+    // set smaller, the others don't follow it. (All at the smallest size set 11 more lines of 456
+    // under 0.7 on real pages; within 20%, 3.)
     const plans = placements.map((p, i) => {
       const text = texts[i];
       // `letter` is the original cap height. The translation's capitals (or a Han character's
@@ -385,7 +388,7 @@
       // the one that fits the text larger, the placement's own on a tie
       let fit = null, at = p;
       for (const t of inBubble ? [p, ...(p.alt || [])] : [p]) {
-        const f = fitText(text, t.rect, setFont, measure, { ...how, shape: inBubble ? t.shape : null });
+        const f = fitText(text, t.rect, setFont, measure, { ...how, shape: inBubble ? t.shape : null, bound: inBubble ? t.bound : null });
         if (!fit || f.size > fit.size) { fit = f; at = t; }
       }
       return { fit, at };
@@ -398,7 +401,7 @@
       if (Math.max(...letters) > Math.min(...letters) * 1.2) continue; // lettering of two sizes: a shout beside a whisper keeps both
       const least = Math.min(...group.map((q) => q.fit.size));
       for (const q of group) {
-        const size = Math.max(least, Math.floor(0.7 * q.target));
+        const size = Math.max(Math.floor(1.2 * least), Math.floor(0.7 * q.target));
         if (q.fit.size > size) Object.assign(q, fitBest(q.text, q.p, true, { ...q.how, maxSize: size, minSize: Math.min(q.how.minSize, size) }));
       }
     }
@@ -407,7 +410,7 @@
       setFont(fit.size);
       if (p !== opts.skip) { drawLines(ctx, fit, at.rect, p.color, family, p.halo); n++; }
       if (opts.sizes) opts.sizes[i] = fit.size; // the size each line was drawn at, for callers that need it
-      if (opts.fits) opts.fits[i] = { size: fit.size, lines: fit.lines.length, outside: outsideRoom(fit, at.rect, inBubble ? at.shape : null, measure, true) };
+      if (opts.fits) opts.fits[i] = { size: fit.size, lines: fit.lines.length, outside: outsideRoom(fit, at.rect, inBubble ? at.bound || at.shape : null, measure, true) };
     });
     return n;
   }

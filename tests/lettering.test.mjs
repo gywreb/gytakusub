@@ -253,14 +253,14 @@ test("the share of a fit outside its room: none in the box, all of it past a sha
   assert.equal(GyText.outsideRoom(fit, rect, { dy: 0, step: 6, half: Array(10).fill(0) }, measure), 1);
 });
 
-test("the lines of one bubble share a size; lettering of two sizes keeps both; the line peeked at keeps its sibling's", () => {
+test("the lines of one bubble stay within 20% of each other's size; lettering of two sizes keeps both; the line peeked at keeps its sibling's", () => {
   const c = createCanvas(600, 400).getContext("2d");
   const line = (text, rect, letter = 20) => ({ text, rect, letter, measured: true, tag: 7, halo: false, color: "#000" });
   const roomy = line("Okay.", { x: 10, y: 10, w: 260, h: 200 }), tight = line("That is a long thing to say in here.", { x: 300, y: 10, w: 110, h: 120 });
   const alone = (p) => { const s = []; GyText.draw(c, [{ ...p, tag: p === roomy ? 1 : 2 }], { sizes: s }); return s[0]; };
   assert.ok(alone(roomy) > alone(tight) * 1.2, `the guard: ${alone(roomy)} px and ${alone(tight)} px alone`);
   const both = []; GyText.draw(c, [roomy, tight], { sizes: both });
-  assert.equal(both[0], both[1]);
+  assert.ok(both[0] <= Math.floor(1.2 * both[1]) && both[0] > both[1], `${both.join(" and ")} px`);
   assert.equal(both[1], alone(tight));
   const peeked = []; const drawn = GyText.draw(c, [roomy, tight], { sizes: peeked, skip: tight });
   assert.equal(drawn, 1); assert.deepEqual(peeked, both);

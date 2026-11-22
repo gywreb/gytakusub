@@ -136,27 +136,27 @@ export function layout(an, items, opts = {}) {
       // a hole of the interior — never past the outline. An interior from light regions has holes
       // where the lettering was; a box around that lettering reaches past a slanted or curved side at
       // its corners, and the translation set to the box crossed the outline (2.15: the owner's
-      // French chapter).
-      const spans = new Map(); // row → [first, last] x of the interior on it
-      const spanAt = (y) => {
-        const yy = Math.round(y);
-        if (!spans.has(yy)) { let lo = Infinity, hi = -Infinity; for (let x = Math.floor(bbox.x); x < bbox.x + bbox.w; x++) if (inside(x, yy)) { if (x < lo) lo = x; hi = x; } spans.set(yy, [lo, hi]); }
-        return spans.get(yy);
-      };
-      const inSpan = (x, y) => { const [lo, hi] = spanAt(y); return x >= lo && x <= hi; };
+      // French chapter). A hole is what the interior encloses, not merely what lies between its two
+      // sides on a row: between a burst's spikes, or in a cloud's notch, is outside.
+      const inHole = inside ? holesOf(inside, bbox) : () => false;
       // Lettering the interior does not hold (a box mostly past it) says the shape is wrong for it: a
       // patch of light art taken for a bubble around text drawn over the art. Its room keeps the
       // lettering's boxes whole, as before 2.15, so the text is never set smaller than it was drawn.
       const held = (boxes) => {
         let n = 0, k = 0;
-        for (const b of boxes) for (let j = 0; j < 8; j++) for (let i = 0; i < 8; i++) { const x = b.x + (i + 0.5) * b.w / 8, y = b.y + (j + 0.5) * b.h / 8; n++; if (inside(x, y) || inSpan(x, y)) k++; }
+        for (const b of boxes) for (let j = 0; j < 8; j++) for (let i = 0; i < 8; i++) { const x = b.x + (i + 0.5) * b.w / 8, y = b.y + (j + 0.5) * b.h / 8; n++; if (inside(x, y) || inHole(x, y)) k++; }
         return n ? k / n : 1;
       };
       const owns = told.map((m, i) => (!anchoredToLettering[i] ? [] : anchors[i].parts || lettering.filter((b) => overlap(b.gbox, anchors[i]) >= LAYOUT.most * area(b.gbox)).map((b) => b.gbox)));
-      const othersPart = inside && anchors.length > 1 ? roomParts(an, r, inside, inSpan, bbox, anchors, owns) : null;
+      const parts = inside ? roomParts(an, r, inside, inHole, bbox, anchors, owns) : null;
+      const othersPart = anchors.length > 1 ? parts?.othersPart : null;
       const roomOf = (own, i) => !inside ? inside : held(own) < LAYOUT.letteringHeld
         ? (x, y) => inside(x, y) || own.some((b) => inBox(b, x, y))
-        : (x, y) => (inside(x, y) || (own.some((b) => inBox(b, x, y)) && inSpan(x, y))) && !othersPart?.(i, x, y);
+        : (x, y) => (inside(x, y) || (own.some((b) => inBox(b, x, y)) && inHole(x, y))) && !othersPart?.(i, x, y);
+      // the room as far as the bubble's ink bounds it, with no margin: the bubble model's mask is
+      // smooth, and reaches past a burst's or a narrow bubble's outline. text.js takes the box's fit
+      // only when its letters stay inside this (2.15: such fits crossed bursts' outlines).
+      const boundOf = (room, i) => (parts && room ? (x, y) => room(x, y) && parts.within(i, x, y) : null);
       told.forEach((m, i) => {
         const a = anchors[i], own = owns[i];
         const room = roomOf(own, i);
@@ -179,13 +179,15 @@ export function layout(an, items, opts = {}) {
         // rectangle in an oval leaves its widest rows unused, and the text came out small (2.14.1).
         const edge = Math.max(LAYOUT.edgeMinPx, LAYOUT.edgeLetters * letter);
         const shape = roomShape(room, bbox, rect, [], others, edge);
+        const inked = boundOf(room, i), bound = inked && roomShape(inked, bbox, rect, [], others, 0);
         // The same room centred on the lettering itself: where the box above is far wider than the
         // lettering and off its centre (the wide middle of an L-shaped caption), the room on both sides
         // of the box's centre was narrow where the lettering stood, and the text came out ragged and
         // small (2.15, the owner's French chapter, page 6). text.js sets the text in whichever fits it larger.
         const mine = anchoredToLettering[i] ? clip(a, bbox) : null;
         const alt = mine && (Math.abs(mine.x + mine.w / 2 - (rect.x + rect.w / 2)) > LAYOUT.altOffset * letter || Math.abs(mine.y + mine.h / 2 - (rect.y + rect.h / 2)) > LAYOUT.altOffset * letter) ? roomShape(room, bbox, mine, [], others, edge) : null;
-        placements.push({ text: m.it.text, size: m.it.size, rect, letter, measured: true, color, halo: false, tag: id, item: m.it.index ?? null, ...(shape ? { shape } : {}), ...(alt ? { alt: [{ rect: mine, shape: alt }] } : {}) });
+        const altBound = alt && inked ? roomShape(inked, bbox, mine, [], others, 0) : null;
+        placements.push({ text: m.it.text, size: m.it.size, rect, letter, measured: true, color, halo: false, tag: id, item: m.it.index ?? null, ...(shape ? { shape } : {}), ...(bound ? { bound } : {}), ...(alt ? { alt: [{ rect: mine, shape: alt, ...(altBound ? { bound: altBound } : {}) }] } : {}) });
       });
       r.kept = kept.length ? kept : null;
     } else {
@@ -371,16 +373,16 @@ export function adoptLettering(an, items, newId) {
  */
 /**
  * The parts of a region its ink divides among its lines: what of the interior (and of the lettering's
- * holes in it, `inSpan`) each line's lettering reaches without crossing ink, with the ink it encloses.
+ * holes in it, `inHole`) each line's lettering reaches without crossing ink, with the ink it encloses.
  * Two caption boxes drawn side by side are one white region to the bubble model, but a box's border
  * runs across it. Returns `othersPart(i, x, y)`: whether the point is in another line's part and not in
- * line i's, which line i's room then leaves out. What no line reaches (the outline, its inner edge
+ * line i's, which line i's room then leaves out; and `within(i, x, y)`: whether it is in line i's part. What no line reaches (the outline, its inner edge
  * inside the bubble model's mask) stays in every room, so a region no ink divides keeps its room
  * whole. Null, for the region undivided, when the analysis has no ink mask, when the parts together
  * leave out much of the interior (ink across a bubble that is not a border: tone, speed lines), or
  * when a line's lettering reaches nothing.
  */
-function roomParts(an, r, inside, inSpan, bbox, anchors, owns) {
+function roomParts(an, r, inside, inHole, bbox, anchors, owns) {
   const ink = an.polarities?.[r.dark ? 1 : 0]?.inkMask;
   if (!ink?.data) return null;
   const I = ink.data, IW = ink.cols;
@@ -392,7 +394,7 @@ function roomParts(an, r, inside, inSpan, bbox, anchors, owns) {
   let open = 0;
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     const px = x0 + x, py = y0 + y;
-    const lettered = boxes.some((b) => inBox(b, px, py)) && inSpan(px, py);
+    const lettered = boxes.some((b) => inBox(b, px, py)) && inHole(px, py);
     if (lettered || (inside(px, py) && !I[py * IW + px])) { pass[y * w + x] = 1; open++; }
   }
   if (!open) return null;
@@ -420,13 +422,37 @@ function roomParts(an, r, inside, inSpan, bbox, anchors, owns) {
     for (const q of queue) if (!covered[q]) { covered[q] = 1; reached++; }
     parts.push(mark);
   }
-  globalThis.GYT_TRACE?.("room", bbox, reached >= LAYOUT.partsCover * open ? "divided by its ink" : "one room: its ink's parts leave out too much", { parts: parts.length, cover: +(reached / open).toFixed(2) });
+  globalThis.GYT_TRACE?.("room", bbox, reached >= LAYOUT.partsCover * open ? "its ink's parts" : "one room: its ink's parts leave out too much", { parts: parts.length, cover: +(reached / open).toFixed(2) });
   if (reached < LAYOUT.partsCover * open) return null;
-  return (i, px, py) => {
+  const at = (px, py) => { const x = Math.floor(px) - x0, y = Math.floor(py) - y0; return x < 0 || y < 0 || x >= w || y >= h ? -1 : y * w + x; };
+  return {
+    othersPart: (i, px, py) => { const q = at(px, py); return q >= 0 && !parts[i][q] && parts.some((m, j) => j !== i && m[q]); },
+    within: (i, px, py) => { const q = at(px, py); return q >= 0 && parts[i][q] === 1; },
+  };
+}
+
+/**
+ * The holes of a bubble's interior within its box: what the interior encloses (where the lettering
+ * was, in an interior from light regions), as against what lies outside it, reached from the box's
+ * edge without crossing the interior. Returns a test for a point.
+ */
+function holesOf(inside, bbox) {
+  const x0 = Math.floor(bbox.x), y0 = Math.floor(bbox.y), w = Math.ceil(bbox.x + bbox.w) - x0, h = Math.ceil(bbox.y + bbox.h) - y0;
+  if (w <= 0 || h <= 0) return () => false;
+  const out = new Uint8Array(w * h), queue = [];
+  const reach = (q) => { if (!out[q] && !inside(x0 + (q % w), y0 + ((q / w) | 0))) { out[q] = 1; queue.push(q); } };
+  for (let x = 0; x < w; x++) { reach(x); reach((h - 1) * w + x); }
+  for (let y = 0; y < h; y++) { reach(y * w); reach(y * w + w - 1); }
+  for (let k = 0; k < queue.length; k++) {
+    const q = queue[k], x = q % w;
+    if (q >= w) reach(q - w);
+    if (q < (h - 1) * w) reach(q + w);
+    if (x > 0) reach(q - 1);
+    if (x < w - 1) reach(q + 1);
+  }
+  return (px, py) => {
     const x = Math.floor(px) - x0, y = Math.floor(py) - y0;
-    if (x < 0 || y < 0 || x >= w || y >= h) return false;
-    const q = y * w + x;
-    return !parts[i][q] && parts.some((m, j) => j !== i && m[q]);
+    return x >= 0 && y >= 0 && x < w && y < h && !out[y * w + x] && !inside(px, py);
   };
 }
 
