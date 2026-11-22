@@ -13,13 +13,18 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
   - **Page 20:** a narrow bubble's lines ran out at the top and bottom, and a slanted bubble's text crossed the slant.
 
   Three causes, all fixed:
-  - A translation's room included the whole box of the lettering it replaces. In a curved or slanted bubble that box's corners lie past the outline. The room is now the bubble's inside and the erased lettering within it, never past the outline. The box's own fit is used only when its letters stay inside (at most 3% past the outline).
+  - A translation's room included the whole box of the lettering it replaces. In a curved or slanted bubble that box's corners lie past the outline. The room is now the bubble's inside and the erased lettering within it, never past the outline. The box's own fit is used only when its letters stay inside, margin included (at most 3% into it).
   - When nothing fitted even at the smallest size, lines could run past the box's top and bottom. Now only a little past its sides.
   - Two captions' lettering merged into one paragraph was cut across its rows. Now each line takes its own lines of it. Where a caption's border runs across one region, each line keeps to its side of the border.
 
-  One margin now keeps text off the outline (0.3 letter sizes). Before, a second margin came on top, so text in narrow bubbles came out smaller than it needed to. Where the room's centre is far from the lettering's, the text is also tried centred on the lettering, and takes whichever fits larger.
+  One margin now keeps text off the outline: 0.15 letter sizes from the outline's ink (below). Before, a second margin came on top, so text in narrow bubbles came out smaller than it needed to. Where the room's centre is far from the lettering's, the text is also tried centred on the lettering, and takes whichever fits larger.
 
   A bubble's outline is now found from its ink, not only from the bubble model's mask, which is smoother than a burst's spikes. Lettering counts as room only where the bubble encloses it, not in the gaps between a burst's spikes or in a cloud's notches.
+- **Lines no longer touch caption borders, bubble outlines or a burst's spikes.** Testing this release in your browser, lines on page 6 came within 1–2 px of a caption's border, and on page 9 against a burst's spikes. Your Naver run showed the same in oval bubbles. The margin was measured from the bubble model's mask, which is smooth and often reaches onto the outline. Two changes:
+  - The margin is now measured from the outline's ink, where the ink is known.
+  - A box's own fit must keep that margin too, not merely stay inside the outline.
+- **Text sits where its room is widest.** On page 6, the room under the two middle captions' lettering narrowed at the bottom. The text was centred on the lettering, so it came out at 17 and 20 px with room to spare above. A text block now stays centred on its lettering when it fits there. Otherwise it moves to where the room is widest for it. Replayed, those captions now come out at 26 and 29 px.
+- **A hyphenated word can end a line after its hyphen.** In page 9's right lobe, "remote-controlled" was one word too wide for the lobe, so the whole translation came out at 19 px. A line may now break after a hyphen between letters ("remote-" / "controlled", "peut-" / "être"), with no hyphen added. As with hyphenation, each side keeps at least 3 letters. Replayed, the two lobes now come out at 25 and 30 px (19 and 22 px in your test).
 - **The lines of one bubble come out at about one size.** In page 9's two-lobe bubble, the two translations came out at 31 and 20 px, where the letterer used one size. Now they're 30 and 25 px: lines of one bubble whose lettering was one size stay within 20% of each other's size.
   - No line goes under 0.7 of its own lettering's size to match another.
   - A shout beside a whisper (lettering more than 20% apart) keeps both sizes.
@@ -50,6 +55,8 @@ By shape, text past its bubble went from 27 to 7 lines in slanted bubbles and fr
 - Real lines under 0.7 of their size: the goal was "no worse".
 
 Size inside tight bubbles is on the list for after 3.0.
+
+- **The Report button could export the page before.** A reader that shows the next page in the same image left the extension holding the previous page's translation. A report taken there held the previous page under the current page's address (your page 6 and 9 reports). Only an image still showing the page it translated is exported now.
 
 ### Added
 - **The debug report shows how much of each line lies outside its room** ("outside" per line, in the extension's and the web app's reports), so text past its bubble shows in a report without anyone having to spot it.

@@ -52,6 +52,7 @@ function rematch(an, rep, it) {
 }
 
 const only = process.env.PAGES ? new Set(process.env.PAGES.split(",")) : null; // PAGES=06,09: those pages only
+const total = { lines: 0, now: 0, then: 0, recorded: false };
 for (const pg of summary.pages) {
   if (only && !only.has(pg.id)) continue;
   const rep = JSON.parse(fs.readFileSync(path.join(tmp, `page-${pg.id}.json`), "utf8"));
@@ -73,11 +74,16 @@ for (const pg of summary.pages) {
   octx.lineWidth = 2; octx.font = `bold ${Math.round(W / 70)}px sans-serif`;
   for (const r of an.regions) { octx.strokeStyle = r.kind === "bubble" ? "rgba(220,38,38,.9)" : "rgba(37,99,235,.9)"; octx.strokeRect(r.box.x, r.box.y, r.box.w, r.box.h); octx.fillStyle = octx.strokeStyle; octx.fillText("#" + r.id, r.box.x + 2, r.box.y - 3); }
   for (const p of placements) { octx.strokeStyle = "rgba(22,163,74,.9)"; octx.strokeRect(p.rect.x, p.rect.y, p.rect.w, p.rect.h); }
-  GyText.draw(octx, placements, { fontFamily: rep.settings?.fontFamily, uppercase: rep.settings?.uppercase });
+  const fits = [];
+  GyText.draw(octx, placements, { fontFamily: rep.settings?.fontFamily, uppercase: rep.settings?.uppercase, fits });
+  // lines over 3% outside their room, now and in the report (2.15 reports record it per line)
+  const past = (v) => v != null && v > 0.03;
+  const outNow = fits.filter((f) => past(f?.outside)).length, outThen = (rep.overlay?.outside || []).filter(past).length;
+  total.lines += fits.length; total.now += outNow; total.then += outThen; total.recorded ||= Array.isArray(rep.overlay?.outside);
   fs.writeFileSync(path.join(out, `page-${pg.id}.replay.png`), o.toBuffer("image/png"));
   fs.copyFileSync(path.join(tmp, orig), path.join(out, orig));
   const ms = Date.now() - t0;
-  console.log(`page ${pg.id}: ${W}x${H} ${ms}ms — regions ${compare(regionsNow, regionsThen, (r) => r.box)}; placements ${compare(placements, rep.placements, (p) => p.rect)}`);
+  console.log(`page ${pg.id}: ${W}x${H} ${ms}ms — regions ${compare(regionsNow, regionsThen, (r) => r.box)}; placements ${compare(placements, rep.placements, (p) => p.rect)}${outNow || outThen ? `; lines past their room: ${outNow} now, ${rep.overlay?.outside ? outThen : "?"} then` : ""}`);
   for (const it of items) {
     const p = placements.find((q) => q.text === it.text);
     const untagged = it.tag == null, region = it.tag != null ? regionsNow.find((r) => r.id === it.tag) : null;
@@ -86,4 +92,5 @@ for (const pg of summary.pages) {
   an.dispose();
 }
 fs.rmSync(tmp, { recursive: true, force: true });
+console.log(`lines over 3% past their room: ${total.now} of ${total.lines} now${total.recorded ? `, ${total.then} in the report` : ""}`);
 console.log(`renders in ${out}/`);

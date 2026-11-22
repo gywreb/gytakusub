@@ -190,6 +190,9 @@
   // ---------- image discovery ----------
 
   const srcOf = (img) => img.currentSrc || img.src || "";
+  // an image's entry while it still shows the picture translated: a reader reuses its <img> for the
+  // next page, and the entry then describes the page before
+  const liveEntry = (img) => { const e = img && entries.get(img); return e && e.src === srcOf(img) ? e : null; };
 
   // A page is something you read, so what counts is the size it's shown at. A large file shown
   // small is a site's logo, a cover thumbnail or a reaction emoji: these were translated (paid
@@ -319,7 +322,7 @@
     hideTimer = setTimeout(() => { bar.classList.remove("visible"); hoverImg = null; }, 350);
   }
   function refreshBar() {
-    const e = hoverImg && entries.get(hoverImg)?.src === srcOf(hoverImg) ? entries.get(hoverImg) : null;
+    const e = liveEntry(hoverImg);
     // what the button does applies to what's on screen: the page, or a tall image's parts there
     const ss = e ? shownUnits(hoverImg).map((k) => e.units.get(k)?.status) : [];
     const st = ss.includes("working") ? "working" : ss.includes("queued") ? "queued" : ss.length && ss.every((x) => x === "done") ? "done" : null;
@@ -346,7 +349,7 @@
   // (a tall image: its parts on screen; Redo when they're all translated)
   btnTranslate.addEventListener("click", (ev) => {
     if (!ev.isTrusted || !hoverImg) return;
-    const e = entries.get(hoverImg)?.src === srcOf(hoverImg) ? entries.get(hoverImg) : null;
+    const e = liveEntry(hoverImg);
     const keys = shownUnits(hoverImg), redo = keys.every((k) => e?.units.get(k)?.status === "done");
     for (const k of keys) if (redo || e?.units.get(k)?.status !== "done") enqueue(hoverImg, redo, false, k);
   });
@@ -385,7 +388,8 @@
   // Export: one .zip with, per translated page, the original image, the debug
   // render (clean page + boxes + text) and the report JSON — nothing to capture by hand.
   async function exportReport(imgs) {
-    const done = imgs.filter((i) => entries.get(i)?.result);
+    // (only pictures still shown: a reused <img> exported the page before under this page's address, 2.15)
+    const done = imgs.filter((i) => liveEntry(i)?.result);
     if (!done.length) { toast(T("content_nothing_translated")); return { ok: false }; }
     toast(TN("content_preparing_report", done.length), 20000);
     const files = [];

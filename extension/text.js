@@ -66,6 +66,25 @@
   }
 
   /**
+   * A word joined by hyphens ("remote-controlled", "peut-être") in the pieces a line may end on: after
+   * a hyphen between two letters, as every reader breaks it, no hyphen added; the same 3 letters at
+   * least on each side as a hyphenation point. (2.15: "remote-controlled" was one word too wide for
+   * its bubble's lobe, and the line came out at 19 px where the lettering was 28.)
+   */
+  function compound(word) {
+    const parts = word.split(/(?<=\p{L}-)(?=\p{L})/u);
+    if (parts.length < 2) return parts;
+    const total = lettersIn(word), out = [];
+    let before = 0;
+    for (const p of parts) {
+      if (out.length && (before < HYPHEN_MIN_SIDE || total - before < HYPHEN_MIN_SIDE)) out[out.length - 1] += p;
+      else out.push(p);
+      before += lettersIn(p);
+    }
+    return out;
+  }
+
+  /**
    * The units a line may break between: words, each with `gap` (a space before it). Runs in a
    * script written without spaces are cut into words, with closing marks kept on the word before
    * and opening marks on the word after; those words are `tight` (no hyphen when cut).
@@ -73,7 +92,7 @@
   function tokens(text, lang) {
     const out = [];
     for (const chunk of String(text).split(/\s+/).filter(Boolean)) {
-      if (!NO_SPACE_RE.test(chunk) || typeof Intl === "undefined" || !Intl.Segmenter) { out.push({ t: chunk, gap: out.length > 0 }); continue; }
+      if (!NO_SPACE_RE.test(chunk) || typeof Intl === "undefined" || !Intl.Segmenter) { compound(chunk).forEach((t, k) => out.push({ t, gap: k === 0 && out.length > 0 })); continue; }
       const sl = segmentLang(chunk, lang);
       let seg = segmenters.get(sl);
       if (!seg) { try { seg = new Intl.Segmenter(sl, { granularity: "word" }); } catch { seg = new Intl.Segmenter(undefined, { granularity: "word" }); } segmenters.set(sl, seg); }
@@ -158,13 +177,13 @@
    */
   function fitText(text, rect, setFont, measure, opts = {}) {
     if (opts.shape) {
-      // the shape's fit, or the box's when it is larger and its lines stay in the room: the box is
-      // the lettering's own box with the room around it, and its corners may lie past a curved or
-      // slanted side, where its lines crossed the outline (2.15, the owner's French chapter)
+      // the shape's fit, or the box's when it is larger and its lines keep to the shape, margin
+      // included: the box is the lettering's own box with the room around it, and its corners may
+      // lie past a curved or slanted side, where its lines crossed the outline (2.15, the owner's
+      // French chapter). Judged short of the margin, the box's lines came to touch the outline.
       const shaped = fitShape(text, rect, opts.shape, setFont, measure, opts);
       const boxed = fitText(text, rect, setFont, measure, { ...opts, shape: null });
-      // (judged on the room as the bubble's ink bounds it, when the layout gives it: `bound`)
-      const pick = shaped && shaped.size >= boxed.size ? shaped : !shaped ? boxed : (setFont(boxed.size), outsideRoom(boxed, rect, opts.bound || opts.shape, measure, true) <= (opts.outsideOk ?? 0.03)) ? boxed : shaped;
+      const pick = shaped && shaped.size >= boxed.size ? shaped : !shaped ? boxed : (setFont(boxed.size), outsideRoom(boxed, rect, opts.shape, measure) <= (opts.outsideOk ?? 0.03)) ? boxed : shaped;
       setFont(pick.size); return pick;
     }
     const minSize = Math.max(6, Math.round(opts.minSize ?? 8));
@@ -206,11 +225,31 @@
     return { size: minSize, lines, lineHeight: minSize * lh, hyphens: 0, forced: true };
   }
 
+  // the narrowest row of a shape between rows i and j, in constant time (a sparse table, kept per shape)
+  const rowMins = new WeakMap();
+  function rowMin(shape) {
+    let q = rowMins.get(shape);
+    if (q) return q;
+    const levels = [shape.half.slice()];
+    for (let w = 1; 2 * w <= shape.half.length; w *= 2) {
+      const p = levels[levels.length - 1], next = [];
+      for (let i = 0; i + 2 * w <= shape.half.length; i++) next.push(Math.min(p[i], p[i + w]));
+      levels.push(next);
+    }
+    q = (i, j) => { const k = 31 - Math.clz32(j - i + 1); return Math.min(levels[k][i], levels[k][j - (1 << k) + 1]); };
+    rowMins.set(shape, q);
+    return q;
+  }
+
   /**
    * fitText() in a bubble's shape (engine/layout.js roomShape): each line as wide as the room on
    * both sides of the box's centre line over that line's height (the shape keeps its own margin off
    * the outline: before 2.15 a fifth of the size more came off each side, and lines a bubble could
-   * hold at 0.7 of their size came out smaller), the block centred on the box as drawLines() centres it. The largest size that fits,
+   * hold at 0.7 of their size came out smaller). The block is centred on the box (the lettering's
+   * centre) when it fits there; else where the room is widest for it: the place where its narrowest
+   * row is widest, nearest the box's centre on a tie. The fit then carries that centre (`cy`), and
+   * drawLines() and outsideRoom() use it. (2.15: a caption whose room narrowed under its lettering
+   * was set at 17 px, centred on the lettering, with room for more above it.) The largest size that fits,
    * unhyphenated first as in fitText(); null when nothing fits at the floor (fitText then fits the
    * box). A rectangle in an oval leaves its widest rows unused: 140 of the 171 lines set under 0.7
    * of their original size sat in boxes under 5 letters wide (2.14.1).
@@ -218,19 +257,29 @@
   function fitShape(text, rect, shape, setFont, measure, opts) {
     const lh = opts.lineHeightRatio ?? 1.15;
     const top0 = rect.y + shape.dy, bottom0 = top0 + shape.half.length * shape.step;
-    const cy = rect.y + rect.h / 2;
-    const tall = 2 * Math.min(cy - top0, bottom0 - cy); // the most a block centred on the box can take
+    const mid = rect.y + rect.h / 2; // the lettering's centre: the block's first place
     const minSize = Math.max(6, Math.round(opts.minSize ?? 8));
-    const maxSize = Math.floor(Math.min(opts.maxSize ?? 72, tall / lh));
+    const maxSize = Math.floor(Math.min(opts.maxSize ?? 72, (bottom0 - top0) / lh));
     if (!(maxSize >= minSize)) return null;
+    const least = rowMin(shape);
     const halfOver = (y0, y1) => {
-      if (y0 < top0 || y1 > bottom0) return 0;
-      let h = Infinity;
-      const k1 = Math.min(shape.half.length - 1, Math.floor((y1 - top0) / shape.step));
-      for (let k = Math.floor((y0 - top0) / shape.step); k <= k1; k++) h = Math.min(h, shape.half[k]);
-      return h === Infinity ? 0 : h;
+      if (y0 < top0 - 1e-6 || y1 > bottom0 + 1e-6) return 0;
+      const k0 = Math.max(0, Math.floor((y0 - top0) / shape.step)), k1 = Math.min(shape.half.length - 1, Math.floor((y1 - top0) / shape.step));
+      return k1 >= k0 ? least(k0, k1) : 0;
     };
-    const widths = (n, size) => {
+    // where a block `tall` high goes: centred on the lettering, or where its narrowest row is widest
+    const centres = (tall) => {
+      const out = [];
+      if (halfOver(mid - tall / 2, mid + tall / 2) > 0) out.push(mid);
+      let best = null, most = 0;
+      for (let j = 0; top0 + j * shape.step + tall <= bottom0 + 1e-6; j++) {
+        const c = top0 + j * shape.step + tall / 2, h = halfOver(c - tall / 2, c + tall / 2);
+        if (h > most || (h === most && h > 0 && Math.abs(c - mid) < Math.abs(best - mid))) { most = h; best = c; }
+      }
+      if (best !== null && best !== mid) out.push(best);
+      return out;
+    };
+    const widths = (n, size, cy) => {
       const line = size * lh, top = cy - (n * line) / 2;
       // (the shape already keeps its margin off the outline: layout.js roomShape, LAYOUT.edgeLetters)
       return Array.from({ length: n }, (_, k) => Math.max(0, 2 * halfOver(top + k * line, top + (k + 1) * line)));
@@ -238,13 +287,17 @@
     const how = { lang: opts.lang, hyphenator: opts.hyphenator };
     const linesAt = (size, hyphenate) => {
       setFont(size);
-      for (let n = 1; n * size * lh <= tall; n++) {
-        const ws = widths(n, size);
-        if (ws.some((w) => w <= 0)) break; // past the shape: more lines only reach further
-        const w = wrapInfo(measure, text, (k) => ws[Math.min(k, n - 1)], { ...how, hyphenate });
-        if (w.broken || w.lines.length > n) continue;
-        const got = w.lines.length === n ? ws : widths(w.lines.length, size); // fewer lines sit closer to the middle
-        if (w.lines.every((l, j) => measure(l) <= got[j])) return w;
+      for (let n = 1; n * size * lh <= bottom0 - top0 + 1e-6; n++) {
+        const at = centres(n * size * lh);
+        if (!at.length) break; // nowhere in the shape: more lines only need more
+        for (const cy of at) {
+          const ws = widths(n, size, cy);
+          if (ws.some((w) => w <= 0)) continue;
+          const w = wrapInfo(measure, text, (k) => ws[Math.min(k, n - 1)], { ...how, hyphenate });
+          if (w.broken || w.lines.length > n) continue;
+          const got = w.lines.length === n ? ws : widths(w.lines.length, size, cy); // fewer lines sit closer to the middle
+          if (w.lines.every((l, j) => measure(l) <= got[j])) return { ...w, cy };
+        }
       }
       return null;
     };
@@ -252,11 +305,11 @@
     // for rare line-break accidents: then a size that would fit can be passed over)
     const largest = (hyphenate) => {
       let lo = minSize, hi = maxSize, found = null;
-      while (lo <= hi) { const mid = (lo + hi) >> 1; const w = linesAt(mid, hyphenate); if (w) { found = { size: mid, w }; lo = mid + 1; } else hi = mid - 1; }
+      while (lo <= hi) { const m = (lo + hi) >> 1; const w = linesAt(m, hyphenate); if (w) { found = { size: m, w }; lo = m + 1; } else hi = m - 1; }
       return found;
     };
     const plain = largest(false), hy = largest(true);
-    const pick = (f, hyphens) => f && { size: f.size, lines: f.w.lines, lineHeight: f.size * lh, hyphens, shaped: true };
+    const pick = (f, hyphens) => f && { size: f.size, lines: f.w.lines, lineHeight: f.size * lh, hyphens, shaped: true, cy: f.w.cy };
     if (plain && (!hy || !hy.w.hyphens || plain.size >= hy.size * (opts.hyphenRatio ?? 0.75))) { setFont(plain.size); return pick(plain, 0); }
     if (hy && hy.w.hyphens) { setFont(hy.size); return pick(hy, hy.w.hyphens); }
     return null;
@@ -309,7 +362,7 @@
    * measured it.
    */
   function outsideRoom(fit, rect, shape, measure, toOutline = false) {
-    const total = fit.lines.length * fit.lineHeight, top = rect.y + (rect.h - total) / 2;
+    const total = fit.lines.length * fit.lineHeight, top = (fit.cy ?? rect.y + rect.h / 2) - total / 2;
     const top0 = shape ? rect.y + shape.dy : rect.y, bottom0 = shape ? top0 + shape.half.length * shape.step : rect.y + rect.h;
     const more = toOutline ? shape?.edge || 0 : 0; // (the shape keeps a margin off the outline: up to the outline itself)
     const halfAt = (y0, y1) => {
@@ -332,7 +385,7 @@
     ctx.font = `bold ${fit.size}px ${family}`;
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     const total = fit.lines.length * fit.lineHeight;
-    let y = rect.y + (rect.h - total) / 2 + fit.lineHeight / 2;
+    let y = (fit.cy ?? rect.y + rect.h / 2) - total / 2 + fit.lineHeight / 2; // (a shape's fit may sit off the box's centre: fitShape)
     const cx = rect.x + rect.w / 2;
     for (const line of fit.lines) {
       if (halo) { ctx.lineJoin = "round"; ctx.lineWidth = Math.max(2, fit.size * 0.22); ctx.strokeStyle = color === "#fff" ? "rgba(0,0,0,.85)" : "rgba(255,255,255,.92)"; ctx.strokeText(line, cx, y); }

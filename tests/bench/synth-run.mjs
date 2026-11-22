@@ -9,6 +9,7 @@
 //   letter    the engine's letter size against the true one (far: under 0.6× or over 1.6×)
 //   small     the translation drawn under 0.7 of the true size (as the 0.7 rule of the 2.14 goal)
 //   overflow  over 3% of a bubble line's translation drawn outside its bubble
+//   touch     a bubble line's letters within a tenth of a letter (2 px at least) of its bubble's edge
 //   big       the translation drawn over 1/0.7 (1.43) of the original lettering's size
 // Where the size is lost (the same text and fitter each time):
 //   smallLetter  small again with the true letter size in the engine's room: what the analysis's
@@ -135,6 +136,18 @@ for (let seed = +first; seed < +first + +count; seed++) {
       const R = p.rect, x0 = Math.max(0, Math.floor(R.x - 40)), y0 = Math.max(0, Math.floor(R.y - 40)), x1 = Math.min(W, Math.ceil(R.x + R.w + 40)), y1 = Math.min(H, Math.ceil(R.y + R.h + 40));
       for (let yy = y0; yy < y1; yy++) for (let xx = x0; xx < x1; xx++) { const q = yy * W + xx; if (d[q * 4 + 3] > 100) { all++; if (!inside[q] && !footSet.has(q)) outside++; } }
       e.overflow = all ? outside / all : 0;
+      // touching: any of its letters within a tenth of a letter (2 px at least) of the bubble's edge,
+      // where a letterer always leaves a margin (2.15: lines set larger came to touch caption borders)
+      const r = Math.max(2, Math.round(0.1 * b.letter));
+      e.touch = false;
+      for (let yy = y0; yy < y1 && !e.touch; yy++) for (let xx = x0; xx < x1 && !e.touch; xx++) {
+        const q = yy * W + xx;
+        if (d[q * 4 + 3] <= 100 || footSet.has(q)) continue;
+        for (let dy = -r; dy <= r && !e.touch; dy++) for (let dx = -r; dx <= r; dx++) {
+          const X = xx + dx, Y = yy + dy;
+          if (dx * dx + dy * dy <= r * r && (X < 0 || Y < 0 || X >= W || Y >= H || !inside[Y * W + X]) && !footSet.has(Y * W + X)) { e.touch = true; break; }
+        }
+      }
     }
   }
   const told = pg.blocks.map((b, i) => tells(items[i]));
@@ -158,7 +171,7 @@ for (let seed = +first; seed < +first + +count; seed++) {
     smallLetter: per.filter((e, i) => told[i] && e.drawnLetter != null && e.drawnLetter < 0.7).length,
     ...Object.fromEntries(["geometry", "avoidable", "shared", "free"].map((w) => [`small${w[0].toUpperCase()}${w.slice(1)}`, per.filter((e, i) => told[i] && e.why === w).length])),
     ...limitCounts(limits),
-    overflow: per.filter((e) => e.overflow > 0.03).length, bubbleLines: pg.blocks.filter((b, i) => told[i] && b.bubble).length,
+    overflow: per.filter((e) => e.overflow > 0.03).length, touch: per.filter((e) => e.touch).length, bubbleLines: pg.blocks.filter((b, i) => told[i] && b.bubble).length,
     // by the shape of the bubble (or caption box) a line is in: [lines, past its bubble, set under 0.7, over 1/0.7]
     shapes: pg.blocks.reduce((o, b, i) => {
       if (!told[i] || !b.bubble || per[i].drawn == null) return o;

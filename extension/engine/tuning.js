@@ -62,7 +62,7 @@ export const LAYOUT = tune("LAYOUT", {
   slackShare: 0.15,       // ...or this share of the bubble's smaller side, whichever is more
   fallbackInset: 0.78,    // no rectangle found: this share of the bubble's box
   airInset: 0.92,         // the rectangle found, shrunk to this share: letters don't touch the outline
-  edgeLetters: 0.3,       // rows set to the bubble's shape keep this many letters off its outline (the one margin: 2.15)...
+  edgeLetters: 0.15,      // rows set to the bubble's shape keep this many letters off its outline's ink (the one margin: 2.15)...
   edgeMinPx: 2,           // ...and at least these pixels
   letteringHeld: 0.85,    // a bubble whose interior holds less of the lettering than this is doubted: the lettering's boxes are room
   partsCover: 0.6,        // a region's ink divides it into parts (one per line) only when they cover this share of it together

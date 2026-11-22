@@ -63,12 +63,27 @@ Four causes:
      mask, such fits crossed the outline: on 18 generated pages, 6 lines past their bubble, and 2
      judged on the ink.
    - The last-resort fit may run past the sides, never past the top and bottom.
-   - One margin keeps text off the outline: 0.3 letters, in the shape. Before, a fifth of the size
-     came off each side on top of 0.2 letters, and lines a bubble could hold at 0.7 of their size
-     came out smaller.
+   - One margin keeps text off the outline: 0.15 letters from the outline's ink, in the shape. Before,
+     a fifth of the size came off each side on top of 0.2 letters, and lines a bubble could hold at
+     0.7 of their size came out smaller.
+   - The margin is measured from the ink, where the region's ink parts are known, not from the
+     bubble model's mask. On the owner's French chapter the mask reached past the ink by 0.13 letters
+     (median), and by more than 0.3 letters on one row in seven, so lines set 0.3 letters off the
+     mask came within 1–2 px of a caption's border. The box's fit must keep the margin too, not
+     only stay inside the outline. Lines within a tenth of a letter of their outline ("touch", on
+     generated look pages): 56 of 686 before, 15 after. That cost 12 lines set under 0.7 of their
+     size on the same pages; 0.2 letters from the ink cost 19, with 12 touching. A mask margin with
+     a floor off the ink (0.3 off the mask, never within 0.15 of the ink) is narrower than either on
+     every row, and was dropped.
 5. **The text is tried centred on the lettering, too.** When the room's box is far from the
    lettering's centre (the wide middle of an L-shaped caption), the room centred on the lettering is
    offered as well, and the text takes whichever fits it larger.
+   - Within its room, a block stays centred on the lettering when it fits there. Otherwise it goes
+     where its narrowest row is widest, nearest the lettering's centre on a tie (`fitShape`). Page
+     6's middle captions, whose room narrowed under the lettering: 17 and 20 px before, 26 and 29.
+   - A line may end after a hyphen between letters, no hyphen added, with 3 letters at least on each
+     side as for a hyphenation point (`compound`). Page 9's right lobe held "remote-controlled" on
+     one line only at 19 px.
 6. **The lines of one bubble keep within 20% of each other's size**, when their lettering was one
    size (within 20%): a larger fit is cut to 1.2 × the smallest, but never under 0.7 of the line's own
    lettering. A line peeked at is still fitted, so its bubble's other lines keep their size.

@@ -177,15 +177,18 @@ export function layout(an, items, opts = {}) {
         if (anchoredToLettering[i]) rect = union([rect, clip(a, bbox)]);
         // The room row by row, for text.js to set each line as wide as the bubble is there: a
         // rectangle in an oval leaves its widest rows unused, and the text came out small (2.14.1).
+        // Its margin is kept off the outline's ink where the ink is known: the bubble model's mask
+        // is smooth and reaches onto, or past, the outline, and lines set to the mask's edge touched
+        // caption borders and a burst's spikes (2.15, the owner's French chapter, pages 6 and 9).
         const edge = Math.max(LAYOUT.edgeMinPx, LAYOUT.edgeLetters * letter);
-        const shape = roomShape(room, bbox, rect, [], others, edge);
         const inked = boundOf(room, i), bound = inked && roomShape(inked, bbox, rect, [], others, 0);
+        const shape = roomShape(inked || room, bbox, rect, [], others, edge);
         // The same room centred on the lettering itself: where the box above is far wider than the
         // lettering and off its centre (the wide middle of an L-shaped caption), the room on both sides
         // of the box's centre was narrow where the lettering stood, and the text came out ragged and
         // small (2.15, the owner's French chapter, page 6). text.js sets the text in whichever fits it larger.
         const mine = anchoredToLettering[i] ? clip(a, bbox) : null;
-        const alt = mine && (Math.abs(mine.x + mine.w / 2 - (rect.x + rect.w / 2)) > LAYOUT.altOffset * letter || Math.abs(mine.y + mine.h / 2 - (rect.y + rect.h / 2)) > LAYOUT.altOffset * letter) ? roomShape(room, bbox, mine, [], others, edge) : null;
+        const alt = mine && (Math.abs(mine.x + mine.w / 2 - (rect.x + rect.w / 2)) > LAYOUT.altOffset * letter || Math.abs(mine.y + mine.h / 2 - (rect.y + rect.h / 2)) > LAYOUT.altOffset * letter) ? roomShape(inked || room, bbox, mine, [], others, edge) : null;
         const altBound = alt && inked ? roomShape(inked, bbox, mine, [], others, 0) : null;
         placements.push({ text: m.it.text, size: m.it.size, rect, letter, measured: true, color, halo: false, tag: id, item: m.it.index ?? null, ...(shape ? { shape } : {}), ...(bound ? { bound } : {}), ...(alt ? { alt: [{ rect: mine, shape: alt, ...(altBound ? { bound: altBound } : {}) }] } : {}) });
       });

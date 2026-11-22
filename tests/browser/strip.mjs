@@ -101,6 +101,12 @@ check("the exported report holds one page with its debug render", exp?.ok && exp
 const asked = calls.length;
 await wait(1500);
 check("exporting the report asked Claude nothing", calls.length === asked, `${calls.length - asked} question(s)`);
+// a reader reusing its <img> for another picture: the entry describes the page before, so the
+// report has nothing to export for it (2.15: it exported the page before under this page's address)
+await page.evaluate(() => { document.getElementById("chapter").src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"; });
+await wait(500);
+const stale = await sw.evaluate((id) => chrome.tabs.sendMessage(id, { type: "EXPORT_REPORT" }), tabId);
+check("an <img> showing another picture exports nothing of the page before", stale && stale.ok === false, JSON.stringify(stale));
 
 // 4. the button follows the image while the page scrolls under the pointer
 const cdp = await context.newCDPSession(page);
