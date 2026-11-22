@@ -364,7 +364,19 @@ export function erase(cv, img, analysis, regionIds, opts = {}) {
       }
     }
     grown.delete();
-    if (opts.outline) growOutline(cv, mask, rois, W, opts.outline);
+    if (opts.outline) {
+      // A bubble's outline, where the interior takes it in: ink of the outline's colour joined to
+      // the interior's edge. A bubble whose surface (the interior less that) is flat keeps it out of
+      // growOutline, and is filled flat below.
+      for (const r of rois) {
+        if (!r.inside) continue;
+        r.edge = outlineOf(r, px, W);
+        const rect = new cv.Rect(r.x, r.y, r.w, r.h), rc = rgb.roi(rect).clone(), mc = mask.roi(rect).clone();
+        r.flat = flatSurface(rc, mc, (x, y) => r.inside(r.x + x, r.y + y) && !r.edge[y * r.w + x]);
+        rc.delete(); mc.delete();
+      }
+      growOutline(cv, mask, rois, W, opts.outline);
+    }
     // lettering a line with nothing to translate claimed (layout.js: region.kept) stays as drawn
     for (const r of analysis.regions) {
       if (!regionIds.has(r.id) || !r.kept) continue;
@@ -381,7 +393,9 @@ export function erase(cv, img, analysis, regionIds, opts = {}) {
       // screentone fill where the surface is a lattice, else the learned inpainter, else Telea)
       // and given Telea meanwhile.
       const rc = srcRoi.clone(), mc = maskRoi.clone(); // continuous copies to read
-      const flat = flatSurface(rc, mc, r.inside ? (x, y) => r.inside(r.x + x, r.y + y) : null);
+      // (a bubble found flat before the growth stays flat: the outline ink the growth left alone
+      // would otherwise read as texture, and Telea smeared it into the bubble)
+      const flat = r.flat || flatSurface(rc, mc, r.inside ? (x, y) => r.inside(r.x + x, r.y + y) : null);
       rc.delete(); mc.delete();
       if (flat) { r.fill = "flat"; r.color = flat; srcRoi.setTo(new cv.Scalar(flat[0], flat[1], flat[2]), maskRoi); }
       else {
@@ -415,10 +429,41 @@ export function erase(cv, img, analysis, regionIds, opts = {}) {
 }
 
 /**
+ * The bubble's outline inside an area, where the bubble's interior takes it in: ink of the
+ * outline's colour (dark in a light bubble, light in a dark one) joined, through such ink, to the
+ * interior's edge. Lettering run into the outline joins it. A Uint8Array over the area (1: outline).
+ */
+function outlineOf(r, px, W) {
+  const { x: X, y: Y, w, h } = r, ink = new Uint8Array(w * h), edge = new Uint8Array(w * h), stack = [];
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const gx = X + x, gy = Y + y;
+    if (!r.inside(gx, gy)) continue;
+    const p = (gy * W + gx) * 4, lum = (px[p] + px[p + 1] + px[p + 2]) / 3;
+    if (r.dark ? lum <= ERASE.outlineLight : lum >= ERASE.outlineDark) continue;
+    const i = y * w + x;
+    ink[i] = 1;
+    if (!r.inside(gx - 1, gy) || !r.inside(gx + 1, gy) || !r.inside(gx, gy - 1) || !r.inside(gx, gy + 1)) { edge[i] = 1; stack.push(i); }
+  }
+  while (stack.length) {
+    const i = stack.pop(), x = i % w, y = (i / w) | 0;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      const xx = x + dx, yy = y + dy, j = yy * w + xx;
+      if (xx < 0 || yy < 0 || xx >= w || yy >= h || !ink[j] || edge[j]) continue;
+      edge[j] = 1; stack.push(j);
+    }
+  }
+  return edge;
+}
+
+/**
  * Grows each area's mask over the lettering's outline (a white stroke around black letters, a
  * dark one around white letters, the glow of a shout): by `k` × the area's letter size, which is
  * how thick lettering outlines run, and never past a bubble's interior, so the bubble's own
  * outline stays. The fill (flat or texture) then covers the outline too; Telea alone smeared it.
+ * In a bubble with a flat surface (`flat`) it never takes the bubble's outline (`edge`,
+ * outlineOf): the interior the bubble model gives takes in its outline, and the growth, set by the
+ * letter size, reached it wherever lettering ran close. On tone or art, ink at the interior's edge
+ * is the surface too, and the growth takes it as before: leaving it in pieces, the fill smeared it.
  */
 function growOutline(cv, mask, rois, W, k) {
   for (const r of rois) {
@@ -429,7 +474,8 @@ function growOutline(cv, mask, rois, W, k) {
     const gd = grown.data, md = m.data;
     for (let y = 0; y < r.h; y++) for (let x = 0; x < r.w; x++) {
       const i = y * r.w + x;
-      if (gd[i] && !md[i] && (!r.inside || r.inside(r.x + x, r.y + y))) md[i] = 255;
+      if (!gd[i] || md[i] || (r.inside && !r.inside(r.x + x, r.y + y)) || (r.flat && r.edge[i])) continue;
+      md[i] = 255;
     }
     m.copyTo(sub);
     grown.delete(); m.delete(); sub.delete();

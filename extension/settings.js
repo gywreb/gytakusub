@@ -38,7 +38,7 @@ export async function getSettings() {
 }
 
 /** The content script's files, in load order. */
-export const CS_FILES = ["vendor/hyphen-en.js", "vendor/lettering-fonts.js", "text.js", "content.js"];
+export const CS_FILES = ["vendor/hyphen-en.js", "vendor/lettering-fonts.js", "text.js", "notpage.js", "content.js"];
 
 /** Injects the content script into a tab unless it already answers. */
 export async function ensureContentScript(tabId) {

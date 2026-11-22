@@ -13,20 +13,20 @@ the engine's rules cannot bend.
 | Books | Pages | Lines | Found before Claude answers | Lettering still seen | Set under 0.7 of its size | Art damage | Sound effects changed |
 |---|---|---|---|---|---|---|---|
 | held out | 333 | 2,752 | 96.9% | 1.8% | 10.3% | 0.12% | 0.29% |
-| looked at | 321 | 2,572 | 96.7% | 1.7% | 10.1% | 0.17% | 0.64% |
+| looked at | 321 | 2,572 | 96.7% | 1.6% | 10.1% | 0.16% | 0.63% |
 
 ### Generated pages
 
 | Script | Pages | Lines | Found before Claude answers | Lettering left untouched | Set under 0.7 of its size | Size measured outside 0.6–1.6× | Text past its bubble | Art damage |
 |---|---|---|---|---|---|---|---|---|
-| all | 300 | 1,615 | 95.1% | 4.6% | 11.8% | 2.7% | 2.0% | 0.055% |
-| Japanese | 76 | 419 | 95.7% | 4.5% | 26.3% | 0.7% | 3.9% | 0.066% |
-| Chinese | 38 | 178 | 95.5% | 4.5% | 24.2% | 1.1% | 0.7% | 0.050% |
-| Korean | 38 | 197 | 95.9% | 6.1% | 15.2% | 4.1% | 1.2% | 0.063% |
-| English | 38 | 199 | 94.0% | 6.0% | 0.5% | 5.0% | 1.2% | 0.031% |
+| all | 300 | 1,615 | 95.1% | 4.6% | 11.8% | 2.7% | 2.0% | 0.052% |
+| Japanese | 76 | 419 | 95.7% | 4.5% | 26.3% | 0.7% | 3.9% | 0.062% |
+| Chinese | 38 | 178 | 95.5% | 4.5% | 24.2% | 1.1% | 0.7% | 0.043% |
+| Korean | 38 | 197 | 95.9% | 6.1% | 15.2% | 4.1% | 1.2% | 0.060% |
+| English | 38 | 199 | 94.0% | 6.5% | 0.5% | 5.0% | 1.2% | 0.030% |
 | Spanish | 38 | 223 | 95.1% | 2.7% | 1.8% | 2.7% | 2.2% | 0.050% |
-| Portuguese | 36 | 194 | 94.8% | 3.1% | 0.0% | 2.1% | 0.0% | 0.020% |
-| Vietnamese | 36 | 205 | 94.1% | 5.4% | 1.5% | 5.4% | 2.2% | 0.098% |
+| Portuguese | 36 | 194 | 94.8% | 3.1% | 0.0% | 2.1% | 0.0% | 0.015% |
+| Vietnamese | 36 | 205 | 94.1% | 5.4% | 1.5% | 5.4% | 2.2% | 0.093% |
 
 ### Where text size is lost
 

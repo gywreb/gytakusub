@@ -194,11 +194,13 @@
   // A page is something you read, so what counts is the size it's shown at. A large file shown
   // small is a site's logo, a cover thumbnail or a reaction emoji: these were translated (paid
   // for, and counted as pages) until 2.12.0. An image not laid out yet (lazy) counts once it
-  // loads: onImgLoad checks again.
+  // loads: onImgLoad checks again. Nor is an image whose address names it a cover, a thumbnail or
+  // a logo (notpage.js, the chapter fetcher's rule): the series' covers at a chapter's end passed
+  // the size check and were translated as pages (a MangaDex chapter, 2.14.2).
   function isEligible(img) {
     if (!(img instanceof HTMLImageElement)) return false;
-    const r = img.getBoundingClientRect();
-    return r.width >= MIN_W && r.height >= MIN_H && !!srcOf(img);
+    const r = img.getBoundingClientRect(), src = srcOf(img);
+    return r.width >= MIN_W && r.height >= MIN_H && !!src && !globalThis.GyNotPage?.notPage(src);
   }
 
   function viewportDistance(img, key = WHOLE) {

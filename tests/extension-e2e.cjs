@@ -68,6 +68,7 @@ const ITEMS_FILE = process.argv[4]; // JSON: [{tag, box:[x,y,w,h] in px of the 1
     storage: { onChanged: { addListener() {} } },
   };
   new Function(fs.readFileSync("../extension/typeset.js", "utf8"))();
+  new Function(fs.readFileSync("../extension/notpage.js", "utf8"))();
   new Function(fs.readFileSync("../extension/content.js", "utf8"))();
   await new Promise((r) => setTimeout(r, 50));
   onMessage({ type: "TRANSLATE_VISIBLE" }, null, () => {});
