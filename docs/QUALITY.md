@@ -12,21 +12,21 @@ the engine's rules cannot bend.
 
 | Books | Pages | Lines | Found before Claude answers | Lettering still seen | Set under 0.7 of its size | Art damage | Sound effects changed |
 |---|---|---|---|---|---|---|---|
-| held out | 333 | 2,752 | 96.9% | 1.8% | 10.3% | 0.12% | 0.29% |
-| looked at | 321 | 2,572 | 96.7% | 1.6% | 10.1% | 0.16% | 0.63% |
+| held out | 333 | 2,752 | 96.9% | 1.8% | 13.4% | 0.12% | 0.29% |
+| looked at | 321 | 2,572 | 96.7% | 1.6% | 14.0% | 0.16% | 0.63% |
 
 ### Generated pages
 
-| Script | Pages | Lines | Found before Claude answers | Lettering left untouched | Set under 0.7 of its size | Size measured outside 0.6–1.6× | Text past its bubble | Art damage |
-|---|---|---|---|---|---|---|---|---|
-| all | 300 | 1,615 | 95.1% | 4.6% | 11.8% | 2.7% | 2.0% | 0.052% |
-| Japanese | 76 | 419 | 95.7% | 4.5% | 26.3% | 0.7% | 3.9% | 0.062% |
-| Chinese | 38 | 178 | 95.5% | 4.5% | 24.2% | 1.1% | 0.7% | 0.043% |
-| Korean | 38 | 197 | 95.9% | 6.1% | 15.2% | 4.1% | 1.2% | 0.060% |
-| English | 38 | 199 | 94.0% | 6.5% | 0.5% | 5.0% | 1.2% | 0.030% |
-| Spanish | 38 | 223 | 95.1% | 2.7% | 1.8% | 2.7% | 2.2% | 0.050% |
-| Portuguese | 36 | 194 | 94.8% | 3.1% | 0.0% | 2.1% | 0.0% | 0.015% |
-| Vietnamese | 36 | 205 | 94.1% | 5.4% | 1.5% | 5.4% | 2.2% | 0.093% |
+| Script | Pages | Lines | Found before Claude answers | Lettering left untouched | Set under 0.7 of its size | Size measured outside 0.6–1.6× | Text past its bubble | Touching its outline | Art damage |
+|---|---|---|---|---|---|---|---|---|---|
+| all | 300 | 1,615 | 95.1% | 4.6% | 12.9% | 2.7% | 0.8% | 3.5% | 0.052% |
+| Japanese | 76 | 419 | 95.7% | 4.5% | 30.3% | 0.7% | 0.6% | 5.3% | 0.062% |
+| Chinese | 38 | 178 | 95.5% | 4.5% | 26.4% | 1.1% | 0.0% | 3.6% | 0.043% |
+| Korean | 38 | 197 | 95.9% | 6.1% | 11.2% | 3.6% | 0.0% | 1.8% | 0.060% |
+| English | 38 | 199 | 94.0% | 6.5% | 2.0% | 5.0% | 0.6% | 2.4% | 0.030% |
+| Spanish | 38 | 223 | 95.1% | 2.7% | 1.8% | 2.7% | 2.2% | 4.4% | 0.050% |
+| Portuguese | 36 | 194 | 94.8% | 3.1% | 0.0% | 2.1% | 0.0% | 1.2% | 0.015% |
+| Vietnamese | 36 | 205 | 94.1% | 5.4% | 2.0% | 5.4% | 2.2% | 3.4% | 0.093% |
 
 ### Where text size is lost
 
@@ -34,15 +34,15 @@ What holds each line set under 0.7 of its size small: the same line fitted again
 
 | Pages | Lines set small | Width (a long word across a narrow room) | Height | Either | Not the room |
 |---|---|---|---|---|---|
-| Real, held out | 10.3% | 58.7% | 5.7% | 31.7% | 4.3% |
-| Real, looked at | 10.1% | 60.1% | 6.2% | 30.6% | 3.1% |
-| Generated | 11.8% | 61.8% | 2.1% | 27.2% | 8.9% |
+| Real, held out | 13.4% | 49.3% | 3.8% | 40.3% | 6.8% |
+| Real, looked at | 14.0% | 47.9% | 4.5% | 40.4% | 7.2% |
+| Generated | 12.9% | 57.2% | 0.5% | 38.0% | 4.3% |
 
 On generated pages, where every letter size and bubble is known exactly:
 
-- **The size estimate:** with the true letter size, 11.2% of lines are set small, against 11.8%.
-- **The translation's length:** of the lines set small that are alone in their bubble, 72.1% could not be set at 0.7 of their size in that bubble however they were laid out, with no margin from the outline. The rest (39 lines) could have been.
-- Not judged: 22 small lines that share their bubble with another line, and 29 over the art.
+- **The size estimate:** with the true letter size, 12.6% of lines are set small, against 12.9%.
+- **The translation's length:** of the lines set small that are alone in their bubble, 77.4% could not be set at 0.7 of their size in that bubble however they were laid out, with no margin from the outline. The rest (31 lines) could have been.
+- Not judged: 29 small lines that share their bubble with another line, and 42 over the art.
 <!-- results:end -->
 
 ## What is measured
@@ -85,6 +85,7 @@ for Latin scripts). So the numbers measure Gytakusub, not Claude's reading.
 | Set under 0.7 of its size | the translation's letters under 0.7 of the original lettering's size, as the engine measured it | the same, against the exact size |
 | Size measured outside 0.6–1.6× | — | the engine's measure of the lettering against the exact size |
 | Text past its bubble | — | over 3% of a translation's ink outside the bubble's inside |
+| Touching its outline | — | any of a bubble line's letters within a tenth of a letter (2 px at least) of the bubble's edge |
 | Art damage | pixels changed by more than 40 levels away from every marked line (grown by 6 px) | the same, away from every line's footprint |
 | Sound effects changed | pixels changed inside the sound effects' outlines | — |
 | What holds a small line small | the line fitted again in a room a quarter wider, and a quarter taller: the width, the height, either, or neither (not the room) | same |

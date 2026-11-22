@@ -44,6 +44,12 @@ Four causes:
    - A bubble whose interior holds less than 85% of its lettering is doubted. This is light art
      taken for a bubble around text drawn over the art, and its lettering's boxes stay room whole,
      as before.
+     It has no shape: the text is fitted to the box. The art's lines around it are no outline, and
+     read as one (the margin off the ink, below), they set text over art at half its size.
+   - The 85% is judged on the lettering's lines, not the block's upright box: in a slanted bubble
+     the box's corners lie past the slant, and judged on it, such bubbles were doubted and their
+     text set across the slant (2 lines past their bubble on generated look pages, 0 judged on the
+     lines).
 2. **A region's ink divides it among its lines** (`roomParts`). Each line's part is what its
    lettering reaches without crossing ink, plus the ink it encloses, such as marks past its line
    boxes. A line's room leaves out what is in another line's part and not in its own.
@@ -71,10 +77,12 @@ Four causes:
      (median), and by more than 0.3 letters on one row in seven, so lines set 0.3 letters off the
      mask came within 1–2 px of a caption's border. The box's fit must keep the margin too, not
      only stay inside the outline. Lines within a tenth of a letter of their outline ("touch", on
-     generated look pages): 56 of 686 before, 15 after. That cost 12 lines set under 0.7 of their
-     size on the same pages; 0.2 letters from the ink cost 19, with 12 touching. A mask margin with
-     a floor off the ink (0.3 off the mask, never within 0.15 of the ink) is narrower than either on
-     every row, and was dropped.
+     generated look pages): 56 of 686 before, 18 after; lines set under 0.7 of their size: 93
+     before, 99 after. Read on a doubted room too, the margin cost 6 more lines under 0.7 (art's
+     lines taken for an outline), so a doubted room has no shape (decision 1). 0.2 letters from the
+     ink cost 7 more small lines than 0.15, with 12 touching. A mask margin with a floor off the ink
+     (0.3 off the mask, never within 0.15 of the ink) is narrower than either on every row, and was
+     dropped.
 5. **The text is tried centred on the lettering, too.** When the room's box is far from the
    lettering's centre (the wide middle of an L-shaped caption), the room centred on the lettering is
    offered as well, and the text takes whichever fits it larger.
