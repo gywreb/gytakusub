@@ -179,15 +179,16 @@ await test("a slanted bubble: the room row by row stays inside its outline where
   });
 });
 
-await test("a 'bubble' that does not hold the lettering (light art around text drawn over it): the lettering's box is room (2.15)", () => {
-  // the interior found is a small patch beside the lettering; the shape alone would set the text tiny
+await test("a 'bubble' that does not hold the lettering (light art around text drawn over it): the text is set to the lettering's box (2.15)", () => {
+  // the interior found is a small patch beside the lettering; the shape alone would set the text
+  // tiny, and the art's lines around it are no outline: the box is the room, with no shape
   const inside = (x, y) => x >= 100 && x < 140 && y >= 100 && y < 260;
   const words = para(110, 110, 120, 140, { bubble: 1, region: 1 });
   const an = analysis([bubbleAt(1, { x: 100, y: 100, w: 140, h: 160 }, [words])], [words]);
   an.insideOf = () => inside;
   const [p] = layout(an, [item([110, 110, 120, 140], "Over the art", 1, "bubble")]).placements;
-  const cx = p.rect.x + p.rect.w / 2, mid = p.shape.half[Math.floor((180 - (p.rect.y + p.shape.dy)) / p.shape.step)];
-  assert.ok(cx + mid >= 220, `the room at the lettering's middle reaches ${(cx + mid).toFixed(0)}, the lettering 230`);
+  assert.ok(!p.shape && !p.bound && !p.alt, "no shape: the box is the room");
+  assert.ok(p.rect.x <= 110 && p.rect.x + p.rect.w >= 230 && p.rect.y <= 110 && p.rect.y + p.rect.h >= 250, `the box ${JSON.stringify(p.rect)} holds the lettering's (110, 110, 120 × 140)`);
 });
 
 await test("two captions' lettering merged into one paragraph: each line takes its own lines of it (2.15)", () => {
