@@ -4,6 +4,19 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
 
 ## [Unreleased]
 
+## [2.14.5] — 2026-11-22
+
+### Fixed
+- **A bubble's outline no longer goes missing next to its text.** The eraser grows past the lettering by a third of the letter size, to take outlined lettering's outline. The area the bubble model marks as the bubble includes the bubble's own outline, so wherever the text ran close, the outline was erased too.
+  - Each bubble now finds its outline: ink of the outline's colour joined to the bubble's edge.
+  - On a plain bubble, the growth leaves the outline alone, and the bubble is filled with its plain colour. Before, the outline left in place made the bubble count as textured, and the fill smeared the leftover ink into it.
+  - On held-out generated pages, bubble outline pixels erased: 3,902 → 1,701. Art damage −8%. Lettering left is unchanged; one line more counts as "lettering stays", 40 of 810 against 39. On the 333 held-out real pages, art damage fell 2% and nothing else changed.
+- **Covers and thumbnails at a chapter's end are no longer translated as pages.** In your MangaDex report, the series' covers at the end of the chapter (addresses under `/covers/`) were sent to Claude as three more pages. The extension now drops images whose address names them a cover, thumbnail, logo or ad. This is the rule the web app's chapter mode already used (`notpage.js`, kept the same as the fetcher's by a test).
+
+### Development
+- **Found, not shipped: Claude's size label scales a size twice.** Claude labels each line "small", "normal" or "large". The label multiplies the letter size even when that size was measured on the lettering the line replaces, which already carries it. In your reports this affects about 1 line in 5 (13% labelled large, 8% small). The bench never labels sizes on real pages, so it can't measure a change yet. The next step is to simulate the labels as Claude gives them.
+- **Report checks, CPU against graphics card.** A replay on the CPU differs from your run for more than one reason. Node decodes and resizes the page with other code than Chrome, so the pixels already differ before any model runs. A replay that says which of the two caused a difference has to run in the browser.
+
 ## [2.14.4] — 2026-11-22
 
 The second step of 3.0: the bench now says where text size is lost, stage by stage. Pages come out exactly as in 2.14.3.
