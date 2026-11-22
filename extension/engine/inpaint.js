@@ -23,6 +23,17 @@ import { FILL } from "./tuning.js";
  *   costs about 40 µs a pixel (a 768 × 512 area: 17 s; at 384 × 256: 4 s)
  * @returns {Promise<any>} cv.Mat CV_8UC3 the size of `rgb` (caller deletes)
  */
+/**
+ * A copy of one area of `mat`, its rows continuous (caller deletes). The view the copy is made
+ * through is freed here: a view left undeleted keeps the whole of its parent's memory alive after
+ * the parent is deleted — a page's worth a time, until the OpenCV heap is full (a long chapter
+ * then failed page after page).
+ */
+export function copyOf(mat, rect) {
+  const view = mat.roi(rect);
+  try { return view.clone(); } finally { view.delete(); }
+}
+
 export async function aotInpaint(cv, model, rgb, mask, opts = {}) {
   const fixed = model.side || 0, lama = model.kind === "lama";
   // A model of one size sees the real page around a smaller area (`opts.context`): padded with a
@@ -31,7 +42,7 @@ export async function aotInpaint(cv, model, rgb, mask, opts = {}) {
   const ctx = opts.context;
   if (fixed && ctx && rgb.cols <= fixed && rgb.rows <= fixed) {
     const win = contextWindow(ctx.image.cols, ctx.image.rows, ctx.x, ctx.y, rgb.cols, rgb.rows, fixed);
-    const wr = ctx.image.roi(new cv.Rect(win.x, win.y, win.w, win.h)).clone(), wm = cv.Mat.zeros(win.h, win.w, cv.CV_8UC1);
+    const wr = copyOf(ctx.image, new cv.Rect(win.x, win.y, win.w, win.h)), wm = cv.Mat.zeros(win.h, win.w, cv.CV_8UC1);
     const at = new cv.Rect(ctx.x - win.x, ctx.y - win.y, rgb.cols, rgb.rows);
     { const v = wr.roi(at); rgb.copyTo(v); v.delete(); const mv = wm.roi(at); mask.copyTo(mv); mv.delete(); }
     const done = await aotInpaint(cv, model, wr, wm, { ...opts, context: null });
