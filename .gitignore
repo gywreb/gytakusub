@@ -28,3 +28,4 @@ tests/fixtures/real/
 tests/bench/models/
 tests/bench/runs/
 tests/bench/data/
+extension/dev-reload.txt
