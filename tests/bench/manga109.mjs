@@ -1,5 +1,5 @@
 // The engine on real pages marked by researchers (Manga109-s), not on the owner's chapters.
-//   node bench/manga109.mjs <dir> <out.jsonl> [--pick pick.tsv] [--half look|held] [--dump dir]
+//   node bench/manga109.mjs <dir> <out.jsonl> [--pick pick.tsv] [--half look|held] [--dump dir] [--fill aot]
 // <dir> holds images/<book>/<NNN>.jpg, annotations/<book>.xml and annotations_COO/<book>.xml.
 // Manga109-s may not be redistributed: its pages stay on the machine running this, never in the
 // repo. Each image is a spread; each half is one page, as a reader shows it. For each page:
@@ -13,6 +13,7 @@
 //      damage    pixels changed away from every marked line (art, sound effects, outlines)
 //      letter    the engine's letter size against one estimated from the box and its characters
 //      small     the translation drawn under 0.7 of that estimated size (smallL: of the engine's own)
+//      smallWidth/Height/Both/Neither  what holds each smallL line small (bench/limits.mjs)
 // The books are split by a hash into "look" (failures there may be examined) and "held" (only
 // ever counted), so a change can't pass by fitting what was looked at.
 import "./tune-env.mjs"; // first: GYT_TUNE must be set before the engine loads
@@ -25,9 +26,19 @@ import { layout, tells } from "../../extension/engine/layout.js";
 import { erase, fillTexture } from "../../extension/engine/erase.js";
 import { loadLettering } from "../lettering-setup.mjs";
 import { witness } from "./witness.mjs";
+import { sizeLimits, limitCounts } from "./limits.mjs";
 
 const argv = process.argv.slice(2), opt = (k) => { const i = argv.indexOf(k); return i >= 0 ? argv.splice(i, 2)[1] : null; };
 const pickFile = opt("--pick"), half = opt("--half"), dump = opt("--dump"), limit = Number(opt("--limit") || 0), most = Number(opt("--max") || 0);
+const fillWith = opt("--fill");
+// --fill aot: textured areas filled by the learned model the extension runs on the CPU (AOT), as a
+// user without a graphics card gets; by default Telea, which is faster and much worse over art
+const inpainter = fillWith === "aot" ? await (async () => {
+  const { getOrt, createSession, run } = await import("../../extension/engine/ort.js");
+  const { session } = await createSession(new Uint8Array(fs.readFileSync(new URL("../../extension/vendor/inpaint.onnx", import.meta.url))), { gpu: false });
+  return { ort: getOrt(), session, run };
+})() : null;
+if (fillWith && fillWith !== "aot") throw new Error(`--fill ${fillWith}: only "aot" (or nothing, for Telea)`);
 let ran = 0; // (--max N: stop after N pages, for a loop that restarts it: node's memory only grows)
 const [dir, outFile] = argv;
 process.chdir(path.dirname(new URL(import.meta.url).pathname) + "/..");
@@ -115,7 +126,7 @@ for (const [split, book, file] of picks) {
     await lookAgain(cv, pixels, an, items, detector);
     const { placements, regionIds } = layout(an, items);
     const res = erase(cv, pixels, an, regionIds, { keepMask: true, outline: 0.3 });
-    const clean = await fillTexture(cv, null, res.image, res);
+    const clean = await fillTexture(cv, inpainter, res.image, res);
     res.mask.delete(); res.surface.delete();
     const ms = Date.now() - t0;
 
@@ -157,11 +168,12 @@ for (const [split, book, file] of picks) {
       const est = 0.8 * Math.sqrt((l.box.w * l.box.h) / n);
       letters.push({ item: p.item, est: +est.toFixed(1), letter: +p.letter.toFixed(1), drawn: +(sizes[k] / 1.45).toFixed(1) });
     });
+    const limits = sizeLimits(GyText, placements, sizes, [...placements.keys()].filter((k) => { const p = placements[k]; return p.item != null && told[p.item] && sizes[k] / 1.45 < 0.7 * p.letter; }), W, H);
     const row = {
       split, page: id, ms, lines: lines.length, told: told.filter(Boolean).length, found: found.filter((f, i) => f && told[i]).length,
       placed: new Set(placements.filter((p) => p.item != null).map((p) => p.item)).size,
       seen, left, damage: +(1000 * changed / (W * H)).toFixed(2), sfxArea, sfxChanged: changedSfx,
-      letterFar: letters.filter((x) => x.letter > 2 * x.est || x.letter < 0.5 * x.est).length, small: letters.filter((x) => x.drawn < 0.7 * x.est).length, smallL: letters.filter((x) => x.drawn < 0.7 * x.letter).length, measured: letters.length,
+      letterFar: letters.filter((x) => x.letter > 2 * x.est || x.letter < 0.5 * x.est).length, small: letters.filter((x) => x.drawn < 0.7 * x.est).length, smallL: letters.filter((x) => x.drawn < 0.7 * x.letter).length, measured: letters.length, ...limitCounts(limits),
       regions: an.regions.length, waste: an.regions.filter((q) => !lines.some((l) => cover(l.box, q.box) > 0 || cover(q.box, l.box) > 0) && !sfx.some((s) => cover(q.box, s.box) > 0.3)).length,
     };
     if (dump && split === "look") {

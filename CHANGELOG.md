@@ -4,6 +4,26 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
 
 ## [Unreleased]
 
+## [2.14.4] — 2026-11-22
+
+The second step of 3.0: the bench now says where text size is lost, stage by stage. Pages come out exactly as in 2.14.3.
+
+### Development
+- **Where text size is lost** ([docs/QUALITY.md](docs/QUALITY.md)). Each line set under 0.7 of its size is fitted again, so the bench can say which stage made it small:
+  - **The room's width holds most of them.** The line is refitted in a room a quarter wider and a room a quarter taller. On the held-out real pages, 59% of the small lines grow only in the wider room, 32% in either, 6% only in the taller room. These are long English words across bubbles drawn for a column or two of Japanese.
+  - **The size estimate costs little.** On generated pages, with the true letter size, 11.2% of lines are set small, against 11.8%. Korean is the exception: 30 → 23 of 197 lines. The engine measures some Korean lines at half their height, because the parts of a syllable are stacked with a gap only the vertical strokes cross.
+  - **Most small lines can't be helped by any layout.** A line alone in its bubble was wrapped into the bubble's true interior at 0.7 of its size, with no margin from the outline and the best line breaks. For 72% of them even that doesn't fit: the translation is too long for that bubble at that size. The other 39 of 1,615 lines (2.4%) could have fitted. This is what the engine can still win.
+  - The real pages have no true bubble shapes, so only the first split is measured there.
+- **Two changes tried and dropped.** Both were measured on the looked-at generated pages:
+  - **Squeezing the letters to 85% of their width in narrow rooms.** Lines set small went 10.6% → 9.7%, but text running past its bubble went 8 → 12 lines. In a bubble, only fits to the bubble's shape were squeezed; squeezing every fit gave 7.8% small lines and 32 past their bubbles.
+  - **Measuring a line's height across gaps that strokes cross** (Hangul syllables, capitals' bars). Korean lines set small went 16 → 11 and Latin dialogue was measured closer to its true size. But the eraser grows by the letter size, so with truer sizes it took more:
+    - bubble outline pixels erased +15% (Korean ×3.8);
+    - art damage +7%.
+
+    The measure and the eraser's growth have to change together, the growth following the outline's own thickness. That is now part of 3.0.
+- **Art damage on printed and slanted lettering is mostly the eraser's mask.** Over tone or an object's surface, the mask takes the line's whole box, not only its letters, so any fill changes those pixels. Filled by the model the extension runs on the CPU (`--fill aot`, new in both bench scripts) instead of Telea, the damage fell by 13–26% on three such pages, at four to six times the time.
+- **QUALITY.md now counts the whole looked-at half of the real pages**: 321 pages, up from 176. The held-out numbers are unchanged.
+
 ## [2.14.3] — 2026-11-22
 
 The first step of 3.0, "Measured core": the engine gets one public entry point and one file for its numbers. Pages come out exactly as in 2.14.2.
