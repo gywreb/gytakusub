@@ -51,7 +51,9 @@ function rematch(an, rep, it) {
   return best ? best.id : null;
 }
 
+const only = process.env.PAGES ? new Set(process.env.PAGES.split(",")) : null; // PAGES=06,09: those pages only
 for (const pg of summary.pages) {
+  if (only && !only.has(pg.id)) continue;
   const rep = JSON.parse(fs.readFileSync(path.join(tmp, `page-${pg.id}.json`), "utf8"));
   const orig = fs.readdirSync(tmp).find((f) => f.startsWith(`page-${pg.id}.original.`));
   if (!orig) { console.log(`page ${pg.id}: no original image in the report (${rep.originalError || "unknown reason"}); skipping`); continue; }
@@ -64,7 +66,7 @@ for (const pg of summary.pages) {
   // regions: same numbering as the report (single slice; strips were numbered page-wide the same way)
   const regionsNow = an.regions.map((r) => ({ id: r.id, kind: r.kind, letter: r.letter, box: r.box }));
   const regionsThen = rep.regions.map((r) => ({ id: r.id, kind: r.kind, letter: r.letter, box: r.box }));
-  const items = rep.items.map((it) => ({ tag: rematch(an, rep, it), box: it.box, text: it.text, size: it.size, kind: it.kind }));
+  const items = rep.items.map((it) => ({ tag: rematch(an, rep, it), box: it.box, text: it.text, size: it.size, kind: it.kind, source: it.source, ...(it.same ? { same: true } : {}) }));
   const { placements, regionIds } = layout(an, items);
   const clean = erase(cv, pixels, an, regionIds).image;
   const o = createCanvas(W, H), octx = o.getContext("2d"); octx.putImageData(clean, 0, 0);
