@@ -57,7 +57,7 @@ jobs:
       # cairo/pango…: node-canvas ships prebuilt binaries; when that download fails it builds
       # from source, which needs these (~1 min). mesa-vulkan-drivers: a software GPU
       # (lavapipe) for Dawn, so gpu.test.mjs runs the WebGPU path for real.
-      - run: sudo apt-get update -q >/dev/null && sudo apt-get install -y --no-install-recommends libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev mesa-vulkan-drivers >/dev/null
+      - run: sudo apt-get update -q >/dev/null && sudo apt-get install -y --no-install-recommends libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev mesa-vulkan-drivers fonts-noto-cjk >/dev/null
       - run: cd tests && npm ci --no-audit --no-fund
       - run: pip install --quiet onnx numpy pillow # detector vendoring rewrites ONNX ops; the stand-in segmentation model is built from a fixture
       # Vendored libraries must match what the vendoring scripts produce from the pinned packages.

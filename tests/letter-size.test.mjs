@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { cv } from "./cv-node.mjs";
 import { rowLetter, bubbleLetter, columnLetter, syllableHeight } from "../extension/engine/analyze.js";
 import { createCanvas } from "canvas";
+import { execFileSync } from "node:child_process";
 import { loadLettering } from "./lettering-setup.mjs";
 
 loadLettering();
@@ -142,6 +143,10 @@ test("a column of glyphs made of bars (テ, 二) keeps its width", () => {
 });
 
 // ---- rows of Hangul (2.15): a syllable's lower part is thin strokes in a few syllables ----
+// (drawn in Noto Sans CJK KR, Debian and Ubuntu's fonts-noto-cjk: without it the canvas falls back to
+// boxes, and these rows measure nothing like Hangul)
+const hasKoreanFont = (() => { try { return /Noto Sans CJK KR/.test(execFileSync("fc-list", [":lang=ko", "family"]).toString()); } catch { return false; } })();
+assert.ok(hasKoreanFont, "Noto Sans CJK KR isn't installed (apt install fonts-noto-cjk): the Hangul rows below can't be drawn");
 const hangulRows = (rows, size, lead = 1.15) => {
   const c = createCanvas(W, H), g = c.getContext("2d");
   g.fillStyle = "#fff"; g.fillRect(0, 0, W, H); g.fillStyle = "#000"; g.font = `${size}px "Noto Sans CJK KR"`; g.textBaseline = "alphabetic";
