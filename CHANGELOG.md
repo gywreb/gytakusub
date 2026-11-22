@@ -4,6 +4,63 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
 
 ## [Unreleased]
 
+## [2.15.0] — 2026-11-22
+
+### Fixed
+- **Translations stay inside their bubble or caption.** In your French chapter (MangaDex), text crossed the borders it belongs inside:
+  - **Page 6:** two captions drawn as one L-shaped box. Each translation spread over both boxes and past them.
+  - **Page 9:** a two-lobe bubble. A translation ran past the bottom curve.
+  - **Page 20:** a narrow bubble's lines ran out at the top and bottom, and a slanted bubble's text crossed the slant.
+
+  Three causes, all fixed:
+  - A translation's room included the whole box of the lettering it replaces. In a curved or slanted bubble that box's corners lie past the outline. The room is now the bubble's inside and the erased lettering within it, never past the outline. The box's own fit is used only when its letters stay inside (at most 3% past the outline).
+  - When nothing fitted even at the smallest size, lines could run past the box's top and bottom. Now only a little past its sides.
+  - Two captions' lettering merged into one paragraph was cut across its rows. Now each line takes its own lines of it. Where a caption's border runs across one region, each line keeps to its side of the border.
+
+  One margin now keeps text off the outline (0.3 letter sizes). Before, a second margin came on top, so text in narrow bubbles came out smaller than it needed to. Where the room's centre is far from the lettering's, the text is also tried centred on the lettering, and takes whichever fits larger.
+
+  A bubble's outline is now found from its ink, not only from the bubble model's mask, which is smoother than a burst's spikes. Lettering counts as room only where the bubble encloses it, not in the gaps between a burst's spikes or in a cloud's notches.
+- **The lines of one bubble come out at about one size.** In page 9's two-lobe bubble, the two translations came out at 31 and 20 px, where the letterer used one size. Now they're 30 and 25 px: lines of one bubble whose lettering was one size stay within 20% of each other's size.
+  - No line goes under 0.7 of its own lettering's size to match another.
+  - A shout beside a whisper (lettering more than 20% apart) keeps both sizes.
+- **Claude's "large" and "small" no longer scale a size measured on the page.** Each line's size is measured on the lettering it replaces. Claude's size label scaled it again, so "HA HA HA!" on page 20 came out 1.3 × too large. The label now only adjusts a size guessed for lines with no lettering under them.
+- **Korean is drawn at its own size.** Your Naver reports had Korean lines set smaller than drawn. The letter size of a row is the band of rows dense with ink, and a Hangul syllable's lower part (a final consonant, a vowel's stem) is a few thin strokes, so the band stopped above it. Lines Claude read as Hangul are now measured on whole syllables: the rows holding at least 10% of the peak, counting letter-sized marks only.
+  - On generated Korean pages (94 lines): 0.88 of the true size before (median), with 14 lines under 0.7. Now 0.95, with none under 0.7.
+  - Replaying your report: small lines such as "So cute, honestly." were tiny before, and are now at the lettering's size.
+
+**Measured on pages never looked at while making these changes** (held-out halves; 2.14.7 → 2.15.0):
+
+| | 2.14.7 | 2.15.0 |
+|---|---|---|
+| Text past its bubble: generated pages (150 pages, 810 lines) | 19 (2.3%) | 12 (1.5%) |
+| Text past its bubble: the new shapes (150 pages, 1,165 lines) | 53 (4.5%) | 21 (1.8%) |
+| Lines a bubble could hold at 0.7 of their size, set smaller: generated | 21 (2.6%) | 12 (1.5%) |
+| Lines a bubble could hold at 0.7 of their size, set smaller: new shapes | 26 (2.2%) | 29 (2.5%) |
+| Lines under 0.7 of their size: generated | 106 (13.1%) | 109 (13.5%) |
+| Lines under 0.7 of their size: new shapes | 156 (13.4%) | 175 (15.0%) |
+| Lines under 0.7 of their size: real pages (Manga109-s, 328 pages, 2,683 lines) | 10.2% | 14.5% |
+| Korean lines under 0.7 of their size: generated | 14 | 12 |
+
+By shape, text past its bubble went from 27 to 7 lines in slanted bubbles and from 8 to 2 in narrow ones.
+
+**The cost is size.** Text kept inside its bubble has less room than text allowed over the outline. On real pages, lines under 0.7 of their size went from 10.2% to 14.5%. The real-page bench has no outline to measure crossing against, so before this release it counted lines as full size when they ran over the outline into the art. On a real page checked by eye, four lines that crossed into the art in 2.14.7 stay inside in 2.15.0, smaller.
+
+**Two goals set for this release are not met:**
+- Text past its bubble: the goal was ≤ 1%. The rest is mostly in bursts, where the bubble model's mask doesn't follow the spikes.
+- Real lines under 0.7 of their size: the goal was "no worse".
+
+Size inside tight bubbles is on the list for after 3.0.
+
+### Added
+- **The debug report shows how much of each line lies outside its room** ("outside" per line, in the extension's and the web app's reports), so text past its bubble shows in a report without anyone having to spot it.
+
+### Development
+- **The bench has the shapes that broke** (`synth.mjs --readers`): two caption boxes one over the other, two-lobe bubbles, slanted bubbles, narrow bubbles. Each line is counted by its shape (lines, past the bubble, under 0.7 of its size, over 1/0.7).
+- **The bench gives Claude's size labels as Claude gives them** (`bench/labels.mjs`, from your reports), counts oversize lines ("big"), and gives each item Claude's source text.
+- **A Gytakusub loaded unpacked reloads itself when `dev-reload.txt` in its folder changes** (`extension/devreload.js`, git-ignored marker). A test run that switches the folder's code writes the file, and the browser runs the new code without anyone clicking Reload on the extensions page. A store install never looks for the file.
+- **`replay-report.mjs`** keeps Claude's source text on each item (Korean replays), and `PAGES=06,09` replays only those pages.
+- [ADR 0019](docs/adr/0019-text-stays-in-its-room.md): text stays in its room, at the lettering's size.
+
 ## [2.14.7] — 2026-11-22
 
 ### Fixed
