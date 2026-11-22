@@ -1,6 +1,6 @@
 // Gytakusub Web – the page engine (OpenCV analysis, erase, layout) runs here,
 // off the main thread. Same engine modules as the extension's service worker.
-import { preparePage, prefillPage, finishPage, warmInpainter, inpainterWarm, setEnginePrefs, onLama } from "./engine/index.js";
+import { preparePage, prefillPage, finishPage, releasePage, warmInpainter, inpainterWarm, setEnginePrefs, onLama } from "./engine/index.js";
 
 // LaMa on a graphics card (ADR 0015), as the app says (translator.js: not after it ran out of memory)
 onLama((state) => self.postMessage({ event: "lama", state }));
@@ -66,13 +66,13 @@ self.onmessage = async (e) => {
           if (job.later > 0) { const w0 = performance.now(); busy--; try { await warmInpainter(); } finally { busy++; } modelWait = Math.round(performance.now() - w0); }
         }
         page = await finishPage(job, e.data.results, { natural });
-      } finally { natural?.close(); }
+      } finally { natural?.close(); releasePage(job); } // (a prefill that failed before the finish: the page is still freed)
       const patches = page.patches.map((p) => ({ x: p.x, y: p.y, w: p.w, h: p.h, bitmap: p.canvas.transferToImageBitmap() }));
       // (and what the debug report records: which engine, where the models ran, their times, how the areas were filled)
       self.postMessage({ id, ok: true, items: page.items, placements: page.placements, regions: page.regions, work: page.work, letter: page.letter, patches, engine: page.engine, backend: page.backend, detectMs: page.detectMs, segmentMs: page.segmentMs, fill: page.fill, look: page.look, dropped: page.dropped, modelWait }, patches.map((p) => p.bitmap));
     } else if (type === "drop") {
       const job = jobs.get(e.data.jobId); jobs.delete(e.data.jobId);
-      if (job) { await stopPrefill(job); for (const s of job.slices) s.analysis.dispose(); job.natural?.close(); }
+      if (job) { await stopPrefill(job); releasePage(job); job.natural?.close(); }
       self.postMessage({ id, ok: true });
     }
   } catch (err) {

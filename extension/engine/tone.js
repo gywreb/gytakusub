@@ -10,6 +10,7 @@
 // must beat "the local average" by a clear margin (VALIDATE). Anything else (art, irregular
 // texture, smooth shading) returns null and goes to the learned inpainter.
 
+import { owning } from "./owner.js";
 import { TONE } from "./tuning.js";
 
 /** Prediction error allowed, as a share of the error of predicting the local average. */
@@ -30,15 +31,19 @@ const MIN_PEAK = TONE.minPeak; // autocorrelation below this is no lattice (nois
  *   surround is not a lattice
  */
 export function latticeFill(cv, rgb, hole, source = null, opts = {}) {
+  return owning((own) => fillLattice(cv, rgb, hole, source, opts, own));
+}
+
+function fillLattice(cv, rgb, hole, source, opts, own) {
   const w = rgb.cols, h = rgb.rows, n = w * h;
   const P = Math.min(opts.maxPeriod || TONE.maxPeriod, Math.floor(Math.min(w, h) / TONE.periodsInArea));
   if (P < TONE.minPeriod) return null;
-  const img = rgb.isContinuous() ? rgb : rgb.clone(), hm = hole.isContinuous() ? hole : hole.clone();
+  const img = rgb.isContinuous() ? rgb : own(rgb.clone()), hm = hole.isContinuous() ? hole : own(hole.clone());
   const px = img.data, hd = hm.data;
   let sd = null;
   if (source) {
-    const e = Math.max(0, Math.round(opts.margin ?? 2)), s = new cv.Mat();
-    if (e) { const k = cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(2 * e + 1, 2 * e + 1)); cv.erode(source, s, k); k.delete(); } else source.copyTo(s);
+    const e = Math.max(0, Math.round(opts.margin ?? 2)), s = own(new cv.Mat());
+    if (e) { const k = own(cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(2 * e + 1, 2 * e + 1))); cv.erode(source, s, k); k.delete(); } else source.copyTo(s);
     sd = new Uint8Array(s.data); s.delete();
   }
   const known = new Uint8Array(n);
@@ -53,12 +58,12 @@ export function latticeFill(cv, rgb, hole, source = null, opts = {}) {
   const t = highPass(cv, L, known, w, h, Math.max(TONE.highPassMin, P / TONE.highPassDiv));
 
   // how far a hole pixel is from the surface: copies must reach that far
-  const dist = new cv.Mat(); cv.distanceTransform(hm, dist, cv.DIST_L2, 3);
+  const dist = own(new cv.Mat()); cv.distanceTransform(hm, dist, cv.DIST_L2, 3);
   let inradius = 0; for (const v of dist.data32F) if (v > inradius) inradius = v;
   dist.delete();
   // and how far each pixel outside it is from the hole (one distance transform, instead of
   // dilating by a wide disc for every band below)
-  const inv = new cv.Mat(), away = new cv.Mat();
+  const inv = own(new cv.Mat()), away = own(new cv.Mat());
   cv.bitwise_not(hm, inv); cv.distanceTransform(inv, away, cv.DIST_L2, 3); inv.delete();
   const fromHole = new Float32Array(away.data32F); away.delete();
   const nearHole = (d) => { const out = new Uint8Array(n); for (let i = 0; i < n; i++) out[i] = known[i] && fromHole[i] <= d ? 1 : 0; return out; };
@@ -96,8 +101,8 @@ export function latticeFill(cv, rgb, hole, source = null, opts = {}) {
   // fill
   const holes = []; for (let i = 0; i < n; i++) if (hd[i]) holes.push(i);
   const fill = predict(px, known, w, h, holes, lattice, reach(inradius, lattice), depthTo(cv, known, w, h));
-  const out = img.clone(), od = out.data;
-  const left = new cv.Mat(h, w, cv.CV_8UC1, new cv.Scalar(0)), ld = left.data;
+  const out = own(img.clone()), od = out.data;
+  const left = own(new cv.Mat(h, w, cv.CV_8UC1, new cv.Scalar(0))), ld = left.data;
   let missing = 0;
   for (let j = 0; j < holes.length; j++) {
     const i = holes[j];
@@ -105,10 +110,10 @@ export function latticeFill(cv, rgb, hole, source = null, opts = {}) {
     od[i * 3] = fill[j * 3]; od[i * 3 + 1] = fill[j * 3 + 1]; od[i * 3 + 2] = fill[j * 3 + 2];
   }
   // a few pixels with no lattice copy in reach (pinned between hole and edge): smooth fill
-  if (missing) { const t2 = new cv.Mat(); cv.inpaint(out, left, t2, TONE.leftRadius, cv.INPAINT_TELEA); t2.copyTo(out); t2.delete(); }
+  if (missing) { const t2 = own(new cv.Mat()); cv.inpaint(out, left, t2, TONE.leftRadius, cv.INPAINT_TELEA); t2.copyTo(out); t2.delete(); }
   left.delete(); done();
   if (opts.info) Object.assign(opts.info, { lattice, score });
-  return out;
+  return own.keep(out);
 }
 
 const len = (v) => Math.hypot(v[0], v[1]);
@@ -124,15 +129,17 @@ function sample(list, k) {
 
 /** Brightness minus its Gaussian-weighted average over known pixels; 0 off the known pixels. */
 function highPass(cv, L, known, w, h, sigma) {
-  const n = w * h, a = new cv.Mat(h, w, cv.CV_32F), b = new cv.Mat(h, w, cv.CV_32F);
-  const ad = a.data32F, bd = b.data32F;
-  for (let i = 0; i < n; i++) { ad[i] = known[i] ? L[i] : 0; bd[i] = known[i]; }
-  const ks = new cv.Size(0, 0);
-  cv.GaussianBlur(a, a, ks, sigma, sigma, cv.BORDER_REFLECT_101); cv.GaussianBlur(b, b, ks, sigma, sigma, cv.BORDER_REFLECT_101);
-  const t = new Float32Array(n), ad2 = a.data32F, bd2 = b.data32F;
-  for (let i = 0; i < n; i++) t[i] = known[i] ? L[i] - ad2[i] / Math.max(bd2[i], 1e-3) : 0;
-  a.delete(); b.delete();
-  return t;
+  return owning((own) => {
+    const n = w * h, a = own(new cv.Mat(h, w, cv.CV_32F)), b = own(new cv.Mat(h, w, cv.CV_32F));
+    const ad = a.data32F, bd = b.data32F;
+    for (let i = 0; i < n; i++) { ad[i] = known[i] ? L[i] : 0; bd[i] = known[i]; }
+    const ks = new cv.Size(0, 0);
+    cv.GaussianBlur(a, a, ks, sigma, sigma, cv.BORDER_REFLECT_101); cv.GaussianBlur(b, b, ks, sigma, sigma, cv.BORDER_REFLECT_101);
+    const t = new Float32Array(n), ad2 = a.data32F, bd2 = b.data32F;
+    for (let i = 0; i < n; i++) t[i] = known[i] ? L[i] - ad2[i] / Math.max(bd2[i], 1e-3) : 0;
+    a.delete(); b.delete();
+    return t;
+  });
 }
 
 /**
@@ -223,13 +230,15 @@ function refine(at, dx, dy) {
 
 /** Each pixel's distance to the nearest known pixel (exact; 0 on known pixels). */
 function depthTo(cv, known, w, h) {
-  const m = new cv.Mat(h, w, cv.CV_8UC1), md = m.data;
-  for (let i = 0; i < md.length; i++) md[i] = known[i] ? 0 : 255;
-  const d = new cv.Mat();
-  cv.distanceTransform(m, d, cv.DIST_L2, cv.DIST_MASK_PRECISE);
-  const out = new Float32Array(d.data32F);
-  m.delete(); d.delete();
-  return out;
+  return owning((own) => {
+    const m = own(new cv.Mat(h, w, cv.CV_8UC1)), md = m.data;
+    for (let i = 0; i < md.length; i++) md[i] = known[i] ? 0 : 255;
+    const d = own(new cv.Mat());
+    cv.distanceTransform(m, d, cv.DIST_L2, cv.DIST_MASK_PRECISE);
+    const out = new Float32Array(d.data32F);
+    m.delete(); d.delete();
+    return out;
+  });
 }
 
 /**

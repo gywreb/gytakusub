@@ -32,6 +32,7 @@ Both apps share the same engine, which runs locally in a worker (the extension's
 | `extension/engine/tone.js` | The screentone fill: measures the surface's lattice from its autocorrelation, checks it predicts the surround, and copies the tone in phase. |
 | `extension/engine/inpaint.js` | The learned fill: AOT-GAN inpainting trained on manga (GPL-3.0), run by ONNX Runtime. |
 | `extension/engine/tuning.js` | The numbers the engine decides with, by stage (layout, erase, analysis, detector, screentone, fill, page), each with its unit and what it bounds. The bench can vary them (`GYT_TUNE`, docs/QUALITY.md); a test checks each is a number the engine reads. |
+| `extension/engine/owner.js` | Who frees what OpenCV made: each engine function passes the objects it makes through an owner, freed however the function ends ([ADR 0018](adr/0018-a-page-leaves-nothing-in-opencv.md)). |
 | `extension/engine/page.js` | One page in the worker: downscale, analyse, stamp the regions for the model; then place, erase and return the cleaned areas with text placements. |
 | `extension/text.js` | Fits and draws the text: one font per page, the first bundled one with every letter of its translations (system fonts for Chinese, Japanese, Korean); sizes from the original letter size; line breaks at spaces, or between words for Chinese, Japanese and Thai, with their line-start rules; the target language's TeX hyphenation patterns only when an un-hyphenated layout does not fit; halo over artwork. |
 | `extension/prompt.js` | Claude prompt (set-of-mark), API call with a JSON-schema structured answer, response parsing, chapter context. The answer contract it re-exports lives in `engine/contract.js`. |
@@ -46,7 +47,7 @@ The copies under `extension/` are canonical; `node scripts/sync-shared.mjs` copi
 
 The apps reach the engine through two files only:
 
-- `engine/index.js`, for the worker that runs pages: prepare, prefill, finish, the inpainter's warm-up, the engine's settings.
+- `engine/index.js`, for the worker that runs pages: prepare, prefill, finish, release (a page dropped before its finish), the inpainter's warm-up, the engine's settings.
 - `engine/contract.js`, for any thread: how a page is cut into slices for the model, and how the model's answer is checked and turned into page fractions. It imports nothing, so the web app's page can load it without the models. `prompt.js` re-exports it.
 
 The engine imports only its own files and `vendor/`. `scripts/check-engine-contract.mjs` checks all of this in CI (`tests/engine-contract.test.mjs`), along with the web app's offline cache listing every engine module, so a stage can be replaced without touching a caller.

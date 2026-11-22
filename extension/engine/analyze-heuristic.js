@@ -6,6 +6,8 @@
 // caller chose). The result keeps OpenCV label maps for erase/layout; call
 // `analysis.dispose()` when done with it.
 
+import { owner, owning } from "./owner.js";
+
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 // Diagnostics: set globalThis.GYT_TRACE = (kind, box, reason, extra) => … to hear
 // why a text block or light region was rejected (tests/engine-viz.mjs --trace).
@@ -41,16 +43,24 @@ const capHeight = (a) => { if (!a.length) return 0; const t = Float64Array.from(
  * @returns {Analysis}
  */
 export function analyzeHeuristic(cv, img) {
+  // (owner.js) the work's objects, freed when it is done; the analysis's (its label maps), which its
+  // dispose() frees — or this, should the work fail
+  const held = owner();
+  try { return owning((own) => analyzeWith(cv, img, own, held)); }
+  catch (e) { held.free(); throw e; }
+}
+
+function analyzeWith(cv, img, own, held) {
   const W = img.width, H = img.height;
-  const src = cv.matFromImageData(img);
-  const gray = new cv.Mat(); cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+  const src = own(cv.matFromImageData(img));
+  const gray = own(new cv.Mat()); cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
   // Median blur turns screentone (dots on white) into flat grey, so only truly
   // flat light areas — bubbles, captions, plain backgrounds — stay "light".
-  const base = new cv.Mat(); cv.medianBlur(gray, base, odd(clamp(Math.round(W / 320), 3, 7)));
+  const base = own(new cv.Mat()); cv.medianBlur(gray, base, odd(clamp(Math.round(W / 320), 3, 7)));
 
   const polarities = [
-    analyzePolarity(cv, src, gray, base, W, H, false), // dark lettering on light bubbles
-    analyzePolarity(cv, src, gray, base, W, H, true),  // light lettering on dark bubbles
+    analyzePolarity(cv, src, gray, base, W, H, false, own, held), // dark lettering on light bubbles
+    analyzePolarity(cv, src, gray, base, W, H, true, own, held),  // light lettering on dark bubbles
   ];
 
   // Merge, number regions in reading order (top-to-bottom, left-to-right in bands).
@@ -128,7 +138,7 @@ export function analyzeHeuristic(cv, img) {
       return (x, y) => x >= 0 && y >= 0 && x < W && y < H && data[(y | 0) * W + (x | 0)] === labelId;
     },
     polarities,
-    dispose() { for (const p of polarities) p.dispose(); },
+    dispose: held.free,
   };
 }
 
@@ -159,11 +169,11 @@ export function mergeParagraphs(lines) {
   return out;
 }
 
-function analyzePolarity(cv, src, gray, base, W, H, dark) {
+function analyzePolarity(cv, src, gray, base, W, H, dark, own, held) {
   // --- ink (the lettering colour) and glyph components ---
-  const ink = new cv.Mat();
+  const ink = own(new cv.Mat());
   if (dark) cv.threshold(gray, ink, 165, 255, cv.THRESH_BINARY); else cv.threshold(gray, ink, 105, 255, cv.THRESH_BINARY_INV);
-  const gl = new cv.Mat(), gs = new cv.Mat(), gc = new cv.Mat();
+  const gl = held(new cv.Mat()), gs = own(new cv.Mat()), gc = own(new cv.Mat());
   const gn = cv.connectedComponentsWithStats(ink, gl, gs, gc, 8, cv.CV_32S);
   const minH = Math.max(3, W / 400), maxH = W / 8;
   const glyphs = []; // index = label
@@ -183,11 +193,11 @@ function analyzePolarity(cv, src, gray, base, W, H, dark) {
   // Close only the glyph-sized components: on a scan, letters sit a pixel or two
   // from the bubble outline, and closing the raw ink would weld the line to the
   // outline and the art behind it (one giant component, silently dropped).
-  const glyphMask = new cv.Mat.zeros(H, W, cv.CV_8UC1);
+  const glyphMask = own(cv.Mat.zeros(H, W, cv.CV_8UC1));
   { const L = gl.data32S, M = glyphMask.data; for (let p = 0; p < W * H; p++) { const g = glyphs[L[p]]; if (g && g.ok) M[p] = 255; } }
-  const kern = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(Math.max(3, Math.round(W / 90)), Math.max(3, Math.round(W / 200))));
-  const closed = new cv.Mat(); cv.morphologyEx(glyphMask, closed, cv.MORPH_CLOSE, kern); glyphMask.delete();
-  const bl = new cv.Mat(), bs = new cv.Mat(), bc = new cv.Mat();
+  const kern = own(cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(Math.max(3, Math.round(W / 90)), Math.max(3, Math.round(W / 200)))));
+  const closed = own(new cv.Mat()); cv.morphologyEx(glyphMask, closed, cv.MORPH_CLOSE, kern); glyphMask.delete();
+  const bl = own(new cv.Mat()), bs = own(new cv.Mat()), bc = own(new cv.Mat());
   const bn = cv.connectedComponentsWithStats(closed, bl, bs, bc, 8, cv.CV_32S);
   const B = bs.data32S;
   // glyph label → block label: the block under the glyph's centre, provided the
@@ -234,7 +244,7 @@ function analyzePolarity(cv, src, gray, base, W, H, dark) {
     // inside a glyph ≈ half its stroke width.
     const core = good.filter((gi) => glyphs[gi].h >= 0.55 * mid); // the letters proper (see above)
     {
-      const roi = ink.roi(new cv.Rect(x, y, w, h)), dt = new cv.Mat();
+      const roi = own(ink.roi(new cv.Rect(x, y, w, h))), dt = own(new cv.Mat());
       cv.distanceTransform(roi, dt, cv.DIST_L2, 3);
       const D = dt.data32F, ratios = [];
       let blobs = 0;
@@ -264,11 +274,11 @@ function analyzePolarity(cv, src, gray, base, W, H, dark) {
   // --- light regions → bubbles (must contain text, text must matter in them) ---
   // Light in the blurred image (so screentone is not light) AND in the raw
   // image (so thin outlines, which the blur erases, still bound the region).
-  const light = new cv.Mat(), lightRaw = new cv.Mat();
+  const light = own(new cv.Mat()), lightRaw = own(new cv.Mat());
   if (dark) { cv.threshold(base, light, 60, 255, cv.THRESH_BINARY_INV); cv.threshold(gray, lightRaw, 90, 255, cv.THRESH_BINARY_INV); }
   else { cv.threshold(base, light, 190, 255, cv.THRESH_BINARY); cv.threshold(gray, lightRaw, 150, 255, cv.THRESH_BINARY); }
   cv.bitwise_and(light, lightRaw, light); lightRaw.delete();
-  const ll = new cv.Mat(), ls = new cv.Mat(), lc = new cv.Mat();
+  const ll = held(new cv.Mat()), ls = own(new cv.Mat()), lc = own(new cv.Mat());
   const ln = cv.connectedComponentsWithStats(light, ll, ls, lc, 4, cv.CV_32S);
   const L = ls.data32S, labels = ll.data32S;
   const sample = (x, y) => (x < 0 || y < 0 || x >= W || y >= H) ? 0 : labels[y * W + x];
@@ -348,16 +358,16 @@ function analyzePolarity(cv, src, gray, base, W, H, dark) {
     // A bubble is a flat light shape whose only content is lettering. Its holes
     // (filled outline minus light pixels) must be small and mostly glyphs; a
     // panel background with a character drawn on it fails both.
-    const roi = light.roi(new cv.Rect(x, y, w, h));
-    const m = new cv.Mat(h, w, cv.CV_8UC1);
+    const roi = own(light.roi(new cv.Rect(x, y, w, h)));
+    const m = own(new cv.Mat(h, w, cv.CV_8UC1));
     const md = m.data, rd = roi.data, step = roi.step ? roi.step[0] : W;
     for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) md[yy * w + xx] = labels[(y + yy) * W + x + xx] === i ? 255 : 0;
-    const contours = new cv.MatVector(), hier = new cv.Mat();
+    const contours = own(new cv.MatVector()), hier = own(new cv.Mat());
     cv.findContours(m, contours, hier, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
     let filled = 0, hullArea = 0, bestK = -1;
     for (let k = 0; k < contours.size(); k++) {
-      const ct = contours.get(k), ar = cv.contourArea(ct);
-      if (ar > filled) { filled = ar; bestK = k; const hull = new cv.Mat(); cv.convexHull(ct, hull); hullArea = cv.contourArea(hull); hull.delete(); }
+      const ct = own(contours.get(k)), ar = cv.contourArea(ct);
+      if (ar > filled) { filled = ar; bestK = k; const hull = own(new cv.Mat()); cv.convexHull(ct, hull); hullArea = cv.contourArea(hull); hull.delete(); }
       ct.delete();
     }
     // the bubble's full footprint (lettering holes filled) — layout needs the shape, not the surface
@@ -396,7 +406,7 @@ function analyzePolarity(cv, src, gray, base, W, H, dark) {
   ink.delete(); gs.delete(); gc.delete(); kern.delete(); closed.delete(); bl.delete(); bs.delete(); bc.delete(); light.delete(); ls.delete(); lc.delete();
   return {
     dark, glyphs, glyphLabels: gl, regionLabels: ll, blocks, bubbles,
-    dispose() { gl.delete(); ll.delete(); },
+    dispose() { for (const m of [gl, ll]) if (!m.isDeleted()) m.delete(); },
   };
 }
 

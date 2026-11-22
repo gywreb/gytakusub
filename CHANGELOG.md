@@ -4,6 +4,24 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
 
 ## [Unreleased]
 
+## [2.14.7] — 2026-11-22
+
+### Fixed
+- **A page that fails or is stopped partway no longer leaves memory behind.** 2.14.6 fixed the leak on pages that go well. On a page that went wrong partway, the image engine (OpenCV) still kept whatever the page had made so far, and that adds up the same way. Two cases come up in normal reading:
+  - The prefill (the fills done while Claude answers) stops each time the answer comes first. Each stop left the page's colour copy behind: 3 MB for one of your Naver images.
+  - A failing learned fill on a graphics card left its window of the page behind, once per area.
+
+  Rarer failures (a model, a page that can't be read) left more. Now each part of the engine frees what it made however it ends, and every page is freed however it ends: answered, scrolled away from, cancelled, or failed. The extension and the web app both do this.
+- **If OpenCV still runs out, the next page starts a fresh OpenCV.** Before, every page after it failed until the extension restarted. The error now says it ran out ("its memory at 1024 MB, all it can have"). A page already under way finishes on the OpenCV it started with.
+
+Pages come out the same, pixel for pixel: the identity set (93 real pages, 90 generated) renders identically with 2.14.6 and 2.14.7.
+
+### Development
+- **A test that makes pages fail at every point they can** (`tests/fail-paths.test.mjs`, [ADR 0018](docs/adr/0018-a-page-leaves-nothing-in-opencv.md)). It records every OpenCV object with the engine line that made it (`tests/opencv-audit.mjs`), then runs pages through the engine and fails them one point at a time: each of 166 engine lines' OpenCV calls made to throw as OpenCV does, each checkpoint as a stop, and each model run. After each of the 191 failures, nothing may be left alive.
+  - The pages cover the engine's paths: a page at its own size, a page analysed smaller, LaMa's fill with the page around each area, the OpenCV text detector, and the analysis without models.
+  - With 2.14.6's engine, 162 of the 191 left objects alive. With 2.14.7's, none do.
+- **`engine/owner.js`:** each engine function passes the OpenCV objects it makes through an owner, which frees them however the function ends. `releasePage(job)` is new at the engine's door.
+
 ## [2.14.6] — 2026-11-22
 
 ### Fixed

@@ -6,7 +6,7 @@
 
 import { callClaude, mergeContext, sliceGeometry } from "./prompt.js";
 import { addCall, addPage, emptyLog } from "./usage.js";
-import { preparePage, prefillPage, finishPage, warmInpainter, inpainterWarm, setEnginePrefs } from "./engine/index.js";
+import { preparePage, prefillPage, finishPage, warmInpainter, inpainterWarm, setEnginePrefs, releasePage } from "./engine/index.js";
 import { DEFAULT_SETTINGS, getSettings, CS_FILES, ensureContentScript } from "./settings.js";
 import { createLane, Cancelled } from "./lane.js";
 import { consentGiven, hasAccess, openWelcome, CONSENT_VERSION } from "./access.js";
@@ -269,8 +269,6 @@ chrome.runtime.onConnect.addListener((port) => {
   });
 });
 
-const disposeJob = (prepared) => { for (const s of prepared?.slices || []) { try { s.analysis?.dispose?.(); } catch { /* already freed */ } } };
-
 // ---------- main handler ----------
 
 async function handleTranslate(msg, sender) {
@@ -330,9 +328,11 @@ async function translatePage(msg, settings, tabId, work) {
   finally { analysing--; }
   lap("analyze");
   engineOnCpu = !/detect:webgpu/.test(job.slices?.[0]?.analysis?.backend || "");
+  // the page's analysis is freed here however it ends: answered, cancelled, Claude's answer failed
+  // (answerPage lets any prefill of it return first)
   try {
     return await answerPage(msg, settings, tabId, work, { job, natural, cached, cacheKey, timing, lap, priority, held });
-  } finally { natural?.close(); }
+  } finally { natural?.close(); releasePage(job); }
 }
 
 // The prefill's place in the lane: behind every other task, so it only ever uses time the engine
@@ -370,7 +370,7 @@ async function answerPage(msg, settings, tabId, work, { job, natural, cached, ca
   if (cached && !msg.force) {
     results = cached.results; usage = cached.usage;
   } else {
-    if (signal.aborted) { disposeJob(job); throw new Cancelled(); }
+    if (signal.aborted) throw new Cancelled(); // (the page is released by translatePage)
     work.asked = true; // from here the page is paid for: it finishes even if the user scrolls away
     // While Claude answers (seconds), the engine fills this page's textured areas ahead
     // (engine/page.js prefillPage), so the finish finds them done; it stops at its next area
@@ -408,7 +408,7 @@ async function answerPage(msg, settings, tabId, work, { job, natural, cached, ca
       timing.claude = Math.round(performance.now() - c0);
     } catch (e) { failed = e; }
     finally { pre.abort(); await prefilled; } // (stopped before the analyses are used or freed)
-    if (failed) { disposeJob(job); throw failed; }
+    if (failed) throw failed;
   }
   lap("model");
 

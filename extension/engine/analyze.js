@@ -10,6 +10,7 @@
 import { detectTextSync } from "./detect.js";
 import { analyzeHeuristic, mergeParagraphs } from "./analyze-heuristic.js";
 import { ANALYZE } from "./tuning.js";
+import { owner, owning } from "./owner.js";
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const odd = (n) => (n % 2 ? n : n + 1);
@@ -74,36 +75,38 @@ export function rowLetter(cv, ink, x0, y0, x1, y1) {
  * judged on it, as before.
  */
 export function columnLetter(cv, ink, ln, x0, y0, x1, y1) {
-  const W = ink.cols, H = ink.rows;
-  const bx0 = clamp(ln.x, 0, W - 1), by0 = clamp(ln.y, 0, H - 1), bw = clamp(ln.x + ln.w, bx0 + 1, W) - bx0, bh = clamp(ln.y + ln.h, by0 + 1, H) - by0;
-  const roi = ink.roi(new cv.Rect(bx0, by0, bw, bh)), lab = new cv.Mat(), st = new cv.Mat(), ce = new cv.Mat();
-  const nc = cv.connectedComponentsWithStats(roi, lab, st, ce, 8, cv.CV_32S), S = st.data32S, Lc = lab.data32S;
-  const inner = new Uint8Array(nc);
-  for (let i = 1; i < nc; i++) inner[i] = S[i * 5] > 0 && S[i * 5 + 1] > 0 && S[i * 5] + S[i * 5 + 2] < bw && S[i * 5 + 1] + S[i * 5 + 3] < bh ? 1 : 0;
-  const prof = new Int32Array(bw); let peak = 0;
-  for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) if (inner[Lc[y * bw + x]]) prof[x]++;
-  for (const v of prof) if (v > peak) peak = v;
-  roi.delete(); lab.delete(); st.delete(); ce.delete();
-  let best = 0, run = 0; for (const v of prof) { run = peak && v >= ANALYZE.columnPeak * peak ? run + 1 : 0; if (run > best) best = run; }
-  const band = Math.max(ANALYZE.minBandPx, best || x1 - x0);
-  // the rows of ink down the box: a column's glyphs make rows about as tall as the column is wide
-  // (one per glyph, or a few close ones); a stack of Latin rows makes rows far shorter than it is wide
-  // Rows of letters only: at least half the column wide, and three marks or more across their
-  // middle, as a row of letters has. The dots of a "…" down a column and the bars of a テ make
-  // short rows too, and measured "あ…" at 5 px and "イテテ" at 6 (2.14.1).
-  const I = ink.data, rows = [];
-  const marksAcross = (y) => { let n = 0, on = false; for (let x = x0; x < x1; x++) { const v = !!I[y * W + x]; if (v && !on) n++; on = v; } return n; };
-  let runH = 0, lo = Infinity, hi = -1;
-  for (let y = y0; y <= y1; y++) {
-    let a = -1, b = -1;
-    if (y < y1) for (let x = x0; x < x1; x++) if (I[y * W + x]) { if (a < 0) a = x; b = x; }
-    if (a >= 0) { runH++; lo = Math.min(lo, a); hi = Math.max(hi, b); continue; }
-    if (runH >= ANALYZE.rowMinPx && hi - lo + 1 >= ANALYZE.rowWidth * band && marksAcross(y - 1 - (runH >> 1)) >= ANALYZE.rowMarks) rows.push(runH);
-    runH = 0; lo = Infinity; hi = -1;
-  }
-  rows.sort((a, b) => a - b);
-  const rowH = rows.length >= 2 ? rows[rows.length >> 1] : 0;
-  return { letter: rowH && band > ANALYZE.columnRows * rowH ? ANALYZE.letterScale * rowH : band, band };
+  return owning((own) => {
+    const W = ink.cols, H = ink.rows;
+    const bx0 = clamp(ln.x, 0, W - 1), by0 = clamp(ln.y, 0, H - 1), bw = clamp(ln.x + ln.w, bx0 + 1, W) - bx0, bh = clamp(ln.y + ln.h, by0 + 1, H) - by0;
+    const roi = own(ink.roi(new cv.Rect(bx0, by0, bw, bh))), lab = own(new cv.Mat()), st = own(new cv.Mat()), ce = own(new cv.Mat());
+    const nc = cv.connectedComponentsWithStats(roi, lab, st, ce, 8, cv.CV_32S), S = st.data32S, Lc = lab.data32S;
+    const inner = new Uint8Array(nc);
+    for (let i = 1; i < nc; i++) inner[i] = S[i * 5] > 0 && S[i * 5 + 1] > 0 && S[i * 5] + S[i * 5 + 2] < bw && S[i * 5 + 1] + S[i * 5 + 3] < bh ? 1 : 0;
+    const prof = new Int32Array(bw); let peak = 0;
+    for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) if (inner[Lc[y * bw + x]]) prof[x]++;
+    for (const v of prof) if (v > peak) peak = v;
+    roi.delete(); lab.delete(); st.delete(); ce.delete();
+    let best = 0, run = 0; for (const v of prof) { run = peak && v >= ANALYZE.columnPeak * peak ? run + 1 : 0; if (run > best) best = run; }
+    const band = Math.max(ANALYZE.minBandPx, best || x1 - x0);
+    // the rows of ink down the box: a column's glyphs make rows about as tall as the column is wide
+    // (one per glyph, or a few close ones); a stack of Latin rows makes rows far shorter than it is wide
+    // Rows of letters only: at least half the column wide, and three marks or more across their
+    // middle, as a row of letters has. The dots of a "…" down a column and the bars of a テ make
+    // short rows too, and measured "あ…" at 5 px and "イテテ" at 6 (2.14.1).
+    const I = ink.data, rows = [];
+    const marksAcross = (y) => { let n = 0, on = false; for (let x = x0; x < x1; x++) { const v = !!I[y * W + x]; if (v && !on) n++; on = v; } return n; };
+    let runH = 0, lo = Infinity, hi = -1;
+    for (let y = y0; y <= y1; y++) {
+      let a = -1, b = -1;
+      if (y < y1) for (let x = x0; x < x1; x++) if (I[y * W + x]) { if (a < 0) a = x; b = x; }
+      if (a >= 0) { runH++; lo = Math.min(lo, a); hi = Math.max(hi, b); continue; }
+      if (runH >= ANALYZE.rowMinPx && hi - lo + 1 >= ANALYZE.rowWidth * band && marksAcross(y - 1 - (runH >> 1)) >= ANALYZE.rowMarks) rows.push(runH);
+      runH = 0; lo = Infinity; hi = -1;
+    }
+    rows.sort((a, b) => a - b);
+    const rowH = rows.length >= 2 ? rows[rows.length >> 1] : 0;
+    return { letter: rowH && band > ANALYZE.columnRows * rowH ? ANALYZE.letterScale * rowH : band, band };
+  });
 }
 const trace = (...a) => { if (globalThis.GYT_TRACE) globalThis.GYT_TRACE(...a); };
 // The letter size of a group of paragraphs: that of most of its lettering, each
@@ -124,22 +127,30 @@ const letterOf = (ps, key = "letter") => median(ps.flatMap((p) => Array(Math.max
  */
 export function analyze(cv, img, opts = {}) {
   if (!opts.lines && !opts.detector) return analyzeHeuristic(cv, img);
+  // (owner.js) the work's objects, freed when it is done; the analysis's (its masks and labels),
+  // which its dispose() frees — or this, should the work fail
+  const held = owner();
+  try { return owning((own) => analyzeLines(cv, img, opts, own, held)); }
+  catch (e) { held.free(); throw e; }
+}
+
+function analyzeLines(cv, img, opts, own, held) {
   const W = img.width, H = img.height;
   const lines = opts.lines || detectTextSync(cv, opts.detector, img, opts.maxSide ? { maxSide: opts.maxSide } : {});
-  const src = cv.matFromImageData(img);
-  const gray = new cv.Mat(); cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
-  const base = new cv.Mat(); cv.medianBlur(gray, base, odd(clamp(Math.round(W / ANALYZE.blurDiv), ANALYZE.blurMin, ANALYZE.blurMax)));
+  const src = own(cv.matFromImageData(img));
+  const gray = own(new cv.Mat()); cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+  const base = own(new cv.Mat()); cv.medianBlur(gray, base, odd(clamp(Math.round(W / ANALYZE.blurDiv), ANALYZE.blurMin, ANALYZE.blurMax)));
   const G = gray.data;
 
   // ---- per polarity: ink mask + light-region labels (the bubble surfaces) ----
   const pol = [false, true].map((dark) => {
-    const ink = new cv.Mat();
+    const ink = held(new cv.Mat());
     if (dark) cv.threshold(gray, ink, ANALYZE.inkLight, 255, cv.THRESH_BINARY); else cv.threshold(gray, ink, ANALYZE.inkDark, 255, cv.THRESH_BINARY_INV);
-    const light = new cv.Mat(), lightRaw = new cv.Mat();
+    const light = held(new cv.Mat()), lightRaw = own(new cv.Mat());
     if (dark) { cv.threshold(base, light, ANALYZE.darkSurfaceBlur, 255, cv.THRESH_BINARY_INV); cv.threshold(gray, lightRaw, ANALYZE.darkSurfaceRaw, 255, cv.THRESH_BINARY_INV); }
     else { cv.threshold(base, light, ANALYZE.lightSurfaceBlur, 255, cv.THRESH_BINARY); cv.threshold(gray, lightRaw, ANALYZE.lightSurfaceRaw, 255, cv.THRESH_BINARY); }
     cv.bitwise_and(light, lightRaw, light); lightRaw.delete();
-    const labels = new cv.Mat(), stats = new cv.Mat(), cents = new cv.Mat();
+    const labels = held(new cv.Mat()), stats = held(new cv.Mat()), cents = own(new cv.Mat());
     const n = cv.connectedComponentsWithStats(light, labels, stats, cents, 4, cv.CV_32S);
     cents.delete();
     return { dark, ink, light, labels, stats, n };
@@ -287,7 +298,7 @@ export function analyze(cv, img, opts = {}) {
   // specks (screentone dots the detector read as a dotted line).
   const looksLettered = (p) => {
     const P = pol[p.dark ? 1 : 0], { x, y, w, h } = p.gbox;
-    const roi = P.ink.roi(new cv.Rect(x, y, w, h)), lab = new cv.Mat(), st = new cv.Mat(), ce = new cv.Mat();
+    const roi = own(P.ink.roi(new cv.Rect(x, y, w, h))), lab = own(new cv.Mat()), st = own(new cv.Mat()), ce = own(new cv.Mat());
     const n = cv.connectedComponentsWithStats(roi, lab, st, ce, 8, cv.CV_32S);
     const S = st.data32S; let longest = 0, ink = 0, letterInk = 0; const sizes = [];
     for (let i = 1; i < n; i++) {
@@ -311,7 +322,7 @@ export function analyze(cv, img, opts = {}) {
     // an outline, a stroke of art — not glyphs of this line)
     const P = pol[p.dark ? 1 : 0], m = ANALYZE.marginPx;
     const x = Math.max(0, p.gbox.x - m), y = Math.max(0, p.gbox.y - m), w = Math.min(W, p.gbox.x + p.gbox.w + m) - x, h = Math.min(H, p.gbox.y + p.gbox.h + m) - y;
-    const roi = P.ink.roi(new cv.Rect(x, y, w, h)), lab = new cv.Mat(), st = new cv.Mat(), ce = new cv.Mat(), dist = new cv.Mat();
+    const roi = own(P.ink.roi(new cv.Rect(x, y, w, h))), lab = own(new cv.Mat()), st = own(new cv.Mat()), ce = own(new cv.Mat()), dist = own(new cv.Mat());
     const n = cv.connectedComponentsWithStats(roi, lab, st, ce, 8, cv.CV_32S);
     cv.distanceTransform(roi, dist, cv.DIST_L2, 3); // half the stroke width at each ink pixel
     const S = st.data32S, Lb = lab.data32S, D = dist.data32F, core = new Float32Array(n);
@@ -364,8 +375,8 @@ export function analyze(cv, img, opts = {}) {
         return (px, py) => px >= 0 && py >= 0 && px < W && py < H && data[(py | 0) * W + (px | 0)] === labelId;
       },
       // erase.js needs the ink masks and the light-region labels per polarity
-      polarities: pol.map((P) => ({ dark: P.dark, inkMask: P.ink, regionLabels: P.labels, dispose() { P.ink.delete(); P.light.delete(); P.labels.delete(); P.stats.delete(); } })),
-      dispose() { for (const P of pol) { P.ink.delete(); P.light.delete(); P.labels.delete(); P.stats.delete(); } },
+      polarities: pol.map((P) => ({ dark: P.dark, inkMask: P.ink, regionLabels: P.labels, dispose() { for (const m of [P.ink, P.light, P.labels, P.stats]) if (!m.isDeleted()) m.delete(); } })),
+      dispose: held.free,
     };
   };
 
@@ -408,14 +419,14 @@ export function analyze(cv, img, opts = {}) {
     if (inBlocks.every((b) => b.gbox.w >= ANALYZE.shapeFill * w && b.gbox.h >= ANALYZE.shapeFill * h && shapeAsGlyph(b))) { reject("the shape itself read as text"); continue; }
     if (a / (w * h) < ANALYZE.minFill) { reject("too ragged", { fill: a / (w * h) }); continue; }
     // the bubble's full footprint (lettering holes filled); its holes must be the lettering
-    const m = new cv.Mat(h, w, cv.CV_8UC1), md = m.data;
+    const m = own(new cv.Mat(h, w, cv.CV_8UC1)), md = m.data;
     for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) md[yy * w + xx] = L[(y + yy) * W + x + xx] === li ? 255 : 0;
-    const contours = new cv.MatVector(), hier = new cv.Mat();
+    const contours = own(new cv.MatVector()), hier = own(new cv.Mat());
     cv.findContours(m, contours, hier, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
     let filled = 0, hullArea = 0, bestK = -1;
     for (let k = 0; k < contours.size(); k++) {
-      const ct = contours.get(k), ar = cv.contourArea(ct);
-      if (ar > filled) { filled = ar; bestK = k; const hull = new cv.Mat(); cv.convexHull(ct, hull); hullArea = cv.contourArea(hull); hull.delete(); }
+      const ct = own(contours.get(k)), ar = cv.contourArea(ct);
+      if (ar > filled) { filled = ar; bestK = k; const hull = own(new cv.Mat()); cv.convexHull(ct, hull); hullArea = cv.contourArea(hull); hull.delete(); }
       ct.delete();
     }
     let fill = null;
@@ -581,39 +592,37 @@ function widenInterior(cv, P, b, W, H) {
   const wx0 = Math.max(0, x - mx), wy0 = Math.max(0, y - my), wx1 = Math.min(W, x + w + mx), wy1 = Math.min(H, y + h + my);
   const ww = wx1 - wx0, wh = wy1 - wy0;
   if (ww < ANALYZE.minWindowPx || wh < ANALYZE.minWindowPx) return;
-  const mats = [];
-  const mat = (m) => { mats.push(m); return m; };
-  try {
+  owning((own) => {
     // structural ink: components longer than 2.5 letters in the window, thickened
-    const roi = mat(P.ink.roi(new cv.Rect(wx0, wy0, ww, wh))), lab = mat(new cv.Mat()), st = mat(new cv.Mat()), ce = mat(new cv.Mat());
+    const roi = own(P.ink.roi(new cv.Rect(wx0, wy0, ww, wh))), lab = own(new cv.Mat()), st = own(new cv.Mat()), ce = own(new cv.Mat());
     const n = cv.connectedComponentsWithStats(roi, lab, st, ce, 8, cv.CV_32S);
     const S = st.data32S, Lk = lab.data32S, limit = ANALYZE.structuralLetters * Math.max(ANALYZE.minLetterPx, b.letter);
     const big = new Uint8Array(n);
     for (let i = 1; i < n; i++) if (Math.max(S[i * 5 + 2], S[i * 5 + 3]) > limit) big[i] = 1;
-    const structural = mat(new cv.Mat(wh, ww, cv.CV_8UC1)), sd = structural.data;
+    const structural = own(new cv.Mat(wh, ww, cv.CV_8UC1)), sd = structural.data;
     for (let i = 0; i < ww * wh; i++) sd[i] = big[Lk[i]] ? 255 : 0;
-    const seal = mat(cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(W > ANALYZE.sealWidePage ? ANALYZE.sealWide : ANALYZE.sealNarrow, W > ANALYZE.sealWidePage ? ANALYZE.sealWide : ANALYZE.sealNarrow)));
+    const seal = own(cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(W > ANALYZE.sealWidePage ? ANALYZE.sealWide : ANALYZE.sealNarrow, W > ANALYZE.sealWidePage ? ANALYZE.sealWide : ANALYZE.sealNarrow)));
     cv.dilate(structural, structural, seal);
-    const pass = mat(new cv.Mat()); cv.bitwise_not(structural, pass);
+    const pass = own(new cv.Mat()); cv.bitwise_not(structural, pass);
     // passable components seeded by the light region
-    const lab2 = mat(new cv.Mat()), st2 = mat(new cv.Mat()), ce2 = mat(new cv.Mat());
+    const lab2 = own(new cv.Mat()), st2 = own(new cv.Mat()), ce2 = own(new cv.Mat());
     const n2 = cv.connectedComponentsWithStats(pass, lab2, st2, ce2, 4, cv.CV_32S);
     const L = P.labels.data32S, L2 = lab2.data32S;
     const seeded = new Uint8Array(n2);
     const isSeed = (xx, yy) => xx >= x && yy >= y && xx < x + w && yy < y + h && L[yy * W + xx] === b.labelId;
     for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) if (L[yy * W + xx] === b.labelId) seeded[L2[(yy - wy0) * ww + (xx - wx0)]] = 1;
     seeded[0] = 0;
-    const flood = mat(new cv.Mat(wh, ww, cv.CV_8UC1)), fd = flood.data;
+    const flood = own(new cv.Mat(wh, ww, cv.CV_8UC1)), fd = flood.data;
     for (let i = 0; i < ww * wh; i++) fd[i] = seeded[L2[i]] ? 255 : 0;
     // cut thin channels: open, keep what the light region touches, grow back within the flood
     const cut = Math.max(ANALYZE.tailCutMin, Math.min(ANALYZE.tailCutMax, Math.round(W / ANALYZE.tailCutDiv))) | 1; // an open tail tip is ~10 px at 850 px; a bubble body is never that thin
-    const k = mat(cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(cut, cut)));
-    const opened = mat(new cv.Mat()); cv.morphologyEx(flood, opened, cv.MORPH_OPEN, k);
-    const lab3 = mat(new cv.Mat()), st3 = mat(new cv.Mat()), ce3 = mat(new cv.Mat());
+    const k = own(cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(cut, cut)));
+    const opened = own(new cv.Mat()); cv.morphologyEx(flood, opened, cv.MORPH_OPEN, k);
+    const lab3 = own(new cv.Mat()), st3 = own(new cv.Mat()), ce3 = own(new cv.Mat());
     const n3 = cv.connectedComponentsWithStats(opened, lab3, st3, ce3, 4, cv.CV_32S);
     const L3 = lab3.data32S, keep = new Uint8Array(n3);
     for (let yy = 0; yy < wh; yy++) for (let xx = 0; xx < ww; xx++) { const l = L3[yy * ww + xx]; if (l && !keep[l] && isSeed(wx0 + xx, wy0 + yy)) keep[l] = 1; }
-    const body = mat(new cv.Mat(wh, ww, cv.CV_8UC1)), bd = body.data;
+    const body = own(new cv.Mat(wh, ww, cv.CV_8UC1)), bd = body.data;
     for (let i = 0; i < ww * wh; i++) bd[i] = keep[L3[i]] ? 255 : 0;
     cv.dilate(body, body, k); cv.bitwise_and(body, flood, body);
     // leak guard on what remains
@@ -622,24 +631,24 @@ function widenInterior(cv, P, b, W, H) {
     const edge = (bx0 <= 0 && wx0 > 0) || (by0 <= 0 && wy0 > 0) || (bx1 >= ww && wx1 < W) || (by1 >= wh && wy1 < H);
     if (edge || area > ANALYZE.widenMax * b.area) { trace("bubble", b.box, "interior not widened", { edge, area, light: b.area, ratio: area / b.area }); return; }
     if (area <= ANALYZE.widenMin * b.area) return;
-    const contours = new cv.MatVector(), hier = mat(new cv.Mat());
+    const contours = own(new cv.MatVector()), hier = own(new cv.Mat());
     try {
       cv.findContours(body, contours, hier, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
       let best = -1, bestA = 0, hullA = 0;
       for (let i = 0; i < contours.size(); i++) {
-        const ct = contours.get(i), ar = cv.contourArea(ct);
-        if (ar > bestA) { bestA = ar; best = i; const hull = new cv.Mat(); cv.convexHull(ct, hull); hullA = cv.contourArea(hull); hull.delete(); }
+        const ct = own(contours.get(i)), ar = cv.contourArea(ct);
+        if (ar > bestA) { bestA = ar; best = i; const hull = own(new cv.Mat()); cv.convexHull(ct, hull); hullA = cv.contourArea(hull); hull.delete(); }
         ct.delete();
       }
       if (best < 0 || !hullA) return;
       if (bestA / hullA < ANALYZE.widenSolidity) { trace("bubble", b.box, "interior not widened", { solidity: bestA / hullA }); return; }
       body.setTo(new cv.Scalar(0)); cv.drawContours(body, contours, best, new cv.Scalar(255), -1);
-      const ct = contours.get(best), r = cv.boundingRect(ct); ct.delete();
+      const ct = own(contours.get(best)), r = cv.boundingRect(ct); ct.delete();
       const fill = new Uint8Array(r.width * r.height);
       for (let yy = 0; yy < r.height; yy++) for (let xx = 0; xx < r.width; xx++) fill[yy * r.width + xx] = bd[(r.y + yy) * ww + r.x + xx];
       b.lightBox = b.box; b.interiorArea = bestA; b.widened = true;
       b.box = { x: wx0 + r.x, y: wy0 + r.y, w: r.width, h: r.height };
       b.fill = fill;
     } finally { contours.delete(); }
-  } finally { for (const m of mats) m.delete(); }
+  });
 }

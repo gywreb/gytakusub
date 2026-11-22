@@ -1,4 +1,5 @@
 import { aotInpaint, contextWindow, copyOf } from "./inpaint.js";
+import { owning } from "./owner.js";
 import { latticeFill } from "./tone.js";
 import { ERASE } from "./tuning.js";
 
@@ -40,10 +41,14 @@ export const teleaRadius = (letter) => Math.min(TELEA_MAX, Math.max(ERASE.teleaM
  * @returns {{image: ImageData, rois: Array<{x:number,y:number,w:number,h:number,radius?:number}>, mask?: any, surface?: any}} cleaned page and the areas that changed
  */
 export function erase(cv, img, analysis, regionIds, opts = {}) {
+  return owning((own) => eraseRegions(cv, img, analysis, regionIds, opts, own));
+}
+
+function eraseRegions(cv, img, analysis, regionIds, opts, own) {
   const { W, H } = analysis;
-  const src = cv.matFromImageData(img);
-  const rgb = new cv.Mat(); cv.cvtColor(src, rgb, cv.COLOR_RGBA2RGB);
-  const mask = cv.Mat.zeros(H, W, cv.CV_8UC1);
+  const src = own(cv.matFromImageData(img));
+  const rgb = own(new cv.Mat()); cv.cvtColor(src, rgb, cv.COLOR_RGBA2RGB);
+  const mask = own(cv.Mat.zeros(H, W, cv.CV_8UC1));
   const md = mask.data;
   const rois = []; // {x,y,w,h,radius}
 
@@ -72,7 +77,7 @@ export function erase(cv, img, analysis, regionIds, opts = {}) {
     // letter is a thin core.
     const paint = (ps, colourToo = true) => {
       const masks = [];
-      for (const pol of ps) masks.push({ roi: pol.inkMask.roi(new cv.Rect(x0, y0, w, h)), x0, y0, w, h });
+      for (const pol of ps) masks.push({ roi: own(pol.inkMask.roi(new cv.Rect(x0, y0, w, h))), x0, y0, w, h });
       if (withColour && colourToo) {
         const l = b.line, cx0 = Math.max(0, Math.min(x0, l ? Math.floor(l.x) : x0)), cy0 = Math.max(0, Math.min(y0, l ? Math.floor(l.y) : y0));
         const cx1 = Math.min(W, Math.max(x1, l ? Math.ceil(l.x + l.w) : x1)), cy1 = Math.min(H, Math.max(y1, l ? Math.ceil(l.y + l.h) : y1));
@@ -80,7 +85,7 @@ export function erase(cv, img, analysis, regionIds, opts = {}) {
         if (colour) masks.push({ roi: colour, x0: cx0, y0: cy0, w: cx1 - cx0, h: cy1 - cy0, colour: true });
       }
       for (const { roi, x0, y0, w, h, colour } of masks) {
-        const lab = new cv.Mat(), st = new cv.Mat(), ce = new cv.Mat();
+        const lab = own(new cv.Mat()), st = own(new cv.Mat()), ce = own(new cv.Mat());
         const n = cv.connectedComponentsWithStats(roi, lab, st, ce, 8, cv.CV_32S);
         const S = st.data32S, Lb = lab.data32S;
         const keep = new Uint8Array(n);
@@ -145,7 +150,7 @@ export function erase(cv, img, analysis, regionIds, opts = {}) {
     let near = 0;
     for (let i = 0; i < rs.length; i++) if (Math.max(Math.abs(rs[i] - c[0]), Math.abs(gs[i] - c[1]), Math.abs(bs[i] - c[2])) <= COLOUR_PLAIN) near++;
     if (near < PLAIN_SHARE * rs.length) return null;
-    const m = cv.Mat.zeros(h, w, cv.CV_8UC1), d = m.data;
+    const m = own(cv.Mat.zeros(h, w, cv.CV_8UC1)), d = m.data;
     for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) {
       const p = ((y0 + yy) * W + x0 + xx) * 4;
       if (Math.max(Math.abs(pix[p] - c[0]), Math.abs(pix[p + 1] - c[1]), Math.abs(pix[p + 2] - c[2])) > COLOUR_APART) d[yy * w + xx] = 255;
@@ -171,7 +176,7 @@ export function erase(cv, img, analysis, regionIds, opts = {}) {
   // and letter-sized — or a stroke as thin as a letter, however long (a stretched long vowel mark,
   // a wave dash running past the detector's box). Painted into the page's mask.
   const keepLettering = (m, x, y, w, h, zone, letter, inside, e = 1) => {
-    const lab = new cv.Mat(), st = new cv.Mat(), ce = new cv.Mat();
+    const lab = own(new cv.Mat()), st = own(new cv.Mat()), ce = own(new cv.Mat());
     const n = cv.connectedComponentsWithStats(m, lab, st, ce, 8, cv.CV_32S);
     const S = st.data32S, Lb = lab.data32S, keep = new Uint8Array(n);
     for (let i = 1; i < n; i++) {
@@ -217,7 +222,7 @@ export function erase(cv, img, analysis, regionIds, opts = {}) {
     if (w < ERASE.minBoxPx || h < ERASE.minBoxPx) return;
     const zone = bubbleZone(blocks, letter, inside), c = plainSurface(r, zone, inside);
     if (!c) return; // the surface is not one colour: tone, a gradient, art
-    const m = cv.Mat.zeros(h, w, cv.CV_8UC1), d = m.data;
+    const m = own(cv.Mat.zeros(h, w, cv.CV_8UC1)), d = m.data;
     for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) {
       const X = x + xx, Y = y + yy, p = (Y * W + X) * 4;
       if (inside(X, Y) && Math.max(Math.abs(pix[p] - c[0]), Math.abs(pix[p + 1] - c[1]), Math.abs(pix[p + 2] - c[2])) > COLOUR_APART) d[yy * w + xx] = 255;
@@ -239,7 +244,7 @@ export function erase(cv, img, analysis, regionIds, opts = {}) {
     if (!plainSurface(r, zone, inside)) return;
     // its own ink only that far from the interior's edge which the outline's would be (an interior
     // drawn a little past the outline holds pieces of it)
-    const roi = P.inkMask.roi(new cv.Rect(x, y, w, h));
+    const roi = own(P.inkMask.roi(new cv.Rect(x, y, w, h)));
     keepLettering(roi, x, y, w, h, zone, letter, inside, Math.max(ERASE.keepDepthMinPx, Math.round(ERASE.keepDepthLetters * letter)));
     roi.delete();
   };
@@ -248,7 +253,7 @@ export function erase(cv, img, analysis, regionIds, opts = {}) {
   // lettering is whatever letter-sized ink lies wholly inside the mask.
   const paintInsideMask = (pol, b, letter) => {
     const { x, y, w, h } = b.box, m = b.fill;
-    const roi = pol.inkMask.roi(new cv.Rect(x, y, w, h)), lab = new cv.Mat(), st = new cv.Mat(), ce = new cv.Mat();
+    const roi = own(pol.inkMask.roi(new cv.Rect(x, y, w, h))), lab = own(new cv.Mat()), st = own(new cv.Mat()), ce = own(new cv.Mat());
     const n = cv.connectedComponentsWithStats(roi, lab, st, ce, 8, cv.CV_32S);
     const S = st.data32S, Lb = lab.data32S, keep = new Uint8Array(n);
     for (let i = 1; i < n; i++) {
@@ -347,8 +352,8 @@ export function erase(cv, img, analysis, regionIds, opts = {}) {
     // Grow the mask over the anti-aliased fringe of each stroke; inside bubbles
     // never past the bubble's interior (so outlines stay crisp).
     const grow = Math.max(ERASE.fringeMinPx, Math.round(analysis.letter * ERASE.fringeLetters));
-    const k = cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(2 * grow + 1, 2 * grow + 1));
-    const grown = new cv.Mat(); cv.dilate(mask, grown, k); k.delete();
+    const k = own(cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(2 * grow + 1, 2 * grow + 1)));
+    const grown = own(new cv.Mat()); cv.dilate(mask, grown, k); k.delete();
     const gd = grown.data, px = img.data;
     for (const r of rois) {
       for (let yy = r.y; yy < r.y + r.h; yy++) for (let xx = r.x; xx < r.x + r.w; xx++) {
@@ -371,7 +376,7 @@ export function erase(cv, img, analysis, regionIds, opts = {}) {
       for (const r of rois) {
         if (!r.inside) continue;
         r.edge = outlineOf(r, px, W);
-        const rect = new cv.Rect(r.x, r.y, r.w, r.h), rc = copyOf(rgb, rect), mc = copyOf(mask, rect);
+        const rect = new cv.Rect(r.x, r.y, r.w, r.h), rc = own(copyOf(rgb, rect)), mc = own(copyOf(mask, rect));
         r.flat = flatSurface(rc, mc, (x, y) => r.inside(r.x + x, r.y + y) && !r.edge[y * r.w + x]);
         rc.delete(); mc.delete();
       }
@@ -387,12 +392,12 @@ export function erase(cv, img, analysis, regionIds, opts = {}) {
     }
     for (const r of rois) {
       const rect = new cv.Rect(r.x, r.y, r.w, r.h);
-      const srcRoi = rgb.roi(rect), maskRoi = mask.roi(rect);
+      const srcRoi = own(rgb.roi(rect)), maskRoi = own(mask.roi(rect));
       // How the area is filled: a flat surface (most white bubbles) takes its own colour, exactly;
       // anything else (screentone, gradients, art) is "texture", filled by fillTexture() (the
       // screentone fill where the surface is a lattice, else the learned inpainter, else Telea)
       // and given Telea meanwhile.
-      const rc = srcRoi.clone(), mc = maskRoi.clone(); // continuous copies to read
+      const rc = own(srcRoi.clone()), mc = own(maskRoi.clone()); // continuous copies to read
       // (a bubble found flat before the growth stays flat: the outline ink the growth left alone
       // would otherwise read as texture, and Telea smeared it into the bubble)
       const flat = r.flat || flatSurface(rc, mc, r.inside ? (x, y) => r.inside(r.x + x, r.y + y) : null);
@@ -400,7 +405,7 @@ export function erase(cv, img, analysis, regionIds, opts = {}) {
       if (flat) { r.fill = "flat"; r.color = flat; srcRoi.setTo(new cv.Scalar(flat[0], flat[1], flat[2]), maskRoi); }
       else {
         r.fill = "texture";
-        const dst = new cv.Mat();
+        const dst = own(new cv.Mat());
         cv.inpaint(srcRoi, maskRoi, dst, r.radius, cv.INPAINT_TELEA);
         dst.copyTo(srcRoi); dst.delete();
       }
@@ -408,21 +413,21 @@ export function erase(cv, img, analysis, regionIds, opts = {}) {
     }
   }
 
-  const out = new cv.Mat(); cv.cvtColor(rgb, out, cv.COLOR_RGB2RGBA);
+  const out = own(new cv.Mat()); cv.cvtColor(rgb, out, cv.COLOR_RGB2RGBA);
   const result = new ImageData(new Uint8ClampedArray(out.data), W, H);
   src.delete(); rgb.delete(); out.delete();
   if (opts.keepMask) {
     // Each textured bubble's surface (its interior, as far around the area as the fill looks),
     // labelled with the area's number: the screentone fill copies only from there, never from the
     // outline or the art outside.
-    const surface = cv.Mat.zeros(H, W, cv.CV_8UC1), sd = surface.data;
+    const surface = own(cv.Mat.zeros(H, W, cv.CV_8UC1)), sd = surface.data;
     rois.forEach((r, i) => {
       if (r.fill !== "texture" || !r.inside || i >= 254) return;
       r.label = i + 1;
       const m = contextMargin(r.letter);
       for (let yy = Math.max(0, r.y - m); yy < Math.min(H, r.y + r.h + m); yy++) for (let xx = Math.max(0, r.x - m); xx < Math.min(W, r.x + r.w + m); xx++) if (r.inside(xx, yy)) sd[yy * W + xx] = r.label;
     });
-    return { image: result, rois: rois.map((r) => ({ x: r.x, y: r.y, w: r.w, h: r.h, radius: r.radius, fill: r.fill, color: r.color, letter: r.letter, label: r.label || 0 })), mask, surface };
+    return { image: result, rois: rois.map((r) => ({ x: r.x, y: r.y, w: r.w, h: r.h, radius: r.radius, fill: r.fill, color: r.color, letter: r.letter, label: r.label || 0 })), mask: own.keep(mask), surface: own.keep(surface) };
   }
   mask.delete();
   return { image: result, rois: rois.map((r) => ({ x: r.x, y: r.y, w: r.w, h: r.h })) };
@@ -466,20 +471,22 @@ function outlineOf(r, px, W) {
  * is the surface too, and the growth takes it as before: leaving it in pieces, the fill smeared it.
  */
 function growOutline(cv, mask, rois, W, k) {
-  for (const r of rois) {
-    const g = Math.max(1, Math.round((r.letter || ERASE.defaultLetter) * k));
-    const sub = mask.roi(new cv.Rect(r.x, r.y, r.w, r.h)), m = sub.clone(), grown = new cv.Mat(); // clones: continuous rows
-    const kern = cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(2 * g + 1, 2 * g + 1));
-    cv.dilate(m, grown, kern); kern.delete();
-    const gd = grown.data, md = m.data;
-    for (let y = 0; y < r.h; y++) for (let x = 0; x < r.w; x++) {
-      const i = y * r.w + x;
-      if (!gd[i] || md[i] || (r.inside && !r.inside(r.x + x, r.y + y)) || (r.flat && r.edge[i])) continue;
-      md[i] = 255;
+  return owning((own) => {
+    for (const r of rois) {
+      const g = Math.max(1, Math.round((r.letter || ERASE.defaultLetter) * k));
+      const sub = own(mask.roi(new cv.Rect(r.x, r.y, r.w, r.h))), m = own(sub.clone()), grown = own(new cv.Mat()); // clones: continuous rows
+      const kern = own(cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(2 * g + 1, 2 * g + 1)));
+      cv.dilate(m, grown, kern); kern.delete();
+      const gd = grown.data, md = m.data;
+      for (let y = 0; y < r.h; y++) for (let x = 0; x < r.w; x++) {
+        const i = y * r.w + x;
+        if (!gd[i] || md[i] || (r.inside && !r.inside(r.x + x, r.y + y)) || (r.flat && r.edge[i])) continue;
+        md[i] = 255;
+      }
+      m.copyTo(sub);
+      grown.delete(); m.delete(); sub.delete();
     }
-    m.copyTo(sub);
-    grown.delete(); m.delete(); sub.delete();
-  }
+  });
 }
 
 /**
@@ -523,37 +530,41 @@ export function flatSurface(rgb, mask, inside) {
  *   `natural` (whose top-left is at x, y in it), for a learned inpainter of one input size (`side`)
  * @returns {Promise<ImageData|null>} the erased area, or null when no mask pixel falls inside it
  */
-export async function eraseFullSize(cv, natural, nx, ny, mask, scale, ox, oy, area = {}, model = null, surface = null, cache = null, context = null) {
+export function eraseFullSize(cv, natural, nx, ny, mask, scale, ox, oy, area = {}, model = null, surface = null, cache = null, context = null) {
+  return owning((own) => eraseArea(cv, natural, nx, ny, mask, scale, ox, oy, area, model, surface, cache, context, own));
+}
+
+async function eraseArea(cv, natural, nx, ny, mask, scale, ox, oy, area, model, surface, cache, context, own) {
   const W = natural.width, H = natural.height;
-  const M = cv.matFromArray(2, 3, cv.CV_64F, [scale, 0, (nx - ox + 0.5) * scale - 0.5, 0, scale, (ny - oy + 0.5) * scale - 0.5]);
-  const m = new cv.Mat();
+  const M = own(cv.matFromArray(2, 3, cv.CV_64F, [scale, 0, (nx - ox + 0.5) * scale - 0.5, 0, scale, (ny - oy + 0.5) * scale - 0.5]));
+  const m = own(new cv.Mat());
   cv.warpAffine(mask, m, M, new cv.Size(W, H), cv.INTER_LINEAR | cv.WARP_INVERSE_MAP, cv.BORDER_CONSTANT, new cv.Scalar(0));
   // a quarter of a work pixel's coverage counts: the work mask was already grown over each stroke's fringe
   cv.threshold(m, m, ERASE.fullSizeCut, 255, cv.THRESH_BINARY);
   if (!cv.countNonZero(m)) { M.delete(); m.delete(); return null; }
   let on = null;
   if (surface && area.label) {
-    on = new cv.Mat();
+    on = own(new cv.Mat());
     cv.warpAffine(surface, on, M, new cv.Size(W, H), cv.INTER_NEAREST | cv.WARP_INVERSE_MAP, cv.BORDER_CONSTANT, new cv.Scalar(0));
     const od = on.data; for (let i = 0; i < od.length; i++) od[i] = od[i] === area.label ? 255 : 0;
   }
   M.delete();
-  const src = cv.matFromImageData(natural), rgb = new cv.Mat(), out = new cv.Mat();
+  const src = own(cv.matFromImageData(natural)), rgb = own(new cv.Mat()), out = own(new cv.Mat());
   cv.cvtColor(src, rgb, cv.COLOR_RGBA2RGB);
   let done = null;
-  if (area.fill === "flat" && area.color) { done = rgb.clone(); done.setTo(new cv.Scalar(area.color[0], area.color[1], area.color[2]), m); }
+  if (area.fill === "flat" && area.color) { done = own(rgb.clone()); done.setTo(new cv.Scalar(area.color[0], area.color[1], area.color[2]), m); }
   else if (area.fill === "texture") {
     let f;
     // (context: the full-size page around the patch, for a model of one size; see fillTexture)
     let ctx = null;
     const at = Date.now(); // (when it started: the debug report's timeline)
-    if (context) { const c = cv.matFromImageData(context.image); ctx = { image: new cv.Mat(), x: context.x, y: context.y, side: context.side }; cv.cvtColor(c, ctx.image, cv.COLOR_RGBA2RGB); c.delete(); }
+    if (context) { const c = own(cv.matFromImageData(context.image)); ctx = { image: own(new cv.Mat()), x: context.x, y: context.y, side: context.side }; cv.cvtColor(c, ctx.image, cv.COLOR_RGBA2RGB); c.delete(); }
     try { f = await fillArea(cv, model, rgb, m, on, { margin: Math.ceil(2 / scale), cache, context: ctx }); }
     catch (e) { ctx?.image.delete(); src.delete(); rgb.delete(); out.delete(); m.delete(); on?.delete(); throw e; } // (NotLoaded: the caller leaves it for later)
     ctx?.image.delete();
-    done = f.mat; area.filled = f.kind; area.fillMs = f.ms; area.fillRunMs = f.runMs; area.fillAt = at; area.fillHit = !!f.hit; area.fillMiss = f.miss;
+    done = own(f.mat); area.filled = f.kind; area.fillMs = f.ms; area.fillRunMs = f.runMs; area.fillAt = at; area.fillHit = !!f.hit; area.fillMiss = f.miss;
   }
-  if (!done) { done = new cv.Mat(); cv.inpaint(rgb, m, done, Math.min(TELEA_MAX, Math.max(ERASE.teleaMin, Math.round((area.radius || ERASE.teleaMin) / scale))), cv.INPAINT_TELEA); }
+  if (!done) { done = own(new cv.Mat()); cv.inpaint(rgb, m, done, Math.min(TELEA_MAX, Math.max(ERASE.teleaMin, Math.round((area.radius || ERASE.teleaMin) / scale))), cv.INPAINT_TELEA); }
   cv.cvtColor(done, out, cv.COLOR_RGB2RGBA);
   const result = new ImageData(new Uint8ClampedArray(out.data), W, H);
   src.delete(); rgb.delete(); done.delete(); out.delete(); m.delete(); on?.delete();
@@ -577,23 +588,27 @@ export async function eraseFullSize(cv, natural, nx, ny, mask, scale, ox, oy, ar
  */
 export class NotLoaded extends Error {}
 
-export async function fillArea(cv, model, rgb, hole, source, opts = {}) {
+export function fillArea(cv, model, rgb, hole, source, opts = {}) {
+  return owning((own) => fillOne(cv, model, rgb, hole, source, opts, own));
+}
+
+async function fillOne(cv, model, rgb, hole, source, opts, own) {
   const t0 = performance.now(), ms = () => Math.round(performance.now() - t0);
   const key = opts.cache ? fillKey(rgb, hole, source, opts.margin, opts.context) : null;
   const had = key && opts.cache.get(key);
   if (had) {
-    const mat = had.data ? cv.matFromArray(had.rows, had.cols, had.type, had.data) : null;
-    return { mat, kind: had.kind, ms: ms(), hit: true };
+    const mat = had.data ? own(cv.matFromArray(had.rows, had.cols, had.type, had.data)) : null;
+    return { mat: own.keep(mat), kind: had.kind, ms: ms(), hit: true };
   }
   // A miss where the page filled ahead (prefillPage) had this very area, only with other pixels
   // around it ("around"), or not ("area"): the debug report says which. On 6 of 14 pages with
   // fills both ahead and after the answer, none done ahead was used (2.13.1), and nothing said why.
-  const own = key && opts.context?.side ? "area:" + fillKey(rgb, hole, source, opts.margin) : null;
-  const miss = key ? (own && opts.cache.has(own) ? "around" : "area") : undefined;
-  const done = await fillAreaNow(cv, model, rgb, hole, source, opts);
+  const areaKey = key && opts.context?.side ? "area:" + fillKey(rgb, hole, source, opts.margin) : null;
+  const miss = key ? (areaKey && opts.cache.has(areaKey) ? "around" : "area") : undefined;
+  const done = await fillAreaNow(cv, model, rgb, hole, source, opts); own(done.mat);
   if (key) opts.cache.set(key, { kind: done.kind, ms: done.ms ?? ms(), runMs: done.runMs, ...(done.mat ? { data: new Uint8Array(done.mat.data), rows: done.mat.rows, cols: done.mat.cols, type: done.mat.type() } : {}) });
-  if (own) opts.cache.set(own, true);
-  return { ...done, ms: ms(), ...(miss ? { miss } : {}) };
+  if (areaKey) opts.cache.set(areaKey, true);
+  return { ...done, mat: own.keep(done.mat), ms: ms(), ...(miss ? { miss } : {}) };
 }
 
 async function fillAreaNow(cv, model, rgb, hole, source, opts) {
@@ -638,32 +653,36 @@ export function fillKey(rgb, hole, source, margin = 0, context = null) {
  *   fillArea; checkpoint: awaited before each area (it throws to stop); side: the learned inpainter's one
  *   input size, when it has one (LaMa): it then sees that much of the page around each area
  */
-export async function fillTexture(cv, model, img, erased, opts = {}) {
+export function fillTexture(cv, model, img, erased, opts = {}) {
+  return owning((own) => fillTextured(cv, model, img, erased, opts, own));
+}
+
+async function fillTextured(cv, model, img, erased, opts, own) {
   const textured = erased.rois.filter((r) => r.fill === "texture");
   if (!textured.length) return img;
   const W = img.width, H = img.height;
-  const src = cv.matFromImageData(img), rgb = new cv.Mat(); cv.cvtColor(src, rgb, cv.COLOR_RGBA2RGB); src.delete();
+  const src = own(cv.matFromImageData(img)), rgb = own(new cv.Mat()); cv.cvtColor(src, rgb, cv.COLOR_RGBA2RGB); src.delete();
   for (const r of textured) {
     if (opts.checkpoint) await opts.checkpoint(); // (prefillPage: a more urgent page may go first, or the answer has come)
     const m = contextMargin(r.letter);
     const x0 = Math.max(0, r.x - m), y0 = Math.max(0, r.y - m), x1 = Math.min(W, r.x + r.w + m), y1 = Math.min(H, r.y + r.h + m);
     const rect = new cv.Rect(x0, y0, x1 - x0, y1 - y0);
-    const view = rgb.roi(rect), crop = view.clone(), hole = copyOf(erased.mask, rect); // continuous copies
+    const view = own(rgb.roi(rect)), crop = own(view.clone()), hole = own(copyOf(erased.mask, rect)); // continuous copies
     let on = null;
-    if (erased.surface && r.label) { on = copyOf(erased.surface, rect); const od = on.data; for (let i = 0; i < od.length; i++) od[i] = od[i] === r.label ? 255 : 0; }
+    if (erased.surface && r.label) { on = own(copyOf(erased.surface, rect)); const od = on.data; for (let i = 0; i < od.length; i++) od[i] = od[i] === r.label ? 255 : 0; }
     try {
       if (cv.countNonZero(hole)) {
         const at = Date.now();
         const f = await fillArea(cv, model, crop, hole, on, { cache: opts.cache, context: opts.side ? { image: rgb, x: x0, y: y0, side: opts.side } : null });
         r.filled = f.kind; r.fillMs = f.ms; r.fillRunMs = f.runMs; r.fillAt = at; r.fillHit = !!f.hit; r.fillMiss = f.miss;
-        if (f.mat) { f.mat.copyTo(view); f.mat.delete(); }
+        if (f.mat) { own(f.mat).copyTo(view); f.mat.delete(); }
       }
     } catch (e) {
       if (!(e instanceof NotLoaded)) throw e;
       r.filled = "later";
     } finally { view.delete(); crop.delete(); hole.delete(); on?.delete(); }
   }
-  const out = new cv.Mat(); cv.cvtColor(rgb, out, cv.COLOR_RGB2RGBA);
+  const out = own(new cv.Mat()); cv.cvtColor(rgb, out, cv.COLOR_RGB2RGBA);
   const result = new ImageData(new Uint8ClampedArray(out.data), W, H);
   rgb.delete(); out.delete();
   return result;

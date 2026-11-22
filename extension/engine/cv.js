@@ -6,14 +6,20 @@ import { getOrt, gpuAvailable, gpuIsSoftware, ortBroken, createSession, run } fr
 import { LAMA_SIDE } from "./inpaint.js";
 import { loadSegmenter } from "./segment.js";
 
-let ready = null, loaded = null;
+let ready = null, loaded = null, cvOverrides = {};
+// The most memory OpenCV can have: the vendored build's maximum (vendor/opencv.js; a test holds
+// the two the same). It never gives any back, and a failure at this size is most likely the
+// memory running out.
+export const OPENCV_MAX = 1024 * 1048576;
 
 /**
- * Resolves to the initialised `cv` namespace. Loads once; later calls are free.
- * @param {object} [overrides] Emscripten Module fields (tests pass `wasmBinary`).
+ * Resolves to the initialised `cv` namespace. Loads once; later calls are free — until OpenCV runs
+ * out of memory (engineError), when the next call starts a fresh one.
+ * @param {object} [overrides] Emscripten Module fields (tests pass `wasmBinary`; kept for a fresh start).
  */
-export function getCV(overrides = {}) {
+export function getCV(overrides = cvOverrides) {
   if (!ready) {
+    cvOverrides = overrides;
     ready = new Promise((resolve, reject) => {
       const Module = {
         locateFile: (file) => new URL("../vendor/" + file, import.meta.url).href,
@@ -38,7 +44,13 @@ export function getCV(overrides = {}) {
 export function engineError(e) {
   if (typeof e !== "number") return e;
   const mb = loaded ? Math.round(loaded.HEAPU8.length / 1048576) : null;
-  return Object.assign(new Error(`Gytakusub: OpenCV failed (exception ${e}${mb ? `; its memory at ${mb} MB` : ""})`), { code: "opencv" });
+  // Out of memory: every page after would fail the same way, so the next page starts a fresh
+  // OpenCV. A page under way keeps the one it began with (its objects live there: job.cv), and that
+  // one is let go of once no page holds it. Nothing should bring this about (tests/memory.test.mjs,
+  // tests/fail-paths.test.mjs: a page leaves nothing behind); this is for whatever still does.
+  const full = loaded && loaded.HEAPU8.length >= OPENCV_MAX;
+  if (full) { ready = null; loaded = null; fallbackReady = null; } // (the fallback text detector is made in OpenCV)
+  return Object.assign(new Error(`Gytakusub: OpenCV failed (exception ${e}${mb ? `; its memory at ${mb} MB` : ""}${full ? ", all it can have: the next page starts afresh" : ""})`), { code: "opencv" });
 }
 
 // Engine preferences that change which models load: `gpu` (run on WebGPU when
