@@ -1,4 +1,4 @@
-import { aotInpaint, contextWindow } from "./inpaint.js";
+import { aotInpaint, contextWindow, copyOf } from "./inpaint.js";
 import { latticeFill } from "./tone.js";
 import { ERASE } from "./tuning.js";
 
@@ -371,7 +371,7 @@ export function erase(cv, img, analysis, regionIds, opts = {}) {
       for (const r of rois) {
         if (!r.inside) continue;
         r.edge = outlineOf(r, px, W);
-        const rect = new cv.Rect(r.x, r.y, r.w, r.h), rc = rgb.roi(rect).clone(), mc = mask.roi(rect).clone();
+        const rect = new cv.Rect(r.x, r.y, r.w, r.h), rc = copyOf(rgb, rect), mc = copyOf(mask, rect);
         r.flat = flatSurface(rc, mc, (x, y) => r.inside(r.x + x, r.y + y) && !r.edge[y * r.w + x]);
         rc.delete(); mc.delete();
       }
@@ -648,9 +648,9 @@ export async function fillTexture(cv, model, img, erased, opts = {}) {
     const m = contextMargin(r.letter);
     const x0 = Math.max(0, r.x - m), y0 = Math.max(0, r.y - m), x1 = Math.min(W, r.x + r.w + m), y1 = Math.min(H, r.y + r.h + m);
     const rect = new cv.Rect(x0, y0, x1 - x0, y1 - y0);
-    const view = rgb.roi(rect), crop = view.clone(), hole = erased.mask.roi(rect).clone(); // continuous copies
+    const view = rgb.roi(rect), crop = view.clone(), hole = copyOf(erased.mask, rect); // continuous copies
     let on = null;
-    if (erased.surface && r.label) { on = erased.surface.roi(rect).clone(); const od = on.data; for (let i = 0; i < od.length; i++) od[i] = od[i] === r.label ? 255 : 0; }
+    if (erased.surface && r.label) { on = copyOf(erased.surface, rect); const od = on.data; for (let i = 0; i < od.length; i++) od[i] = od[i] === r.label ? 255 : 0; }
     try {
       if (cv.countNonZero(hole)) {
         const at = Date.now();

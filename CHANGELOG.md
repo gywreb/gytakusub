@@ -4,6 +4,17 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
 
 ## [Unreleased]
 
+## [2.14.6] — 2026-11-22
+
+### Fixed
+- **Long chapters no longer fail partway with a number for an error.** In your Naver webtoon report, images 110 to 121 of the episode failed, each with only a number ("Gytakusub Error: 6686152"). The image engine (OpenCV) gets at most 1 GB of memory, and what a page leaves in use stays in use until the extension's worker restarts. Each page left about 7 MB of it in use: when the eraser copied an area out of the page, the view it copied through was never freed, and a view keeps the whole page it came from. Four places did this: the outline check added in 2.14.5, the textured-area fill (twice), and the learned fill's look at the page around an area. They now all go through one helper that frees the view.
+  - The 109 pages your report holds, replayed one after another: the memory stays at 128 MB the whole way. Before, it reached 512 MB by page 56.
+  - Pages come out the same, pixel for pixel.
+- **An engine failure now says what failed.** OpenCV reports its errors as a bare number. The engine now turns that into a message naming OpenCV and how large its memory had grown, so a report shows whether it ran out.
+
+### Development
+- **A test that fails when a page leaves memory behind** (`tests/memory.test.mjs`). It runs a generated page through the engine's own entry points (the analysis, the fills done while Claude answers, the finish) again and again, and fails if the memory in use grows. It covers a page analysed at its own size, one analysed smaller (full-size patches), a two-slice webtoon strip, and the learned fill of both kinds (with a stand-in model). Without the fix it fails: 22 MB more after three runs.
+
 ## [2.14.5] — 2026-11-22
 
 ### Fixed

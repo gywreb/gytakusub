@@ -6,7 +6,7 @@ import { getOrt, gpuAvailable, gpuIsSoftware, ortBroken, createSession, run } fr
 import { LAMA_SIDE } from "./inpaint.js";
 import { loadSegmenter } from "./segment.js";
 
-let ready = null;
+let ready = null, loaded = null;
 
 /**
  * Resolves to the initialised `cv` namespace. Loads once; later calls are free.
@@ -17,7 +17,7 @@ export function getCV(overrides = {}) {
     ready = new Promise((resolve, reject) => {
       const Module = {
         locateFile: (file) => new URL("../vendor/" + file, import.meta.url).href,
-        onRuntimeInitialized() { delete cv.then; resolve(cv); }, // the module object is a thenable; Promises would loop on it
+        onRuntimeInitialized() { delete cv.then; loaded = cv; resolve(cv); }, // the module object is a thenable; Promises would loop on it
         onAbort: (why) => reject(new Error("OpenCV failed to start: " + why)),
         print: () => {},
         printErr: (s) => console.warn("OpenCV:", s),
@@ -27,6 +27,18 @@ export function getCV(overrides = {}) {
     });
   }
   return ready;
+}
+
+/**
+ * What the engine threw, as an Error. OpenCV throws its C++ exceptions as a bare number (where the
+ * exception sits in its memory), and a report then said "Gytakusub Error: 6686152" and nothing
+ * more. The message names OpenCV and how large its memory had grown: it stops at 1 GiB, and a
+ * failure at that size is most likely the memory running out.
+ */
+export function engineError(e) {
+  if (typeof e !== "number") return e;
+  const mb = loaded ? Math.round(loaded.HEAPU8.length / 1048576) : null;
+  return Object.assign(new Error(`Gytakusub: OpenCV failed (exception ${e}${mb ? `; its memory at ${mb} MB` : ""})`), { code: "opencv" });
 }
 
 // Engine preferences that change which models load: `gpu` (run on WebGPU when
