@@ -150,8 +150,11 @@ export function layout(an, items, opts = {}) {
       const owns = told.map((m, i) => (!anchoredToLettering[i] ? [] : anchors[i].parts || lettering.filter((b) => overlap(b.gbox, anchors[i]) >= LAYOUT.most * area(b.gbox)).map((b) => b.gbox)));
       const parts = inside ? roomParts(an, r, inside, inHole, bbox, anchors, owns) : null;
       const othersPart = anchors.length > 1 ? parts?.othersPart : null;
-      const doubted = (own) => !!inside && held(own) < LAYOUT.letteringHeld;
-      const roomOf = (own, i) => !inside ? inside : doubted(own)
+      // (judged on the lettering's lines: a block's upright box reaches past a slanted bubble's side
+      // at its corners, and such bubbles were doubted, their text set across the slant)
+      const linesOf = (i) => (!anchoredToLettering[i] ? [] : anchors[i].parts || lettering.filter((b) => overlap(b.gbox, anchors[i]) >= LAYOUT.most * area(b.gbox)).flatMap((b) => b.parts || [b.gbox]));
+      const doubted = (i) => !!inside && held(linesOf(i)) < LAYOUT.letteringHeld;
+      const roomOf = (own, i) => !inside ? inside : doubted(i)
         ? (x, y) => inside(x, y) || own.some((b) => inBox(b, x, y))
         : (x, y) => (inside(x, y) || (own.some((b) => inBox(b, x, y)) && inHole(x, y))) && !othersPart?.(i, x, y);
       // the room as far as the bubble's ink bounds it, with no margin: the bubble model's mask is
@@ -184,7 +187,7 @@ export function layout(an, items, opts = {}) {
         // A doubted room (light art taken for a bubble) is its lettering's boxes, and the ink around
         // them is the art's, not an outline: the text is set to the box, as before 2.15. Read as an
         // outline, art lines crossing the room set text over art at half its size (generated pages).
-        const edge = Math.max(LAYOUT.edgeMinPx, LAYOUT.edgeLetters * letter), art = doubted(own);
+        const edge = Math.max(LAYOUT.edgeMinPx, LAYOUT.edgeLetters * letter), art = doubted(i);
         const inked = art ? null : boundOf(room, i), bound = inked && roomShape(inked, bbox, rect, [], others, 0);
         const shape = art ? null : roomShape(inked || room, bbox, rect, [], others, edge);
         // The same room centred on the lettering itself: where the box above is far wider than the

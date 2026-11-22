@@ -179,6 +179,27 @@ await test("a slanted bubble: the room row by row stays inside its outline where
   });
 });
 
+await test("a steeply slanted bubble whose lettering's box reaches past its sides, its lines inside: a bubble, not art (2.15)", () => {
+  // a parallelogram leaning 1 px per row; the block's upright box has its top-left and bottom-right
+  // corners well past the slanted sides (judged on the box, under 85% held: taken for art and set
+  // to the box, across the slant), while each line, centred on the bubble at its height, is inside
+  const inside = (x, y) => y >= 100 && y < 260 && x >= 100 + (y - 100) && x < 230 + (y - 100);
+  const rows = [0, 1, 2, 3].map((k) => ({ x: 155 + 30 + 34 * k - 40, y: 120 + 34 * k, w: 80, h: 26 }));
+  const words = para(145, 120, 202, 128, { bubble: 1, region: 1, parts: rows, lineLetters: rows.map(() => 24) });
+  const an = analysis([bubbleAt(1, { x: 100, y: 100, w: 290, h: 160 }, [words])], [words]);
+  an.insideOf = () => inside;
+  const boxHeld = (() => { let n = 0, k = 0; for (let j = 0; j < 8; j++) for (let i = 0; i < 8; i++) { n++; if (inside(145 + (i + 0.5) * 202 / 8, 120 + (j + 0.5) * 128 / 8)) k++; } return k / n; })();
+  assert.ok(boxHeld < 0.85, `the guard: the block's box is ${boxHeld.toFixed(2)} held`);
+  const [p] = layout(an, [item([145, 120, 202, 128], "It's leaning, the whole thing is leaning!", 1, "bubble")]).placements;
+  assert.ok(p.shape, "a shape, not the box");
+  const cx = p.rect.x + p.rect.w / 2;
+  p.shape.half.forEach((h, k) => {
+    if (!h) return;
+    const y = p.rect.y + p.shape.dy + (k + 0.5) * p.shape.step;
+    assert.ok(inside(cx - h, y) && inside(cx + h, y), `row ${y.toFixed(0)}: ${(cx - h).toFixed(0)} to ${(cx + h).toFixed(0)} past the outline`);
+  });
+});
+
 await test("a 'bubble' that does not hold the lettering (light art around text drawn over it): the text is set to the lettering's box (2.15)", () => {
   // the interior found is a small patch beside the lettering; the shape alone would set the text
   // tiny, and the art's lines around it are no outline: the box is the room, with no shape
