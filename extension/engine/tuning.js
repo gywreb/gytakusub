@@ -37,6 +37,10 @@ export const LAYOUT = tune("LAYOUT", {
   // A box lies on a region when at least this share of it does (used throughout).
   most: 0.5,
 
+  // Lettering Claude read as Hangul is set at its syllables' height (analyze.js syllableHeight)
+  hangulShare: 0.5,       // at least this share of its letters in Hangul
+  hangulWeightMax: 40,    // a block's weight in that height, in glyphs, at most (as for the page's letter)
+
   // Tag against box (a misread stamp)
   strayOnStamp: 0.25,     // a box this little on its stamped region, and mostly on another: the other one
   driftNear: 0.5,         // box drifted off its stamped region by this much of its size: checked against the text's length
@@ -58,8 +62,11 @@ export const LAYOUT = tune("LAYOUT", {
   slackShare: 0.15,       // ...or this share of the bubble's smaller side, whichever is more
   fallbackInset: 0.78,    // no rectangle found: this share of the bubble's box
   airInset: 0.92,         // the rectangle found, shrunk to this share: letters don't touch the outline
-  edgeLetters: 0.2,       // rows set to the bubble's shape keep this many letters off its outline...
+  edgeLetters: 0.3,       // rows set to the bubble's shape keep this many letters off its outline (the one margin: 2.15)...
   edgeMinPx: 2,           // ...and at least these pixels
+  letteringHeld: 0.85,    // a bubble whose interior holds less of the lettering than this is doubted: the lettering's boxes are room
+  partsCover: 0.6,        // a region's ink divides it into parts (one per line) only when they cover this share of it together
+  altOffset: 1,           // the lettering's centre this many letters off its room's: the text is also tried centred on the lettering
   joinShare: 0.3,         // a line without lettering of its own joins the anchor holding this share of its box
   cutMargin: 0.1,         // lines side by side: no cut closer than this share of the bubble to its edge
   moveMin: 0.1,           // a line moves to a region holding at least this share of its box
@@ -175,6 +182,9 @@ export const ANALYZE = tune("ANALYZE", {
   letterScale: 1.15,      // cap height to letter size
   rowPeak: 0.3,           // a row's letters span the rows with this share of the peak's ink
   columnPeak: 0.12,       // a column's: this share
+  syllablePeak: 0.1,      // a row of Hangul syllables spans the rows with this share of the peak's ink...
+  syllableMarkH: 1.6,     // ...counting marks up to this × the row's letter tall...
+  syllableMarkW: 2,       // ...and this × wide (a caption box's sides run down every row)
   glyphSwitch: 0.4,       // the band below this share of the glyphs' height: the glyphs set the size
   minBandPx: 4,
   minMarkPx: 4,           // marks of fewer pixels are not glyphs

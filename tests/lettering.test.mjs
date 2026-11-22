@@ -199,4 +199,95 @@ test("in an oval, lines are set to its shape: larger than in the inscribed recta
   assert.ok(!none.shaped && none.size === boxed.size);
 });
 
+// ---------- text stays in its bubble (2.15) ----------
+// An oval 120 × 180 drawn from 0,0; the shape is read short of the outline by `edge`, as layout.js
+// roomShape reads it, and carries that margin
+const oval = (edge, rect) => {
+  const A = 60, B = 90, step = 2, half = [];
+  for (let y = 0; y < 2 * B; y += step) { const d = (y + step / 2 - B) / B; const h = Math.floor(A * Math.sqrt(Math.max(0, 1 - d * d))); half.push(h ? Math.max(0, h - edge) : 0); }
+  return { dy: -rect.y, step, half, edge };
+};
+const fitter = (text) => {
+  const look = GyText.lettering([text], { lang: "en" });
+  return { setFont: (s) => { ctx.font = `bold ${s}px ${look.family}`; }, measure: (s) => ctx.measureText(s).width, opts: { maxSize: 60, minSize: 8, lang: "en", hyphenator: GyHyphen.hyphenateEn } };
+};
+test("a box whose corners lie past the bubble: the text is set to the bubble's shape, every line inside", () => {
+  // the box is the oval's own bounding box (the lettering's box with the room around it, as layout.js
+  // makes it): fitted to the box alone, the lines run past the curve at the top and bottom
+  const rect = { x: 0, y: 0, w: 120, h: 180 }, shape = oval(3, rect), text = "Does that mean it's because I'm an idiot, then?";
+  const { setFont, measure, opts } = fitter(text);
+  const boxed = GyText.fitText(text, rect, setFont, measure, opts);
+  setFont(boxed.size);
+  assert.ok(GyText.outsideRoom(boxed, rect, shape, measure, true) > 0.03, "the guard: the box's fit crosses the oval");
+  const fit = GyText.fitText(text, rect, setFont, measure, { ...opts, shape });
+  assert.ok(fit.shaped, `set to the shape (${fit.size} px; the box's ${boxed.size} px)`);
+  setFont(fit.size);
+  assert.ok(GyText.outsideRoom(fit, rect, shape, measure, true) <= 0.001, "inside the oval");
+});
+test("a box whose lines stay in the bubble keeps its larger fit", () => {
+  // a box well inside the oval (its middle), the shape read with a wide margin off the outline: the
+  // box's fit is larger and still inside the outline, so it stays
+  const rect = { x: 25, y: 50, w: 70, h: 80 }, shape = oval(30, rect), text = "No way!! Really?";
+  const { setFont, measure, opts } = fitter(text);
+  const boxed = GyText.fitText(text, rect, setFont, measure, opts);
+  const shaped = GyText.fitText(text, rect, setFont, measure, { ...opts, shape: { ...shape, edge: 0 } }); // (judged short of the margin: the box's lines cross it)
+  assert.ok(shaped.size < boxed.size && shaped.shaped, `the guard: the shape's fit ${shaped.size} px, the box's ${boxed.size} px`);
+  const fit = GyText.fitText(text, rect, setFont, measure, { ...opts, shape });
+  assert.equal(fit.size, boxed.size);
+  setFont(fit.size);
+  assert.ok(GyText.outsideRoom(fit, rect, shape, measure, true) <= 0.03);
+});
+test("nothing fits at the floor: words may run past the box's sides a little, never past its top and bottom", () => {
+  // a narrow bubble's box: the floor is too large for the lines it needs; before 2.15 they were set at
+  // the floor anyway and ran out of the bubble above and below
+  const rect = { x: 0, y: 0, w: 60, h: 40 }, text = "Wait, what is that over there?"; // (main: 4 lines, 64 px)
+  const { setFont, measure } = fitter(text);
+  const fit = GyText.fitText(text, rect, setFont, measure, { maxSize: 30, minSize: 14, lang: "en", hyphenator: null });
+  assert.ok(fit.lines.length * fit.lineHeight <= rect.h + 0.5 || fit.forced, `${fit.lines.length} lines of ${fit.lineHeight.toFixed(1)} px in ${rect.h} px`);
+});
+test("the share of a fit outside its room: none in the box, all of it past a shape with no room", () => {
+  const rect = { x: 0, y: 0, w: 200, h: 60 }, text = "Hello there";
+  const { setFont, measure, opts } = fitter(text);
+  const fit = GyText.fitText(text, rect, setFont, measure, opts); setFont(fit.size);
+  assert.equal(GyText.outsideRoom(fit, rect, null, measure), 0);
+  assert.equal(GyText.outsideRoom(fit, rect, { dy: 0, step: 6, half: Array(10).fill(0) }, measure), 1);
+});
+
+test("the lines of one bubble share a size; lettering of two sizes keeps both; the line peeked at keeps its sibling's", () => {
+  const c = createCanvas(600, 400).getContext("2d");
+  const line = (text, rect, letter = 20) => ({ text, rect, letter, measured: true, tag: 7, halo: false, color: "#000" });
+  const roomy = line("Okay.", { x: 10, y: 10, w: 260, h: 200 }), tight = line("That is a long thing to say in here.", { x: 300, y: 10, w: 110, h: 120 });
+  const alone = (p) => { const s = []; GyText.draw(c, [{ ...p, tag: p === roomy ? 1 : 2 }], { sizes: s }); return s[0]; };
+  assert.ok(alone(roomy) > alone(tight) * 1.2, `the guard: ${alone(roomy)} px and ${alone(tight)} px alone`);
+  const both = []; GyText.draw(c, [roomy, tight], { sizes: both });
+  assert.equal(both[0], both[1]);
+  assert.equal(both[1], alone(tight));
+  const peeked = []; const drawn = GyText.draw(c, [roomy, tight], { sizes: peeked, skip: tight });
+  assert.equal(drawn, 1); assert.deepEqual(peeked, both);
+  const shout = []; GyText.draw(c, [{ ...roomy, letter: 30 }, tight], { sizes: shout });
+  assert.ok(shout[0] > shout[1], `lettering 30 and 20 px: ${shout.join(" and ")}`);
+  // a line that can only be set far under its lettering's size: the other keeps 0.7 of its own
+  const cramped = line("This is far too much text for a bubble this small, really.", { x: 300, y: 10, w: 60, h: 50 });
+  const pair = []; GyText.draw(c, [roomy, cramped], { sizes: pair });
+  assert.ok(pair[1] < 0.7 * 20 * 1.45, `the guard: the cramped line at ${pair[1]} px`);
+  assert.ok(pair[0] >= Math.floor(0.7 * 20 * 1.45) && pair[0] > pair[1], `the roomy line at ${pair[0]} px beside ${pair[1]} px`);
+});
+test("a placement's other room (centred on the lettering) is used when the text fits it larger", () => {
+  const c = createCanvas(600, 400).getContext("2d");
+  const p = { text: "Somewhere over there, far away.", rect: { x: 10, y: 10, w: 60, h: 100 }, letter: 20, measured: true, tag: 1, halo: false, color: "#000" };
+  const s1 = [], s2 = [];
+  GyText.draw(c, [p], { sizes: s1 });
+  GyText.draw(c, [{ ...p, alt: [{ rect: { x: 10, y: 10, w: 200, h: 120 } }] }], { sizes: s2 });
+  assert.ok(s2[0] > s1[0], `${s2[0]} px with the other room, ${s1[0]} px without`);
+});
+
+// ---------- Claude's size label scales only a guessed size (2.15) ----------
+test("a line on measured lettering is drawn at its size whatever Claude's label; a guessed size follows the label", () => {
+  const at = (size, measured) => { const sizes = []; GyText.draw(createCanvas(600, 400).getContext("2d"), [{ text: "Hey!", rect: { x: 10, y: 10, w: 500, h: 300 }, letter: 30, size, tag: measured ? 1 : null, halo: false, color: "#000", ...(measured ? { measured: true } : {}) }], { sizes }); return sizes[0]; };
+  assert.equal(at("small", true), at("normal", true));
+  assert.equal(at("large", true), at("normal", true));
+  assert.ok(at("small", false) < at("normal", false));
+  assert.ok(at("large", false) > at("normal", false));
+});
+
 console.log(`lettering: ${passed} checks passed`);

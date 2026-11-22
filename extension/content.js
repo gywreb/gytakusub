@@ -373,7 +373,9 @@
         // where the overlay sits on screen and where the image's picture is (CSS px): they must match
         rect: e.canvas ? ["left", "top", "width", "height"].map((k) => +parseFloat(e.canvas.style[k] || "0").toFixed(2)) : null,
         image: (() => { const r = contentRect(img, e.objectFit); return [r.left, r.top, r.width, r.height].map((v) => +v.toFixed(2)); })(),
-        lineSizes: (e.sizes || []).map((v) => +(v * img.getBoundingClientRect().width / res.work.W).toFixed(1)) },
+        lineSizes: (e.sizes || []).map((v) => +(v * img.getBoundingClientRect().width / res.work.W).toFixed(1)),
+        // each line's share of its text outside the room the layout gave it (0: all inside; 2.15)
+        outside: (e.fits || []).map((f) => f?.outside ?? null) },
       settings: { model: settings.model, targetLang: settings.targetLang, fontFamily: settings.fontFamily, uppercase: settings.uppercase, useContext: settings.useContext },
       // how the page was lettered: the font chosen for its translations, and the language's rules
       lettering: { ...settings.lettering, hyphenation: !!hyphenation.fn, family: GyText.lettering(res.placements.map((p) => p.text), lettering(res)).family },
@@ -790,9 +792,10 @@
     if (settings.debugOverlay) drawDebug(ctx, res);
     const peek = res.placements[entry.peek];
     // the size each line was drawn at (work pixels), for the readable view
-    const sizes = [];
-    GyText.draw(ctx, peek ? res.placements.filter((p) => p !== peek) : res.placements, { ...lettering(res), sizes });
-    if (!peek) entry.sizes = sizes;
+    const sizes = [], fits = [];
+    // (every line fitted, the one peeked at not drawn: the lines of one bubble share a size)
+    GyText.draw(ctx, res.placements, { ...lettering(res), sizes, fits, skip: peek || null });
+    if (!peek) { entry.sizes = sizes; entry.fits = fits; }
     if (peek) { const r = peekRect(peek, res); ctx.clearRect(r.x, r.y, r.w, r.h); }
     ctx.setTransform(1, 0, 0, 1, 0, 0);
   }

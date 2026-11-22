@@ -10,6 +10,7 @@ import assert from "node:assert/strict";
 import { createCanvas } from "canvas";
 import { cv, analyzePage } from "./cv-node.mjs";
 import { layout } from "../extension/engine/layout.js";
+import { LAYOUT } from "../extension/engine/tuning.js";
 import { erase } from "../extension/engine/erase.js";
 import { loadLettering } from "./lettering-setup.mjs";
 
@@ -155,10 +156,78 @@ await test("a line in an oval gets the oval's room row by row, short of its outl
   const [p] = layout(an, [item([140, 150, 40, 80], "Does that mean it's because I'm an idiot?", 1, "bubble")]).placements;
   assert.ok(p.shape, "a shape");
   const row = (y) => p.shape.half[Math.floor((y - (p.rect.y + p.shape.dy)) / p.shape.step)];
-  const edge = Math.max(2, 0.2 * 24), cx = p.rect.x + p.rect.w / 2;
+  const edge = Math.max(LAYOUT.edgeMinPx, LAYOUT.edgeLetters * 24), cx = p.rect.x + p.rect.w / 2;
   const inOval = (y) => Math.min(cx - (160 - 60 * Math.sqrt(1 - ((y - 190) / 90) ** 2)), 160 + 60 * Math.sqrt(1 - ((y - 190) / 90) ** 2) - cx);
   for (const y of [130, 160, 190, 220, 250]) assert.ok(Math.abs(row(y) - (inOval(y) - edge)) <= 2.5, `row ${y}: ${row(y)} against ${(inOval(y) - edge).toFixed(1)}`);
   assert.ok(row(190) > p.rect.w / 2, "wider than the box at the oval's middle");
+});
+
+await test("a slanted bubble: the room row by row stays inside its outline where the lettering's box reaches past it (2.15)", () => {
+  // a parallelogram leaning right 0.5 px per row, 120 wide and 160 tall; the lettering's box (as the
+  // detector draws it, upright) has its top-left and bottom-right corners past the slanted sides
+  const inside = (x, y) => y >= 100 && y < 260 && x >= 100 + (y - 100) * 0.5 && x < 220 + (y - 100) * 0.5;
+  const words = para(150, 120, 100, 120, { bubble: 1, region: 1 });
+  const an = analysis([bubbleAt(1, { x: 100, y: 100, w: 200, h: 160 }, [words])], [words]);
+  an.insideOf = () => inside;
+  const [p] = layout(an, [item([150, 120, 100, 120], "It's leaning, the whole thing is leaning!", 1, "bubble")]).placements;
+  assert.ok(p.shape, "a shape");
+  const cx = p.rect.x + p.rect.w / 2;
+  p.shape.half.forEach((h, k) => {
+    if (!h) return;
+    const y = p.rect.y + p.shape.dy + (k + 0.5) * p.shape.step;
+    assert.ok(inside(cx - h, y) && inside(cx + h, y), `row ${y.toFixed(0)}: ${(cx - h).toFixed(0)} to ${(cx + h).toFixed(0)} past the outline`);
+  });
+});
+
+await test("a 'bubble' that does not hold the lettering (light art around text drawn over it): the lettering's box is room (2.15)", () => {
+  // the interior found is a small patch beside the lettering; the shape alone would set the text tiny
+  const inside = (x, y) => x >= 100 && x < 140 && y >= 100 && y < 260;
+  const words = para(110, 110, 120, 140, { bubble: 1, region: 1 });
+  const an = analysis([bubbleAt(1, { x: 100, y: 100, w: 140, h: 160 }, [words])], [words]);
+  an.insideOf = () => inside;
+  const [p] = layout(an, [item([110, 110, 120, 140], "Over the art", 1, "bubble")]).placements;
+  const cx = p.rect.x + p.rect.w / 2, mid = p.shape.half[Math.floor((180 - (p.rect.y + p.shape.dy)) / p.shape.step)];
+  assert.ok(cx + mid >= 220, `the room at the lettering's middle reaches ${(cx + mid).toFixed(0)}, the lettering 230`);
+});
+
+await test("two captions' lettering merged into one paragraph: each line takes its own lines of it (2.15)", () => {
+  // an L-shaped caption: one text top right, the other bottom left, their lines merged by the analysis
+  const lines = [[300, 110], [300, 140], [300, 170], [300, 200], [130, 220], [130, 250], [130, 280]].map(([x, y]) => ({ x, y, w: 120, h: 22 }));
+  const merged = para(130, 110, 290, 192, { bubble: 1, region: 1, parts: lines, lineLetters: lines.map(() => 24) });
+  const an = boxShapes(analysis([bubbleAt(1, { x: 110, y: 90, w: 330, h: 230 }, [merged])], [merged]));
+  const { placements } = layout(an, [item([295, 105, 130, 120], "First, I need to leave the city", 1, "bubble"), item([125, 215, 130, 92], "Once I've lost them, I strike back", 1, "bubble")]);
+  const first = placements.find((p) => p.text.startsWith("First")), then = placements.find((p) => p.text.startsWith("Once"));
+  const cx = (r) => r.x + r.w / 2;
+  assert.ok(cx(first.rect) > 300 && cx(then.rect) < 270, `centres ${cx(first.rect).toFixed(0)} and ${cx(then.rect).toFixed(0)}`);
+});
+
+await test("two boxes one region, a border across it: each line's room stays its side of the border (2.15)", () => {
+  // one white region 200 × 100 (the bubble model's mask over two caption boxes drawn side by side); the
+  // left box's border at x = 170 runs across it from top to bottom, in the ink mask: not midway between
+  // the two lettering, where the region is cut between speakers anyway
+  const W2 = 400, H2 = 300, inkData = new Uint8Array(W2 * H2);
+  for (let y = 100; y < 200; y++) for (let x = 169; x < 172; x++) inkData[y * W2 + x] = 255;
+  const left = para(110, 130, 40, 40, { bubble: 1, region: 1 }), right = para(240, 130, 40, 40, { bubble: 1, region: 1 });
+  const an = { ...analysis([bubbleAt(1, { x: 100, y: 100, w: 200, h: 100 }, [left, right])], [left, right]), W: W2, H: H2 };
+  an.insideOf = () => (x, y) => x >= 100 && x < 300 && y >= 100 && y < 200;
+  an.polarities = [{ dark: false, inkMask: { data: inkData, cols: W2, rows: H2 } }, { dark: true, inkMask: { data: new Uint8Array(W2 * H2), cols: W2, rows: H2 } }];
+  const { placements } = layout(an, [item([105, 125, 50, 50], "Left side", 1, "bubble"), item([235, 125, 50, 50], "Right side", 1, "bubble")]);
+  for (const p of placements) {
+    const cx = p.rect.x + p.rect.w / 2, side = p.text.startsWith("Left") ? -1 : 1;
+    for (const h of p.shape.half) if (h) assert.ok(side < 0 ? cx + h < 169 : cx - h > 171, `${p.text}: ${(cx - h).toFixed(0)} to ${(cx + h).toFixed(0)} across the border`);
+  }
+});
+
+await test("lettering Claude read as Hangul is set at its syllables' height; other lettering at its letter (2.15)", () => {
+  const words = para(140, 150, 60, 60, { bubble: 1, region: 1, letter: 20, lineLetters: [20], syllable: 24, lineSyllables: [24] });
+  const at = (source) => {
+    const an = boxShapes(analysis([{ ...bubbleAt(1, { x: 120, y: 130, w: 100, h: 100 }, [words]), letter: 20 }], [words]));
+    return layout(an, [{ ...item([140, 150, 60, 60], "What is it?", 1, "bubble"), source }]).placements[0].letter;
+  };
+  assert.equal(at("뭐야?"), 24);
+  assert.equal(at("なに？"), 20);
+  assert.equal(at("Quoi ?"), 20);
+  assert.equal(at(undefined), 20);
 });
 
 await test("a tight box on the core of big lettering takes it; a small box in a large paragraph does not", () => {

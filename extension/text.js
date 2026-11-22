@@ -158,13 +158,13 @@
    */
   function fitText(text, rect, setFont, measure, opts = {}) {
     if (opts.shape) {
-      // the shape's fit when it is at least as large as the box's: a box anchored on the lettering
-      // it replaces may reach past the bubble's interior (that lettering is erased), and the text
-      // is never set smaller than it was for that
+      // the shape's fit, or the box's when it is larger and its lines stay in the room: the box is
+      // the lettering's own box with the room around it, and its corners may lie past a curved or
+      // slanted side, where its lines crossed the outline (2.15, the owner's French chapter)
       const shaped = fitShape(text, rect, opts.shape, setFont, measure, opts);
       const boxed = fitText(text, rect, setFont, measure, { ...opts, shape: null });
-      if (shaped && shaped.size >= boxed.size) { setFont(shaped.size); return shaped; }
-      setFont(boxed.size); return boxed;
+      const pick = shaped && shaped.size >= boxed.size ? shaped : !shaped ? boxed : (setFont(boxed.size), outsideRoom(boxed, rect, opts.shape, measure, true) <= (opts.outsideOk ?? 0.03)) ? boxed : shaped;
+      setFont(pick.size); return pick;
     }
     const minSize = Math.max(6, Math.round(opts.minSize ?? 8));
     const maxSize = Math.max(minSize, Math.floor(Math.min(opts.maxSize ?? 72, rect.h)));
@@ -185,10 +185,11 @@
     if (hyph) return hyph;
     // Nothing fits even at the minimum size. Words are kept whole and allowed to
     // run past the box a little (a letterer lets a long word kiss the outline)
-    // before they are ever cut letter by letter, which is unreadable.
+    // before they are ever cut letter by letter, which is unreadable. Across only: lines
+    // past the box's top and bottom ran out of narrow bubbles (2.15, the owner's French chapter).
     setFont(minSize);
     const whole = wrapInfo(measure, text, rect.w, { ...how, hyphenate: false });
-    if (Math.max(0, ...whole.lines.map(measure)) <= rect.w * 1.3) return { size: minSize, lines: whole.lines, lineHeight: minSize * lh, hyphens: 0, overflow: true };
+    if (whole.lines.length * minSize * lh <= rect.h && Math.max(0, ...whole.lines.map(measure)) <= rect.w * 1.3) return { size: minSize, lines: whole.lines, lineHeight: minSize * lh, hyphens: 0, overflow: true };
     // Still too big: the floor (a share of the original lettering's size) is wrong for this box,
     // so it gives way before any word is cut. A floor of 64 px set "There you are!" in a 97 px
     // bubble as "e / you / ar- / e!" (2.13.1).
@@ -206,8 +207,9 @@
 
   /**
    * fitText() in a bubble's shape (engine/layout.js roomShape): each line as wide as the room on
-   * both sides of the box's centre line over that line's height (less a fifth of the size each
-   * side), the block centred on the box as drawLines() centres it. The largest size that fits,
+   * both sides of the box's centre line over that line's height (the shape keeps its own margin off
+   * the outline: before 2.15 a fifth of the size more came off each side, and lines a bubble could
+   * hold at 0.7 of their size came out smaller), the block centred on the box as drawLines() centres it. The largest size that fits,
    * unhyphenated first as in fitText(); null when nothing fits at the floor (fitText then fits the
    * box). A rectangle in an oval leaves its widest rows unused: 140 of the 171 lines set under 0.7
    * of their original size sat in boxes under 5 letters wide (2.14.1).
@@ -229,7 +231,8 @@
     };
     const widths = (n, size) => {
       const line = size * lh, top = cy - (n * line) / 2;
-      return Array.from({ length: n }, (_, k) => Math.max(0, 2 * (halfOver(top + k * line, top + (k + 1) * line) - size * 0.2)));
+      // (the shape already keeps its margin off the outline: layout.js roomShape, LAYOUT.edgeLetters)
+      return Array.from({ length: n }, (_, k) => Math.max(0, 2 * halfOver(top + k * line, top + (k + 1) * line)));
     };
     const how = { lang: opts.lang, hyphenator: opts.hyphenator };
     const linesAt = (size, hyphenate) => {
@@ -256,18 +259,6 @@
     if (plain && (!hy || !hy.w.hyphens || plain.size >= hy.size * (opts.hyphenRatio ?? 0.75))) { setFont(plain.size); return pick(plain, 0); }
     if (hy && hy.w.hyphens) { setFont(hy.size); return pick(hy, hy.w.hyphens); }
     return null;
-  }
-
-  function drawLines(ctx, fit, rect, color, family, halo) {
-    ctx.font = `bold ${fit.size}px ${family}`;
-    ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    const total = fit.lines.length * fit.lineHeight;
-    let y = rect.y + (rect.h - total) / 2 + fit.lineHeight / 2;
-    const cx = rect.x + rect.w / 2;
-    for (const line of fit.lines) {
-      if (halo) { ctx.lineJoin = "round"; ctx.lineWidth = Math.max(2, fit.size * 0.22); ctx.strokeStyle = color === "#fff" ? "rgba(0,0,0,.85)" : "rgba(255,255,255,.92)"; ctx.strokeText(line, cx, y); }
-      ctx.fillStyle = color; ctx.fillText(line, cx, y); y += fit.lineHeight;
-    }
   }
 
   const covers = (font, cp) => {
@@ -308,6 +299,34 @@
     return { family: lead + family, cap: font ? font.cap : BASE_CAP, font };
   }
 
+  /**
+   * The share of a fitted text's letters (each line's width and middle 0.8 of its size) that lies
+   * outside its room: the rectangle, or in a
+   * bubble's shape the width the shape gives on each line's rows (engine/layout.js roomShape; with
+   * `toOutline`, up to the outline, not the margin the shape keeps off it). The debug report records
+   * it per line (2.15): text that ran past its bubble showed in the owner's chapters, and nothing
+   * measured it.
+   */
+  function outsideRoom(fit, rect, shape, measure, toOutline = false) {
+    const total = fit.lines.length * fit.lineHeight, top = rect.y + (rect.h - total) / 2;
+    const top0 = shape ? rect.y + shape.dy : rect.y, bottom0 = shape ? top0 + shape.half.length * shape.step : rect.y + rect.h;
+    const more = toOutline ? shape?.edge || 0 : 0; // (the shape keeps a margin off the outline: up to the outline itself)
+    const halfAt = (y0, y1) => {
+      if (!shape) return rect.w / 2;
+      let h = Infinity;
+      for (let k = Math.max(0, Math.floor((y0 - top0) / shape.step)); k <= Math.min(shape.half.length - 1, Math.floor((y1 - top0) / shape.step)); k++) h = Math.min(h, shape.half[k] ? shape.half[k] + more : 0);
+      return h === Infinity ? 0 : h;
+    };
+    // each line's letters: its width, and the middle 0.8 of its size (not the leading between lines)
+    let all = 0, out = 0;
+    fit.lines.forEach((line, k) => {
+      const body = 0.8 * fit.size, y0 = top + k * fit.lineHeight + (fit.lineHeight - body) / 2, y1 = y0 + body, w = measure(line), a = w * body;
+      const iy0 = Math.max(y0, top0), iy1 = Math.min(y1, bottom0), half = iy1 > iy0 ? halfAt(iy0, iy1) : 0;
+      all += a; out += a - Math.max(0, iy1 - iy0) * Math.min(w, 2 * half);
+    });
+    return all ? +(out / all).toFixed(3) : 0;
+  }
+
   function drawLines(ctx, fit, rect, color, family, halo) {
     ctx.font = `bold ${fit.size}px ${family}`;
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
@@ -326,10 +345,12 @@
    * Draw every placement onto ctx (which already shows the cleaned page).
    * @param {CanvasRenderingContext2D} ctx
    * @param {Array} placements from engine/layout.js, in ctx pixel units
-   * @param {{fontFamily?:string, uppercase?:boolean, lang?:string|null, hyphenator?:Function|null, pageTexts?:string[]}} opts
+   * @param {{fontFamily?:string, uppercase?:boolean, lang?:string|null, hyphenator?:Function|null, pageTexts?:string[], skip?:object|null, sizes?:number[], fits?:object[]}} opts
    *   `lang`: the target language's BCP 47 tag (line breaking, upper case, CJK font); with it,
    *   only `hyphenator` hyphenates (English's is built in). Without `lang`: English rules.
    *   `pageTexts`: every line of the page, when drawing only some, so the font stays the same.
+   *   `skip`: a placement fitted but not drawn (the line peeked at: its bubble's other lines keep
+   *   the size they share with it). `sizes`, `fits`: filled per placement, drawn or not.
    * @returns {number} count drawn
    */
   function draw(ctx, placements, opts = {}) {
@@ -342,22 +363,54 @@
     const family = look.family;
     const setFont = (size) => { ctx.font = `bold ${size}px ${family}`; };
     const measure = (s) => ctx.measureText(s).width;
-    let n = 0;
-    placements.forEach((p, i) => {
+    // Each line's fit: the size its room allows (`plans`), then one size for the lines of one bubble
+    // whose lettering was one size, as the letterer set them (2.15: in a two-lobe bubble of the owner's
+    // French chapter, one translation came out at 31 px and the other at 20). Never below 0.7 of a
+    // line's own lettering for that: when one line can only be set smaller, the others don't follow it.
+    const plans = placements.map((p, i) => {
       const text = texts[i];
       // `letter` is the original cap height. The translation's capitals (or a Han character's
       // ink) are made about as tall: 1.45 × letter for Comic Neue, scaled by each font's own
       // cap height. Inside a bubble it may grow up to 30% beyond that when there is room
       // (letterers fill a roomy bubble a little); over artwork it keeps the original size.
-      const target = p.letter * 1.45 * (BASE_CAP / look.cap) * (SIZE_MUL[p.size] || 1);
+      // Claude's size ("small", "large") scales only a letter size guessed for the page: one measured
+      // on the lettering the line replaces has its size already, and was scaled twice (2.15)
+      const target = p.letter * 1.45 * (BASE_CAP / look.cap) * (p.measured ? 1 : SIZE_MUL[p.size] || 1);
       const inBubble = p.tag != null && !p.halo;
-      const fit = fitText(text, p.rect, setFont, measure, { maxSize: inBubble ? target * 1.3 : target, minSize: Math.max(7, target * 0.35), lang, hyphenator, shape: inBubble ? p.shape : null });
-      drawLines(ctx, fit, p.rect, p.color, family, p.halo);
+      const how = { maxSize: inBubble ? target * 1.3 : target, minSize: Math.max(7, target * 0.35), lang, hyphenator };
+      return { p, text, inBubble, how, target, ...fitBest(text, p, inBubble, how) };
+    });
+    function fitBest(text, p, inBubble, how) {
+      // the placement's room, or another the layout offers (the room centred on the lettering itself):
+      // the one that fits the text larger, the placement's own on a tie
+      let fit = null, at = p;
+      for (const t of inBubble ? [p, ...(p.alt || [])] : [p]) {
+        const f = fitText(text, t.rect, setFont, measure, { ...how, shape: inBubble ? t.shape : null });
+        if (!fit || f.size > fit.size) { fit = f; at = t; }
+      }
+      return { fit, at };
+    }
+    const bubbles = new Map();
+    for (const q of plans) if (q.inBubble) { if (!bubbles.has(q.p.tag)) bubbles.set(q.p.tag, []); bubbles.get(q.p.tag).push(q); }
+    for (const group of bubbles.values()) {
+      if (group.length < 2) continue;
+      const letters = group.map((q) => q.p.letter);
+      if (Math.max(...letters) > Math.min(...letters) * 1.2) continue; // lettering of two sizes: a shout beside a whisper keeps both
+      const least = Math.min(...group.map((q) => q.fit.size));
+      for (const q of group) {
+        const size = Math.max(least, Math.floor(0.7 * q.target));
+        if (q.fit.size > size) Object.assign(q, fitBest(q.text, q.p, true, { ...q.how, maxSize: size, minSize: Math.min(q.how.minSize, size) }));
+      }
+    }
+    let n = 0;
+    plans.forEach(({ p, fit, at, inBubble }, i) => {
+      setFont(fit.size);
+      if (p !== opts.skip) { drawLines(ctx, fit, at.rect, p.color, family, p.halo); n++; }
       if (opts.sizes) opts.sizes[i] = fit.size; // the size each line was drawn at, for callers that need it
-      n++;
+      if (opts.fits) opts.fits[i] = { size: fit.size, lines: fit.lines.length, outside: outsideRoom(fit, at.rect, inBubble ? at.shape : null, measure, true) };
     });
     return n;
   }
 
-  root.GyText = { draw, fitText, wrapInfo, syllables, tokens, lettering, DEFAULT_FONT };
+  root.GyText = { draw, fitText, wrapInfo, syllables, tokens, lettering, outsideRoom, DEFAULT_FONT };
 })(typeof globalThis !== "undefined" ? globalThis : this);
