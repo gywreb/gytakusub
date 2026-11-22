@@ -13,6 +13,7 @@
 
 import { createSession, run } from "./ort.js";
 import { DETECT } from "./tuning.js";
+import { owning } from "./owner.js";
 
 const MEAN = [0.485, 0.456, 0.406], STD = [0.229, 0.224, 0.225];
 
@@ -51,16 +52,18 @@ function loadDnn(cv, modelBytes) {
  * @returns {Promise<Line[]>}
  */
 export async function detectText(cv, det, img, opts = {}) {
-  opts = { ...det.post, ...opts };
-  const inp = prepareInput(cv, img, opts);
-  let prob;
-  if (det.kind === "ort") {
-    const tensor = new det.ort.Tensor("float32", new Float32Array(inp.data), [1, 3, inp.h, inp.w]); // a copy: the blob lives in OpenCV's heap
-    inp.blob.delete();
-    const out = await run(det.session, { [det.session.inputNames[0]]: tensor });
-    prob = out[det.session.outputNames[0]].data;
-  } else { prob = forwardDnn(cv, det, inp); inp.blob.delete(); }
-  return decodeOutput(cv, prob, inp, opts);
+  return owning(async (own) => {
+    opts = { ...det.post, ...opts };
+    const inp = prepareInput(cv, img, opts); own(inp.blob);
+    let prob;
+    if (det.kind === "ort") {
+      const tensor = new det.ort.Tensor("float32", new Float32Array(inp.data), [1, 3, inp.h, inp.w]); // a copy: the blob lives in OpenCV's heap
+      inp.blob.delete();
+      const out = await run(det.session, { [det.session.inputNames[0]]: tensor });
+      prob = out[det.session.outputNames[0]].data;
+    } else { prob = forwardDnn(cv, det, inp); inp.blob.delete(); }
+    return decodeOutput(cv, prob, inp, opts);
+  });
 }
 
 /**
@@ -103,12 +106,16 @@ export async function detectInEmptyBubbles(cv, det, img, lines, instances, bubbl
  * its crop is detected at up to twice the resolution, as in detectInEmptyBubbles.
  * Returns the page lines plus any found inside such shapes.
  */
-export async function detectInDarkShapes(cv, det, img, lines) {
+export function detectInDarkShapes(cv, det, img, lines) {
+  return owning((own) => lookInDarkShapes(cv, det, img, lines, own));
+}
+
+async function lookInDarkShapes(cv, det, img, lines, own) {
   const W = img.width, H = img.height;
-  const src = cv.matFromImageData(img), gray = new cv.Mat(), dark = new cv.Mat();
+  const src = own(cv.matFromImageData(img)), gray = own(new cv.Mat()), dark = own(new cv.Mat());
   cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY); src.delete();
   cv.threshold(gray, dark, DETECT.darkShape, 255, cv.THRESH_BINARY_INV);
-  const labels = new cv.Mat(), stats = new cv.Mat(), cents = new cv.Mat();
+  const labels = own(new cv.Mat()), stats = own(new cv.Mat()), cents = own(new cv.Mat());
   const n = cv.connectedComponentsWithStats(dark, labels, stats, cents, 8, cv.CV_32S);
   const S = stats.data32S, L = labels.data32S, G = gray.data, shapes = [];
   const hasLine = (r) => lines.some((l) => { const cx = l.x + l.w / 2, cy = l.y + l.h / 2; return cx >= r.x && cy >= r.y && cx < r.x + r.width && cy < r.y + r.height; });
@@ -116,14 +123,14 @@ export async function detectInDarkShapes(cv, det, img, lines) {
     const r = { x: S[i * 5], y: S[i * 5 + 1], width: S[i * 5 + 2], height: S[i * 5 + 3] }, ink = S[i * 5 + 4];
     if (ink < DETECT.shapeMinArea * W * H || ink > DETECT.shapeMaxArea * W * H || ink < DETECT.shapeMinFill * r.width * r.height || r.width > DETECT.shapeMaxAspect * r.height || r.height > DETECT.shapeMaxAspect * r.width || hasLine(r)) continue;
     // the shape filled (lettering holes included), its convexity, and the light ink in it
-    const m = new cv.Mat(r.height, r.width, cv.CV_8UC1), md = m.data;
+    const m = own(new cv.Mat(r.height, r.width, cv.CV_8UC1)), md = m.data;
     for (let y = 0; y < r.height; y++) for (let x = 0; x < r.width; x++) md[y * r.width + x] = L[(r.y + y) * W + r.x + x] === i ? 255 : 0;
-    const contours = new cv.MatVector(), hier = new cv.Mat();
+    const contours = own(new cv.MatVector()), hier = own(new cv.Mat());
     cv.findContours(m, contours, hier, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
     let best = -1, filled = 0;
-    for (let k = 0; k < contours.size(); k++) { const ct = contours.get(k), a = cv.contourArea(ct); if (a > filled) { filled = a; best = k; } ct.delete(); }
+    for (let k = 0; k < contours.size(); k++) { const ct = own(contours.get(k)), a = cv.contourArea(ct); if (a > filled) { filled = a; best = k; } ct.delete(); }
     if (best >= 0) {
-      const ct = contours.get(best), hull = new cv.Mat(); cv.convexHull(ct, hull);
+      const ct = own(contours.get(best)), hull = own(new cv.Mat()); cv.convexHull(ct, hull);
       const solidity = filled / Math.max(1, cv.contourArea(hull)); hull.delete(); ct.delete();
       if (solidity >= DETECT.shapeSolidity && filled >= DETECT.shapeFilled * r.width * r.height) {
         m.setTo(new cv.Scalar(0)); cv.drawContours(m, contours, best, new cv.Scalar(255), -1);
@@ -188,53 +195,63 @@ const overlapArea = (a, b) => Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.
 
 /** detectText for the OpenCV backend only, without a promise (analyze() is synchronous). */
 export function detectTextSync(cv, det, img, opts = {}) {
-  if (det.kind === "ort") throw new Error("detectTextSync: the ONNX Runtime detector is asynchronous; pass `lines` to analyze()");
-  opts = { ...det.post, ...opts };
-  const inp = prepareInput(cv, img, opts);
-  const prob = forwardDnn(cv, det, inp); inp.blob.delete();
-  return decodeOutput(cv, prob, inp, opts);
+  return owning((own) => {
+    if (det.kind === "ort") throw new Error("detectTextSync: the ONNX Runtime detector is asynchronous; pass `lines` to analyze()");
+    opts = { ...det.post, ...opts };
+    const inp = prepareInput(cv, img, opts); own(inp.blob);
+    const prob = forwardDnn(cv, det, inp); inp.blob.delete();
+    return decodeOutput(cv, prob, inp, opts);
+  });
 }
 
 /** Resize to a multiple of 32 within maxSide and normalise to the model's input (CHW float). */
 function prepareInput(cv, img, opts) {
-  const maxSide = opts.maxSide ?? DETECT.maxSide;
-  const W = img.width, H = img.height;
-  const scale = Math.min(opts.maxScale ?? 1, maxSide / Math.max(W, H));
-  const w = Math.max(32, Math.round((W * scale) / 32) * 32), h = Math.max(32, Math.round((H * scale) / 32) * 32);
-  const src = cv.matFromImageData(img);
-  const rgb = new cv.Mat(); cv.cvtColor(src, rgb, cv.COLOR_RGBA2RGB);
-  const resized = new cv.Mat(); cv.resize(rgb, resized, new cv.Size(w, h), 0, 0, cv.INTER_AREA);
-  // CHW float, normalised (the blob OpenCV's dnn wants is built the same way)
-  const blob = cv.blobFromImage(resized, 1 / 255, new cv.Size(w, h), new cv.Scalar(0, 0, 0), false, false);
-  const data = blob.data32F, plane = w * h;
-  for (let c = 0; c < 3; c++) { const m = MEAN[c], sd = STD[c], o = c * plane; for (let i = 0; i < plane; i++) data[o + i] = (data[o + i] - m) / sd; }
-  src.delete(); rgb.delete(); resized.delete();
-  // the input is resized to multiples of 32, so each axis has its own scale (up to a
-  // few percent apart): mapping boxes back with one factor would shift them
-  return { data, blob, w, h, W, H, sx: w / W, sy: h / H };
+  return owning((own) => {
+    const maxSide = opts.maxSide ?? DETECT.maxSide;
+    const W = img.width, H = img.height;
+    const scale = Math.min(opts.maxScale ?? 1, maxSide / Math.max(W, H));
+    const w = Math.max(32, Math.round((W * scale) / 32) * 32), h = Math.max(32, Math.round((H * scale) / 32) * 32);
+    const src = own(cv.matFromImageData(img));
+    const rgb = own(new cv.Mat()); cv.cvtColor(src, rgb, cv.COLOR_RGBA2RGB);
+    const resized = own(new cv.Mat()); cv.resize(rgb, resized, new cv.Size(w, h), 0, 0, cv.INTER_AREA);
+    // CHW float, normalised (the blob OpenCV's dnn wants is built the same way)
+    const blob = own(cv.blobFromImage(resized, 1 / 255, new cv.Size(w, h), new cv.Scalar(0, 0, 0), false, false));
+    const data = blob.data32F, plane = w * h;
+    for (let c = 0; c < 3; c++) { const m = MEAN[c], sd = STD[c], o = c * plane; for (let i = 0; i < plane; i++) data[o + i] = (data[o + i] - m) / sd; }
+    src.delete(); rgb.delete(); resized.delete();
+    // the input is resized to multiples of 32, so each axis has its own scale (up to a
+    // few percent apart): mapping boxes back with one factor would shift them
+    return { data, blob: own.keep(blob), w, h, W, H, sx: w / W, sy: h / H };
+  });
 }
 
 function forwardDnn(cv, det, inp) {
-  const { w, h } = inp;
-  // OpenCV's dnn keeps the shapes of the first forward; a new input size needs a fresh net.
-  const key = w * 100000 + h;
-  if (det.inputSize !== null && det.inputSize !== key) { det.net.delete(); det.net = loadDnn(cv, det.bytes).net; }
-  det.inputSize = key;
-  det.net.setInput(inp.blob);
-  const out = det.net.forward();
-  const prob = new Float32Array(out.data32F.subarray(0, w * h));
-  out.delete();
-  return prob;
+  return owning((own) => {
+    const { w, h } = inp;
+    // OpenCV's dnn keeps the shapes of the first forward; a new input size needs a fresh net.
+    const key = w * 100000 + h;
+    if (det.inputSize !== null && det.inputSize !== key) { det.net.delete(); det.net = loadDnn(cv, det.bytes).net; }
+    det.inputSize = key;
+    det.net.setInput(inp.blob);
+    const out = own(det.net.forward());
+    const prob = new Float32Array(out.data32F.subarray(0, w * h));
+    out.delete();
+    return prob;
+  });
 }
 
 /** DB post-processing: threshold, components, box score, unclip, back to image pixels. */
 function decodeOutput(cv, probData, inp, opts) {
+  return owning((own) => decodeLines(cv, probData, inp, opts, own));
+}
+
+function decodeLines(cv, probData, inp, opts, own) {
   const thr = opts.threshold ?? opts.thresh ?? DEFAULT_POST.thresh, unclip = opts.unclip ?? DEFAULT_POST.unclip, boxThresh = opts.boxThresh ?? DEFAULT_POST.boxThresh;
   const { w, h, W, H, sx, sy } = inp;
-  const prob = new cv.Mat(h, w, cv.CV_32F); prob.data32F.set(probData.subarray(0, w * h));
-  const bin = new cv.Mat(); cv.threshold(prob, bin, thr, 255, cv.THRESH_BINARY);
-  const bin8 = new cv.Mat(); bin.convertTo(bin8, cv.CV_8U);
-  const labels = new cv.Mat(), stats = new cv.Mat(), cents = new cv.Mat();
+  const prob = own(new cv.Mat(h, w, cv.CV_32F)); prob.data32F.set(probData.subarray(0, w * h));
+  const bin = own(new cv.Mat()); cv.threshold(prob, bin, thr, 255, cv.THRESH_BINARY);
+  const bin8 = own(new cv.Mat()); bin.convertTo(bin8, cv.CV_8U);
+  const labels = own(new cv.Mat()), stats = own(new cv.Mat()), cents = own(new cv.Mat());
   const n = cv.connectedComponentsWithStats(bin8, labels, stats, cents, 8, cv.CV_32S);
   const S = stats.data32S, P = prob.data32F, L = labels.data32S;
   const lines = [];

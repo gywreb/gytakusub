@@ -6,23 +6,16 @@
 // the heap in use must not move.
 //   node memory.test.mjs
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import { createCanvas } from "canvas";
+import { bitmapOf } from "./worker-env.mjs";
 import { cv } from "./cv-node.mjs";
 import { preparePage, prefillPage, finishPage } from "../extension/engine/index.js";
 import { erase, fillTexture, eraseFullSize } from "../extension/engine/erase.js";
-import { engineError } from "../extension/engine/cv.js";
+import { engineError, getCV, OPENCV_MAX } from "../extension/engine/cv.js";
 import { makePage } from "./bench/synth.mjs";
 
-// what the worker has in a browser and Node does not
-globalThis.OffscreenCanvas ??= function OffscreenCanvas(w, h) {
-  const c = createCanvas(w, h);
-  c.convertToBlob = async ({ type = "image/png", quality } = {}) => new Blob([c.toBuffer(type, { quality })], { type });
-  return c;
-};
-globalThis.FileReader ??= class {
-  readAsDataURL(blob) { blob.arrayBuffer().then((b) => { this.result = `data:${blob.type};base64,${Buffer.from(b).toString("base64")}`; this.onload?.(); }, (e) => this.onerror?.(e)); }
-};
-const drawable = (c) => Object.assign(c, { close() {} });
+const drawable = bitmapOf;
 
 // The heap in use, in MB: where a block larger than anything a page frees is placed. A page that
 // leaves memory behind pushes it up by what it left (a view of the page left undeleted: the
@@ -135,6 +128,26 @@ await test("the learned fill, of either kind, frees all it used", async () => {
       assert.ok(moved < 1, `the heap in use grew by ${moved.toFixed(1)} MB over 3 runs (${model.kind})`);
     }
   } finally { an.dispose(); }
+});
+
+await test("OpenCV's maximum is the vendored build's", async () => {
+  const m = /"maximum":(\d+)\/WASM_PAGE_SIZE/.exec(fs.readFileSync(new URL("../extension/vendor/opencv.js", import.meta.url), "utf8"));
+  assert.ok(m, "the build states its maximum");
+  assert.equal(Number(m[1]), OPENCV_MAX);
+});
+
+// (last: the pages after it run on another OpenCV than the one the tests above share)
+await test("OpenCV out of memory: the page fails saying so, and the next page starts a fresh OpenCV", async () => {
+  // its memory taken up to all it can have (as by something left behind, page after page)
+  const taken = [];
+  for (const side of [2048, 256, 32]) try { for (;;) taken.push(new cv.Mat(side, side, cv.CV_8UC4)); } catch (e) { assert.equal(typeof e, "number"); }
+  assert.equal(cv.HEAPU8.length, OPENCV_MAX);
+  await assert.rejects(translate(drawable(canvasOf(pages[0])), SETTINGS), (e) => e.code === "opencv" && /its memory at 1024 MB, all it can have/.test(e.message));
+  await translate(drawable(canvasOf(pages[0])), SETTINGS);
+  const fresh = await getCV();
+  assert.notEqual(fresh, cv, "a fresh OpenCV");
+  assert.ok(fresh.HEAPU8.length < OPENCV_MAX);
+  for (const m of taken) m.delete();
 });
 
 console.log(`${passed} passed`);

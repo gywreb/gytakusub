@@ -9,6 +9,18 @@
 //    (`side`, 512): the area is scaled to fit it and padded to it.
 
 import { FILL } from "./tuning.js";
+import { owning } from "./owner.js";
+
+/**
+ * A copy of one area of `mat`, its rows continuous (caller deletes). The view the copy is made
+ * through is freed here: a view left undeleted keeps the whole of its parent's memory alive after
+ * the parent is deleted — a page's worth a time, until the OpenCV heap is full (a long chapter
+ * then failed page after page).
+ */
+export function copyOf(mat, rect) {
+  const view = mat.roi(rect);
+  try { return view.clone(); } finally { view.delete(); }
+}
 
 /**
  * Inpaints one area. Only masked pixels change in the result.
@@ -23,18 +35,11 @@ import { FILL } from "./tuning.js";
  *   costs about 40 µs a pixel (a 768 × 512 area: 17 s; at 384 × 256: 4 s)
  * @returns {Promise<any>} cv.Mat CV_8UC3 the size of `rgb` (caller deletes)
  */
-/**
- * A copy of one area of `mat`, its rows continuous (caller deletes). The view the copy is made
- * through is freed here: a view left undeleted keeps the whole of its parent's memory alive after
- * the parent is deleted — a page's worth a time, until the OpenCV heap is full (a long chapter
- * then failed page after page).
- */
-export function copyOf(mat, rect) {
-  const view = mat.roi(rect);
-  try { return view.clone(); } finally { view.delete(); }
+export function aotInpaint(cv, model, rgb, mask, opts = {}) {
+  return owning((own) => inpaintArea(cv, model, rgb, mask, opts, own));
 }
 
-export async function aotInpaint(cv, model, rgb, mask, opts = {}) {
+async function inpaintArea(cv, model, rgb, mask, opts, own) {
   const fixed = model.side || 0, lama = model.kind === "lama";
   // A model of one size sees the real page around a smaller area (`opts.context`): padded with a
   // mirror image of the area, LaMa read the copies as more of the same and filled screentone with
@@ -42,14 +47,14 @@ export async function aotInpaint(cv, model, rgb, mask, opts = {}) {
   const ctx = opts.context;
   if (fixed && ctx && rgb.cols <= fixed && rgb.rows <= fixed) {
     const win = contextWindow(ctx.image.cols, ctx.image.rows, ctx.x, ctx.y, rgb.cols, rgb.rows, fixed);
-    const wr = copyOf(ctx.image, new cv.Rect(win.x, win.y, win.w, win.h)), wm = cv.Mat.zeros(win.h, win.w, cv.CV_8UC1);
+    const wr = own(copyOf(ctx.image, new cv.Rect(win.x, win.y, win.w, win.h))), wm = own(cv.Mat.zeros(win.h, win.w, cv.CV_8UC1));
     const at = new cv.Rect(ctx.x - win.x, ctx.y - win.y, rgb.cols, rgb.rows);
-    { const v = wr.roi(at); rgb.copyTo(v); v.delete(); const mv = wm.roi(at); mask.copyTo(mv); mv.delete(); }
-    const done = await aotInpaint(cv, model, wr, wm, { ...opts, context: null });
-    const part = done.roi(at), res = rgb.clone();
+    { const v = own(wr.roi(at)); rgb.copyTo(v); v.delete(); const mv = own(wm.roi(at)); mask.copyTo(mv); mv.delete(); }
+    const done = own(await aotInpaint(cv, model, wr, wm, { ...opts, context: null }));
+    const part = own(done.roi(at)), res = own(rgb.clone());
     part.copyTo(res, mask);
     part.delete(); done.delete(); wr.delete(); wm.delete();
-    return res;
+    return own.keep(res);
   }
   const W = rgb.cols, H = rgb.rows, maxSide = fixed || opts.maxSide || (model.ep === "wasm" ? CPU_SIDE : GPU_SIDE);
   // scaled to fit maxSide, but never so far that the short side drops under MIN_SIDE (a long strip;
@@ -59,11 +64,11 @@ export async function aotInpaint(cv, model, rgb, mask, opts = {}) {
   // padded to multiples of 8, and to MIN_SIDE: the model's widest dilated convolution pads its
   // quarter-size feature map by 16 (reflecting), which needs that map to be more than 16 across
   const pw = fixed || Math.max(MIN_SIDE, Math.ceil(w / 8) * 8), ph = fixed || Math.max(MIN_SIDE, Math.ceil(h / 8) * 8);
-  const small = new cv.Mat(), smask = new cv.Mat();
+  const small = own(new cv.Mat()), smask = own(new cv.Mat());
   if (k < 1) { cv.resize(rgb, small, new cv.Size(w, h), 0, 0, cv.INTER_AREA); cv.resize(mask, smask, new cv.Size(w, h), 0, 0, cv.INTER_LINEAR); }
   else { rgb.copyTo(small); mask.copyTo(smask); }
   // pad to multiples of 8 by reflection (the pad is known pixels: mask 0 there)
-  const img = new cv.Mat(), m = new cv.Mat();
+  const img = own(new cv.Mat()), m = own(new cv.Mat());
   cv.copyMakeBorder(small, img, 0, ph - h, 0, pw - w, cv.BORDER_REFLECT_101);
   cv.copyMakeBorder(smask, m, 0, ph - h, 0, pw - w, cv.BORDER_CONSTANT, new cv.Scalar(0));
   small.delete(); smask.delete();
@@ -83,7 +88,7 @@ export async function aotInpaint(cv, model, rgb, mask, opts = {}) {
   // A grey page stays grey: the model can tint its fill (a pink cast on screentone was seen),
   // so where the area around the lettering has no colour, the fill keeps only its brightness.
   const grey = isGrey(rgb, mask);
-  const filled = new cv.Mat(h, w, cv.CV_8UC3), fd = filled.data;
+  const filled = own(new cv.Mat(h, w, cv.CV_8UC3)), fd = filled.data;
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     const i = y * pw + x, j = (y * w + x) * 3;
     const r = lama ? o[i] * 255 : (o[i] + 1) * 127.5, g = lama ? o[n + i] * 255 : (o[n + i] + 1) * 127.5, b = lama ? o[2 * n + i] * 255 : (o[2 * n + i] + 1) * 127.5;
@@ -91,12 +96,12 @@ export async function aotInpaint(cv, model, rgb, mask, opts = {}) {
     else { fd[j] = clamp8(r); fd[j + 1] = clamp8(g); fd[j + 2] = clamp8(b); }
   }
   let full = filled;
-  if (k < 1) { full = new cv.Mat(); cv.resize(filled, full, new cv.Size(W, H), 0, 0, cv.INTER_CUBIC); filled.delete(); }
+  if (k < 1) { full = own(new cv.Mat()); cv.resize(filled, full, new cv.Size(W, H), 0, 0, cv.INTER_CUBIC); filled.delete(); }
   // only the masked pixels take the fill
-  const res = rgb.clone();
+  const res = own(rgb.clone());
   full.copyTo(res, mask);
   full.delete();
-  return res;
+  return own.keep(res);
 }
 
 /** The largest side the model inpaints at: on the GPU, and on the CPU (a time budget, see ADR 0013). */

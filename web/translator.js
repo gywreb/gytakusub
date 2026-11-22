@@ -145,11 +145,13 @@ async function translateRows(img, settings, ctx, part) {
   lap("analyze");
   // While Claude answers, the engine fills the page's textured areas ahead (the finish then finds
   // them done). The page at its own size goes with it when the analysis worked on a smaller copy.
-  const natural = prep.work.W < prep.width ? await rows() : null;
-  rpc({ type: "prefill", jobId: prep.jobId, natural }, natural ? [natural] : []).catch(() => {});
+  // (anything failing before the finish drops the page, so the engine frees its analysis)
   let results;
-  try { results = await Promise.all(prep.slices.map((s) => callAndRecord(settings, s, ctx))); }
-  catch (e) { rpc({ type: "drop", jobId: prep.jobId }).catch(() => {}); throw e; }
+  try {
+    const natural = prep.work.W < prep.width ? await rows() : null;
+    rpc({ type: "prefill", jobId: prep.jobId, natural }, natural ? [natural] : []).catch(() => {});
+    results = await Promise.all(prep.slices.map((s) => callAndRecord(settings, s, ctx)));
+  } catch (e) { rpc({ type: "drop", jobId: prep.jobId }).catch(() => {}); throw e; }
   lap("model");
   recordClaudePage(results);
   const terms = [];

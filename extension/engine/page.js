@@ -11,6 +11,7 @@ import { layout, tells } from "./layout.js";
 import { erase, eraseFullSize, fillTexture, contextMargin, NotLoaded } from "./erase.js";
 import { aotInpaint, GPU_SIDE } from "./inpaint.js";
 import { PAGE } from "./tuning.js";
+import { owning } from "./owner.js";
 
 // How far the mask grows over a lettering's outline, as a share of its letter size (ADR 0013).
 export const OUTLINE = PAGE.outline;
@@ -101,7 +102,8 @@ export async function preparePage(bitmap, settings, opts = {}) {
     for (const sl of slices) sl.analysis.dispose(); // stopped at a checkpoint, or failed: free what was made
     throw e;
   }
-  return { width: W, height: H, work, scale, slices, part: part ? part.index : null };
+  // (cv: the OpenCV the analyses live in, which the prefill and the finish use even after a fresh one started)
+  return { width: W, height: H, work, scale, slices, part: part ? part.index : null, cv };
 }
 
 /**
@@ -115,7 +117,12 @@ export async function preparePage(bitmap, settings, opts = {}) {
  *   `natural`, at the work size), placements and regions in work pixels.
  */
 export async function finishPage(job, results, opts = {}) {
-  const cv = await getCV();
+  try { return await finishSlices(job, results, opts); }
+  finally { releasePage(job); } // (each slice's analysis is freed as it is done; on a failure, the rest)
+}
+
+async function finishSlices(job, results, opts) {
+  const cv = job.cv || await getCV();
   const { width, height, work, scale } = job;
   const full = !!opts.natural && scale < 0.999;
   // the learned eraser's models (null without them: rules and Telea, as before 2.12)
@@ -153,22 +160,22 @@ export async function finishPage(job, results, opts = {}) {
     for (const p of pl) placements.push({ ...p, rect: { x: p.rect.x + s.ox, y: p.rect.y + s.oy, w: p.rect.w, h: p.rect.h } });
     for (const r of an.regions) regions.push({ id: r.id, kind: r.kind, letter: r.letter, box: { x: r.box.x + s.ox, y: r.box.y + s.oy, w: r.box.w, h: r.box.h } });
     let clean = { image: s.imageData, rois: [] };
-    if (regionIds.size) {
-      clean = erase(cv, s.imageData, an, regionIds, { keepMask: true, outline: OUTLINE });
-      // textured areas at the size the page was analysed at (when that is its own size, the
-      // patches come from here; else the full-size pass below does them)
-      if (!full) clean.image = await fillTexture(cv, inpainter, clean.image, clean, { cache, side });
-    }
-    ctx.putImageData(clean.image, s.ox, s.oy - top);
-    if (full && clean.mask) {
-      for (const r of clean.rois) { const p = await fullSizePatch(cv, opts.natural, s, scale, clean.mask, r, inpainter, clean.surface, cache, side); if (p) patches.push(p); }
-    } else {
-      for (const r of clean.rois) rois.push({ x: r.x + s.ox, y: r.y + s.oy, w: r.w, h: r.h });
-    }
-    for (const r of clean.rois) { const kind = r.fill === "texture" ? r.filled || "telea" : r.fill || "telea"; fill[kind]++; fill.ms += r.fillMs || 0; if (r.fillHit) fill.ready++; }
-    runs.push(...fillRuns(clean.rois, !!cache));
-    clean.mask?.delete(); clean.surface?.delete();
-    an.dispose();
+    try {
+      if (regionIds.size) {
+        clean = erase(cv, s.imageData, an, regionIds, { keepMask: true, outline: OUTLINE });
+        // textured areas at the size the page was analysed at (when that is its own size, the
+        // patches come from here; else the full-size pass below does them)
+        if (!full) clean.image = await fillTexture(cv, inpainter, clean.image, clean, { cache, side });
+      }
+      ctx.putImageData(clean.image, s.ox, s.oy - top);
+      if (full && clean.mask) {
+        for (const r of clean.rois) { const p = await fullSizePatch(cv, opts.natural, s, scale, clean.mask, r, inpainter, clean.surface, cache, side); if (p) patches.push(p); }
+      } else {
+        for (const r of clean.rois) rois.push({ x: r.x + s.ox, y: r.y + s.oy, w: r.w, h: r.h });
+      }
+      for (const r of clean.rois) { const kind = r.fill === "texture" ? r.filled || "telea" : r.fill || "telea"; fill[kind]++; fill.ms += r.fillMs || 0; if (r.fillHit) fill.ready++; }
+      runs.push(...fillRuns(clean.rois, !!cache));
+    } finally { clean.mask?.delete(); clean.surface?.delete(); an.dispose(); }
   }
   const letter = job.slices.length ? job.slices[0].analysis.letter : 0;
   const first = job.slices[0]?.analysis;
@@ -196,6 +203,18 @@ export async function finishPage(job, results, opts = {}) {
   if (inpainterTimes.load != null) fill.model = { ...inpainterTimes }; // its load and first run, once per worker
   job.fills = null;
   return { items, placements, regions, work, letter, canvas, canvasTop: top, patches, fullSize: full, engine, segmentMs, detectMs, backend, fill, look, dropped };
+}
+
+/**
+ * Frees a page's OpenCV memory: its slices' analyses. finishPage() frees them as it goes, however
+ * it ends; a page dropped before its finish (the reader moved on, Claude's answer failed) is freed
+ * here. Safe to call more than once, and on a job that was finished; never while a prefillPage()
+ * of the job is still running (stop it and let it return first, as before finishPage).
+ * @param {Job} job from preparePage
+ */
+export function releasePage(job) {
+  for (const s of job?.slices || []) s.analysis?.dispose();
+  if (job) job.fills = null;
 }
 
 /**
@@ -246,17 +265,18 @@ export function warmInpainter() {
         // CPU (test machines), 128 px, which makes the same 33 programs.
         // LaMa (on a graphics card only) takes one size, 512 px, whatever the area.
         const cv = await getCV(), side = model.ep === "wasm" ? 72 : gpuIsSoftware() ? 128 : GPU_SIDE;
-        const rgb = new cv.Mat(side, side, cv.CV_8UC3, new cv.Scalar(200, 200, 200)), hole = cv.Mat.zeros(side, side, cv.CV_8UC1);
-        cv.rectangle(hole, new cv.Point(side / 3, side / 3), new cv.Point((2 * side) / 3, (2 * side) / 3), new cv.Scalar(255), -1);
-        let t1 = performance.now();
-        (await aotInpaint(cv, model, rgb, hole)).delete();
-        inpainterTimes.warm = Math.round(performance.now() - t1);
-        t1 = performance.now();
-        (await aotInpaint(cv, model, rgb, hole)).delete();
-        inpainterTimes.again = Math.round(performance.now() - t1);
+        await owning(async (own) => {
+          const rgb = own(new cv.Mat(side, side, cv.CV_8UC3, new cv.Scalar(200, 200, 200))), hole = own(cv.Mat.zeros(side, side, cv.CV_8UC1));
+          cv.rectangle(hole, new cv.Point(side / 3, side / 3), new cv.Point((2 * side) / 3, (2 * side) / 3), new cv.Scalar(255), -1);
+          let t1 = performance.now();
+          own(await aotInpaint(cv, model, rgb, hole)).delete();
+          inpainterTimes.warm = Math.round(performance.now() - t1);
+          t1 = performance.now();
+          own(await aotInpaint(cv, model, rgb, hole)).delete();
+          inpainterTimes.again = Math.round(performance.now() - t1);
+        });
         inpainterTimes.side = model.side || side; inpainterTimes.kind = model.kind;
         if (model.kind === "lama") lamaEvent("ok");
-        rgb.delete(); hole.delete();
       } catch (e) { console.warn("Gytakusub: inpainter warm-up failed", e); }
       return model;
     })().then((model) => { warmed = { model }; return model; });
@@ -296,7 +316,7 @@ const fillRuns = (rois, misses = false) => rois.filter((r) => r.fill === "textur
  */
 export async function prefillPage(job, opts = {}) {
   const t0 = performance.now();
-  const cv = await getCV();
+  const cv = job.cv || await getCV();
   const full = !!opts.natural && job.scale < 0.999;
   const cache = job.fills || (job.fills = new Map());
   const inpainter = () => { if (!warmed) throw new NotLoaded(); return warmed.model; };
@@ -388,4 +408,5 @@ export function blobToBase64(blob) {
  * @property {number} scale work / natural
  * @property {Array<object>} slices
  * @property {number|null} part the slice this job is, for a part of a tall image (else null: all of them)
+ * @property {object} cv the OpenCV its analyses were made in
  */
