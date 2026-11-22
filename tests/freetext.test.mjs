@@ -253,4 +253,28 @@ await test("a long vowel mark run past the detector's box in a bubble is erased 
   assert.ok(dark < 40, `${dark} dark pixels of the mark's lower part left`);
 });
 
+await test("lettering close to a white bubble's outline is erased without the outline (3.0)", async () => {
+  // the eraser grows over lettering outlines by a share of the letter size; the bubble model's
+  // interior takes in the bubble's own outline, and the growth took the outline beside the column
+  const ring = (x, y) => Math.abs(Math.hypot((x - 450) / 70, (y - 300) / 200) - 1) < 0.02;
+  const img = page((x) => {
+    x.fillStyle = "#fff"; x.strokeStyle = "#000"; x.lineWidth = 5;
+    x.beginPath(); x.ellipse(450, 300, 70, 200, 0, 0, 2 * Math.PI); x.fill(); x.stroke();
+    x.fillStyle = "#000"; x.font = "34px 'Noto Sans CJK JP', sans-serif";
+    ["そ", "う", "だ", "よ"].forEach((ch, i) => x.fillText(ch, 472, 225 + i * 38)); // its right side ~8 px off the outline
+  });
+  const outline = (im) => { let n = 0; for (let y = 190; y < 370; y++) for (let x = 480; x < 530; x++) if (ring(x, y) && im.data[(y * 900 + x) * 4] < 100) n++; return n; };
+  const before = outline(img);
+  const an = await analyzePage(img);
+  const bub = an.regions.find((r) => r.kind === "bubble");
+  assert.ok(bub, "the bubble is found");
+  const { regionIds } = layout(an, [{ tag: bub.id, box: [468 / 900, 190 / 600, 40 / 900, 160 / 600], text: "That's it!", size: "normal", kind: "bubble" }]);
+  const out = erase(cv, img, an, regionIds, { outline: 0.3 }).image;
+  an.dispose();
+  let letters = 0; for (let y = 195; y < 365; y++) for (let x = 472; x < 506; x++) if (!ring(x, y) && out.data[(y * 900 + x) * 4] < 100) letters++;
+  assert.ok(before > 100, `the outline is there (${before} px)`);
+  assert.ok(outline(out) > 0.9 * before, `${outline(out)} of ${before} outline pixels left`);
+  assert.ok(letters < 40, `${letters} lettering pixels left`);
+});
+
 console.log(`\nFREETEXT TESTS PASSED (${passed})`);
