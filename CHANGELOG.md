@@ -53,6 +53,8 @@ On generated pages the erasing is close to 2.15.0 but not the same, because the 
 - Real lines set under 0.7 of their size no worse than 10.3%: not met (11.1%). The margin off the outline costs that (above).
 - Done: the engine's contract checked in CI, its numbers in one file and per stage, letter sizes across gaps (Korean), the eraser's growth following the outline, text sized to its room, the same page on the CPU and a graphics card, only chapter pages translated.
 
+You chose to ship 3.0 with the size goals restated (23 Nov): they count with the margin kept, since text that touches its outline isn't what you want. The two left over move to 3.1: lines that follow a slanted bubble (most of the new shapes' 1.4%), and size won back without giving up the margin.
+
 ### Development
 - **The real-page bench says which lines sit over the outline or the art** (`overArt`, and `perLine` to compare two builds line by line). It has no bubble outlines, so before 2.15 a line run over the outline into the art counted as full size.
 - **Lines a bubble could hold at 0.7, keeping clear of the outline** (`smallAvoidableClear`), apart from those that fit only by touching it. `--why` refits each such line with one cause removed at a time (the true letter size, no margin, the true bubble, its centre line) and records each touching line's fit.
