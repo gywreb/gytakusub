@@ -17,7 +17,7 @@ export function sizeLimits(GyText, placements, sizes, which, W, H) {
   const fit = (ps) => { const s = []; GyText.draw(ctx, ps, { sizes: s, pageTexts }); return s; };
   const pick = which.map((k) => placements[k]);
   const wider = fit(pick.map((p) => ({ ...p, rect: { ...p.rect, x: p.rect.x - p.rect.w / 8, w: p.rect.w * 1.25 }, shape: p.shape && { ...p.shape, half: p.shape.half.map((h) => h * 1.25) } })));
-  const taller = fit(pick.map((p) => ({ ...p, rect: { ...p.rect, y: p.rect.y - p.rect.h / 8, h: p.rect.h * 1.25 }, shape: p.shape && { ...p.shape, dy: p.shape.dy * 1.25, step: p.shape.step * 1.25 } })));
+  const taller = fit(pick.map((p) => ({ ...p, rect: { ...p.rect, y: p.rect.y - p.rect.h / 8, h: p.rect.h * 1.25 }, shape: p.shape && { ...p.shape, dy: p.shape.dy * 1.25, step: p.shape.step * 1.25, top: p.rect.y - p.rect.h / 8 + p.shape.dy * 1.25 } })));
   which.forEach((k, j) => {
     const gw = wider[j] / sizes[k], gh = taller[j] / sizes[k];
     out.set(k, gw >= 1.05 && gh >= 1.05 ? "both" : gw >= 1.05 ? "width" : gh >= 1.05 ? "height" : "neither");

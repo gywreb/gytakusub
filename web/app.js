@@ -303,7 +303,8 @@ async function processPage(page) {
 function drawPage(page) {
   const screenWidth = Math.round(page.media.clientWidth * (window.devicePixelRatio || 1));
   page.drawnFor = screenWidth;
-  const { original, translated, drawn, sizes } = renderPage(page.img, page.result, settings, page.look, { minWidth: screenWidth });
+  const { original, translated, drawn, sizes, fits } = renderPage(page.img, page.result, settings, page.look, { minWidth: screenWidth });
+  page.fits = fits; // (each line's text outside its room, for the debug report)
   original.className = "original"; translated.className = "translated";
   // the pictures say nothing to a screen reader; the text layer below says it
   original.setAttribute("aria-hidden", "true"); translated.setAttribute("aria-hidden", "true");

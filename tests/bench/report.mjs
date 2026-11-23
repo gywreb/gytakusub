@@ -41,7 +41,7 @@ const readme = [
 
 const realRow = (name, rs) => `| ${name} | ${n(rs.length)} | ${n(sum(rs, "told"))} | ${pct(sum(rs, "found"), sum(rs, "told"))} | ${pct(sum(rs, "left"), sum(rs, "seen"))} | ${pct(sum(rs, "smallL"), sum(rs, "measured"))} | ${(sum(rs, "damage") / rs.length / 10).toFixed(2)}% | ${pct(sum(rs, "sfxChanged"), sum(rs, "sfxArea"), 2)} |`;
 const SCRIPTS = { ja: "Japanese", zh: "Chinese", ko: "Korean", en: "English", es: "Spanish", pt: "Portuguese", vi: "Vietnamese" };
-const genRow = (name, rs) => `| ${name} | ${n(rs.length)} | ${n(sum(rs, "lines"))} | ${pct(sum(rs, "found"), sum(rs, "lines"))} | ${pct(sum(rs, "stays"), sum(rs, "lines"))} | ${pct(sum(rs, "small"), sum(rs, "lines"))} | ${pct(sum(rs, "letterFar"), sum(rs, "lines"))} | ${pct(sum(rs, "overflow"), sum(rs, "bubbleLines"))} | ${(sum(rs, "damage") / rs.length / 10).toFixed(3)}% |`;
+const genRow = (name, rs) => `| ${name} | ${n(rs.length)} | ${n(sum(rs, "lines"))} | ${pct(sum(rs, "found"), sum(rs, "lines"))} | ${pct(sum(rs, "stays"), sum(rs, "lines"))} | ${pct(sum(rs, "small"), sum(rs, "lines"))} | ${pct(sum(rs, "letterFar"), sum(rs, "lines"))} | ${pct(sum(rs, "overflow"), sum(rs, "bubbleLines"))} | ${pct(sum(rs, "touch"), sum(rs, "bubbleLines"))} | ${(sum(rs, "damage") / rs.length / 10).toFixed(3)}% |`;
 const quality = [
   "### Real pages (Manga109-s)",
   "",
@@ -52,8 +52,8 @@ const quality = [
   "",
   "### Generated pages",
   "",
-  "| Script | Pages | Lines | Found before Claude answers | Lettering left untouched | Set under 0.7 of its size | Size measured outside 0.6–1.6× | Text past its bubble | Art damage |",
-  "|---|---|---|---|---|---|---|---|---|",
+  "| Script | Pages | Lines | Found before Claude answers | Lettering left untouched | Set under 0.7 of its size | Size measured outside 0.6–1.6× | Text past its bubble | Touching its outline | Art damage |",
+  "|---|---|---|---|---|---|---|---|---|---|",
   genRow("all", generated),
   ...Object.entries(SCRIPTS).map(([k, name]) => genRow(name, generated.filter((r) => r.script === k))),
   "",

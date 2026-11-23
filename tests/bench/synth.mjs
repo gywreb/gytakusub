@@ -40,6 +40,11 @@ const W = 1000, H = 1420;
  * text printed on an object in the art (a sheet of paper, a label, a book cover), tilted, sometimes
  * white on a dark emblem for part of the line; and free text set at a slant. Drawn from a random
  * stream of their own, so a seed's other blocks stay as they were without it.
+ * opts.readers: also bubble shapes the owner's chapters showed the bench lacked (a debug report,
+ * 2.15), where translations ran out of their bubble: two caption boxes, one laid over the corner of
+ * the other; a bubble of two lobes, one speaker each, set diagonally; a bubble with straight slanted
+ * sides, its lines set along the slant; a narrow bubble with a line broken into short rows. Also
+ * from a stream of their own.
  */
 export function makePage(seed, opts = {}) {
   const r = rng(seed * 7919 + 17);
@@ -116,6 +121,7 @@ export function makePage(seed, opts = {}) {
   }
   const ink2 = createCanvas(W, H), k2 = ink2.getContext("2d"); // printed lettering (light glyphs count too)
   if (opts.printed) printed(rng(seed * 104729 + 3), { t, k, k2, panels, occupied, blocks, script, vertical, colour });
+  if (opts.readers) readers(rng(seed * 7727 + 5), { t, k, panels, occupied, bubbles, blocks, script, vertical, colour });
   // a sound effect over the art (stays as drawn), on a third of the pages
   const sfx = [];
   if (r() < 0.33 && panels.length) {
@@ -188,6 +194,139 @@ function printed(r, { t, k, k2, panels, occupied, blocks, script, vertical, colo
       blocks.push({ id: blocks.length, kind: "free", script, vertical: false, letter: l.letter, size: l.size, box: rotBox(cx, cy, l.w, l.h, a), text: l.text, bubble: null, two: false, shape: "slanted", tilt: +a.toFixed(2) });
   };
   for (const p of panels) { if (r() < 0.5) printOne(p); if (r() < 0.35) slantOne(p); }
+}
+
+// ---------- bubble shapes from readers' chapters (opts.readers) ----------
+function readers(r, { t, k, panels, occupied, bubbles, blocks, script, vertical, colour }) {
+  const spotFor = (p, w, h) => {
+    for (let tries = 0; tries < 25; tries++) {
+      const cand = { x: p.x + r.range(5, Math.max(6, p.w - w - 5)), y: p.y + r.range(5, Math.max(6, p.h - h - 5)), w, h };
+      if (cand.x + w < p.x + p.w - 4 && cand.y + h < p.y + p.h - 4 && !occupied.some((o) => overlaps(o, cand, 8))) return cand;
+    }
+    return null;
+  };
+  const fill = () => (colour && r() < 0.3 ? r.pick(["#fff7d6", "#e8f4ff"]) : "#fff");
+  const ink = () => (colour && r() < 0.35 ? r.pick(["#1d3fa6", "#b3161b", "#1b6b2a"]) : "#111");
+  const sizeOf = () => Math.round(vertical ? r.range(16, 30) : r.range(12, 24) * (script === "ko" ? 1.1 : 1));
+  // a bubble of the page: its inside and outline from a drawing function, as maskOf does for a path
+  const bubbleOf = (shape, box, lw, kind, inside, outline) => {
+    const b = { box, lw, shape, kind, id: bubbles.length + 1, inside: maskFrom(inside), outline: maskFrom(outline) };
+    bubbles.push(b); return b;
+  };
+  const block = (l, box, bubble, kind, shape, two) => blocks.push({ id: blocks.length, kind, script, vertical: l.vertical, letter: l.letter, size: l.size, box, text: l.text, bubble: bubble.id, two, shape });
+  const rectPath = (c, b) => { c.beginPath(); c.rect(b.x, b.y, b.w, b.h); };
+  const ellPath = (c, e) => { c.beginPath(); c.ellipse(e.cx, e.cy, e.rx, e.ry, 0, 0, Math.PI * 2); };
+
+  // Two caption boxes, the second laid over the lower corner of the first (its lettering clear of it)
+  const captions = (p) => {
+    const size = sizeOf(), m = size * 0.7, la = lettering(r, script, vertical, size, "narration"), lb = lettering(r, script, vertical, size, "narration");
+    const right = r() < 0.5, A = { w: la.w + 2 * m, h: la.h + 2 * m + size * r.range(1.2, 2.2) }, B = { w: lb.w + 2 * m, h: lb.h + 2 * m };
+    const dx = A.w * r.range(0.3, 0.6), dy = la.h + 2 * m + size * r.range(0.1, 0.5); // B's corner over A's empty lower part
+    const W2 = Math.max(A.w, dx + B.w), H2 = Math.max(A.h, dy + B.h), spot = spotFor(p, W2, H2);
+    if (!spot) return;
+    occupied.push(spot);
+    A.x = right ? spot.x : spot.x + W2 - A.w; A.y = spot.y;
+    B.x = right ? A.x + dx : A.x + A.w - dx - B.w; B.y = A.y + dy;
+    const lw = r.range(1.5, 3), fa = fill(), fb = fill();
+    t.fillStyle = fa; t.fillRect(A.x, A.y, A.w, A.h); t.lineWidth = lw; t.strokeStyle = "#111"; t.strokeRect(A.x, A.y, A.w, A.h);
+    t.fillStyle = fb; t.fillRect(B.x, B.y, B.w, B.h); t.strokeRect(B.x, B.y, B.w, B.h);
+    const ba = bubbleOf("captions", A, lw, "narration",
+      (c) => { rectPath(c, A); c.fill(); c.lineWidth = lw + 1; c.globalCompositeOperation = "destination-out"; c.stroke(); rectPath(c, B); c.fill(); c.stroke(); },
+      (c) => { rectPath(c, A); c.lineWidth = lw; c.stroke(); c.globalCompositeOperation = "destination-out"; rectPath(c, B); c.fill(); });
+    const bb = bubbleOf("captions", B, lw, "narration",
+      (c) => { rectPath(c, B); c.fill(); c.lineWidth = lw + 1; c.globalCompositeOperation = "destination-out"; c.stroke(); },
+      (c) => { rectPath(c, B); c.lineWidth = lw; c.stroke(); });
+    const col = ink();
+    block(la, drawLettering(k, la, A.x + m, A.y + m, col, false), ba, "narration", "captions", false);
+    block(lb, drawLettering(k, lb, B.x + m, B.y + m, col, false), bb, "narration", "captions", false);
+  };
+
+  // One bubble of two lobes set diagonally, one speaker in each; one outline around both
+  const lobes = (p) => {
+    const size = sizeOf(), la = lettering(r, script, vertical, size, "bubble"), lb = lettering(r, script, vertical, size, "bubble");
+    const ea = { rx: la.w * 0.75 + size * 0.6, ry: la.h * 0.75 + size * 0.6 }, eb = { rx: lb.w * 0.75 + size * 0.6, ry: lb.h * 0.75 + size * 0.6 };
+    const up = r() < 0.5; // lobe a up and right of lobe b, or up and left
+    const ox = (ea.rx + eb.rx) * r.range(0.45, 0.65), oy = (ea.ry + eb.ry) * r.range(0.5, 0.7);
+    const W2 = ox + ea.rx + eb.rx, H2 = oy + ea.ry + eb.ry, spot = spotFor(p, W2, H2);
+    if (!spot) return;
+    occupied.push(spot);
+    ea.cy = spot.y + ea.ry; eb.cy = ea.cy + oy;
+    if (up) { eb.cx = spot.x + eb.rx; ea.cx = eb.cx + ox; } else { ea.cx = spot.x + ea.rx; eb.cx = ea.cx + ox; }
+    const lw = r.range(1.5, 3.5), f = fill();
+    // both outlines, then both insides filled again: one continuous outline around the two
+    for (const e of [ea, eb]) { ellPath(t, e); t.fillStyle = f; t.fill(); t.lineWidth = lw; t.strokeStyle = "#111"; t.stroke(); }
+    for (const e of [ea, eb]) { ellPath(t, { ...e, rx: e.rx - lw / 2, ry: e.ry - lw / 2 }); t.fillStyle = f; t.fill(); }
+    const box = { x: Math.min(ea.cx - ea.rx, eb.cx - eb.rx), y: ea.cy - ea.ry, w: 0, h: 0 };
+    box.w = Math.max(ea.cx + ea.rx, eb.cx + eb.rx) - box.x; box.h = eb.cy + eb.ry - box.y;
+    const b = bubbleOf("lobes", box, lw, "bubble",
+      (c) => { for (const e of [ea, eb]) { ellPath(c, { ...e, rx: e.rx - (lw + 1) / 2, ry: e.ry - (lw + 1) / 2 }); c.fill(); } },
+      (c) => { for (const e of [ea, eb]) { ellPath(c, e); c.lineWidth = lw; c.stroke(); } c.globalCompositeOperation = "destination-out"; for (const e of [ea, eb]) { ellPath(c, { ...e, rx: e.rx - lw / 2, ry: e.ry - lw / 2 }); c.fill(); } });
+    const col = ink();
+    block(la, drawLettering(k, la, ea.cx - la.w / 2, ea.cy - la.h / 2, col, false), b, "bubble", "lobes", true);
+    block(lb, drawLettering(k, lb, eb.cx - lb.w / 2, eb.cy - lb.h / 2, col, false), b, "bubble", "lobes", true);
+  };
+
+  // A bubble with straight sides at a slant, its rows set along the slant (each row inside, the
+  // block's box reaching past the sides at two corners)
+  const slanted = (p) => {
+    const size = sizeOf(), l = lettering(r, script, false, size, "bubble");
+    if (l.lines.length < 2) return;
+    const lh = l.lh || size * 1.2, k1 = (r() < 0.5 ? -1 : 1) * r.range(0.25, 0.6); // x shift per px down
+    const m = size * 0.8, shift = k1 * l.h, W2 = l.w + Math.abs(shift) + 2 * m, H2 = l.h + 2 * m, spot = spotFor(p, W2, H2);
+    if (!spot) return;
+    occupied.push(spot);
+    const x0 = spot.x + m + Math.max(0, -shift), y0 = spot.y + m; // the block's top-left, unshifted
+    const at = (y) => k1 * (y - y0); // the slant's shift at a row
+    const pts = [[x0 - m * 0.6 + at(y0 - m), y0 - m], [x0 + l.w + m * 0.6 + at(y0 - m), y0 - m], [x0 + l.w + m * 0.6 + at(y0 + l.h + m), y0 + l.h + m], [x0 - m * 0.6 + at(y0 + l.h + m), y0 + l.h + m]];
+    const lw = r.range(1.5, 3.5), shape = { pts, lw };
+    drawShape(t, shape, fill(), "#111");
+    const xs = pts.map((q) => q[0]), box = { x: Math.min(...xs), y: y0 - m, w: Math.max(...xs) - Math.min(...xs), h: l.h + 2 * m };
+    const b = bubbleOf("slanted", box, lw, "bubble",
+      (c) => { path(c, shape); c.fill(); c.lineWidth = lw + 1; c.globalCompositeOperation = "destination-out"; c.stroke(); },
+      (c) => { path(c, shape); c.lineWidth = lw; c.stroke(); });
+    // each row centred on the slanted centre line
+    k.save(); k.font = l.font; k.fillStyle = ink(); k.textBaseline = "top"; k.textAlign = "center";
+    l.lines.forEach((row, i) => { const y = y0 + i * lh; k.fillText(row, x0 + l.w / 2 + at(y + lh / 2), y); });
+    k.restore();
+    const lx = [x0 + at(y0), x0 + at(y0 + l.h)];
+    block(l, { x: Math.min(...lx), y: y0, w: l.w + Math.abs(shift), h: l.h }, b, "bubble", "slanted", false);
+  };
+
+  // A narrow bubble: the line broken into short rows (a word or two), as letterers do in a tall shape
+  const narrow = (p) => {
+    const size = sizeOf();
+    let l = null, e = null;
+    for (let tries = 0; tries < 6 && !e; tries++) {
+      l = lettering(r, script, vertical, size, "bubble");
+      if (!l.vertical) { // the same words, one a row
+        const rows = l.text.split(" ");
+        meas.font = l.font; l.lines = rows; l.w = Math.max(...rows.map((q) => meas.measureText(q).width)); l.h = rows.length * (l.lh || size * 1.2);
+      }
+      const cand = { rx: l.w / 2 + size * 0.7, ry: l.h / 2 + size * 1.1 };
+      if (cand.ry >= 1.5 * cand.rx) e = cand; // narrow: half again as tall as wide, or more
+    }
+    const spot = e && spotFor(p, 2 * e.rx, 2 * e.ry);
+    if (!spot) return;
+    occupied.push(spot);
+    e.cx = spot.x + e.rx; e.cy = spot.y + e.ry;
+    const lw = r.range(1.5, 3.5), f = fill();
+    ellPath(t, e); t.fillStyle = f; t.fill(); t.lineWidth = lw; t.strokeStyle = "#111"; t.stroke();
+    const b = bubbleOf("narrow", { x: spot.x, y: spot.y, w: 2 * e.rx, h: 2 * e.ry }, lw, "bubble",
+      (c) => { ellPath(c, e); c.fill(); c.lineWidth = lw + 1; c.globalCompositeOperation = "destination-out"; c.stroke(); },
+      (c) => { ellPath(c, e); c.lineWidth = lw; c.stroke(); });
+    block(l, drawLettering(k, l, e.cx - l.w / 2, e.cy - l.h / 2, ink(), false), b, "bubble", "narrow", false);
+  };
+
+  const kinds = [captions, lobes, slanted, narrow];
+  for (const p of panels) if (r() < 0.55) r.pick(kinds)(p);
+}
+/** A mask (1 inside) drawn by `draw` in white on a page-sized canvas. */
+function maskFrom(draw) {
+  const m = createCanvas(W, H), c = m.getContext("2d");
+  c.fillStyle = "#fff"; c.strokeStyle = "#fff"; draw(c);
+  const d = c.getImageData(0, 0, W, H).data, out = new Uint8Array(W * H);
+  for (let i = 0; i < W * H; i++) out[i] = d[i * 4 + 3] > 127 ? 1 : 0;
+  return out;
 }
 
 // ---------- art ----------

@@ -14,6 +14,9 @@ import { sniffImageType, readCapped } from "./imagecheck.js";
 import { t, langTag, messagesWithPrefix, localeLoaded } from "./i18n.js";
 import { useLanguageOf } from "./locale.js";
 import { uiLocaleFor, languageForLocale, letteringFor, LANGUAGES } from "./languages.js";
+import { devReloadSoon } from "./devreload.js";
+
+devReloadSoon(); // loaded unpacked: new code in the folder? (devreload.js; pages asking check again)
 
 // Claude usage log (usage.js) in chrome.storage.local, read by the popup and Options. This worker is
 // its only writer; a page's slices answer in parallel, so the writes queue up instead of racing.
@@ -256,6 +259,7 @@ function updateJobs(tabId, { page = "", update = [], cancel = [] } = {}) {
 // cached, for when the reader comes back), but no longer count as on screen or near it.
 chrome.runtime.onConnect.addListener((port) => {
   if (port.sender?.id !== chrome.runtime.id || !port.name.startsWith("gyt-page:")) return;
+  devReloadSoon();
   const prefix = `${port.sender.tab?.id ?? -1}:${port.name.slice("gyt-page:".length)}:`;
   port.onMessage.addListener(() => {}); // the page's word while you read: receiving it keeps this worker (and its models) alive
   port.onDisconnect.addListener(() => {
@@ -529,6 +533,7 @@ const coded = (message, code) => Object.assign(new Error(message), { code });
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (sender.id !== chrome.runtime.id) return false; // only this extension's own pages and content scripts
+  if (sender.tab) devReloadSoon(); // a page asking (every page asks for its settings first)
   const reply = (p) => p.then((r) => sendResponse(r)).catch((e) => sendResponse({ error: e.message || String(e) }));
   switch (msg?.type) {
     case "TRANSLATE": handleTranslate(msg, sender).then(sendResponse, (e) => sendResponse(e instanceof Cancelled || e?.name === "AbortError" ? { cancelled: true } : { error: e.message || String(e), code: e.code })); return true;

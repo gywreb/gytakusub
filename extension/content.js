@@ -190,6 +190,9 @@
   // ---------- image discovery ----------
 
   const srcOf = (img) => img.currentSrc || img.src || "";
+  // an image's entry while it still shows the picture translated: a reader reuses its <img> for the
+  // next page, and the entry then describes the page before
+  const liveEntry = (img) => { const e = img && entries.get(img); return e && e.src === srcOf(img) ? e : null; };
 
   // A page is something you read, so what counts is the size it's shown at. A large file shown
   // small is a site's logo, a cover thumbnail or a reaction emoji: these were translated (paid
@@ -319,7 +322,7 @@
     hideTimer = setTimeout(() => { bar.classList.remove("visible"); hoverImg = null; }, 350);
   }
   function refreshBar() {
-    const e = hoverImg && entries.get(hoverImg)?.src === srcOf(hoverImg) ? entries.get(hoverImg) : null;
+    const e = liveEntry(hoverImg);
     // what the button does applies to what's on screen: the page, or a tall image's parts there
     const ss = e ? shownUnits(hoverImg).map((k) => e.units.get(k)?.status) : [];
     const st = ss.includes("working") ? "working" : ss.includes("queued") ? "queued" : ss.length && ss.every((x) => x === "done") ? "done" : null;
@@ -346,7 +349,7 @@
   // (a tall image: its parts on screen; Redo when they're all translated)
   btnTranslate.addEventListener("click", (ev) => {
     if (!ev.isTrusted || !hoverImg) return;
-    const e = entries.get(hoverImg)?.src === srcOf(hoverImg) ? entries.get(hoverImg) : null;
+    const e = liveEntry(hoverImg);
     const keys = shownUnits(hoverImg), redo = keys.every((k) => e?.units.get(k)?.status === "done");
     for (const k of keys) if (redo || e?.units.get(k)?.status !== "done") enqueue(hoverImg, redo, false, k);
   });
@@ -373,7 +376,9 @@
         // where the overlay sits on screen and where the image's picture is (CSS px): they must match
         rect: e.canvas ? ["left", "top", "width", "height"].map((k) => +parseFloat(e.canvas.style[k] || "0").toFixed(2)) : null,
         image: (() => { const r = contentRect(img, e.objectFit); return [r.left, r.top, r.width, r.height].map((v) => +v.toFixed(2)); })(),
-        lineSizes: (e.sizes || []).map((v) => +(v * img.getBoundingClientRect().width / res.work.W).toFixed(1)) },
+        lineSizes: (e.sizes || []).map((v) => +(v * img.getBoundingClientRect().width / res.work.W).toFixed(1)),
+        // each line's share of its text outside the room the layout gave it (0: all inside; 2.15)
+        outside: (e.fits || []).map((f) => f?.outside ?? null) },
       settings: { model: settings.model, targetLang: settings.targetLang, fontFamily: settings.fontFamily, uppercase: settings.uppercase, useContext: settings.useContext },
       // how the page was lettered: the font chosen for its translations, and the language's rules
       lettering: { ...settings.lettering, hyphenation: !!hyphenation.fn, family: GyText.lettering(res.placements.map((p) => p.text), lettering(res)).family },
@@ -383,7 +388,8 @@
   // Export: one .zip with, per translated page, the original image, the debug
   // render (clean page + boxes + text) and the report JSON — nothing to capture by hand.
   async function exportReport(imgs) {
-    const done = imgs.filter((i) => entries.get(i)?.result);
+    // (only pictures still shown: a reused <img> exported the page before under this page's address, 2.15)
+    const done = imgs.filter((i) => liveEntry(i)?.result);
     if (!done.length) { toast(T("content_nothing_translated")); return { ok: false }; }
     toast(TN("content_preparing_report", done.length), 20000);
     const files = [];
@@ -790,9 +796,10 @@
     if (settings.debugOverlay) drawDebug(ctx, res);
     const peek = res.placements[entry.peek];
     // the size each line was drawn at (work pixels), for the readable view
-    const sizes = [];
-    GyText.draw(ctx, peek ? res.placements.filter((p) => p !== peek) : res.placements, { ...lettering(res), sizes });
-    if (!peek) entry.sizes = sizes;
+    const sizes = [], fits = [];
+    // (every line fitted, the one peeked at not drawn: the lines of one bubble share a size)
+    GyText.draw(ctx, res.placements, { ...lettering(res), sizes, fits, skip: peek || null });
+    if (!peek) { entry.sizes = sizes; entry.fits = fits; }
     if (peek) { const r = peekRect(peek, res); ctx.clearRect(r.x, r.y, r.w, r.h); }
     ctx.setTransform(1, 0, 0, 1, 0, 0);
   }

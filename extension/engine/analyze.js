@@ -49,6 +49,34 @@ export function glyphHeights(cv, ink, x, y, w, h) {
  * marks strokes, not blobs) is judged on the band as before, since a face's eyes are glyph-sized
  * by their own height too.
  */
+/**
+ * The height of a row of Hangul syllables (ink mask, the line's box, its letter by rowLetter). A
+ * syllable is two or three jamo stacked in a square: its lower part, a final consonant or a vowel's
+ * stem, is a few thin strokes, in some syllables only, and holds under 30% of the peak row's ink in
+ * most lines. rowLetter's band stopped above it: on generated pages it measured 0.88 of the
+ * syllables' height (median of 94 lines), and 0.67 or less on one line in seven, so Korean was
+ * drawn small. The rows holding ≥10% of the peak span the whole syllable (0.95, none under 0.7).
+ * Hangul has no x-height, so this is the size as it is, with no 1.15× for lowercase. Only
+ * letter-sized marks count: a caption box's side runs down every row beside it and joined the rows
+ * above and below (4 lines of 94 over 1.3× instead of 8). The layout uses it for lines Claude read
+ * as Hangul.
+ */
+export function syllableHeight(cv, ink, x0, y0, x1, y1, letter) {
+  const w = x1 - x0, h = y1 - y0;
+  if (w < 2 || h < 2) return letter;
+  return owning((own) => {
+    const roi = own(ink.roi(new cv.Rect(x0, y0, w, h))), lab = own(new cv.Mat()), st = own(new cv.Mat()), ce = own(new cv.Mat());
+    const n = cv.connectedComponentsWithStats(roi, lab, st, ce, 8, cv.CV_32S), S = st.data32S, L = lab.data32S;
+    const mark = new Uint8Array(n);
+    for (let i = 1; i < n; i++) mark[i] = S[i * 5 + 3] <= ANALYZE.syllableMarkH * letter && S[i * 5 + 2] <= ANALYZE.syllableMarkW * letter ? 1 : 0;
+    const prof = new Int32Array(h); let peak = 0;
+    for (let y = 0; y < h; y++) { let c = 0; for (let x = 0; x < w; x++) if (mark[L[y * w + x]]) c++; prof[y] = c; if (c > peak) peak = c; }
+    if (!peak) return letter;
+    let best = 0, run = 0; for (const v of prof) { run = v && v >= ANALYZE.syllablePeak * peak ? run + 1 : 0; if (run > best) best = run; }
+    return Math.max(ANALYZE.minBandPx, best);
+  });
+}
+
 export function rowLetter(cv, ink, x0, y0, x1, y1) {
   const I = ink.data, W = ink.cols;
   const prof = new Int32Array(y1 - y0); let peak = 0;
@@ -242,11 +270,13 @@ function analyzeLines(cv, img, opts, own, held) {
       g = 0; while (g < tail && y0 > 0 && rowOk(y0 - 1, x0, x1) && !rowBlocked(y0 - 1, x0, x1)) { y0--; g++; }
       g = 0; while (g < tail && y1 < H && rowOk(y1, x0, x1) && !rowBlocked(y1, x0, x1)) { y1++; g++; }
     }
-    let letter, band;
+    let letter, band, syllable;
     if (!ln.vertical) {
       ({ letter, band } = rowLetter(cv, P.ink, x0, y0, x1, y1)); // (cap height from the ink profile, or the glyphs)
+      syllable = syllableHeight(cv, P.ink, x0, y0, x1, y1, letter); // (the same row, if it is Hangul)
     } else {
       ({ letter, band } = columnLetter(cv, P.ink, ln, x0, y0, x1, y1)); // (the column's width, or the glyphs)
+      syllable = letter;
     }
     if (x1 - x0 < ANALYZE.minSnappedPx || y1 - y0 < ANALYZE.minSnappedPx) continue; // snapped down to nothing: no lettering there
     // ink pixels in the box = the lettering; a glyph count estimate for tag sanity and scoring
@@ -259,7 +289,7 @@ function analyzeLines(cv, img, opts, own, held) {
     const letters = Math.max(1, Math.round(ln.vertical ? (y1 - y0) / Math.max(letter, ANALYZE.columnPitch * typicalW) : (x1 - x0) / (ANALYZE.glyphWidth * letter)));
     const box = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
     // `line`: the detector's own box, which the snapping above may have cut to the letters' dark core
-    blocks.push({ box, gbox: { ...box }, line: { x: ln.x, y: ln.y, w: ln.w, h: ln.h }, pieces: ln.pieces || 1, letter, lineLetters: [letter], band: band ?? letter, lineBands: [band ?? letter], glyphCount: letters, components: letters, glyphs: [], inkArea, dark, vertical: ln.vertical, score: ln.score, bubble: null, region: null, lines: 1, lineWidth: box.w });
+    blocks.push({ box, gbox: { ...box }, line: { x: ln.x, y: ln.y, w: ln.w, h: ln.h }, pieces: ln.pieces || 1, letter, lineLetters: [letter], syllable, lineSyllables: [syllable], band: band ?? letter, lineBands: [band ?? letter], glyphCount: letters, components: letters, glyphs: [], inkArea, dark, vertical: ln.vertical, score: ln.score, bubble: null, region: null, lines: 1, lineWidth: box.w });
   }
   // Lines in different bubbles are different speakers: with the segmentation model's
   // masks, a line joins a paragraph only within its own bubble (or outside all of them)
@@ -285,7 +315,7 @@ function analyzeLines(cv, img, opts, own, held) {
 
   // ---- paragraphs ----
   const paragraphs = mergeParagraphs(blocks);
-  for (const p of paragraphs) { if (p.lineLetters) p.letter = median(p.lineLetters); p.band = p.lineBands ? median(p.lineBands) : p.band ?? p.letter; }
+  for (const p of paragraphs) { if (p.lineLetters) p.letter = median(p.lineLetters); p.band = p.lineBands ? median(p.lineBands) : p.band ?? p.letter; p.syllable = p.lineSyllables ? median(p.lineSyllables) : p.syllable ?? p.letter; }
   const pageLetter = letterOf(paragraphs) || Math.max(ANALYZE.minPageLetter, W / ANALYZE.pageLetterDiv);
   // what is lettering, and which lines group, is decided on the lines' bands as before 2.13.1
   // (rowLetter); the sizes drawn and erased use the letters

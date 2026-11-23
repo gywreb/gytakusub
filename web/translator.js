@@ -224,10 +224,10 @@ export function renderPage(img, result, settings, look = {}, opts = {}) {
   tctx.setTransform(W / result.width, 0, 0, H / result.height, 0, 0);
   for (const p of result.patches || []) tctx.drawImage(p.bitmap, p.x, p.y, p.w, p.h);
   tctx.setTransform(W / result.work.W, 0, 0, H / result.work.H, 0, 0);
-  const sizes = []; // the size each line was drawn at (work pixels), for the text layer (app.js)
-  const drawn = GyText.draw(tctx, result.placements, { fontFamily: settings.fontFamily, uppercase: settings.uppercase, lang: look.lang ?? null, hyphenator: look.hyphenator ?? null, sizes });
+  const sizes = [], fits = []; // the size each line was drawn at (work pixels), for the text layer (app.js); how each fitted
+  const drawn = GyText.draw(tctx, result.placements, { fontFamily: settings.fontFamily, uppercase: settings.uppercase, lang: look.lang ?? null, hyphenator: look.hyphenator ?? null, sizes, fits });
   tctx.setTransform(1, 0, 0, 1, 0, 0);
-  return { original, translated, drawn, sizes };
+  return { original, translated, drawn, sizes, fits };
 }
 
 export async function testKey(settings) {

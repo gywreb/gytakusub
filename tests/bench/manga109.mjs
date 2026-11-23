@@ -13,6 +13,7 @@
 //      damage    pixels changed away from every marked line (art, sound effects, outlines)
 //      letter    the engine's letter size against one estimated from the box and its characters
 //      small     the translation drawn under 0.7 of that estimated size (smallL: of the engine's own)
+//      big       drawn over 1/0.7 (1.43) of that estimated size
 //      smallWidth/Height/Both/Neither  what holds each smallL line small (bench/limits.mjs)
 // The books are split by a hash into "look" (failures there may be examined) and "held" (only
 // ever counted), so a change can't pass by fitting what was looked at.
@@ -27,6 +28,7 @@ import { erase, fillTexture } from "../../extension/engine/erase.js";
 import { loadLettering } from "../lettering-setup.mjs";
 import { witness } from "./witness.mjs";
 import { sizeLimits, limitCounts } from "./limits.mjs";
+import { sizeLabel } from "./labels.mjs";
 
 const argv = process.argv.slice(2), opt = (k) => { const i = argv.indexOf(k); return i >= 0 ? argv.splice(i, 2)[1] : null; };
 const pickFile = opt("--pick"), half = opt("--half"), dump = opt("--dump"), limit = Number(opt("--limit") || 0), most = Number(opt("--max") || 0);
@@ -117,11 +119,14 @@ for (const [split, book, file] of picks) {
     const found = lines.map((l) => !!regionAt(l.box));
     // Claude's answer: one item per marked line, its box off by up to 15% of its size (a tenth of
     // them by up to 40%), tagged with the region holding the line's centre when there is one
+    // Claude's size label, as Claude gives it for the line's size against the page's (bench/labels.mjs)
+    const cellOf = (l) => { const n = [...l.text.replace(/\s/g, "")].length; return n ? 0.8 * Math.sqrt((l.box.w * l.box.h) / n) : 0; };
+    const cells = lines.map(cellOf).filter(Boolean).sort((a, b) => a - b), pageCell = cells[cells.length >> 1] || 1, labelRnd = rngOf(id + "#size");
     const items = lines.map((l, i) => {
       const big = r() < 0.1 ? 0.4 : 0.15, j = (v) => (r() * 2 - 1) * big * v;
       const bx = { x: l.box.x + j(l.box.w), y: l.box.y + j(l.box.h), w: l.box.w * (1 + j(1)), h: l.box.h * (1 + j(1)) };
       const reg = regionAt(l.box);
-      return { tag: reg ? reg.id : null, box: [bx.x / W, bx.y / H, bx.w / W, bx.h / H].map((v) => Math.max(0, Math.min(1, v))), text: english(l.text, r), size: "normal", kind: reg?.kind === "bubble" ? "bubble" : "narration", index: i };
+      return { tag: reg ? reg.id : null, box: [bx.x / W, bx.y / H, bx.w / W, bx.h / H].map((v) => Math.max(0, Math.min(1, v))), text: english(l.text, r), size: sizeLabel((cellOf(l) || pageCell) / pageCell, labelRnd), kind: reg?.kind === "bubble" ? "bubble" : "narration", index: i };
     });
     await lookAgain(cv, pixels, an, items, detector);
     const { placements, regionIds } = layout(an, items);
@@ -173,7 +178,7 @@ for (const [split, book, file] of picks) {
       split, page: id, ms, lines: lines.length, told: told.filter(Boolean).length, found: found.filter((f, i) => f && told[i]).length,
       placed: new Set(placements.filter((p) => p.item != null).map((p) => p.item)).size,
       seen, left, damage: +(1000 * changed / (W * H)).toFixed(2), sfxArea, sfxChanged: changedSfx,
-      letterFar: letters.filter((x) => x.letter > 2 * x.est || x.letter < 0.5 * x.est).length, small: letters.filter((x) => x.drawn < 0.7 * x.est).length, smallL: letters.filter((x) => x.drawn < 0.7 * x.letter).length, measured: letters.length, ...limitCounts(limits),
+      letterFar: letters.filter((x) => x.letter > 2 * x.est || x.letter < 0.5 * x.est).length, small: letters.filter((x) => x.drawn < 0.7 * x.est).length, big: letters.filter((x) => x.drawn > x.est / 0.7).length, smallL: letters.filter((x) => x.drawn < 0.7 * x.letter).length, measured: letters.length, ...limitCounts(limits),
       regions: an.regions.length, waste: an.regions.filter((q) => !lines.some((l) => cover(l.box, q.box) > 0 || cover(q.box, l.box) > 0) && !sfx.some((s) => cover(q.box, s.box) > 0.3)).length,
     };
     if (dump && split === "look") {

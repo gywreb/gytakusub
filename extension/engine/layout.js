@@ -99,7 +99,7 @@ export function layout(an, items, opts = {}) {
   const placements = [];
   for (const [id, members] of groups) {
     const r = byId.get(id);
-    const letter = r.letter;
+    const letter = members.some((m) => tells(m.it) && hangul(m.it.source)) ? hangulLetter(r) : r.letter;
     const color = r.dark ? "#fff" : "#000";
     if (r.kind === "bubble") {
       const inside = an.insideOf(id), bbox = r.box;
@@ -132,28 +132,72 @@ export function layout(an, items, opts = {}) {
       // Smaller regions lying within this shape are never written over: the
       // bubbles inside a light background that passed as a bubble, say.
       const foreign = an.regions.filter((q) => q.id !== id && area(q.box) < area(bbox) && overlap(q.box, bbox) >= LAYOUT.most * area(q.box)).map((q) => grow(q.box, letter * LAYOUT.keepClear));
+      // The room: the bubble's interior, and the lettering a line replaces (erased) where it lies in
+      // a hole of the interior — never past the outline. An interior from light regions has holes
+      // where the lettering was; a box around that lettering reaches past a slanted or curved side at
+      // its corners, and the translation set to the box crossed the outline (2.15: the owner's
+      // French chapter). A hole is what the interior encloses, not merely what lies between its two
+      // sides on a row: between a burst's spikes, or in a cloud's notch, is outside.
+      const inHole = inside ? holesOf(inside, bbox) : () => false;
+      // Lettering the interior does not hold (a box mostly past it) says the shape is wrong for it: a
+      // patch of light art taken for a bubble around text drawn over the art. Its room keeps the
+      // lettering's boxes whole, as before 2.15, so the text is never set smaller than it was drawn.
+      const held = (boxes) => {
+        let n = 0, k = 0;
+        for (const b of boxes) for (let j = 0; j < 8; j++) for (let i = 0; i < 8; i++) { const x = b.x + (i + 0.5) * b.w / 8, y = b.y + (j + 0.5) * b.h / 8; n++; if (inside(x, y) || inHole(x, y)) k++; }
+        return n ? k / n : 1;
+      };
+      const owns = told.map((m, i) => (!anchoredToLettering[i] ? [] : anchors[i].parts || lettering.filter((b) => overlap(b.gbox, anchors[i]) >= LAYOUT.most * area(b.gbox)).map((b) => b.gbox)));
+      const parts = inside ? roomParts(an, r, inside, inHole, bbox, anchors, owns) : null;
+      const othersPart = anchors.length > 1 ? parts?.othersPart : null;
+      // (judged on the lettering's lines: a block's upright box reaches past a slanted bubble's side
+      // at its corners, and such bubbles were doubted, their text set across the slant)
+      const linesOf = (i) => (!anchoredToLettering[i] ? [] : anchors[i].parts || lettering.filter((b) => overlap(b.gbox, anchors[i]) >= LAYOUT.most * area(b.gbox)).flatMap((b) => b.parts || [b.gbox]));
+      const doubted = (i) => !!inside && held(linesOf(i)) < LAYOUT.letteringHeld;
+      const roomOf = (own, i) => !inside ? inside : doubted(i)
+        ? (x, y) => inside(x, y) || own.some((b) => inBox(b, x, y))
+        : (x, y) => (inside(x, y) || (own.some((b) => inBox(b, x, y)) && inHole(x, y))) && !othersPart?.(i, x, y);
+      // the room as far as the bubble's ink bounds it, with no margin: the bubble model's mask is
+      // smooth, and reaches past a burst's or a narrow bubble's outline. text.js takes the box's fit
+      // only when its letters stay inside this (2.15: such fits crossed bursts' outlines).
+      const boundOf = (room, i) => (parts && room ? (x, y) => room(x, y) && parts.within(i, x, y) : null);
       told.forEach((m, i) => {
-        const a = anchors[i];
+        const a = anchors[i], own = owns[i];
+        const room = roomOf(own, i);
         // off limits: the other speakers' lettering, and everything past the cut
         // between the two (the waist of a joined bubble, else midway between them),
         // and lettering left as drawn
         const others = [...foreign, ...kept.map((k) => grow(k, letter * LAYOUT.keepClear))];
         anchors.forEach((o, j) => { if (j !== i) others.push(grow(o, letter * LAYOUT.speakerClear), beyondCut(inside, bbox, a, o)); });
         const slack = Math.max(LAYOUT.slackLetters * letter, LAYOUT.slackShare * Math.min(bbox.w, bbox.h));
-        let rect = inscribedRect(inside, bbox, { anchor: a, exclude: others, slack })
-          || inscribedRect(inside, bbox, { exclude: others })
-          || inscribedRect(inside, bbox)
+        let rect = inscribedRect(room, bbox, { anchor: a, exclude: others, slack })
+          || inscribedRect(room, bbox, { exclude: others })
+          || inscribedRect(room, bbox)
           || inset(bbox, LAYOUT.fallbackInset);
-        // Invariant: the translation never gets less room than the lettering it
-        // replaces — that area is erased and is, by definition, inside the bubble.
-        // Whatever the shape analysis got wrong, the text cannot come out smaller
-        // than the original for lack of space.
+        // The text is centred on the lettering it replaces and never gets less room than it had: the
+        // box is the rectangle and that lettering's box together. Its corners may lie past a curved
+        // or slanted side, so in a bubble text.js sets the text to the shape below, and to the box
+        // only where the box's lines stay in the room (2.15: past it, they crossed the outline).
         if (anchoredToLettering[i]) rect = union([rect, clip(a, bbox)]);
         // The room row by row, for text.js to set each line as wide as the bubble is there: a
         // rectangle in an oval leaves its widest rows unused, and the text came out small (2.14.1).
-        const own = anchoredToLettering[i] ? lettering.filter((b) => overlap(b.gbox, a) >= LAYOUT.most * area(b.gbox)).map((b) => b.gbox) : [];
-        const shape = roomShape(inside, bbox, rect, own, others, Math.max(LAYOUT.edgeMinPx, LAYOUT.edgeLetters * letter));
-        placements.push({ text: m.it.text, size: m.it.size, rect, letter, color, halo: false, tag: id, item: m.it.index ?? null, ...(shape ? { shape } : {}) });
+        // Its margin is kept off the outline's ink where the ink is known: the bubble model's mask
+        // is smooth and reaches onto, or past, the outline, and lines set to the mask's edge touched
+        // caption borders and a burst's spikes (2.15, the owner's French chapter, pages 6 and 9).
+        // A doubted room (light art taken for a bubble) is its lettering's boxes, and the ink around
+        // them is the art's, not an outline: the text is set to the box, as before 2.15. Read as an
+        // outline, art lines crossing the room set text over art at half its size (generated pages).
+        const edge = Math.max(LAYOUT.edgeMinPx, LAYOUT.edgeLetters * letter), art = doubted(i);
+        const inked = art ? null : boundOf(room, i), bound = inked && roomShape(inked, bbox, rect, [], others, 0);
+        const shape = art ? null : roomShape(inked || room, bbox, rect, [], others, edge);
+        // The same room centred on the lettering itself: where the box above is far wider than the
+        // lettering and off its centre (the wide middle of an L-shaped caption), the room on both sides
+        // of the box's centre was narrow where the lettering stood, and the text came out ragged and
+        // small (2.15, the owner's French chapter, page 6). text.js sets the text in whichever fits it larger.
+        const mine = anchoredToLettering[i] ? clip(a, bbox) : null;
+        const alt = !art && mine && (Math.abs(mine.x + mine.w / 2 - (rect.x + rect.w / 2)) > LAYOUT.altOffset * letter || Math.abs(mine.y + mine.h / 2 - (rect.y + rect.h / 2)) > LAYOUT.altOffset * letter) ? roomShape(inked || room, bbox, mine, [], others, edge) : null;
+        const altBound = alt && inked ? roomShape(inked, bbox, mine, [], others, 0) : null;
+        placements.push({ text: m.it.text, size: m.it.size, rect, letter, measured: true, color, halo: false, tag: id, item: m.it.index ?? null, ...(shape ? { shape } : {}), ...(bound ? { bound } : {}), ...(alt ? { alt: [{ rect: mine, shape: alt, ...(altBound ? { bound: altBound } : {}) }] } : {}) });
       });
       r.kept = kept.length ? kept : null;
     } else {
@@ -173,7 +217,7 @@ export function layout(an, items, opts = {}) {
       }
       const told = members.filter((m) => tells(m.it));
       const text = told.map((m) => m.it.text).join(" ");
-      placements.push({ text, size: told[0].it.size, rect, letter, color: r.dark ? "#fff" : "#000", halo: true, tag: id, item: told.length === 1 ? told[0].it.index ?? null : null });
+      placements.push({ text, size: told[0].it.size, rect, letter, measured: true, color: r.dark ? "#fff" : "#000", halo: true, tag: id, item: told.length === 1 ? told[0].it.index ?? null : null });
     }
   }
   for (const { it, px } of loose) {
@@ -197,7 +241,9 @@ const area = (b) => b.w * b.h;
  * between them, lines left as drawn). Text centred on that line stays inside. `{dy, step, half}`:
  * rows from rect.y + dy, one every `step` px, half[k] the half-width there (0: none), less `edge`:
  * a bubble's shape from the segmentation model takes in its outline, and lines set to it touched
- * the outline (2.14.1). Relative to the rect, so it moves with it. null without the bubble's shape,
+ * the outline (2.14.1). Its centre line and top are kept too (`cx`, `top`): separate() trims the
+ * placements' rects afterwards, and text centred on a trimmed rect sat off its room by up to 8 px,
+ * against a caption's border (2.15, page 6 in the owner's browser). null without the bubble's shape,
  * or when the centre line is out.
  */
 export function roomShape(inside, bbox, rect, own, exclude, edge = 0) {
@@ -219,7 +265,7 @@ export function roomShape(inside, bbox, rect, own, exclude, edge = 0) {
   while (a < b && !half[a]) a++;
   while (b > a && !half[b - 1]) b--;
   if (a >= b) return null;
-  return { dy: y0 + a * step - rect.y, step, half: half.slice(a, b) };
+  return { dy: y0 + a * step - rect.y, step, half: half.slice(a, b), edge, cx, top: y0 + a * step };
 }
 
 /** How far apart two boxes are (0 when they touch or overlap). */
@@ -259,7 +305,7 @@ export function adoptLettering(an, items, newId) {
     parts.forEach((g, i) => {
       if (held(g)) return;
       const letter = p.lineLetters?.[i] || p.letter, line = p.lineBoxes?.[i] || (p.parts ? g : p.line || g);
-      pool.push({ ...p, box: { ...g }, gbox: { ...g }, parts: [g], lineLetters: [letter], lineBoxes: [line], line, letter, glyphCount: Math.max(1, Math.round((p.vertical ? g.h : g.w) / Math.max(1, p.vertical ? letter : LAYOUT.glyphWidth * letter))) });
+      pool.push({ ...p, box: { ...g }, gbox: { ...g }, parts: [g], lineLetters: [letter], lineSyllables: [p.lineSyllables?.[i] || p.syllable || letter], syllable: p.lineSyllables?.[i] || p.syllable || letter, lineBoxes: [line], line, letter, glyphCount: Math.max(1, Math.round((p.vertical ? g.h : g.w) / Math.max(1, p.vertical ? letter : LAYOUT.glyphWidth * letter))) });
     });
   }
   for (const l of an.lines || []) {
@@ -305,13 +351,13 @@ export function adoptLettering(an, items, newId) {
     const zone = zones[k];
     const picks = pool.filter((p) => owner.get(p) === k);
     if (!picks.length) continue;
-    const lines = (p) => (p.parts || [p.gbox]).map((g, i) => ({ g, letter: p.lineLetters?.[i] || p.letter, line: p.lineBoxes?.[i] || (p.parts ? g : p.line || g) }));
+    const lines = (p) => (p.parts || [p.gbox]).map((g, i) => ({ g, letter: p.lineLetters?.[i] || p.letter, syllable: p.lineSyllables?.[i] || p.syllable || p.lineLetters?.[i] || p.letter, line: p.lineBoxes?.[i] || (p.parts ? g : p.line || g) }));
     if (stamped && stamped.kind === "block" && overlap(stamped.box, zone) > 0) {
       // the rest of the tagged text: one region, its lines erased one by one (erase.js)
       const ref = stamped.ref, all = [...lines(ref), ...picks.flatMap(lines)];
       const box = union([ref.gbox, ...picks.map((p) => p.gbox)]);
       const own = (ref.parts || [ref.gbox]).length;
-      stamped.ref = { ...ref, gbox: box, box: union([ref.box || ref.gbox, ...picks.map((p) => p.box || p.gbox)]), parts: all.map((l) => l.g), lineLetters: all.map((l) => l.letter), lineBoxes: all.map((l) => l.line), lineAdopted: all.map((_, i) => i >= own), glyphCount: (ref.glyphCount || 0) + picks.reduce((n, p) => n + (p.glyphCount || 0), 0), adopted: true };
+      stamped.ref = { ...ref, gbox: box, box: union([ref.box || ref.gbox, ...picks.map((p) => p.box || p.gbox)]), parts: all.map((l) => l.g), lineLetters: all.map((l) => l.letter), lineSyllables: all.map((l) => l.syllable), lineBoxes: all.map((l) => l.line), lineAdopted: all.map((_, i) => i >= own), glyphCount: (ref.glyphCount || 0) + picks.reduce((n, p) => n + (p.glyphCount || 0), 0), adopted: true };
       stamped.box = box;
       continue;
     }
@@ -321,7 +367,7 @@ export function adoptLettering(an, items, newId) {
     // lettering: the translation would shrink into it while the rest stays
     if (overlap(box, px) < LAYOUT.adoptSliver * Math.sqrt(area(box) * area(px))) continue;
     const letter = Math.max(...picks.map((p) => p.letter)), dark = picks.every((p) => p.dark === picks[0].dark) ? picks[0].dark : null;
-    const ref = { ...picks[0], gbox: box, box, parts: all.map((l) => l.g), lineLetters: all.map((l) => l.letter), lineBoxes: all.map((l) => l.line), lineAdopted: all.map(() => true), letter, dark, vertical: picks.every((p) => p.vertical), glyphCount: picks.reduce((n, p) => n + (p.glyphCount || 0), 0), adopted: true };
+    const ref = { ...picks[0], gbox: box, box, parts: all.map((l) => l.g), lineLetters: all.map((l) => l.letter), lineSyllables: all.map((l) => l.syllable), lineBoxes: all.map((l) => l.line), lineAdopted: all.map(() => true), letter, dark, vertical: picks.every((p) => p.vertical), glyphCount: picks.reduce((n, p) => n + (p.glyphCount || 0), 0), adopted: true };
     const r = { id: fresh(), kind: "block", ref, box, letter, dark, adopted: true };
     an.regions.push(r); byId.set(r.id, r);
     ref.region = r.id;
@@ -337,6 +383,115 @@ export function adoptLettering(an, items, newId) {
  * takes one. Without this the neighbour's lettering stays and two translations share one bubble.
  * Updates `groups` (region id → members) in place.
  */
+/**
+ * The parts of a region its ink divides among its lines: what of the interior (and of the lettering's
+ * holes in it, `inHole`) each line's lettering reaches without crossing ink, with the ink it encloses.
+ * Two caption boxes drawn side by side are one white region to the bubble model, but a box's border
+ * runs across it. Returns `othersPart(i, x, y)`: whether the point is in another line's part and not in
+ * line i's, which line i's room then leaves out; and `within(i, x, y)`: whether it is in line i's part. What no line reaches (the outline, its inner edge
+ * inside the bubble model's mask) stays in every room, so a region no ink divides keeps its room
+ * whole. Null, for the region undivided, when the analysis has no ink mask, when the parts together
+ * leave out much of the interior (ink across a bubble that is not a border: tone, speed lines), or
+ * when a line's lettering reaches nothing.
+ */
+function roomParts(an, r, inside, inHole, bbox, anchors, owns) {
+  const ink = an.polarities?.[r.dark ? 1 : 0]?.inkMask;
+  if (!ink?.data) return null;
+  const I = ink.data, IW = ink.cols;
+  const x0 = Math.max(0, Math.floor(bbox.x)), y0 = Math.max(0, Math.floor(bbox.y));
+  const w = Math.min(IW, Math.ceil(bbox.x + bbox.w)) - x0, h = Math.min(ink.rows, Math.ceil(bbox.y + bbox.h)) - y0;
+  if (w <= 0 || h <= 0) return null;
+  const boxes = owns.flat();
+  const pass = new Uint8Array(w * h);
+  let open = 0;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const px = x0 + x, py = y0 + y;
+    const lettered = boxes.some((b) => inBox(b, px, py)) && inHole(px, py);
+    if (lettered || (inside(px, py) && !I[py * IW + px])) { pass[y * w + x] = 1; open++; }
+  }
+  if (!open) return null;
+  const parts = [], covered = new Uint8Array(w * h);
+  let reached = 0;
+  for (let i = 0; i < anchors.length; i++) {
+    const seeds = owns[i].length ? owns[i] : [anchors[i]], mark = new Uint8Array(w * h), queue = [];
+    for (const b of seeds) for (let y = Math.max(0, Math.floor(b.y) - y0); y < Math.min(h, Math.ceil(b.y + b.h) - y0); y++) for (let x = Math.max(0, Math.floor(b.x) - x0); x < Math.min(w, Math.ceil(b.x + b.w) - x0); x++) { const q = y * w + x; if (pass[q] && !mark[q]) { mark[q] = 1; queue.push(q); } }
+    for (let k = 0; k < queue.length; k++) {
+      const q = queue[k], x = q % w;
+      for (const n of [q - w, q + w, x > 0 ? q - 1 : -1, x < w - 1 ? q + 1 : -1]) if (n >= 0 && n < w * h && pass[n] && !mark[n]) { mark[n] = 1; queue.push(n); }
+    }
+    if (!queue.length) { globalThis.GYT_TRACE?.("room", bbox, "one room: a line's lettering reaches nothing", { line: i }); return null; }
+    // and the ink it encloses (marks of the lettering past its line boxes, an accent): what cannot
+    // reach the box's edge without crossing the part. A border between two captions runs to the
+    // outline, so it is never enclosed.
+    const out = new Uint8Array(w * h), edgeQ = [];
+    for (let x = 0; x < w; x++) for (const y of [0, h - 1]) { const q = y * w + x; if (!mark[q] && !out[q]) { out[q] = 1; edgeQ.push(q); } }
+    for (let y = 0; y < h; y++) for (const x of [0, w - 1]) { const q = y * w + x; if (!mark[q] && !out[q]) { out[q] = 1; edgeQ.push(q); } }
+    for (let k = 0; k < edgeQ.length; k++) {
+      const q = edgeQ[k], x = q % w;
+      for (const n of [q - w, q + w, x > 0 ? q - 1 : -1, x < w - 1 ? q + 1 : -1]) if (n >= 0 && n < w * h && !mark[n] && !out[n]) { out[n] = 1; edgeQ.push(n); }
+    }
+    for (let q = 0; q < w * h; q++) if (!mark[q] && !out[q]) mark[q] = 1;
+    for (const q of queue) if (!covered[q]) { covered[q] = 1; reached++; }
+    parts.push(mark);
+  }
+  globalThis.GYT_TRACE?.("room", bbox, reached >= LAYOUT.partsCover * open ? "its ink's parts" : "one room: its ink's parts leave out too much", { parts: parts.length, cover: +(reached / open).toFixed(2) });
+  if (reached < LAYOUT.partsCover * open) return null;
+  const at = (px, py) => { const x = Math.floor(px) - x0, y = Math.floor(py) - y0; return x < 0 || y < 0 || x >= w || y >= h ? -1 : y * w + x; };
+  return {
+    othersPart: (i, px, py) => { const q = at(px, py); return q >= 0 && !parts[i][q] && parts.some((m, j) => j !== i && m[q]); },
+    within: (i, px, py) => { const q = at(px, py); return q >= 0 && parts[i][q] === 1; },
+  };
+}
+
+/**
+ * The holes of a bubble's interior within its box: what the interior encloses (where the lettering
+ * was, in an interior from light regions), as against what lies outside it, reached from the box's
+ * edge without crossing the interior. Returns a test for a point.
+ */
+function holesOf(inside, bbox) {
+  const x0 = Math.floor(bbox.x), y0 = Math.floor(bbox.y), w = Math.ceil(bbox.x + bbox.w) - x0, h = Math.ceil(bbox.y + bbox.h) - y0;
+  if (w <= 0 || h <= 0) return () => false;
+  const out = new Uint8Array(w * h), queue = [];
+  const reach = (q) => { if (!out[q] && !inside(x0 + (q % w), y0 + ((q / w) | 0))) { out[q] = 1; queue.push(q); } };
+  for (let x = 0; x < w; x++) { reach(x); reach((h - 1) * w + x); }
+  for (let y = 0; y < h; y++) { reach(y * w); reach(y * w + w - 1); }
+  for (let k = 0; k < queue.length; k++) {
+    const q = queue[k], x = q % w;
+    if (q >= w) reach(q - w);
+    if (q < (h - 1) * w) reach(q + w);
+    if (x > 0) reach(q - 1);
+    if (x < w - 1) reach(q + 1);
+  }
+  return (px, py) => {
+    const x = Math.floor(px) - x0, y = Math.floor(py) - y0;
+    return x >= 0 && y >= 0 && x < w && y < h && !out[y * w + x] && !inside(px, py);
+  };
+}
+
+/** Text mostly in Hangul (Claude's reading of the lettering): at least half its letters. */
+export function hangul(text) {
+  const s = String(text || "");
+  const letters = (s.match(/\p{L}/gu) || []).length;
+  return letters > 0 && (s.match(/[\uac00-\ud7a3\u1100-\u11ff\u3130-\u318f]/gu) || []).length >= LAYOUT.hangulShare * letters;
+}
+
+/**
+ * A region's letter size for lettering in Hangul: its lines' syllable heights (analyze.js
+ * syllableHeight), weighted by their glyphs as its own letter is, instead of the band rowLetter takes
+ * for Latin letters, which stops above a syllable's lower part. Where the region's letter was raised
+ * to the page's (marks too small to be letters), no smaller than that.
+ */
+export function hangulLetter(r) {
+  const blocks = r.kind === "bubble" ? r.ref.blocks || [] : [r.ref];
+  const weighed = (key) => {
+    const v = blocks.flatMap((b) => Array(Math.max(1, Math.min(LAYOUT.hangulWeightMax, b.glyphCount | 0))).fill(b[key] ?? b.letter)).sort((a, b) => a - b);
+    return v.length ? v[v.length >> 1] : 0;
+  };
+  const own = weighed("letter"), syl = weighed("syllable");
+  if (!syl) return r.letter;
+  return r.letter > own ? Math.max(r.letter, syl) : syl;
+}
+
 function shareStamp(an, groups) {
   const lettering = (q) => (q.kind === "bubble" ? q.ref.blocks.map((b) => b.gbox) : [q.ref.gbox || q.box]);
   const on = (px, q) => lettering(q).reduce((n, g) => n + overlap(px, g), 0);
@@ -409,7 +564,7 @@ function nearestRegion(an, px) {
  */
 function assignAnchors(blocks, members, bbox, letter) {
   if (members.length === 1 && blocks.length) return [{ ...union(blocks.map((b) => b.gbox)), fromLettering: true }];
-  const free = blocks.map((b) => ({ ...b.gbox, fromLettering: true, vertical: !!b.vertical })).sort((a, b) => (a.y - b.y) || (a.x - b.x));
+  const free = blocks.map((b) => ({ ...b.gbox, fromLettering: true, vertical: !!b.vertical, parts: b.parts })).sort((a, b) => (a.y - b.y) || (a.x - b.x));
   const anchors = new Array(members.length).fill(null);
   // boxes first, best overlap first, so two members never claim one block
   const claims = [];
@@ -433,7 +588,10 @@ function assignAnchors(blocks, members, bbox, letter) {
  * second member gets only its own box, often a sliver, and its text comes out
  * tiny. The block is cut across its lines — between columns for vertical text,
  * between rows otherwise — midway between the members' boxes, and each member
- * anchors to its part. Updates `anchors` in place.
+ * anchors to its part. When the block's lines each lie under one member's box, each member takes
+ * its own lines instead: two captions' lettering side by side, merged into one paragraph, were cut
+ * across their rows and each translation spread over both captions (2.15, the owner's French
+ * chapter, page 6). Updates `anchors` in place.
  */
 function shareBlocks(anchors, members) {
   const groups = new Map(); // claimed block → indices of the members on it
@@ -446,6 +604,30 @@ function shareBlocks(anchors, members) {
     groups.get(best).push(i);
   });
   for (const [g, idx] of groups) {
+    // Lettering of as many paragraphs as members (two captions merged into one block): each member
+    // takes a whole paragraph, the one-to-one choice its boxes overlap most. Claude's box can cover a
+    // caption's first line only, and taken line by line, the caption's other lines went to the next
+    // member (2.15, the owner's French chapter, page 6: the first caption's text set at 16 px).
+    const runs = g.parts?.length > 1 ? paragraphs(g.parts, !!g.vertical) : [];
+    if (runs.length === idx.length && idx.length > 1 && idx.length <= 4) {
+      const boxes = runs.map((r) => union(r));
+      let best = null, most = 0;
+      for (const order of permutations(idx.length)) {
+        const os = order.map((r, k) => overlap(members[idx[k]].px, boxes[r]));
+        const sum = os.reduce((a, b) => a + b, 0);
+        if (os.every((o) => o > 0) && sum > most) { most = sum; best = order; }
+      }
+      if (best) { idx.forEach((i, k) => { anchors[i] = { ...boxes[best[k]], fromLettering: true, vertical: g.vertical, parts: runs[best[k]] }; }); continue; }
+    }
+    if (g.parts?.length > 1) {
+      const mine = idx.map(() => []);
+      for (const part of g.parts) {
+        let best = -1, most = 0;
+        idx.forEach((i, k) => { const o = overlap(members[i].px, part); if (o > most) { most = o; best = k; } });
+        if (best >= 0 && most >= LAYOUT.most * area(part)) mine[best].push(part);
+      }
+      if (mine.every((ps) => ps.length)) { idx.forEach((i, k) => { anchors[i] = { ...union(mine[k]), fromLettering: true, vertical: g.vertical, parts: mine[k] }; }); continue; }
+    }
     const across = g.vertical ? "x" : "y", len = g.vertical ? "w" : "h";
     const at = (i) => members[i].px[across] + members[i].px[len] / 2;
     idx.sort((a, b) => at(a) - at(b));
@@ -459,6 +641,38 @@ function shareBlocks(anchors, members) {
       start = end;
     });
   }
+}
+
+/**
+ * A block's lines (or columns, `vertical`) in the paragraphs they read as: a line belongs with the one
+ * before it when it follows it (a gap under a line's height) and overlaps it across at least half the
+ * narrower one (LAYOUT.most). Two captions side by side, merged into one block, come apart.
+ */
+export function paragraphs(parts, vertical) {
+  const [x, w, y, h] = vertical ? ["y", "h", "x", "w"] : ["x", "w", "y", "h"];
+  const order = [...parts].sort((a, b) => vertical ? (b.x + b.w) - (a.x + a.w) : a.y - b.y);
+  const runs = [];
+  for (const p of order) {
+    let best = null, most = 0;
+    for (const r of runs) {
+      const q = r[r.length - 1];
+      const gap = vertical ? q.x - (p.x + p.w) : p.y - (q.y + q.h);
+      if (gap > Math.max(p[h], q[h])) continue;
+      const o = Math.min(p[x] + p[w], q[x] + q[w]) - Math.max(p[x], q[x]);
+      const share = o / Math.max(1, Math.min(p[w], q[w]));
+      if (share >= LAYOUT.most && share > most) { most = share; best = r; }
+    }
+    if (best) best.push(p); else runs.push([p]);
+  }
+  return runs;
+}
+
+/** The orders of 0..n-1 (n ≤ 4: a bubble's members). */
+function permutations(n) {
+  if (n <= 1) return [[0]];
+  const out = [];
+  for (const p of permutations(n - 1)) for (let k = 0; k <= p.length; k++) out.push([...p.slice(0, k), n - 1, ...p.slice(k)]);
+  return out;
 }
 
 /**

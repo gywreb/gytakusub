@@ -23,7 +23,8 @@ export async function buildReport(pages, settings) {
       gytakusub: VERSION, app: "web", when, page: page.mode === "chapter" ? location.href : "screenshot", image: page.url || page.file?.name || "",
       natural: [res.width, res.height], displayed: canvas ? [Math.round(canvas.clientWidth), Math.round(canvas.clientHeight)] : null,
       work: res.work, letter: res.letter, fromCache: false, timing: res.timing || null, engine: res.engine || null,
-      overlay: { dpr: window.devicePixelRatio || 1, backing: canvas ? [canvas.width, canvas.height] : null },
+      // (outside: each line's share of its text outside the room the layout gave it; 2.15)
+      overlay: { dpr: window.devicePixelRatio || 1, backing: canvas ? [canvas.width, canvas.height] : null, outside: (page.fits || []).map((f) => f?.outside ?? null) },
       settings: { model: settings.model, targetLang: settings.targetLang, fontFamily: settings.fontFamily, uppercase: settings.uppercase, useContext: settings.useContext },
       lettering: page.look ? { lang: page.look.lang ?? null, hyphenation: !!page.look.hyphenator } : null,
       regions: res.regions, items: res.items, placements: res.placements,

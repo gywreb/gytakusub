@@ -5,7 +5,9 @@
 //  2. the reader leaves while pages wait in the worker: those not yet sent to Claude never are
 //  3. the reader reloads while a page is with Claude: the reloaded page waits for that answer
 //     instead of asking (and paying) again
-//  4. the worker stops while pages are with Claude: they're asked again by themselves (2.12.0:
+//  4. loaded unpacked, as here: the folder's dev-reload.txt changing reloads the extension, once
+//     (2.15.0, devreload.js)
+//  5. the worker stops while pages are with Claude: they're asked again by themselves (2.12.0:
 //     they stayed failed until the reader pressed Translate)
 // Usage: node startup.mjs [--ext ../../extension] [--out /tmp/gyt-startup]
 import fs from "node:fs";
@@ -95,7 +97,30 @@ if (done.size < 3) fail(`only ${done.size} of 3 pages were translated after the 
 if (asked3 > 3) fail(`${asked3} questions for 3 pages: a page was asked twice across the reload`);
 else console.log(`3. reloaded mid-answer: ${asked3} question(s) for ${done.size} page(s) translated`);
 
-// 4. the worker stops while pages are with Claude (Chrome stopped or restarted it; a user's report
+// 4. loaded unpacked, as here: dev-reload.txt written into the extension's folder makes the next page
+// that asks reload the extension, once. A test browser can't show the reload itself: an unpacked
+// extension that reloads in one comes back turned off, which no real Chrome does (github.com/
+// dominic-lam/ext-reload; the same seen here). So the worker's chrome.runtime.reload is a stand-in
+// that counts, and empties session storage as a reload does.
+await sw.evaluate(() => {
+  globalThis.__reloads = 0;
+  chrome.runtime.reload = () => { globalThis.__reloads++; chrome.storage.session.remove("devReloadMark"); };
+});
+const reloads = () => sw.evaluate(() => globalThis.__reloads);
+await page.goto(`http://127.0.0.1:${PORT}/chapter?n=1&ch=5`); await wait(2500);
+const before5 = await reloads();
+fs.writeFileSync(path.join(ext, "dev-reload.txt"), "test 1\n");
+await page.goto(`http://127.0.0.1:${PORT}/chapter?n=1&ch=6`); await wait(2500);
+const after5 = await reloads();
+await page.goto(`http://127.0.0.1:${PORT}/chapter?n=1&ch=7`); await wait(2500); // the new start takes the mark
+await page.goto(`http://127.0.0.1:${PORT}/chapter?n=1&ch=8`); await wait(2500);
+const again5 = await reloads();
+if (before5 !== 0) fail(`no dev-reload.txt: the extension reloaded itself ${before5} time(s)`);
+else if (after5 !== 1) fail(`dev-reload.txt written: ${after5} reload(s), not 1`);
+else if (again5 !== 1) fail(`the same dev-reload.txt: reloaded again (${again5} in all)`);
+else console.log("4. no dev-reload.txt: no reload; written: the next page's request reloaded the extension, once");
+
+// 5. the worker stops while pages are with Claude (Chrome stopped or restarted it; a user's report
 // showed the last two pages of a chapter failing so): the pages are asked again by themselves
 done.clear();
 const t4 = Date.now();
@@ -109,7 +134,7 @@ const stopped = Date.now();
 console.log(`   (worker stopped at ${((stopped - t4) / 1000).toFixed(1)} s)`);
 while (done.size < 3 && Date.now() - stopped < 120000) await wait(250);
 if (done.size < 3) fail(`after the worker stopped, ${done.size} of 3 pages were translated without the reader doing anything`);
-else console.log(`4. worker stopped mid-chapter: all 3 pages translated by themselves, ${((Date.now() - stopped) / 1000).toFixed(1)} s later`);
+else console.log(`5. worker stopped mid-chapter: all 3 pages translated by themselves, ${((Date.now() - stopped) / 1000).toFixed(1)} s later`);
 
 await Promise.race([context.close(), wait(10000)]); srv.close();
 console.log(failures ? `\n${failures} FAILED` : "\nSTARTUP TEST PASSED");

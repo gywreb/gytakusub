@@ -3,7 +3,9 @@
 // so their lettering was left on the page and the translation drawn tiny.
 import assert from "node:assert/strict";
 import { cv } from "./cv-node.mjs";
-import { rowLetter, bubbleLetter, columnLetter } from "../extension/engine/analyze.js";
+import { rowLetter, bubbleLetter, columnLetter, syllableHeight } from "../extension/engine/analyze.js";
+import { createCanvas } from "canvas";
+import { execFileSync } from "node:child_process";
 import { loadLettering } from "./lettering-setup.mjs";
 
 loadLettering();
@@ -138,6 +140,46 @@ test("a column of glyphs made of bars (テ, 二) keeps its width", () => {
   for (let k = 0; k < 3; k++) { const t = y + k * 28; rect(I, x + 3, t, 16, 3); rect(I, x, t + 8, 22, 3); rect(I, x + 10, t + 14, 3, 8); } // テ: two bars, then a stroke down
   const { letter, band } = column(I, { x, y, w: 22, h: 84 });
   assert.equal(letter, band, "measured " + letter + " in a column " + band + " wide");
+});
+
+// ---- rows of Hangul (2.15): a syllable's lower part is thin strokes in a few syllables ----
+// (drawn in Noto Sans CJK KR, Debian and Ubuntu's fonts-noto-cjk: without it the canvas falls back to
+// boxes, and these rows measure nothing like Hangul)
+const hasKoreanFont = (() => { try { return /Noto Sans CJK KR/.test(execFileSync("fc-list", [":lang=ko", "family"]).toString()); } catch { return false; } })();
+assert.ok(hasKoreanFont, "Noto Sans CJK KR isn't installed (apt install fonts-noto-cjk): the Hangul rows below can't be drawn");
+const hangulRows = (rows, size, lead = 1.15) => {
+  const c = createCanvas(W, H), g = c.getContext("2d");
+  g.fillStyle = "#fff"; g.fillRect(0, 0, W, H); g.fillStyle = "#000"; g.font = `${size}px "Noto Sans CJK KR"`; g.textBaseline = "alphabetic";
+  const m = g.measureText("한"), truth = m.actualBoundingBoxAscent + m.actualBoundingBoxDescent;
+  rows.forEach((t, k) => g.fillText(t, 10, 10 + m.actualBoundingBoxAscent + k * size * lead));
+  const d = g.getImageData(0, 0, W, H).data, I = page();
+  for (let q = 0; q < W * H; q++) I[q] = d[q * 4] < 128 ? 255 : 0;
+  const ink = cv.matFromArray(H, W, cv.CV_8UC1, I);
+  return { ink, truth, top: 10, step: size * lead };
+};
+test("a row of Hangul measures its syllables' height; the band for Latin letters stopped above their lower part", () => {
+  const lines = ["안녕하세요", "그래 뭐야", "정말 왜", "괜찮아 지금"];
+  let low = 0;
+  for (const t of lines) {
+    const { ink, truth } = hangulRows([t], 24);
+    try {
+      const x1 = W - 4, y0 = 6, y1 = 10 + Math.ceil(truth) + 4;
+      const { letter } = rowLetter(cv, ink, 6, y0, x1, y1), syl = syllableHeight(cv, ink, 6, y0, x1, y1, letter);
+      assert.ok(syl >= 0.85 * truth && syl <= 1.1 * truth, `"${t}": ${syl} for syllables ${truth.toFixed(1)} tall`);
+      if (letter < 0.9 * truth) low++;
+    } finally { ink.delete(); }
+  }
+  assert.ok(low >= 1, "the guard: the band for Latin letters measured some of these rows short");
+});
+test("two rows of Hangul close together, a caption box's side down both: one row's height", () => {
+  const { ink, truth } = hangulRows(["안녕하세요", "그래 뭐야"], 24, 1.1);
+  try {
+    const I = ink.data; for (let y = 4; y < 80; y++) for (let x = 0; x < 6; x++) I[y * W + x] = 255; // the box's side, 6 px (counted, it joined the rows: 57 px)
+    const y1 = 10 + Math.ceil(2 * 24 * 1.1); // a line box the detector drew over both rows
+    const { letter } = rowLetter(cv, ink, 0, 6, W - 4, y1);
+    const syl = syllableHeight(cv, ink, 0, 6, W - 4, y1, letter);
+    assert.ok(syl <= 1.15 * truth, `${syl} for syllables ${truth.toFixed(1)} tall`);
+  } finally { ink.delete(); }
 });
 
 console.log(`\nLETTER SIZE TESTS PASSED (${passed})`);

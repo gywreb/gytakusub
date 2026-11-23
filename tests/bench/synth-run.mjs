@@ -9,6 +9,8 @@
 //   letter    the engine's letter size against the true one (far: under 0.6× or over 1.6×)
 //   small     the translation drawn under 0.7 of the true size (as the 0.7 rule of the 2.14 goal)
 //   overflow  over 3% of a bubble line's translation drawn outside its bubble
+//   touch     a bubble line's letters within a tenth of a letter (2 px at least) of its bubble's edge
+//   big       the translation drawn over 1/0.7 (1.43) of the original lettering's size
 // Where the size is lost (the same text and fitter each time):
 //   smallLetter  small again with the true letter size in the engine's room: what the analysis's
 //                size estimate costs is small − smallLetter
@@ -31,11 +33,13 @@ const { erase, fillTexture } = await import("../../extension/engine/erase.js");
 const { loadLettering } = await import("../lettering-setup.mjs");
 const GyText = loadLettering();
 const { makePage, englishFor, rng } = await import("./synth.mjs");
+const { sizeLabel } = await import("./labels.mjs");
 const { sizeLimits, limitCounts, fitsInside } = await import("./limits.mjs");
 
 const argv = process.argv.slice(2), opt = (k) => { const i = argv.indexOf(k); return i >= 0 ? argv.splice(i, 2)[1] : null; };
-const dump = opt("--dump"), printedPages = argv.includes("--printed");
+const dump = opt("--dump"), printedPages = argv.includes("--printed"), readerPages = argv.includes("--readers");
 if (printedPages) argv.splice(argv.indexOf("--printed"), 1);
+if (readerPages) argv.splice(argv.indexOf("--readers"), 1);
 const most = Number(opt("--max") || 0); let ran = 0; // (--max N: stop after N pages; rerun to go on)
 const fillWith = opt("--fill");
 // --fill aot: textured areas filled by the learned model the extension runs on the CPU (AOT), as a
@@ -54,7 +58,8 @@ const lum = (d, q) => (d[q * 4] + d[q * 4 + 1] + d[q * 4 + 2]) / 3;
 
 for (let seed = +first; seed < +first + +count; seed++) {
   if (done.has(seed)) continue;
-  const pg = makePage(seed, { printed: printedPages }), { W, H } = pg, r = rng(seed + 99);
+  const pg = makePage(seed, { printed: printedPages, readers: readerPages }), { W, H } = pg, r = rng(seed + 99);
+  const labelRnd = rng(seed * 7919 + 17); // Claude's size labels: a stream of their own (bench/labels.mjs)
   const pixels = new ImageData(new Uint8ClampedArray(pg.input.data), W, H);
   const t0 = Date.now();
   const an = await analyzePage(pixels);
@@ -65,7 +70,7 @@ for (let seed = +first; seed < +first + +count; seed++) {
     const big = r() < 0.1 ? 0.4 : 0.15, j = (v) => (r() * 2 - 1) * big * v;
     const bx = { x: b.box.x + j(b.box.w), y: b.box.y + j(b.box.h), w: b.box.w * (1 + j(1)), h: b.box.h * (1 + j(1)) };
     const reg = regionAt(b.box);
-    return { tag: reg ? reg.id : null, box: [bx.x / W, bx.y / H, bx.w / W, bx.h / H].map((v) => Math.max(0, Math.min(1, v))), text: englishFor(b, r), size: b.letter > 1.6 * median ? "large" : b.letter < 0.65 * median ? "small" : "normal", kind: b.kind === "free" ? "sign" : b.kind, index: i };
+    return { tag: reg ? reg.id : null, box: [bx.x / W, bx.y / H, bx.w / W, bx.h / H].map((v) => Math.max(0, Math.min(1, v))), text: englishFor(b, r), source: b.text, size: sizeLabel(b.letter / median, labelRnd), kind: b.kind === "free" ? "sign" : b.kind, index: i };
   });
   await lookAgain(cv, pixels, an, items, detector);
   const { placements, regionIds } = layout(an, items);
@@ -131,13 +136,25 @@ for (let seed = +first; seed < +first + +count; seed++) {
       const R = p.rect, x0 = Math.max(0, Math.floor(R.x - 40)), y0 = Math.max(0, Math.floor(R.y - 40)), x1 = Math.min(W, Math.ceil(R.x + R.w + 40)), y1 = Math.min(H, Math.ceil(R.y + R.h + 40));
       for (let yy = y0; yy < y1; yy++) for (let xx = x0; xx < x1; xx++) { const q = yy * W + xx; if (d[q * 4 + 3] > 100) { all++; if (!inside[q] && !footSet.has(q)) outside++; } }
       e.overflow = all ? outside / all : 0;
+      // touching: any of its letters within a tenth of a letter (2 px at least) of the bubble's edge,
+      // where a letterer always leaves a margin (2.15: lines set larger came to touch caption borders)
+      const r = Math.max(2, Math.round(0.1 * b.letter));
+      e.touch = false;
+      for (let yy = y0; yy < y1 && !e.touch; yy++) for (let xx = x0; xx < x1 && !e.touch; xx++) {
+        const q = yy * W + xx;
+        if (d[q * 4 + 3] <= 100 || footSet.has(q)) continue;
+        for (let dy = -r; dy <= r && !e.touch; dy++) for (let dx = -r; dx <= r; dx++) {
+          const X = xx + dx, Y = yy + dy;
+          if (dx * dx + dy * dy <= r * r && (X < 0 || Y < 0 || X >= W || Y >= H || !inside[Y * W + X]) && !footSet.has(Y * W + X)) { e.touch = true; break; }
+        }
+      }
     }
   }
   const told = pg.blocks.map((b, i) => tells(items[i]));
   const limits = sizeLimits(GyText, placements, sizes, [...placements.keys()].filter((k) => placements[k].item != null && told[placements[k].item] && per[placements[k].item].drawn < 0.7), W, H);
   const n = told.filter(Boolean).length;
   const row = {
-    seed, script: pg.script, printed: printedPages, colour: pg.colour, ms, lines: n,
+    seed, script: pg.script, printed: printedPages, readers: readerPages, colour: pg.colour, ms, lines: n,
     found: found.filter((f, i) => f && told[i]).length,
     placed: pg.blocks.filter((b, i) => told[i] && per[i].letter != null).length,
     left: rows.filter((x, i) => told[i] && x.left).length, stays: rows.filter((x, i) => told[i] && x.stays).length,
@@ -150,10 +167,18 @@ for (let seed = +first; seed < +first + +count; seed++) {
     restore: +(rows.reduce((s, x, i) => s + (told[i] ? x.restore : 0), 0) / Math.max(1, n)).toFixed(2),
     letterFar: per.filter((e, i) => told[i] && e.letter != null && (e.letter < 0.6 || e.letter > 1.6)).length,
     small: per.filter((e, i) => told[i] && e.drawn != null && e.drawn < 0.7).length,
+    big: per.filter((e, i) => told[i] && e.drawn != null && e.drawn > 1 / 0.7).length,
     smallLetter: per.filter((e, i) => told[i] && e.drawnLetter != null && e.drawnLetter < 0.7).length,
     ...Object.fromEntries(["geometry", "avoidable", "shared", "free"].map((w) => [`small${w[0].toUpperCase()}${w.slice(1)}`, per.filter((e, i) => told[i] && e.why === w).length])),
     ...limitCounts(limits),
-    overflow: per.filter((e) => e.overflow > 0.03).length, bubbleLines: pg.blocks.filter((b, i) => told[i] && b.bubble).length,
+    overflow: per.filter((e) => e.overflow > 0.03).length, touch: per.filter((e) => e.touch).length, bubbleLines: pg.blocks.filter((b, i) => told[i] && b.bubble).length,
+    // by the shape of the bubble (or caption box) a line is in: [lines, past its bubble, set under 0.7, over 1/0.7]
+    shapes: pg.blocks.reduce((o, b, i) => {
+      if (!told[i] || !b.bubble || per[i].drawn == null) return o;
+      const c = (o[b.shape] ||= [0, 0, 0, 0]);
+      c[0]++; if (per[i].overflow > 0.03) c[1]++; if (per[i].drawn < 0.7) c[2]++; if (per[i].drawn > 1 / 0.7) c[3]++;
+      return o;
+    }, {}),
     damage: +(1000 * damage / (W * H)).toFixed(2), outline,
   };
   if (dump && seed < 100000) {
