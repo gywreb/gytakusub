@@ -17,6 +17,7 @@
 //   smallGeometry, smallAvoidable: a small line alone in its bubble that could not be set at 0.7
 //                of its size in that bubble at all, however laid out (the translation is too long
 //                for it), or could; smallShared: in a bubble with other lines; smallFree: in none
+//   smallAvoidableClear: avoidable even keeping its letters clear of the outline (not touching it)
 //   smallWidth, smallHeight, smallBoth, smallNeither: what holds each small line's text small
 //                (bench/limits.mjs): a narrow room, a low one, either, or not the room
 // Per page: damage (pixels changed away from every line to translate), outline (bubble outline
@@ -28,7 +29,7 @@ import { createCanvas } from "canvas";
 process.chdir(path.dirname(new URL(import.meta.url).pathname) + "/..");
 const { cv, detector, analyzePage } = await import("../cv-node.mjs");
 const { lookAgain } = await import("../../extension/engine/page.js");
-const { layout, tells } = await import("../../extension/engine/layout.js");
+const { layout, tells, roomShape, erode } = await import("../../extension/engine/layout.js");
 const { erase, fillTexture } = await import("../../extension/engine/erase.js");
 const { loadLettering } = await import("../lettering-setup.mjs");
 const GyText = loadLettering();
@@ -37,6 +38,7 @@ const { sizeLabel } = await import("./labels.mjs");
 const { sizeLimits, limitCounts, fitsInside } = await import("./limits.mjs");
 
 const argv = process.argv.slice(2), opt = (k) => { const i = argv.indexOf(k); return i >= 0 ? argv.splice(i, 2)[1] : null; };
+const whyFile = opt("--why"); // (--why file: each avoidable line refitted with one cause removed at a time, as JSON lines)
 const dump = opt("--dump"), printedPages = argv.includes("--printed"), readerPages = argv.includes("--readers");
 if (printedPages) argv.splice(argv.indexOf("--printed"), 1);
 if (readerPages) argv.splice(argv.indexOf("--readers"), 1);
@@ -100,7 +102,7 @@ for (let seed = +first; seed < +first + +count; seed++) {
   let outline = 0; for (const bb of pg.bubbles) for (let q = 0; q < W * H; q++) if (bb.outline[q] && !near[q] && lum(tr, q) < 100 && lum(o, q) > lum(tr, q) + 80) outline++;
   // letter sizes, drawn sizes, overflow
   const tc = createCanvas(W, H), tctx = tc.getContext("2d"); tctx.putImageData(clean, 0, 0);
-  const sizes = []; GyText.draw(tctx, placements, { sizes });
+  const sizes = [], fits = []; GyText.draw(tctx, placements, { sizes, fits });
   const per = pg.blocks.map(() => ({}));
   // the same lines fitted again (one font for the page, as drawn): with the true letter size in
   // the engine's room, and for a line alone in its bubble, also in the room the layout's method
@@ -113,11 +115,21 @@ for (let seed = +first; seed < +first + +count; seed++) {
   const family = GyText.lettering(pageTexts).family;
   const boundCtx = createCanvas(8, 8).getContext("2d");
   /** a line alone in its bubble: could it be set at 0.7 of its size there at all (bench/limits.mjs)? */
-  const couldFit = (k) => {
+  // (clear: its letters kept clear of the outline, as far as `touch` below asks: a line that fits at
+  // 0.7 only by touching its outline isn't one the engine should have set larger, since 2.15 keeps
+  // a margin; the bound with no margin at all is kept as `smallAvoidable`)
+  const couldFit = (k, clear = false) => {
     const p = placements[k], b = pg.blocks[p.item];
-    const m = pg.bubbles[b.bubble - 1].inside, inside = (x, y) => x >= 0 && y >= 0 && x < W && y < H && m[(y | 0) * W + (x | 0)] === 1;
+    let m = pg.bubbles[b.bubble - 1].inside;
     let x0 = W, y0 = H, x1 = 0, y1 = 0;
     for (let q = 0; q < W * H; q++) if (m[q]) { const x = q % W, y = (q / W) | 0; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    let ox = 0, oy = 0, mw = W;
+    if (clear) { // the interior less a band as wide as the touching distance
+      const gw = x1 - x0 + 1, gh = y1 - y0 + 1, g = new Uint8Array(gw * gh);
+      for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) g[y * gw + x] = m[(y0 + y) * W + x0 + x];
+      m = erode(g, gw, gh, Math.max(2, Math.round(0.1 * b.letter))); ox = x0; oy = y0; mw = gw;
+    }
+    const inside = (x, y) => { const X = (x | 0) - ox, Y = (y | 0) - oy; return X >= 0 && Y >= 0 && X < mw && (Y * mw + X) < m.length && m[Y * mw + X] === 1; };
     return fitsInside(GyText, boundCtx, family, p.text, inside, { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 }, Math.ceil(0.7 * 1.45 * b.letter));
   };
   for (const [k, p] of placements.entries()) {
@@ -128,6 +140,7 @@ for (let seed = +first; seed < +first + +count; seed++) {
     // why a small line is small: the translation can't fit its bubble at 0.7 even ideally
     // (geometry), or it could (avoidable); in a bubble with other lines, or in none, not known
     if (e.drawn < 0.7) e.why = !b.bubble ? "free" : toldIn.get(b.bubble) !== 1 ? "shared" : couldFit(k) ? "avoidable" : "geometry";
+    if (e.why === "avoidable") e.clear = couldFit(k, true);
     if (b.bubble) { // the translation alone: its ink outside the bubble's inside (and the erased lettering)
       const c = createCanvas(W, H), x = c.getContext("2d"); GyText.draw(x, [p]);
       const d = x.getImageData(0, 0, W, H).data, inside = pg.bubbles[b.bubble - 1].inside;
@@ -150,6 +163,35 @@ for (let seed = +first; seed < +first + +count; seed++) {
       }
     }
   }
+  if (whyFile) {
+    // each avoidable line fitted again with one cause taken away: the true letter size; no margin;
+    // the true interior as the room (same method, same margin); the true interior around its own
+    // centre line; the true interior with no margin
+    for (const [k, p] of placements.entries()) {
+      if (p.item == null || per[p.item].why !== "avoidable") continue;
+      const b = pg.blocks[p.item], m = pg.bubbles[b.bubble - 1].inside, ins = (x, y) => x >= 0 && y >= 0 && x < W && y < H && m[(y | 0) * W + (x | 0)] === 1;
+      let x0 = W, y0 = H, x1 = 0, y1 = 0;
+      for (let q = 0; q < W * H; q++) if (m[q]) { const x = q % W, y = (q / W) | 0; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+      const bb = { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 }, edge = p.shape?.edge ?? 0;
+      const mid = { ...p.rect, x: x0 + (x1 - x0) / 2 - p.rect.w / 2 };
+      const v = {
+        letter: { ...p, letter: b.letter },
+        margin: p.shape ? { ...p, shape: { ...p.shape, half: p.shape.half.map((h) => (h ? h + edge : 0)), edge: 0 } } : p,
+        trueRoom: { ...p, shape: roomShape(ins, bb, p.rect, [], [], edge) },
+        trueAxis: { ...p, shape: roomShape(ins, bb, mid, [], [], edge) },
+        trueNoMargin: { ...p, shape: roomShape(ins, bb, mid, [], [], 0) },
+      };
+      const names = Object.keys(v), got = fitted(names.map((n) => v[n]));
+      const rec = { seed, item: p.item, shape: b.shape, script: b.script, est: +(p.letter / b.letter).toFixed(2), drawn: +per[p.item].drawn.toFixed(3), clear: !!per[p.item].clear, hadShape: !!p.shape, edge, fit: fits[k]?.fit, alt: !!fits[k]?.alt, text: p.text };
+      names.forEach((n, j) => { rec[n] = +(got[j] / 1.45 / b.letter).toFixed(3); });
+      fs.appendFileSync(whyFile, JSON.stringify(rec) + "\n");
+    }
+  }
+  if (whyFile) for (const [k, p] of placements.entries()) {
+    if (p.item == null || !per[p.item].touch) continue;
+    const b = pg.blocks[p.item];
+    fs.appendFileSync(whyFile, JSON.stringify({ seed, item: p.item, touch: true, shape: b.shape, letter: +(p.letter / b.letter).toFixed(2), drawn: +per[p.item].drawn.toFixed(3), hadShape: !!p.shape, ...fits[k], text: p.text }) + "\n");
+  }
   const told = pg.blocks.map((b, i) => tells(items[i]));
   const limits = sizeLimits(GyText, placements, sizes, [...placements.keys()].filter((k) => placements[k].item != null && told[placements[k].item] && per[placements[k].item].drawn < 0.7), W, H);
   const n = told.filter(Boolean).length;
@@ -170,6 +212,7 @@ for (let seed = +first; seed < +first + +count; seed++) {
     big: per.filter((e, i) => told[i] && e.drawn != null && e.drawn > 1 / 0.7).length,
     smallLetter: per.filter((e, i) => told[i] && e.drawnLetter != null && e.drawnLetter < 0.7).length,
     ...Object.fromEntries(["geometry", "avoidable", "shared", "free"].map((w) => [`small${w[0].toUpperCase()}${w.slice(1)}`, per.filter((e, i) => told[i] && e.why === w).length])),
+    smallAvoidableClear: per.filter((e, i) => told[i] && e.why === "avoidable" && e.clear).length,
     ...limitCounts(limits),
     overflow: per.filter((e) => e.overflow > 0.03).length, touch: per.filter((e) => e.touch).length, bubbleLines: pg.blocks.filter((b, i) => told[i] && b.bubble).length,
     // by the shape of the bubble (or caption box) a line is in: [lines, past its bubble, set under 0.7, over 1/0.7]
