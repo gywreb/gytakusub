@@ -61,7 +61,7 @@ To update, unzip the new release over the same folder and press the reload butto
 
 ### Web app (iPhone, Android, desktop)
 
-Open [gywreb.github.io/gytakusub](https://gywreb.github.io/gytakusub/). On iPhone, open it in Safari and choose **Share → Add to Home Screen**. The first page downloads the engine and its models (about 75 MB, cached afterwards), and the eraser's model comes the first time a page needs it (23 MB, or 103 MB on a graphics card). Use Wi-Fi the first time.
+Open [gywreb.github.io/gytakusub](https://gywreb.github.io/gytakusub/). On iPhone, open it in Safari and choose **Share → Add to Home Screen**. The first page downloads the engine and its models (about 75 MB, cached afterwards), and the eraser's model comes the first time a page needs it (12 MB, or 103 MB on a graphics card). Use Wi-Fi the first time.
 
 ## Quick start
 

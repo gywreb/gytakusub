@@ -13,11 +13,14 @@ inference still runs in float32 (in the hole, 0.001 off the full model on a 0..1
     python3 scripts/lama-static.py lama-manga-dynamic.onnx lama.onnx [--side 512]
 """
 import argparse
+import os
+import sys
 
-import numpy as np
 import onnx
 import onnxsim
-from onnx import TensorProto, helper, numpy_helper
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from half_weights import halve  # noqa: E402
 
 ap = argparse.ArgumentParser()
 ap.add_argument("src")
@@ -29,23 +32,6 @@ m = onnx.load(a.src)
 m, ok = onnxsim.simplify(m, overwrite_input_shapes={"image": [1, 3, a.side, a.side], "mask": [1, 1, a.side, a.side]})
 assert ok, "the simplified model does not match the original"
 
-g = m.graph
-inits, casts = [], []
-for init in list(g.initializer):
-    if init.data_type != TensorProto.FLOAT or np.prod(init.dims or [1]) < 16:
-        inits.append(init)
-        continue
-    full = numpy_helper.to_array(init)
-    if not np.all(np.isfinite(full)) or np.abs(full).max() > 60000:
-        inits.append(init)  # outside float16's range: kept as it is
-        continue
-    half = numpy_helper.from_array(full.astype(np.float16), init.name + "__f16")
-    inits.append(half)
-    casts.append(helper.make_node("Cast", [half.name], [init.name], to=TensorProto.FLOAT, name=init.name + "__cast"))
-del g.initializer[:]
-g.initializer.extend(inits)
-nodes = list(g.node)
-del g.node[:]
-g.node.extend(casts + nodes)
+n = halve(m)  # weights in float16, cast back to float32 at load (scripts/half_weights.py)
 onnx.save(m, a.dst)
-print(f"{len(g.node)} nodes, {len(casts)} weights in float16, input {a.side}x{a.side}")
+print(f"{len(m.graph.node)} nodes, {n} weights in float16, input {a.side}x{a.side}")

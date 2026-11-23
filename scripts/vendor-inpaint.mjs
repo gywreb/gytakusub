@@ -1,10 +1,11 @@
 // Vendors the learned eraser's models into extension/vendor/, recording where they came from:
-//   inpaint.onnx  AOT-GAN inpainting (manga), float32, any size (multiples of 8): the fill on the CPU
+//   inpaint.onnx  AOT-GAN inpainting (manga), any size (multiples of 8), float16 weights (computes in
+//                 float32; made by scripts/half_weights.py): the fill on the CPU
 //   lama.onnx     LaMa finetuned on manga and anime, fixed at 512 × 512, float16 weights (computes in
 //                 float32): the fill on a graphics card (ADR 0015); made by scripts/lama-static.py
 // Downloaded at pinned Hugging Face revisions and checked against their sha256.
 //
-//   node scripts/vendor-inpaint.mjs           download and vendor (lama.onnx needs python3 with onnx, onnxsim, numpy)
+//   node scripts/vendor-inpaint.mjs           download and vendor (python3 with onnx and numpy; lama.onnx also onnxsim)
 //   node scripts/vendor-inpaint.mjs --check   the vendored files match their records
 import fs from "node:fs";
 import path from "node:path";
@@ -20,13 +21,16 @@ const MODELS = {
   inpaint: {
     repo: "lemondouble/lemon-manga-translator", rev: "e8c08f38f188db684fdc32c4cf88627c7df92096",
     out: "inpaint.onnx", src: "onnx/aot-inpainting/aot_folded.onnx", sha256: "e0d8f438ca9567eccc9d358963427601b6f64a650cbe6189ec82fc43830a0390",
-    license: "GPL-3.0", what: "AOT-GAN inpainting trained on manga (float32)",
+    license: "GPL-3.0", what: "AOT-GAN inpainting trained on manga, float16 weights",
+    made: "scripts/half_weights.py",
+    convert: (src, dst) => execFileSync("python3", [path.join(root, "scripts", "half_weights.py"), src, dst], { stdio: "inherit" }),
   },
   lama: {
     repo: "ogkalu/lama-manga-onnx-dynamic", rev: "ee4ed4a8447b6730fc41d34f90876b6c48af925a",
     out: "lama.onnx", src: "lama-manga-dynamic.onnx", sha256: "de31ffa5ba26916b8ea35319f6c12151ff9654d4261bccf0583a69bb095315f9",
     license: "Apache-2.0 (the ONNX export; LaMa: Apache-2.0; the manga weights, dreMaz/AnimeMangaInpainting: MIT)",
     what: "LaMa finetuned on 300k manga and anime images, fixed at 512 x 512, float16 weights",
+    made: "scripts/lama-static.py --side 512",
     convert: (src, dst) => execFileSync("python3", [path.join(root, "scripts", "lama-static.py"), src, dst, "--side", "512"], { stdio: "inherit" }),
   },
 };
@@ -57,7 +61,7 @@ for (const name of want) {
   if (!upSha.startsWith(m.sha256)) throw new Error(`${m.src}: sha256 ${upSha} is not the pinned ${m.sha256}`);
   if (m.convert) m.convert(file, path.join(vendor, m.out)); else fs.writeFileSync(path.join(vendor, m.out), upstream);
   const bytes = fs.readFileSync(path.join(vendor, m.out));
-  const info = { source: `https://huggingface.co/${m.repo}/blob/${m.rev}/${m.src}`, upstreamSha256: upSha, ...(m.convert ? { made: "scripts/lama-static.py --side 512" } : {}), license: m.license, what: m.what, bytes: bytes.length, sha256: sha(bytes) };
+  const info = { source: `https://huggingface.co/${m.repo}/blob/${m.rev}/${m.src}`, upstreamSha256: upSha, ...(m.made ? { made: m.made } : {}), license: m.license, what: m.what, bytes: bytes.length, sha256: sha(bytes) };
   fs.writeFileSync(path.join(vendor, m.out.replace(/\.onnx$/, ".json")), JSON.stringify(info, null, 2) + "\n");
   console.log(`vendored ${m.out} (${(bytes.length / 1e6).toFixed(1)} MB) from ${m.repo}@${m.rev.slice(0, 7)}`);
 }

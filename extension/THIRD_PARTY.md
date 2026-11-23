@@ -9,7 +9,7 @@ following, each under its own licence; the licence texts ship next to the files.
 | ONNX Runtime Web 1.31.1 (Microsoft) | `vendor/ort/` | MIT | `vendor/ort/LICENSE-onnxruntime.txt` |
 | PaddleOCR PP-OCRv6 (small) text detector | `vendor/ppocr-det.onnx`, `vendor/ppocr-det.json` | Apache-2.0 | `vendor/LICENSE-PaddleOCR.txt` |
 | Speech-bubble segmentation model (kitsumed, Ultralytics YOLOv8m-seg), int8 weights | `vendor/segment.onnx` (CPU and WebGPU), `vendor/segment.json` | GPL-3.0 (model card) / Ultralytics AGPL-3.0 | `vendor/LICENSE-segment.txt` |
-| AOT-GAN inpainting model trained on manga (lemon-manga-translator), float32 | `vendor/inpaint.onnx`, `vendor/inpaint.json` (source and checksum) | GPL-3.0 | `vendor/LICENSE-inpaint.txt` |
+| AOT-GAN inpainting model trained on manga (lemon-manga-translator), float16 weights (computed in float32; `scripts/half_weights.py`) | `vendor/inpaint.onnx`, `vendor/inpaint.json` (source and checksum) | GPL-3.0 | `vendor/LICENSE-inpaint.txt` |
 | LaMa inpainting finetuned on manga and anime (dreMaz/AnimeMangaInpainting, ONNX export by ogkalu), fixed at 512 px, float16 weights | `vendor/lama.onnx`, `vendor/lama.json` (source and checksum) | Apache-2.0 (export, LaMa); MIT (weights) | `vendor/LICENSE-lama.txt` |
 | hyphen (hyphenation library) with English patterns | `vendor/hyphen-en.js` | ISC | `vendor/LICENSE-hyphen.txt` |
 | Hyphenation patterns: German, Spanish, French, Italian, Dutch, Polish, Portuguese, Ukrainian (hyph-utf8, via hyphen) | `vendor/hyphen/*.json` | MIT, BSD-3-Clause (each file's terms) | `vendor/hyphen/LICENSE-patterns.txt` |
