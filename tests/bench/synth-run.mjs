@@ -29,13 +29,13 @@ import { createCanvas } from "canvas";
 process.chdir(path.dirname(new URL(import.meta.url).pathname) + "/..");
 const { cv, detector, analyzePage } = await import("../cv-node.mjs");
 const { lookAgain } = await import("../../extension/engine/page.js");
-const { layout, tells, roomShape, erode } = await import("../../extension/engine/layout.js");
+const { layout, tells, roomShape } = await import("../../extension/engine/layout.js");
 const { erase, fillTexture } = await import("../../extension/engine/erase.js");
 const { loadLettering } = await import("../lettering-setup.mjs");
 const GyText = loadLettering();
 const { makePage, englishFor, rng } = await import("./synth.mjs");
 const { sizeLabel } = await import("./labels.mjs");
-const { sizeLimits, limitCounts, fitsInside } = await import("./limits.mjs");
+const { sizeLimits, limitCounts, fitsInside, erodeGrid } = await import("./limits.mjs");
 
 const argv = process.argv.slice(2), opt = (k) => { const i = argv.indexOf(k); return i >= 0 ? argv.splice(i, 2)[1] : null; };
 const whyFile = opt("--why"); // (--why file: each avoidable line refitted with one cause removed at a time, as JSON lines)
@@ -127,7 +127,7 @@ for (let seed = +first; seed < +first + +count; seed++) {
     if (clear) { // the interior less a band as wide as the touching distance
       const gw = x1 - x0 + 1, gh = y1 - y0 + 1, g = new Uint8Array(gw * gh);
       for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) g[y * gw + x] = m[(y0 + y) * W + x0 + x];
-      m = erode(g, gw, gh, Math.max(2, Math.round(0.1 * b.letter))); ox = x0; oy = y0; mw = gw;
+      m = erodeGrid(g, gw, gh, Math.max(2, Math.round(0.1 * b.letter))); ox = x0; oy = y0; mw = gw;
     }
     const inside = (x, y) => { const X = (x | 0) - ox, Y = (y | 0) - oy; return X >= 0 && Y >= 0 && X < mw && (Y * mw + X) < m.length && m[Y * mw + X] === 1; };
     return fitsInside(GyText, boundCtx, family, p.text, inside, { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 }, Math.ceil(0.7 * 1.45 * b.letter));
