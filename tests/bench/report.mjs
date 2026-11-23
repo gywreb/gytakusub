@@ -69,7 +69,7 @@ const quality = [
   "On generated pages, where every letter size and bubble is known exactly:",
   "",
   `- **The size estimate:** with the true letter size, ${pct(sum(generated, "smallLetter"), sum(generated, "lines"))} of lines are set small, against ${pct(sum(generated, "small"), sum(generated, "lines"))}.`,
-  `- **The translation's length:** of the lines set small that are alone in their bubble, ${pct(sum(generated, "smallGeometry"), sum(generated, "smallGeometry") + sum(generated, "smallAvoidable"))} could not be set at 0.7 of their size in that bubble however they were laid out, with no margin from the outline. The rest (${n(sum(generated, "smallAvoidable"))} lines) could have been.`,
+  `- **The translation's length:** of the lines set small that are alone in their bubble, ${pct(sum(generated, "smallGeometry"), sum(generated, "smallGeometry") + sum(generated, "smallAvoidable"))} could not be set at 0.7 of their size in that bubble however they were laid out, with no margin from the outline. The rest (${n(sum(generated, "smallAvoidable"))} lines) could have been${generated.some((r) => "smallAvoidableClear" in r) ? `; ${n(sum(generated, "smallAvoidableClear"))} of them (${pct(sum(generated, "smallAvoidableClear"), sum(generated, "lines"))} of all lines) keeping their letters clear of the outline, as the engine does since 2.15. The others fit only by touching it` : ""}.`,
   `- Not judged: ${n(sum(generated, "smallShared"))} small lines that share their bubble with another line, and ${n(sum(generated, "smallFree"))} over the art.`,
 ].join("\n");
 
