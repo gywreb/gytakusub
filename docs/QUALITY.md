@@ -137,7 +137,9 @@ node bench/report.mjs --real 'bench/runs/m109*.jsonl' --generated 'bench/runs/sy
 `--dump <dir>` writes each looked-at page's render and details for examining failures. A run can
 be stopped and started again: pages already counted are skipped. `--max N` stops after N pages
 (node's memory grows over a long run; a loop that restarts it is in the bench's header).
-`--printed` adds lettering printed on objects and slanted free text to the generated pages.
+`--printed` adds lettering printed on objects and slanted free text to the generated pages;
+`--readers` the bubble shapes the owner's chapters showed; `--webtoon` dark bubbles with coloured
+lettering and bubbles cut by the image's edge, as a webtoon episode has them.
 
 The numbers the engine decides with are in `extension/engine/tuning.js`. `GYT_TUNE` changes some
 for one run, to see what a result hangs on; a name that is not a tuning value stops the run:

@@ -148,7 +148,7 @@ You pay Anthropic per page through your own key. One page is one request: the im
 - Sound effects stay as drawn.
 - Translations are set horizontally, also into Japanese and Chinese. Right-to-left languages (Arabic, Hebrew, Persian) are not lettered right yet.
 - Chapter links can't be read from sites behind a login, a "checking your browser" wall, or pages built by a script. Screenshots work for those.
-- The extension is large (about 200 MB unpacked) because the models are bundled.
+- The extension is large (about 190 MB unpacked) because the models are bundled.
 
 More in [`extension/README.md`](extension/README.md#known-limitations).
 
