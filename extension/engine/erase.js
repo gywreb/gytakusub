@@ -56,6 +56,32 @@ function eraseRegions(cv, img, analysis, regionIds, opts, own) {
     for (let y = g.y; y < g.y + g.h; y++) for (let x = g.x; x < g.x + g.w; x++) { const p = y * W + x; if (labels[p] === lbl) md[p] = 255; }
   };
 
+  // Each mark's thickness: twice its distance transform's peak (its stroke's width where widest),
+  // over the components `Lb` of a mask (w × h). Lettering is drawn with one pen: the pen of a line
+  // is the thickness most of its own ink has (the components on its box, `core`, weighted by ink).
+  // A mark swept up beside it as lettering (a dash, a long vowel mark, punctuation) is drawn with
+  // that pen too; a stroke far thinner is something else — a panel's frame, an outline of a cloud,
+  // screentone. Letter-sized thresholds alone could not tell: around brush lettering 158 px tall
+  // (a title the bubble model took for a bubble, 3.0) every frame line and cloud near it was
+  // "letter-sized" and was erased.
+  const thicknessOf = (mask, Lb, n, w, h) => {
+    const dist = own(new cv.Mat()); cv.distanceTransform(mask, dist, cv.DIST_L2, 3);
+    const D = dist.data32F, t = new Float32Array(n);
+    for (let i = 0; i < w * h; i++) { const l = Lb[i]; if (l && D[i] > t[l]) t[l] = D[i]; }
+    dist.delete();
+    for (let i = 1; i < n; i++) t[i] *= 2;
+    return t;
+  };
+  // the pen of the marks on the line's boxes (`core`), from the components' stats
+  const penAt = (S, n, thick, core) => {
+    const marks = [];
+    for (let i = 1; i < n; i++) {
+      const cx = S[i * 5], cy = S[i * 5 + 1], cw = S[i * 5 + 2], ch = S[i * 5 + 3];
+      if (core.some((b) => cx < b.x + b.w && cx + cw > b.x && cy < b.y + b.h && cy + ch > b.y)) marks.push({ t: thick[i], a: S[i * 5 + 4] });
+    }
+    return penOf(marks);
+  };
+
   // Learned analysis: the lettering is the ink inside each detected text box (grown
   // by a third of a letter across the lines and most of a letter along them, where
   // the detector tends to stop short of a last glyph), as connected components that
@@ -63,6 +89,9 @@ function eraseRegions(cv, img, analysis, regionIds, opts, own) {
   // not a letter.
   // the extent of what the current region's lettering painted: the area to fill must hold all of it
   let painted = null;
+  // the pens of the current region's lines (paintTextBox), and theirs as one: the median
+  let pens = [];
+  const regionPen = () => (pens.length ? pens.slice().sort((p, q) => p - q)[pens.length >> 1] : 0);
   const extend = (x0, y0, x1, y1) => { painted = painted ? { x0: Math.min(painted.x0, x0), y0: Math.min(painted.y0, y0), x1: Math.max(painted.x1, x1), y1: Math.max(painted.y1, y1) } : { x0, y0, x1, y1 }; };
   const paintTextBox = (pols, b, letter, inside = null, withColour = true) => {
     pols = (Array.isArray(pols) ? pols : [pols]).filter(Boolean);
@@ -89,6 +118,9 @@ function eraseRegions(cv, img, analysis, regionIds, opts, own) {
         const n = cv.connectedComponentsWithStats(roi, lab, st, ce, 8, cv.CV_32S);
         const S = st.data32S, Lb = lab.data32S;
         const keep = new Uint8Array(n);
+        // the line's own pen: the marks on its box
+        const thick = thicknessOf(roi, Lb, n, w, h), pen = penAt(S, n, thick, [{ x: b.gbox.x - x0, y: b.gbox.y - y0, w: b.gbox.w, h: b.gbox.h }]);
+        if (pen) pens.push(pen);
         for (let i = 1; i < n; i++) {
           const cx = S[i * 5], cy = S[i * 5 + 1], cw = S[i * 5 + 2], ch = S[i * 5 + 3];
           const touches = cx <= 0 || cy <= 0 || cx + cw >= w || cy + ch >= h;
@@ -100,7 +132,9 @@ function eraseRegions(cv, img, analysis, regionIds, opts, own) {
           // own fill would paint over
           const X0 = x0 + cx, Y0 = y0 + cy;
           if (colour && inside && !(inside(X0 - 1, Y0 - 1) && inside(X0 + cw, Y0 - 1) && inside(X0 - 1, Y0 + ch) && inside(X0 + cw, Y0 + ch))) continue;
-          if (!touches && (b.vertical ? cw : ch) <= ERASE.markLetters * letter) { keep[i] = 1; extend(X0, Y0, X0 + cw, Y0 + ch); }
+          // (a mark on the line's own box is its lettering whatever its pen: a typeface's thin strokes)
+          const onBox = X0 < b.gbox.x + b.gbox.w && X0 + cw > b.gbox.x && Y0 < b.gbox.y + b.gbox.h && Y0 + ch > b.gbox.y;
+          if (!touches && (b.vertical ? cw : ch) <= ERASE.markLetters * letter && (onBox || ofPen(thick[i], pen))) { keep[i] = 1; extend(X0, Y0, X0 + cw, Y0 + ch); }
         }
         for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) { const l = Lb[yy * w + xx]; if (l && keep[l]) md[(y0 + yy) * W + x0 + xx] = 255; }
         roi.delete(); lab.delete(); st.delete(); ce.delete();
@@ -175,12 +209,15 @@ function eraseRegions(cv, img, analysis, regionIds, opts, own) {
   // inside the interior (never the outline, nor art past it), reaching into the lettering's zone,
   // and letter-sized — or a stroke as thin as a letter, however long (a stretched long vowel mark,
   // a wave dash running past the detector's box). Painted into the page's mask.
-  const keepLettering = (m, x, y, w, h, zone, letter, inside, e = 1) => {
+  const keepLettering = (m, x, y, w, h, zone, letter, inside, e = 1, pen = 0, core = []) => {
     const lab = own(new cv.Mat()), st = own(new cv.Mat()), ce = own(new cv.Mat());
     const n = cv.connectedComponentsWithStats(m, lab, st, ce, 8, cv.CV_32S);
     const S = st.data32S, Lb = lab.data32S, keep = new Uint8Array(n);
+    const thick = pen ? thicknessOf(m, Lb, n, w, h) : null;
     for (let i = 1; i < n; i++) {
       const cx = x + S[i * 5], cy = y + S[i * 5 + 1], cw = S[i * 5 + 2], ch = S[i * 5 + 3];
+      // drawn with another pen (the lettering's: penOf), away from the lines' own boxes
+      if (thick && !ofPen(thick[i], pen) && !core.some((g) => cx < g.x + g.w && cx + cw > g.x && cy < g.y + g.h && cy + ch > g.y)) continue;
       // not a letter (a drawing) — but a long stroke as thin as one is: a stretched long vowel mark
       const long = cw > ERASE.longLetters * letter || ch > ERASE.longLetters * letter;
       if (long && !(Math.min(cw, ch) <= ERASE.strokeLetters * letter && Math.max(cw, ch) <= ERASE.strokeSpan * Math.max(w, h))) continue;
@@ -227,7 +264,7 @@ function eraseRegions(cv, img, analysis, regionIds, opts, own) {
       const X = x + xx, Y = y + yy, p = (Y * W + X) * 4;
       if (inside(X, Y) && Math.max(Math.abs(pix[p] - c[0]), Math.abs(pix[p + 1] - c[1]), Math.abs(pix[p + 2] - c[2])) > COLOUR_APART) d[yy * w + xx] = 255;
     }
-    keepLettering(m, x, y, w, h, zone, letter, inside);
+    keepLettering(m, x, y, w, h, zone, letter, inside, 1, regionPen(), blocks.map((b) => b.gbox));
     m.delete();
   };
 
@@ -245,7 +282,7 @@ function eraseRegions(cv, img, analysis, regionIds, opts, own) {
     // its own ink only that far from the interior's edge which the outline's would be (an interior
     // drawn a little past the outline holds pieces of it)
     const roi = own(P.inkMask.roi(new cv.Rect(x, y, w, h)));
-    keepLettering(roi, x, y, w, h, zone, letter, inside, Math.max(ERASE.keepDepthMinPx, Math.round(ERASE.keepDepthLetters * letter)));
+    keepLettering(roi, x, y, w, h, zone, letter, inside, Math.max(ERASE.keepDepthMinPx, Math.round(ERASE.keepDepthLetters * letter)), regionPen(), blocks.map((b) => b.gbox));
     roi.delete();
   };
 
@@ -279,7 +316,7 @@ function eraseRegions(cv, img, analysis, regionIds, opts, own) {
       const letter = Math.max(ERASE.minLetterPx, r.letter);
       const blocks = r.kind === "bubble" ? r.ref.blocks : [r.ref];
       let roi;
-      painted = null;
+      painted = null; pens = [];
       if (blocks.length) {
         // Free text: line by line (`parts`, the detected lines a paragraph was merged from), not
         // the paragraph's whole box: lines chained across a picture make a box that holds the art
@@ -432,6 +469,21 @@ function eraseRegions(cv, img, analysis, regionIds, opts, own) {
   mask.delete();
   return { image: result, rois: rois.map((r) => ({ x: r.x, y: r.y, w: r.w, h: r.h })) };
 }
+
+/**
+ * A line's pen: the thickness (`t`) most of the ink (`a`) of its marks has, the median weighted by
+ * ink; 0 with no marks.
+ * @param {Array<{t:number,a:number}>} marks
+ */
+export function penOf(marks) {
+  if (!marks.length) return 0;
+  const xs = marks.slice().sort((p, q) => p.t - q.t);
+  let half = xs.reduce((s, m) => s + m.a, 0) / 2;
+  for (const m of xs) if ((half -= m.a) <= 0) return m.t;
+  return xs[xs.length - 1].t;
+}
+/** A mark `t` thick is drawn with pen `pen` unless far thinner; a pen of a few pixels judges nothing. */
+export const ofPen = (t, pen) => !(pen * ERASE.penShare >= ERASE.penMinPx && t < pen * ERASE.penShare);
 
 /**
  * The bubble's outline inside an area, where the bubble's interior takes it in: ink of the
