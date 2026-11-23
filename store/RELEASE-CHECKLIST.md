@@ -2,6 +2,23 @@
 
 Everything below is a one-time account step or a copy-paste from `store/LISTING.md`. Budget: US$5 one-time developer fee; nothing else.
 
+## Releasing 3.0.0, public (the item already exists)
+
+Checked before the PR (23 Nov): the store zip builds (157.8 MB, 201 MB unpacked, 108 files, `manifest.json` at its root; the store takes up to 2 GB), and that exact zip loads in Chromium: the setup page opens on install, and Options, the popup and the setup page load with no errors. The permissions are the same as 2.10.0's, so people updating aren't asked anything new. The listing text, the five screenshots and the privacy policy are updated for 3.0.0.
+
+1. **Merge PR #38**, then wait for both runs on `main`: **Tests** (about 30 min) and **Deploy web app to GitHub Pages**. The deploy after 2.15.0 failed with GitHub's "Deployment failed, try again later"; if this one fails too, open it in Actions and press **Re-run all jobs**.
+2. **The privacy policy is live:** https://gywreb.github.io/gytakusub/privacy.html says "(3.0.0)" in its dates line.
+3. **`node scripts/release.mjs`** from the repo folder. CI tests again and makes the GitHub Release `v3.0.0` with `gytakusub-extension-3.0.0.zip`. Store upload isn't set up, so the zip waits there.
+4. **Try that zip once** in a fresh Brave profile: setup page → I agree → key → Allow access → translate one page.
+5. **Dashboard → the item:** if a version is still in review, ⋮ → **Cancel review**. Then **Package → Upload new package** with the zip.
+6. **Store listing:** paste the new **Description** from `LISTING.md`. Replace **all five screenshots** with the ones in `store/assets/` (made again for 3.0.0). The icon and promo tile are unchanged.
+7. **Privacy practices:** paste the new **Remote code** row (it now names the inpainting models). The other answers are unchanged.
+8. **Test instructions:** a new spend-limited review key (`LISTING.md` → Test instructions). Revoke it after the review.
+9. **Account → Trader status**, if not declared yet (required for public items; your call, see "Going public").
+10. **Distribution:** Visibility **Public**, all regions, free. Then **Submit for review**.
+11. "Pending review" isn't approved. Wait for Google's email; on a rejection, paste it to me verbatim (§ 7).
+12. **After approval:** install from the public listing in a fresh profile and walk through the setup page once.
+
 ## 0. Before you start (5 min)
 - [ ] Load `extension/` unpacked in Brave one more time, open Options → Test key, and translate one page end to end. (CI runs the real extension in headless Chromium, but against a mock API; a real key on a real site is the one check only you can do.)
 - [ ] `git pull` and take the zip from the GitHub Release of the tag you tested (`gytakusub-extension-X.Y.Z.zip`; CI builds it only after the full test suite passes on that tag, and it is `extension/` minus `icon512.png`).

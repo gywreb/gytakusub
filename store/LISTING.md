@@ -1,6 +1,6 @@
 # Chrome Web Store listing — Gytakusub
 
-Last updated for 2.9.0 (lettering in every listed language).
+Last updated for 3.0.0 (the core, measured).
 
 Copy each block into the matching field of the Developer Dashboard. Keep the wording: it is written to match what the extension actually does (reviewers compare listing claims against behaviour) and to stay generic about content sources.
 
@@ -15,10 +15,12 @@ Translate manga and comic pages in place, right on the page, using your own Clau
 
 **Description**
 ```
-Gytakusub re-letters comic and manga pages in your browser. Hover a page and click Translate, press Alt+T to translate everything on screen, or turn on auto-translate for a site you read regularly. Speech bubbles are detected on your device, the original lettering is replaced inside the bubble, and the translation is typeset to fit — artwork stays untouched.
+Gytakusub re-letters comic and manga pages in your browser. Hover a page and click Translate, press Alt+T to translate everything on screen, or turn on auto-translate for a site you read regularly. Speech bubbles are detected on your device, the original lettering is erased, and the translation is lettered into the bubble's shape at the original's size. Sound effects stay as drawn.
 
 HOW IT WORKS
-• Text and speech bubbles are found locally by open-source models (PaddleOCR's text detector and a speech-bubble segmentation model) and OpenCV, all running in your browser — on the graphics card when available. No page content is read except the images you translate.
+• Text and speech bubbles are found locally by open-source models (PaddleOCR's text detector and a speech-bubble segmentation model) and OpenCV, all running in your browser, on the graphics card when available. No page content is read except the images you translate.
+• The original lettering is erased on your device: bubbles keep their own white, screentone is continued, and other surfaces are filled by inpainting models trained on manga.
+• The translation is drawn at your screen's own resolution, and drawn again when you zoom or resize.
 • The image is sent directly from your browser to Anthropic's Claude API using YOUR API key. Gytakusub has no server and never sees your data.
 • Names and recent dialogue are carried from page to page so translations stay consistent through a chapter.
 • Japanese (including vertical text), Korean, Chinese, Spanish, Italian and most other languages → the language you pick: English, Vietnamese, Spanish, Portuguese, Indonesian, French, German, Chinese, Japanese, Korean, Thai and more, or any other you type, lettered in a font that has all its letters.
@@ -32,10 +34,10 @@ YOU STAY IN CONTROL
 • Glossary for names and terms; custom instructions; model choice (Haiku for speed, Sonnet/Opus for difficult pages).
 • Results are cached for the browser session so re-reading costs nothing.
 • See what it costs: your real cost per page for each model, and today's and this month's spend, counted from Claude's own answers to this browser (Settings → What translating costs). To cap spending on every device, it points you to the Console's spend limit.
-• Double-click a translated bubble to correct a line or add a term to the glossary; an option lets you peek at the original by hovering.
+• Double-click a translated line (or press Enter on it) to correct it or add a term to the glossary; an option lets you peek at the original by hovering.
 
 REQUIREMENTS
-You need a Claude API key from platform.claude.com (pay-per-use; Claude Max, Ultra and Team plans include monthly API credits). The key is stored only in your browser.
+You need a Claude API key from platform.claude.com (pay-per-use, billed by Anthropic to your account). The key is stored only in your browser.
 
 PRIVACY
 No analytics, no telemetry, no account. The page images you translate (with your glossary and the chapter's names, for consistency) go to api.anthropic.com only, with your key. Full policy: https://gywreb.github.io/gytakusub/privacy.html
@@ -61,9 +63,14 @@ https://github.com/gywreb/gytakusub/issues
 
 **Graphic assets** (in `store/assets/`)
 - Icon 128×128: `extension/icons/icon128.png`
-- Screenshots 1280×800, in this order: `screenshot-1-before-after.png`, `screenshot-2-closeup.png`, `screenshot-3-how-it-works.png`, `screenshot-4-japanese.png`, `screenshot-5-controls.png` (made by `npm run assets` in `tests/`: 1–4 render test pages through the engine, 5 is the real popup and Options page with demo data)
+- Screenshots 1280×800, in this order: `screenshot-1-before-after.png`, `screenshot-2-closeup.png`, `screenshot-3-how-it-works.png`, `screenshot-4-japanese.png`, `screenshot-5-controls.png` (made by `npm run assets` in `tests/`: 1–4 render test pages through the engine, erased with the learned fill the extension runs on the CPU; 5 is the real popup and Options page with demo data). Made again for 3.0.0: replace all five in the dashboard.
 - Small promo tile 440×280: `promo-small-440x280.png`
 - Marquee 1400×560: optional, not provided
+
+**What's new in 3.0.0** (paste into the version notes if the dashboard asks)
+```
+A cleaner, sharper page. The original lettering is erased by inpainting models trained on manga, so screentone and art continue under it; sound effects and logos stay as drawn. Translations are set to each bubble's shape at the original lettering's size, keep clear of its outline, and are drawn at your screen's own resolution. The same page now comes out the same with or without a graphics card. Long chapters no longer fail partway, and keyboard and screen-reader users can reach and edit every translated line.
+```
 
 **What's new in 2.9.0** (paste into the version notes if the dashboard asks)
 ```
@@ -110,7 +117,7 @@ Translates the text inside comic and manga page images that the user is viewing,
 | `activeTab` | Lets the user invoke the translator on the current tab from the toolbar button or keyboard shortcut without the extension running on every page. |
 | `scripting` | Injects the translator only into the current tab on user request, and registers it for the specific sites the user has enabled in the popup/options. |
 | Optional host permission `<all_urls>` (`optional_host_permissions`; not granted at install) | Requested at runtime, in a click, the first time the user enables a site, starts auto-translate or translates, after a setup page explains why. Comic pages are served from many image CDNs that differ from the page's own domain and block cross-origin reads, so the background worker needs host access to fetch the image the user asked to translate so its pixels can be analysed. It downloads only images (checked by their bytes, capped at 25 MB). The extension does not read or modify any other page content and does not run on sites the user has not enabled or explicitly invoked it on. The user can remove the access in Settings → About. |
-| Remote code | Not used. All code and models are packaged in the extension: OpenCV and ONNX Runtime (WebAssembly), the text-detection model and the speech-bubble model (ONNX files), all loaded from the extension package. The CSP allows `wasm-unsafe-eval`, not `unsafe-eval`. The only network calls are to api.anthropic.com (user's key) and to fetch the image being translated. |
+| Remote code | Not used. All code and models are packaged in the extension: OpenCV and ONNX Runtime (WebAssembly), the text-detection model, the speech-bubble model and the two inpainting models (ONNX files), all loaded from the extension package. The CSP allows `wasm-unsafe-eval`, not `unsafe-eval`. The only network calls are to api.anthropic.com (user's key) and to fetch the image being translated. |
 
 **Data usage disclosures** — tick these, and only these:
 - [x] **Authentication information** — the user's Claude API key, stored locally, transmitted only to api.anthropic.com.

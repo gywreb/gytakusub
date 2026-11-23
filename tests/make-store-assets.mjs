@@ -14,9 +14,17 @@ registerFont("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", { family: "DemoS
 import { cv, detector, analyzePage } from "./cv-node.mjs";
 import { analyze } from "../extension/engine/analyze.js";
 import { layout } from "../extension/engine/layout.js";
-import { erase } from "../extension/engine/erase.js";
+import { erase, fillTexture } from "../extension/engine/erase.js";
+import { OUTLINE } from "../extension/engine/page.js";
 import { loadLettering } from "./lettering-setup.mjs";
 loadLettering();
+// The learned fill, as the extension runs it on the CPU (AOT): Telea alone smudged the screentone
+// under the free text, which the extension doesn't (3.0: the pictures show what ships)
+const inpainter = await (async () => {
+  const { getOrt, createSession, run } = await import("../extension/engine/ort.js");
+  const { session } = await createSession(new Uint8Array(fs.readFileSync(new URL("../extension/vendor/inpaint.onnx", import.meta.url))), { gpu: false });
+  return { ort: getOrt(), session, run };
+})();
 const iou = (a, b) => { const ix = Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)), iy = Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y)); const i = ix * iy; return i / (a.w * a.h + b.w * b.h - i); };
 /**
  * A test page through the engine: analysis, layout, erase, lettering. The model's answer is
@@ -40,7 +48,9 @@ async function render(name, texts = null) {
   const items = lines.map((it, i) => ({ tag: regionFor(it, i)?.id ?? null, box: null, text: texts?.[i] ?? it.text, size: it.size, kind: it.kind }));
   const { placements, regionIds } = layout(an, items);
   const translated = createCanvas(W, H); const tctx = translated.getContext("2d");
-  tctx.putImageData(erase(cv, pixels, an, regionIds).image, 0, 0);
+  const res = erase(cv, pixels, an, regionIds, { keepMask: true, outline: OUTLINE });
+  tctx.putImageData(await fillTexture(cv, inpainter, res.image, res), 0, 0);
+  res.mask.delete(); res.surface.delete();
   const drawn = globalThis.GyText.draw(tctx, placements, {});
   an.dispose();
   console.log(`${name}: ${items.length} lines, ${items.filter((i) => i.tag != null).length} matched to a region, ${drawn} drawn`);

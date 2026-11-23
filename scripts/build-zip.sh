@@ -14,6 +14,7 @@ tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 cp -r "$root/extension" "$tmp/gytakusub"
 rm -f "$tmp/gytakusub/icons/icon512.png"   # listing asset, not needed inside the package
+rm -f "$tmp/gytakusub/dev-reload.txt"      # a developer's reload marker (git-ignored), never shipped
 find "$tmp/gytakusub" -name ".DS_Store" -delete
 (cd "$tmp/gytakusub" && zip -rq "$out" .)
 echo "built dist/$(basename "$out")"; unzip -l "$out" | tail -1
