@@ -12,8 +12,8 @@ the engine's rules cannot bend.
 
 | Books | Pages | Lines | Found before Claude answers | Lettering still seen | Set under 0.7 of its size | Art damage | Sound effects changed |
 |---|---|---|---|---|---|---|---|
-| held out | 333 | 2,752 | 96.9% | 1.8% | 13.4% | 0.12% | 0.29% |
-| looked at | 321 | 2,572 | 96.7% | 1.6% | 14.0% | 0.16% | 0.63% |
+| held out | 333 | 2,752 | 96.9% | 1.8% | 13.0% | 0.12% | 0.29% |
+| looked at | 321 | 2,572 | 96.7% | 1.6% | 13.2% | 0.16% | 0.63% |
 
 ### Generated pages
 
@@ -34,13 +34,13 @@ What holds each line set under 0.7 of its size small: the same line fitted again
 
 | Pages | Lines set small | Width (a long word across a narrow room) | Height | Either | Not the room |
 |---|---|---|---|---|---|
-| Real, held out | 13.4% | 49.3% | 3.8% | 40.3% | 6.8% |
-| Real, looked at | 14.0% | 47.9% | 4.5% | 40.4% | 7.2% |
+| Real, held out | 13.0% | 50.0% | 3.9% | 42.1% | 4.2% |
+| Real, looked at | 13.2% | 49.1% | 4.7% | 42.6% | 3.5% |
 | Generated | 12.9% | 57.2% | 0.5% | 38.0% | 4.3% |
 
 On generated pages, where every letter size and bubble is known exactly:
 
-- **The size estimate:** with the true letter size, 12.6% of lines are set small, against 12.9%.
+- **The size estimate:** with the true letter size, 12.3% of lines are set small, against 12.9%.
 - **The translation's length:** of the lines set small that are alone in their bubble, 77.4% could not be set at 0.7 of their size in that bubble however they were laid out, with no margin from the outline. The rest (31 lines) could have been.
 - Not judged: 29 small lines that share their bubble with another line, and 42 over the art.
 <!-- results:end -->

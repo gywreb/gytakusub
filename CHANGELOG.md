@@ -44,12 +44,12 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
 | Text past its bubble: generated pages (150 pages, 810 lines) | 19 (2.3%) | 9 (1.1%) |
 | Text past its bubble: the new shapes (150 pages, 1,165 lines) | 52 (4.5%) | 12 (1.0%) |
 | Lines touching their outline (within a tenth of a letter): generated (671 lines in bubbles) | 74 (11.0%) | 29 (4.3%) |
-| Lines touching their outline: the new shapes (1,026 lines in bubbles) | 200 (19.5%) | 50 (4.9%) |
+| Lines touching their outline: the new shapes (1,026 lines in bubbles) | 200 (19.5%) | 49 (4.8%) |
 | Lines a bubble could hold at 0.7 of their size, set smaller: generated | 21 (2.6%) | 14 (1.7%) |
 | Lines a bubble could hold at 0.7 of their size, set smaller: new shapes | 27 (2.3%) | 36 (3.1%) |
 | Lines under 0.7 of their size: generated | 107 (13.2%) | 109 (13.5%) |
 | Lines under 0.7 of their size: new shapes | 160 (13.7%) | 171 (14.7%) |
-| Lines under 0.7 of their size: real pages (Manga109-s, 333 pages, 2,752 lines) | 10.3% | 13.4% |
+| Lines under 0.7 of their size: real pages (Manga109-s, 333 pages, 2,752 lines) | 10.3% | 13.0% |
 | Lines over 1/0.7 of their size: generated and new shapes | 186 | 134 |
 | Korean lines under 0.7 of their size: generated (99 lines) | 14 | 10 |
 
@@ -61,12 +61,12 @@ On your chapters (replaying your reports through 2.15.0):
 - **French chapter (2.14.7 report):** 0 of 70 lines past their room.
 - **Naver episode (your 2.15.0 run tonight):** all 121 images translated, none failed. In 2.14.5's report 12 had failed. Lines past their room: 19 of 168 in your run, 10 now. The other 10 sit in dark red bubbles: on pages like 84 and 102, the red Korean under them isn't erased either. 2.14.7 does the same on these pages, so this is on the list for after 3.0.
 
-**The cost is size.** Text kept inside its bubble, off its outline, has less room than text allowed over the outline. On real pages, lines under 0.7 of their size went from 10.3% to 13.4%. The real-page bench has no outline to measure crossing against, so before this release it counted lines as full size when they ran over the outline into the art. On a real page checked by eye, four lines that crossed into the art in 2.14.7 stay inside in 2.15.0, smaller.
+**The cost is size.** Text kept inside its bubble, off its outline, has less room than text allowed over the outline. On real pages, lines under 0.7 of their size went from 10.3% to 13.0%. The real-page bench has no outline to measure crossing against, so before this release it counted lines as full size when they ran over the outline into the art. On a real page checked by eye, four lines that crossed into the art in 2.14.7 stay inside in 2.15.0, smaller.
 
 **Goals set for this release:**
 - Text past its bubble ≤ 1%: met on the new shapes (1.0%). On generated pages it's 1.1%, 9 lines, mostly in bursts, where the bubble model's mask doesn't follow the spikes.
 - Lines a bubble could hold at 0.7, set smaller ≤ 1%: not met (1.7% and 3.1%).
-- Real lines under 0.7 of their size, no worse: not met (10.3% → 13.4%; see above).
+- Real lines under 0.7 of their size, no worse: not met (10.3% → 13.0%; see above).
 
 Size inside tight bubbles is on the list for after 3.0.
 
