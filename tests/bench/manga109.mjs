@@ -15,6 +15,8 @@
 //      small     the translation drawn under 0.7 of that estimated size (smallL: of the engine's own)
 //      big       drawn over 1/0.7 (1.43) of that estimated size
 //      smallWidth/Height/Both/Neither  what holds each smallL line small (bench/limits.mjs)
+//      overArt   lines with over 3% of their ink on the page's dark pixels away from every marked
+//                line: the bubble's outline or the art past it (perLine: each line's size and share)
 // The books are split by a hash into "look" (failures there may be examined) and "held" (only
 // ever counted), so a change can't pass by fitting what was looked at.
 import "./tune-env.mjs"; // first: GYT_TUNE must be set before the engine loads
@@ -173,12 +175,46 @@ for (const [split, book, file] of picks) {
       const est = 0.8 * Math.sqrt((l.box.w * l.box.h) / n);
       letters.push({ item: p.item, est: +est.toFixed(1), letter: +p.letter.toFixed(1), drawn: +(sizes[k] / 1.45).toFixed(1) });
     });
+    // over the art: each translated line drawn alone; its ink on pixels dark in the original page
+    // and away from every marked line (grown by 6 px). In a bubble that is its outline, or the art
+    // past it. (3.0: the bench has no outline, so before 2.15 a line run over the outline into the
+    // art counted as full size; this says which.)
+    const lineArt = new Map();
+    {
+      // (the page's lines drawn all together, and again without this one: the difference is its
+      // ink at the size the page gave it)
+      const ac = createCanvas(W, H), ax = ac.getContext("2d"); GyText.draw(ax, placements, {});
+      const sc = createCanvas(W, H), sx = sc.getContext("2d");
+      placements.forEach((p, k) => {
+        if (p.item == null || !told[p.item]) return;
+        // drawn alone when that gives it the page's size (a build that sets each line on its own,
+        // or one without `skip`), else the page without it
+        const one = []; sx.clearRect(0, 0, W, H); GyText.draw(sx, [p], { sizes: one, pageTexts: placements.map((q) => q.text) });
+        const alone = Math.abs(one[0] - sizes[k]) < 1e-6;
+        if (!alone) { sx.clearRect(0, 0, W, H); GyText.draw(sx, placements, { skip: p }); }
+        const R = p.rect, xa = Math.max(0, Math.floor(R.x - 60)), ya = Math.max(0, Math.floor(R.y - 60)), xb = Math.min(W, Math.ceil(R.x + R.w + 60)), yb = Math.min(H, Math.ceil(R.y + R.h + 60));
+        if (!(xb > xa && yb > ya)) return;
+        const da = ax.getImageData(xa, ya, xb - xa, yb - ya).data, dd = sx.getImageData(xa, ya, xb - xa, yb - ya).data;
+        let all = 0, over = 0;
+        for (let y = ya; y < yb; y++) for (let x = xa; x < xb; x++) {
+          const q = ((y - ya) * (xb - xa) + (x - xa)) * 4;
+          if (alone ? dd[q + 3] <= 100 : da[q + 3] <= 100 || dd[q + 3] > 100) continue;
+          all++;
+          const o = y * W + x;
+          if (!keep[o] && (before[o * 4] + before[o * 4 + 1] + before[o * 4 + 2]) / 3 < 100) over++;
+        }
+        lineArt.set(p.item, all ? over / all : 0);
+      });
+    }
     const limits = sizeLimits(GyText, placements, sizes, [...placements.keys()].filter((k) => { const p = placements[k]; return p.item != null && told[p.item] && sizes[k] / 1.45 < 0.7 * p.letter; }), W, H);
     const row = {
       split, page: id, ms, lines: lines.length, told: told.filter(Boolean).length, found: found.filter((f, i) => f && told[i]).length,
       placed: new Set(placements.filter((p) => p.item != null).map((p) => p.item)).size,
       seen, left, damage: +(1000 * changed / (W * H)).toFixed(2), sfxArea, sfxChanged: changedSfx,
       letterFar: letters.filter((x) => x.letter > 2 * x.est || x.letter < 0.5 * x.est).length, small: letters.filter((x) => x.drawn < 0.7 * x.est).length, big: letters.filter((x) => x.drawn > x.est / 0.7).length, smallL: letters.filter((x) => x.drawn < 0.7 * x.letter).length, measured: letters.length, ...limitCounts(limits),
+      overArt: [...lineArt.values()].filter((v) => v > 0.03).length,
+      // per line: [drawn / its lettering's size, share of its ink over the art]
+      perLine: Object.fromEntries(letters.map((x) => [x.item, [+(x.drawn / x.letter).toFixed(3), +(lineArt.get(x.item) || 0).toFixed(3)]])),
       regions: an.regions.length, waste: an.regions.filter((q) => !lines.some((l) => cover(l.box, q.box) > 0 || cover(q.box, l.box) > 0) && !sfx.some((s) => cover(q.box, s.box) > 0.3)).length,
     };
     if (dump && split === "look") {

@@ -271,6 +271,31 @@ test("a shape keeps its own centre line when the box is trimmed afterwards: the 
   // the guard: the same lines centred on the trimmed box leave the room
   assert.ok(GyText.outsideRoom({ ...fit, cx: undefined }, trimmed, shape, measure) > 0.001, "the guard: centred on the box, they cross");
 });
+test("font sizes go in quarter pixels: a room that holds a line a fraction of a pixel larger gets it", () => {
+  // 3.0: whole pixels are 5–7% apart at dialogue sizes; most lines a bubble could hold at 0.7 of their size sat a pixel under it
+  const text = "Even though";
+  const look = GyText.lettering([text]), setFont = (s) => { ctx.font = `bold ${s}px ${look.family}`; }, measure = (s) => ctx.measureText(s).width;
+  setFont(20); const w20 = measure(text); setFont(21); const w21 = measure(text);
+  const w = (w20 + w21) / 2; // room between the two whole sizes
+  const f = GyText.fitText(text, { x: 0, y: 0, w, h: 25 }, setFont, measure, { maxSize: 30, minSize: 8 }); // (one line only)
+  assert.ok(f.size > 20 && f.size < 21 && Number.isInteger(f.size * 4), `size ${f.size}`);
+  setFont(f.size); assert.ok(measure(text) <= w);
+});
+
+test("a box fit is judged by its letters' ink: a descender over the room's bottom counts as outside", () => {
+  const look = GyText.lettering(["gypsy"]), setFont = (s) => { ctx.font = `bold ${s}px ${look.family}`; }, measure = (s) => ctx.measureText(s).width;
+  setFont(40);
+  const ink = (s) => { ctx.textAlign = "center"; ctx.textBaseline = "middle"; const m = ctx.measureText(s); return { l: m.actualBoundingBoxLeft, r: m.actualBoundingBoxRight, a: m.actualBoundingBoxAscent, d: m.actualBoundingBoxDescent }; };
+  const fit = { size: 40, lines: ["gypsy"], lineHeight: 46, cy: 100 };
+  const m = ink("gypsy");
+  // a room whose rows end just under the line's middle 0.8 but over its descenders
+  const shape = { dy: 0, step: 1, half: Array(Math.round(0.4 * 40 + 23)).fill(200), edge: 0, cx: 100, top: 100 - 23 };
+  const rect = { x: 0, y: 77, w: 200, h: 46 };
+  assert.ok(m.d > 0.4 * 40 + 1, "the font's descenders reach past the middle 0.8");
+  assert.equal(GyText.outsideRoom(fit, rect, shape, measure), 0, "by the middle 0.8: all inside");
+  assert.ok(GyText.outsideRoom(fit, rect, shape, measure, false, ink) > 0, "by the ink: the descenders are outside");
+});
+
 test("a room that narrows under the lettering: the block moves to where the room is wide, every line inside", () => {
   // a caption box whose room is wide over its top 80 px and a strip below (the bubble's tail, a
   // corner): centred on the box, the block could take 60 px at most; above, it takes up to 80

@@ -4,6 +4,67 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
 
 ## [Unreleased]
 
+## [3.0.0] — 2026-11-23
+
+The core, measured. 3.0 is the release of the work since 2.10.0 (2.11 to 2.15 were not released on their own), and the last step of its plan: text that fits its bubble, and the same page on the CPU and on a graphics card.
+
+### Since 2.10.0
+- **Sharp on every screen** (2.11): the translation is drawn at the screen's own pixels and drawn again when the window or zoom changes.
+- **Clean bubbles and clean art** (2.12, 2.13): a learned eraser continues screentone and art (LaMa on a graphics card), and what Claude reads is either erased or left exactly as drawn. Sound effects and logos stay as drawn.
+- **Measured on pages never tuned on** (2.14): every change is checked on 333 real pages from held-out Manga109-s books and on generated pages in seven scripts, never looked at while changing the engine ([docs/QUALITY.md](docs/QUALITY.md)).
+- **Text stays in its bubble** (2.15): set to the bubble's shape, off its outline, at the lettering's size; Korean measured on whole syllables.
+- **Long chapters no longer fail partway** (2.14.6, 2.14.7): a page frees all it used, however it ends.
+- Each step's details are in its section below.
+
+### Pages
+- **The same page comes out the same on a graphics card and on the CPU.** The bubble model came in two variants, one per backend, and they drew bubbles a few pixels apart. In your French chapter's page 9, the bubbles came out 12 px apart, and a report replayed here didn't reproduce your screen. One model now serves both: replayed on the CPU, your pages 9 and 20 come out as on your graphics card (page 9 within 1 px, page 20 exactly). The extension is 43 MB smaller (about 200 MB unpacked). [ADR 0020](docs/adr/0020-one-bubble-model.md)
+  - The cost: on a device without a graphics card the bubble model is slower. A generated page took 5.5 s through the whole engine against 4.7 s. Chrome, Brave and Edge with WebGPU, and Safari 26 for the web app, don't pay it.
+- **Text a fraction larger where its bubble holds it.** Font sizes now go in quarter pixels. Whole pixels are 5–7% apart at dialogue sizes, and many lines sat a pixel under what their bubble held.
+- **The margin off the outline is kept above and below the text too.** It was kept only beside it, so a line near a bubble's top or bottom curve could sit on the outline. Each row's width is now the narrowest over every pixel row it spans, not its width at the middle.
+- **A box fit is judged by its letters' real ink**, descenders and accents included. Box fits judged inside could touch a bubble's bottom curve.
+- **Text can be centred in its bubble** when the original lettering stood off the bubble's middle, if it fits larger there.
+
+**Measured on pages never looked at** (held-out halves, both versions measured again on the same bench, 2.15.0 → 3.0.0):
+
+| | 2.15.0 | 3.0.0 |
+|---|---|---|
+| Lines touching their outline: generated (671 lines in bubbles) | 29 (4.3%) | 20 (3.0%) |
+| Lines touching their outline: the new shapes (1,026 lines in bubbles) | 49 (4.8%) | 28 (2.7%) |
+| Text past its bubble: generated (810 lines) | 9 (1.1%) | 10 (1.2%) |
+| Text past its bubble: the new shapes (1,165 lines) | 12 (1.0%) | 11 (0.9%) |
+| Lines a bubble could hold at 0.7 of their size, keeping clear of the outline, set smaller: generated | 5 (0.6%) | 5 (0.6%) |
+| The same, the new shapes | 17 (1.5%) | 16 (1.4%) |
+| Lines under 0.7 of their size: generated | 109 (13.5%) | 111 (13.7%) |
+| Lines under 0.7 of their size: the new shapes | 171 (14.7%) | 172 (14.8%) |
+| Lines under 0.7 of their size: real pages (Manga109-s, 333 pages) | 13.0% | 11.1% |
+| Lines over 1/0.7 of their size: generated and new shapes | 134 | 125 |
+| Real pages: lines found before Claude answers | 96.9% | 97.1% |
+| Real pages: lettering the independent detector still sees after erasing | 1.76% | 1.66% |
+| Real pages: art damage (pixels changed away from any text) | 0.118% | 0.115% |
+| Real pages: sound effects changed | 0.29% | 0.25% |
+
+On generated pages the erasing is close to 2.15.0 but not the same, because the bubble model changed: lettering left 94 → 96 lines of 810, and 94 → 96 of 1,165. Art damage is down 5% on the new shapes but up 4.5% on the other half, and outline pixels erased are down 19% and up 14%. That rise is one page, where a bubble came out differently and the eraser took part of the art. Without that page, both are a little lower. Held-out pages are never looked at; on a looked-at real page the same thing happened when part of a big sound effect over a bubble fell inside the new bubble mask. On the real looked-at pages, art damage fell overall (1.36 → 1.22 per thousand pixels).
+
+**Lines over the outline or the art, on real pages.** Measured line by line on the 333 held-out real pages, against 2.14.7: lines with over 3% of their ink on the outline or the art beyond it went 103 (3.8%) → 73 (2.7%). Lines under 0.7 of their size went 10.3% → 11.1% (2.15.0: 13.0%). 2.15.0's changelog put the size it lost down to lines that ran over the outline and counted as full size. That holds for few of them: of the 75 lines small now and full size in 2.14.7, 5 lay over the outline or art. The cost is the margin. On the real pages looked at, the same build with no margin sets 7.9% of lines small, against 9.0% for 2.14.7 and 10.7% with the margin, and still puts fewer lines over the art than 2.14.7 (32 against 45).
+
+**The goals set for 3.0:**
+- Lines a bubble could hold at 0.7 of their size but set smaller, at most 1%: met on generated pages (0.6%), not on the new shapes (1.4%), counting the lines that would fit only by touching the outline apart. Counting them in, as when the goal was set: 2.1% and 3.3%.
+- Bubble outlines erased and art damage no worse: on real pages, met (art damage 0.118% → 0.115%). On generated pages, one of two halves is worse, through one page (above).
+- Real lines set under 0.7 of their size no worse than 10.3%: not met (11.1%). The margin off the outline costs that (above).
+- Done: the engine's contract checked in CI, its numbers in one file and per stage, letter sizes across gaps (Korean), the eraser's growth following the outline, text sized to its room, the same page on the CPU and a graphics card, only chapter pages translated.
+
+You chose to ship 3.0 with the size goals restated (23 Nov): they count with the margin kept, since text that touches its outline isn't what you want. The two left over move to 3.1: lines that follow a slanted bubble (most of the new shapes' 1.4%), and size won back without giving up the margin.
+
+### Development
+- **The real-page bench says which lines sit over the outline or the art** (`overArt`, and `perLine` to compare two builds line by line). It has no bubble outlines, so before 2.15 a line run over the outline into the art counted as full size.
+- **Lines a bubble could hold at 0.7, keeping clear of the outline** (`smallAvoidableClear`), apart from those that fit only by touching it. `--why` refits each such line with one cause removed at a time (the true letter size, no margin, the true bubble, its centre line) and records each touching line's fit.
+- **`gpu.test.mjs` requires the same page on both backends**: the same bubbles (mask IoU 0.98 or more) and the page's regions and placements within 2 px, on every fixture page, in CI.
+- `scripts/vendor-segment.mjs` vendors one bubble model; `quantize-segment.py` keeps the static variant for measuring.
+
+### Store
+- **Ready to publish publicly**: the listing text, the five screenshots (made again with this engine) and the steps for this release (`store/LISTING.md`, `store/RELEASE-CHECKLIST.md`). The store zip loads in Chromium as built, and asks for no permission 2.10.0 didn't have.
+- **Privacy policy:** a line Claude gives back untranslated is sent once more, as text, to translate it (since 2.14.0; now written down).
+
 ## [2.15.0] — 2026-11-22
 
 ### Fixed

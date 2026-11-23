@@ -9,7 +9,7 @@
 import assert from "node:assert/strict";
 import { createCanvas } from "canvas";
 import { cv, analyzePage } from "./cv-node.mjs";
-import { layout } from "../extension/engine/layout.js";
+import { layout, roomShape, erode } from "../extension/engine/layout.js";
 import { LAYOUT } from "../extension/engine/tuning.js";
 import { erase } from "../extension/engine/erase.js";
 import { loadLettering } from "./lettering-setup.mjs";
@@ -380,6 +380,42 @@ await test("lettering close to a white bubble's outline is erased without the ou
   assert.ok(before > 100, `the outline is there (${before} px)`);
   assert.ok(outline(out) > 0.9 * before, `${outline(out)} of ${before} outline pixels left`);
   assert.ok(letters < 40, `${letters} lettering pixels left`);
+});
+
+// ---------- 3.0: the margin in every direction, each row read over all its pixel rows ----------
+await test("erode: a room less every cell closer than r px to its edge (Euclidean)", () => {
+  const w = 21, h = 21, g = new Uint8Array(w * h).fill(1);
+  const k = erode(g, w, h, 3);
+  // a cell's edge at least 3 px from the border's (the cells just outside the grid): columns 3..17 kept
+  assert.equal(k[10 * w + 2], 0); assert.equal(k[10 * w + 3], 1); assert.equal(k[10 * w + 17], 1); assert.equal(k[10 * w + 18], 0);
+  assert.equal(k[3 * w + 3], 1, "the corner cell 3 px in on both axes is kept");
+  const disc = new Uint8Array(w * h); for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) disc[y * w + x] = (x - 10) ** 2 + (y - 10) ** 2 <= 81 ? 1 : 0;
+  const kd = erode(disc, w, h, 3); let n = 0; for (const v of kd) n += v;
+  assert.ok(n > 0 && n < 120, `a disc of radius 9 eroded by 3 keeps about a disc of radius 5 (${n} cells)`);
+});
+
+await test("a room's margin is kept above and below too: no row within the margin of a curved top or bottom", () => {
+  // an ellipse 160 × 80: before 3.0 the margin came off the sides only, and the first row sat on the top curve
+  const inside = (x, y) => ((x - 100) / 80) ** 2 + ((y - 60) / 40) ** 2 <= 1;
+  const bbox = { x: 20, y: 20, w: 160, h: 80 }, rect = { x: 70, y: 45, w: 60, h: 30 }, edge = 4;
+  const s = roomShape(inside, bbox, rect, [], [], edge);
+  assert.ok(s.top >= 20 + edge, `the first row starts ${s.top - 20} px under the top, the margin is ${edge}`);
+  assert.ok(s.top + s.half.length * s.step <= 100 - edge, "the last row ends the margin over the bottom");
+  // and every row's half-width keeps the margin from the outline over all the rows it spans
+  for (let k = 0; k < s.half.length; k++) {
+    if (!s.half[k]) continue;
+    for (let y = s.top + k * s.step; y < s.top + (k + 1) * s.step; y++) {
+      const reach = 80 * Math.sqrt(Math.max(0, 1 - ((y + 0.5 - 60) / 40) ** 2));
+      assert.ok(s.half[k] <= reach - edge + 1, `row ${k}: half ${s.half[k]} at y ${y}, room ${reach.toFixed(1)}`);
+    }
+  }
+});
+
+await test("a room keeps its own centre line: lettering off a bubble's middle offers the text centred in the bubble", () => {
+  const inside = (x, y) => ((x - 100) / 80) ** 2 + ((y - 60) / 40) ** 2 <= 1;
+  const s = roomShape(inside, { x: 20, y: 20, w: 160, h: 80 }, { x: 40, y: 45, w: 50, h: 30 }, [], [], 3);
+  assert.ok(Math.abs(s.axis - 100) <= 1.5, `the room's centre line at ${s.axis}, the bubble's at 100`);
+  assert.ok(Math.abs(s.cx - 65) < 1e-9, "the shape itself stays on the text's centre line");
 });
 
 console.log(`\nFREETEXT TESTS PASSED (${passed})`);

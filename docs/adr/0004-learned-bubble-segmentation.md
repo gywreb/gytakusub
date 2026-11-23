@@ -124,6 +124,8 @@ where the lettering was. 100 assertions pass with the model in place.
 
 ## GPU (WebGPU), added 2026-11-09
 
+**Superseded in part by [ADR 0020](0020-one-bubble-model.md) (3.0.0):** one model, the weight-only variant below, now serves the CPU too, so a page comes out the same on both.
+
 Both models run on ONNX Runtime's WebGPU execution provider when the context
 has a WebGPU adapter — extension service workers since Chrome 124 (Brave keeps
 WebGPU on and only blanks the adapter's identifying strings), dedicated

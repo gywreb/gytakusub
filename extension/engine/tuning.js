@@ -67,6 +67,7 @@ export const LAYOUT = tune("LAYOUT", {
   letteringHeld: 0.85,    // a bubble whose interior holds less of the lettering than this is doubted: the lettering's boxes are room
   partsCover: 0.6,        // a region's ink divides it into parts (one per line) only when they cover this share of it together
   altOffset: 1,           // the lettering's centre this many letters off its room's: the text is also tried centred on the lettering
+  axisOffset: 0.25,       // the room's own centre line this many letters off the text's: the text is also tried centred on the room's (3.0)
   joinShare: 0.3,         // a line without lettering of its own joins the anchor holding this share of its box
   cutMargin: 0.1,         // lines side by side: no cut closer than this share of the bubble to its edge
   moveMin: 0.1,           // a line moves to a region holding at least this share of its box

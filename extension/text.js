@@ -175,6 +175,14 @@
    * not fit (TeX's hyphen penalty, in spirit), and a clean fit wins unless it is
    * much smaller than the best hyphenated one.
    */
+  // Font sizes go in quarter pixels: whole pixels are 5–7% apart at dialogue sizes, and a line
+  // whose room held it a fraction of a pixel larger was set a whole pixel smaller (3.0: on generated
+  // pages, most lines a bubble could hold at 0.7 of their size sat one pixel under it). Found by
+  // whole pixels first, then the three quarters above tried, largest first.
+  const STEP = 0.25;
+  const finer = (size, cap, ok) => { for (let s = size + 1 - STEP; s > size; s -= STEP) if (s <= cap + 1e-9 && ok(s)) return s; return size; };
+  const stepDown = (v) => Math.floor(v / STEP + 1e-9) * STEP, stepUp = (v) => Math.ceil(v / STEP - 1e-9) * STEP;
+
   function fitText(text, rect, setFont, measure, opts = {}) {
     if (opts.shape) {
       // the shape's fit, or the box's when it is larger and its lines keep to the shape, margin
@@ -183,7 +191,7 @@
       // French chapter). Judged short of the margin, the box's lines came to touch the outline.
       const shaped = fitShape(text, rect, opts.shape, setFont, measure, opts);
       const boxed = fitText(text, rect, setFont, measure, { ...opts, shape: null });
-      const pick = shaped && shaped.size >= boxed.size ? shaped : !shaped ? boxed : (setFont(boxed.size), outsideRoom(boxed, rect, opts.shape, measure) <= (opts.outsideOk ?? 0.03)) ? boxed : shaped;
+      const pick = shaped && shaped.size >= boxed.size ? shaped : !shaped ? boxed : (setFont(boxed.size), outsideRoom(boxed, rect, opts.shape, measure, false, opts.ink) <= (opts.outsideOk ?? 0.03)) ? boxed : shaped;
       setFont(pick.size); return pick;
     }
     const minSize = Math.max(6, Math.round(opts.minSize ?? 8));
@@ -201,8 +209,15 @@
         if (h.hyphens && fits(h)) hyph = { size, lines: h.lines, lineHeight: size * lh, hyphens: h.hyphens };
       }
     }
-    if (clean && (!hyph || clean.size >= hyph.size * (opts.hyphenRatio ?? 0.75))) return clean;
-    if (hyph) return hyph;
+    const cap = Math.min(opts.maxSize ?? 72, rect.h);
+    const refine = (f, hyphenate) => {
+      const s = finer(f.size, cap, (t) => { setFont(t); const w = wrapInfo(measure, text, rect.w, { ...how, hyphenate }); size = t; return (hyphenate ? !!w.hyphens : true) && fits(w); });
+      if (s === f.size) return f;
+      setFont(s); const w = wrapInfo(measure, text, rect.w, { ...how, hyphenate });
+      return { size: s, lines: w.lines, lineHeight: s * lh, hyphens: w.hyphens || 0 };
+    };
+    if (clean && (!hyph || clean.size >= hyph.size * (opts.hyphenRatio ?? 0.75))) { const f = refine(clean, false); setFont(f.size); return f; }
+    if (hyph) { const f = refine(hyph, true); setFont(f.size); return f; }
     // Nothing fits even at the minimum size. Words are kept whole and allowed to
     // run past the box a little (a letterer lets a long word kiss the outline)
     // before they are ever cut letter by letter, which is unreadable. Across only: lines
@@ -311,6 +326,7 @@
     const largest = (hyphenate) => {
       let lo = minSize, hi = maxSize, found = null;
       while (lo <= hi) { const m = (lo + hi) >> 1; const w = linesAt(m, hyphenate); if (w) { found = { size: m, w }; lo = m + 1; } else hi = m - 1; }
+      if (found) { let w = null; const s = finer(found.size, Math.min(opts.maxSize ?? 72, (bottom0 - top0) / lh), (t) => !!(w = linesAt(t, hyphenate))); if (s !== found.size) found = { size: s, w: linesAt(s, hyphenate) }; }
       return found;
     };
     const plain = largest(false), hy = largest(true);
@@ -366,7 +382,7 @@
    * it per line (2.15): text that ran past its bubble showed in the owner's chapters, and nothing
    * measured it.
    */
-  function outsideRoom(fit, rect, shape, measure, toOutline = false) {
+  function outsideRoom(fit, rect, shape, measure, toOutline = false, ink = null) {
     const total = fit.lines.length * fit.lineHeight, top = (fit.cy ?? rect.y + rect.h / 2) - total / 2;
     const top0 = shape ? shapeTop(shape, rect) : rect.y, bottom0 = shape ? top0 + shape.half.length * shape.step : rect.y + rect.h;
     const sx = shape ? shapeCx(shape, rect) : rect.x + rect.w / 2, lx = fit.cx ?? rect.x + rect.w / 2; // the room's centre line, the lines'
@@ -377,12 +393,17 @@
       for (let k = Math.max(0, Math.floor((y0 - top0) / shape.step)); k <= Math.min(shape.half.length - 1, Math.floor((y1 - top0) / shape.step)); k++) h = Math.min(h, shape.half[k] ? shape.half[k] + more : 0);
       return h === Infinity ? 0 : h;
     };
-    // each line's letters: its width, and the middle 0.8 of its size (not the leading between lines)
+    // each line's letters: their ink as drawn (centred on the line's middle) when the caller can
+    // measure it, else the line's width and the middle 0.8 of its size. (3.0: the middle 0.8 left out
+    // descenders and accents, and box fits judged inside touched a bubble's bottom curve.)
     let all = 0, out = 0;
     fit.lines.forEach((line, k) => {
-      const body = 0.8 * fit.size, y0 = top + k * fit.lineHeight + (fit.lineHeight - body) / 2, y1 = y0 + body, w = measure(line), a = w * body;
+      const yc = top + (k + 0.5) * fit.lineHeight, m = ink ? ink(line) : null;
+      const y0 = m ? yc - m.a : yc - 0.4 * fit.size, y1 = m ? yc + m.d : yc + 0.4 * fit.size;
+      const x0 = m ? lx - m.l : lx - measure(line) / 2, x1 = m ? lx + m.r : lx + measure(line) / 2, a = (x1 - x0) * (y1 - y0);
+      if (!(a > 0)) return;
       const iy0 = Math.max(y0, top0), iy1 = Math.min(y1, bottom0), half = iy1 > iy0 ? halfAt(iy0, iy1) : 0;
-      const across = Math.max(0, Math.min(lx + w / 2, sx + half) - Math.max(lx - w / 2, sx - half));
+      const across = Math.max(0, Math.min(x1, sx + half) - Math.max(x0, sx - half));
       all += a; out += a - Math.max(0, iy1 - iy0) * across;
     });
     return all ? +(out / all).toFixed(3) : 0;
@@ -424,6 +445,13 @@
     const family = look.family;
     const setFont = (size) => { ctx.font = `bold ${size}px ${family}`; };
     const measure = (s) => ctx.measureText(s).width;
+    // a line's ink as drawLines() sets it (centred, on its middle): how far it reaches each way
+    const ink = (s) => {
+      const a0 = ctx.textAlign, b0 = ctx.textBaseline; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      const m = ctx.measureText(s); ctx.textAlign = a0; ctx.textBaseline = b0;
+      return Number.isFinite(m.actualBoundingBoxAscent) ? { l: m.actualBoundingBoxLeft, r: m.actualBoundingBoxRight, a: m.actualBoundingBoxAscent, d: m.actualBoundingBoxDescent } : null;
+    };
+    const inkOr = (s) => ink(s) || { l: measure(s) / 2, r: measure(s) / 2, a: 0.4 * parseFloat(ctx.font.match(/([\d.]+)px/)?.[1] || 0), d: 0.4 * parseFloat(ctx.font.match(/([\d.]+)px/)?.[1] || 0) };
     // Each line's fit: the size its room allows (`plans`), then the lines of one bubble whose
     // lettering was one size kept within 20% of each other's size, as the letterer set them alike
     // (2.15: in a two-lobe bubble of the owner's French chapter, one translation came out at 31 px and
@@ -448,7 +476,7 @@
       // the one that fits the text larger, the placement's own on a tie
       let fit = null, at = p;
       for (const t of inBubble ? [p, ...(p.alt || [])] : [p]) {
-        const f = fitText(text, t.rect, setFont, measure, { ...how, shape: inBubble ? t.shape : null, bound: inBubble ? t.bound : null });
+        const f = fitText(text, t.rect, setFont, measure, { ...how, shape: inBubble ? t.shape : null, bound: inBubble ? t.bound : null, ink: inkOr });
         if (!fit || f.size > fit.size) { fit = f; at = t; }
       }
       return { fit, at };
@@ -461,7 +489,7 @@
       if (Math.max(...letters) > Math.min(...letters) * 1.2) continue; // lettering of two sizes: a shout beside a whisper keeps both
       const least = Math.min(...group.map((q) => q.fit.size));
       for (const q of group) {
-        const size = Math.max(Math.floor(1.2 * least), Math.ceil(0.7 * q.target)); // (never pulled under 0.7 of its size: a floor took it to 0.67)
+        const size = Math.max(stepDown(1.2 * least), stepUp(0.7 * q.target)); // (never pulled under 0.7 of its size: a floor took it to 0.67)
         if (q.fit.size > size) Object.assign(q, fitBest(q.text, q.p, true, { ...q.how, maxSize: size, minSize: Math.min(q.how.minSize, size) }));
       }
     }
@@ -470,7 +498,7 @@
       setFont(fit.size);
       if (p !== opts.skip) { drawLines(ctx, fit, at.rect, p.color, family, p.halo); n++; }
       if (opts.sizes) opts.sizes[i] = fit.size; // the size each line was drawn at, for callers that need it
-      if (opts.fits) opts.fits[i] = { size: fit.size, lines: fit.lines.length, outside: outsideRoom(fit, at.rect, inBubble ? at.bound || at.shape : null, measure, true) };
+      if (opts.fits) opts.fits[i] = { size: fit.size, lines: fit.lines.length, outside: outsideRoom(fit, at.rect, inBubble ? at.bound || at.shape : null, measure, true, inkOr), fit: fit.shaped ? "shape" : fit.overflow ? "over" : fit.forced ? "forced" : fit.below ? "below" : "box", ...(at !== p ? { alt: true } : {}) };
     });
     return n;
   }

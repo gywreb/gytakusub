@@ -197,7 +197,15 @@ export function layout(an, items, opts = {}) {
         const mine = anchoredToLettering[i] ? clip(a, bbox) : null;
         const alt = !art && mine && (Math.abs(mine.x + mine.w / 2 - (rect.x + rect.w / 2)) > LAYOUT.altOffset * letter || Math.abs(mine.y + mine.h / 2 - (rect.y + rect.h / 2)) > LAYOUT.altOffset * letter) ? roomShape(inked || room, bbox, mine, [], others, edge) : null;
         const altBound = alt && inked ? roomShape(inked, bbox, mine, [], others, 0) : null;
-        placements.push({ text: m.it.text, size: m.it.size, rect, letter, measured: true, color, halo: false, tag: id, item: m.it.index ?? null, ...(shape ? { shape } : {}), ...(bound ? { bound } : {}), ...(alt ? { alt: [{ rect: mine, shape: alt, ...(altBound ? { bound: altBound } : {}) }] } : {}) });
+        // The same room around its own centre line: lettering off its bubble's middle (or a box
+        // drawn around it) put the text's centre line off the room's, and the room on both sides of
+        // that line was narrow on one side; text centred in the bubble fitted larger (3.0, generated
+        // pages: lines in clouds and slanted bubbles set under 0.7 of their size that the bubble held).
+        const axisRect = shape && Math.abs(shape.axis - shape.cx) > LAYOUT.axisOffset * letter ? { ...rect, x: shape.axis - rect.w / 2 } : null;
+        const centred = axisRect ? roomShape(inked || room, bbox, axisRect, [], others, edge) : null;
+        const centredBound = centred && inked ? roomShape(inked, bbox, axisRect, [], others, 0) : null;
+        const alts = [...(alt ? [{ rect: mine, shape: alt, ...(altBound ? { bound: altBound } : {}) }] : []), ...(centred ? [{ rect: axisRect, shape: centred, ...(centredBound ? { bound: centredBound } : {}) }] : [])];
+        placements.push({ text: m.it.text, size: m.it.size, rect, letter, measured: true, color, halo: false, tag: id, item: m.it.index ?? null, ...(shape ? { shape } : {}), ...(bound ? { bound } : {}), ...(alts.length ? { alt: alts } : {}) });
       });
       r.kept = kept.length ? kept : null;
     } else {
@@ -239,33 +247,88 @@ const area = (b) => b.w * b.h;
  * (or the lettering the line replaces, erased) reaches on both sides of the text box's centre
  * line, short of the parts kept for others (`exclude`: other speakers' lettering and the cut
  * between them, lines left as drawn). Text centred on that line stays inside. `{dy, step, half}`:
- * rows from rect.y + dy, one every `step` px, half[k] the half-width there (0: none), less `edge`:
- * a bubble's shape from the segmentation model takes in its outline, and lines set to it touched
- * the outline (2.14.1). Its centre line and top are kept too (`cx`, `top`): separate() trims the
- * placements' rects afterwards, and text centred on a trimmed rect sat off its room by up to 8 px,
- * against a caption's border (2.15, page 6 in the owner's browser). null without the bubble's shape,
- * or when the centre line is out.
+ * rows from rect.y + dy, one every `step` px, half[k] the half-width there (0: none). Its centre
+ * line and top are kept too (`cx`, `top`): separate() trims the placements' rects afterwards, and
+ * text centred on a trimmed rect sat off its room by up to 8 px, against a caption's border (2.15,
+ * page 6 in the owner's browser). null without the bubble's shape, or when the centre line is out.
+ *
+ * The margin (`edge` px) is kept in every direction: the room is eroded by it, so a line keeps it
+ * from the outline above and below as well as beside. A row's half-width is the narrowest over all
+ * the pixel rows it spans, not the width at its middle. (3.0: the margin was taken off the sides
+ * only and the width read once per row, so a line near a bubble's top or bottom curve, or at its
+ * steep sides, came within a pixel of the outline; set a fraction of a pixel larger, many touched.)
  */
 export function roomShape(inside, bbox, rect, own, exclude, edge = 0) {
   if (!inside) return null;
   const cx = rect.x + rect.w / 2;
   const ok = (x, y) => (inside(x, y) || own.some((b) => inBox(b, x, y))) && !exclude.some((e) => inBox(e, x, y));
   const step = Math.max(1, Math.round(Math.min(bbox.w, bbox.h) / LAYOUT.shapeRows));
-  const y0 = Math.floor(bbox.y), reach = Math.ceil(bbox.w);
-  const half = [];
-  for (let y = y0; y < bbox.y + bbox.h; y += step) {
-    const yy = y + step / 2;
-    if (!ok(cx, yy)) { half.push(0); continue; }
-    let l = 0, r = 0;
-    while (l < reach && ok(cx - l - 1, yy)) l++;
-    while (r < reach && ok(cx + r + 1, yy)) r++;
-    half.push(Math.max(0, Math.round(Math.min(l, r) - edge)));
+  const gx0 = Math.floor(bbox.x), gy0 = Math.floor(bbox.y), gw = Math.ceil(bbox.x + bbox.w) - gx0, gh = Math.ceil(bbox.y + bbox.h) - gy0;
+  if (!(gw > 0 && gh > 0)) return null;
+  const grid = new Uint8Array(gw * gh);
+  for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) grid[y * gw + x] = ok(gx0 + x + 0.5, gy0 + y + 0.5) ? 1 : 0;
+  const room = edge > 0 ? erode(grid, gw, gh, edge) : grid;
+  const at = (x, y) => x >= 0 && y >= 0 && x < gw && y < gh && room[y * gw + x] === 1;
+  const col = Math.floor(cx) - gx0, frac = cx - Math.floor(cx);
+  const half = [], mids = [];
+  for (let y = gy0; y < bbox.y + bbox.h; y += step) {
+    let h = Infinity, mid = null;
+    for (let r = y - gy0; r < y - gy0 + step && r < gh; r++) {
+      if (!at(col, r)) { h = 0; break; }
+      let l = 0, rr = 0;
+      while (at(col - l - 1, r)) l++;
+      while (at(col + rr + 1, r)) rr++;
+      if (frac + l < h || 1 - frac + rr < h) mid = gx0 + col + (1 + rr - l) / 2; // the run's own middle
+      h = Math.min(h, frac + l, 1 - frac + rr);
+    }
+    half.push(h === Infinity ? 0 : Math.max(0, Math.floor(h)));
+    mids.push(h > 0 && h !== Infinity ? mid : null);
   }
   let a = 0, b = half.length;
   while (a < b && !half[a]) a++;
   while (b > a && !half[b - 1]) b--;
   if (a >= b) return null;
-  return { dy: y0 + a * step - rect.y, step, half: half.slice(a, b), edge, cx, top: y0 + a * step };
+  // the room's own centre line: the middle of its rows' runs (the median), where text centred in
+  // the bubble would stand
+  const ms = mids.slice(a, b).filter((m) => m != null).sort((p, q) => p - q);
+  return { dy: gy0 + a * step - rect.y, step, half: half.slice(a, b), edge, cx, top: gy0 + a * step, axis: ms.length ? ms[ms.length >> 1] : cx };
+}
+
+/**
+ * A room grid (1: room) less every cell closer than `r` px to anything else, the grid's border included:
+ * an exact Euclidean distance transform (Felzenszwalb and Huttenlocher), rows then columns.
+ */
+export function erode(grid, w, h, r) {
+  const INF = 1e12, d = new Float64Array(w * h), f = new Float64Array(Math.max(w, h) + 2), out = new Float64Array(Math.max(w, h) + 2);
+  const v = new Int32Array(Math.max(w, h) + 2), z = new Float64Array(Math.max(w, h) + 3);
+  // squared distance along a line to the nearest zero, with zeros just past both ends
+  const pass = (n) => {
+    // f[0] and f[n+1] are the zeros past the ends
+    let k = 0; v[0] = 0; z[0] = -INF; z[1] = INF;
+    for (let q = 1; q <= n + 1; q++) {
+      let s;
+      for (;;) { s = ((f[q] + q * q) - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]); if (s <= z[k]) k--; else break; }
+      k++; v[k] = q; z[k] = s; z[k + 1] = INF;
+    }
+    k = 0;
+    for (let q = 1; q <= n; q++) { while (z[k + 1] < q) k++; out[q] = (q - v[k]) * (q - v[k]) + f[v[k]]; }
+  };
+  for (let y = 0; y < h; y++) {
+    f[0] = 0; f[w + 1] = 0;
+    for (let x = 0; x < w; x++) f[x + 1] = grid[y * w + x] ? INF : 0;
+    pass(w);
+    for (let x = 0; x < w; x++) d[y * w + x] = out[x + 1];
+  }
+  for (let x = 0; x < w; x++) {
+    f[0] = 0; f[h + 1] = 0;
+    for (let y = 0; y < h; y++) f[y + 1] = d[y * w + x];
+    pass(h);
+    for (let y = 0; y < h; y++) d[y * w + x] = out[y + 1];
+  }
+  // a cell's edge at least r px from the nearest other cell's: centres r + 1 apart
+  const keep = new Uint8Array(w * h), r2 = (r + 1) * (r + 1);
+  for (let q = 0; q < w * h; q++) keep[q] = grid[q] && d[q] >= r2 - 1e-9 ? 1 : 0;
+  return keep;
 }
 
 /** How far apart two boxes are (0 when they touch or overlap). */

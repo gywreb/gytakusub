@@ -57,3 +57,27 @@ export function fitsInside(GyText, ctx, family, text, inside, bbox, size) {
   }
   return false;
 }
+
+/**
+ * A grid (1: in) less every cell closer than `r` px to anything else, the grid's border included:
+ * an exact Euclidean distance transform (Felzenszwalb and Huttenlocher), rows then columns. The
+ * bench's own, so it measures older builds the same way (the engine has one too since 3.0).
+ */
+export function erodeGrid(grid, w, h, r) {
+  const INF = 1e12, n = Math.max(w, h) + 2, d = new Float64Array(w * h), f = new Float64Array(n), out = new Float64Array(n), v = new Int32Array(n), z = new Float64Array(n + 1);
+  const pass = (m) => {
+    let k = 0; v[0] = 0; z[0] = -INF; z[1] = INF;
+    for (let q = 1; q <= m + 1; q++) {
+      let s;
+      for (;;) { s = ((f[q] + q * q) - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]); if (s <= z[k]) k--; else break; }
+      k++; v[k] = q; z[k] = s; z[k + 1] = INF;
+    }
+    k = 0;
+    for (let q = 1; q <= m; q++) { while (z[k + 1] < q) k++; out[q] = (q - v[k]) * (q - v[k]) + f[v[k]]; }
+  };
+  for (let y = 0; y < h; y++) { f[0] = 0; f[w + 1] = 0; for (let x = 0; x < w; x++) f[x + 1] = grid[y * w + x] ? INF : 0; pass(w); for (let x = 0; x < w; x++) d[y * w + x] = out[x + 1]; }
+  for (let x = 0; x < w; x++) { f[0] = 0; f[h + 1] = 0; for (let y = 0; y < h; y++) f[y + 1] = d[y * w + x]; pass(h); for (let y = 0; y < h; y++) d[y * w + x] = out[y + 1]; }
+  const keep = new Uint8Array(w * h), r2 = (r + 1) * (r + 1);
+  for (let q = 0; q < w * h; q++) keep[q] = grid[q] && d[q] >= r2 - 1e-9 ? 1 : 0;
+  return keep;
+}
