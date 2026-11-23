@@ -1,6 +1,8 @@
 // The engine on generated pages (bench/synth.mjs), scored against their exact answers.
 //   node bench/synth-run.mjs <out.jsonl> <first seed> <count> [--dump dir] [--printed] [--fill aot]
 // --printed: pages with lettering printed on objects and slanted free text too (synth.mjs opts.printed)
+// --readers, --webtoon: the bubble shapes the owner's chapters showed, and what a webtoon episode
+// showed: dark bubbles with coloured lettering, a bubble cut by the image's edge (synth.mjs opts)
 // Seeds 0–9999 may be looked at when something fails; seeds from 100000 on are only ever counted.
 // Per line to translate:
 //   found     its centre lies in a region the engine found before any second look
@@ -39,9 +41,10 @@ const { sizeLimits, limitCounts, fitsInside, erodeGrid } = await import("./limit
 
 const argv = process.argv.slice(2), opt = (k) => { const i = argv.indexOf(k); return i >= 0 ? argv.splice(i, 2)[1] : null; };
 const whyFile = opt("--why"); // (--why file: each avoidable line refitted with one cause removed at a time, as JSON lines)
-const dump = opt("--dump"), printedPages = argv.includes("--printed"), readerPages = argv.includes("--readers");
+const dump = opt("--dump"), printedPages = argv.includes("--printed"), readerPages = argv.includes("--readers"), webtoonPages = argv.includes("--webtoon");
 if (printedPages) argv.splice(argv.indexOf("--printed"), 1);
 if (readerPages) argv.splice(argv.indexOf("--readers"), 1);
+if (webtoonPages) argv.splice(argv.indexOf("--webtoon"), 1);
 const most = Number(opt("--max") || 0); let ran = 0; // (--max N: stop after N pages; rerun to go on)
 const fillWith = opt("--fill");
 // --fill aot: textured areas filled by the learned model the extension runs on the CPU (AOT), as a
@@ -60,7 +63,7 @@ const lum = (d, q) => (d[q * 4] + d[q * 4 + 1] + d[q * 4 + 2]) / 3;
 
 for (let seed = +first; seed < +first + +count; seed++) {
   if (done.has(seed)) continue;
-  const pg = makePage(seed, { printed: printedPages, readers: readerPages }), { W, H } = pg, r = rng(seed + 99);
+  const pg = makePage(seed, { printed: printedPages, readers: readerPages, webtoon: webtoonPages }), { W, H } = pg, r = rng(seed + 99);
   const labelRnd = rng(seed * 7919 + 17); // Claude's size labels: a stream of their own (bench/labels.mjs)
   const pixels = new ImageData(new Uint8ClampedArray(pg.input.data), W, H);
   const t0 = Date.now();
@@ -196,7 +199,7 @@ for (let seed = +first; seed < +first + +count; seed++) {
   const limits = sizeLimits(GyText, placements, sizes, [...placements.keys()].filter((k) => placements[k].item != null && told[placements[k].item] && per[placements[k].item].drawn < 0.7), W, H);
   const n = told.filter(Boolean).length;
   const row = {
-    seed, script: pg.script, printed: printedPages, readers: readerPages, colour: pg.colour, ms, lines: n,
+    seed, script: pg.script, printed: printedPages, readers: readerPages, webtoon: webtoonPages, colour: pg.colour, ms, lines: n,
     found: found.filter((f, i) => f && told[i]).length,
     placed: pg.blocks.filter((b, i) => told[i] && per[i].letter != null).length,
     left: rows.filter((x, i) => told[i] && x.left).length, stays: rows.filter((x, i) => told[i] && x.stays).length,
