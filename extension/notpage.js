@@ -19,5 +19,26 @@
     const m = URL_PARTS.exec(String(src || ""));
     return !!m && isJunk(m[1], m[2]);
   }
-  root.GyNotPage = { notPage };
+  // A chapter's pages come from one site and folder: the chapter fetcher (fetcher/worker.js
+  // pickPages) keeps the largest such group. Here the rule is narrower, as a reader may show two
+  // chapters at once (one still loading): of the page-sized images on the page, one alone in its
+  // site and folder is not a page while three or more share one. Naver's end-of-episode ad, from
+  // its ad server beside the episode's 121 images, was translated as a page (2.15). Sites that give
+  // each page its own folder (Blogger, some CDNs) are grouped by site and their first two folders
+  // instead, as the fetcher does. Pages given as blob: or data: are never judged.
+  const site = (host) => host.toLowerCase().replace(/:\d+$/, "").split(".").slice(-2).join(".");
+  const fine = (host, path) => site(host) + path.replace(/[^/]*$/, "");
+  const coarse = (host, path) => site(host) + "/" + path.split("/").slice(1, 3).join("/");
+  /** Of these image addresses (the page-sized images on a page), the ones that stand alone beside a chapter: a Set. */
+  function strays(srcs) {
+    const list = [];
+    for (const src of new Set(srcs)) { const m = URL_PARTS.exec(String(src || "")); if (m) list.push({ src, host: m[1], path: m[2] || "/" }); }
+    for (const key of [fine, coarse]) {
+      const count = new Map();
+      for (const x of list) { const k = key(x.host, x.path); count.set(k, (count.get(k) || 0) + 1); }
+      if (Math.max(0, ...count.values()) >= 3) return new Set(list.filter((x) => count.get(key(x.host, x.path)) === 1).map((x) => x.src));
+    }
+    return new Set();
+  }
+  root.GyNotPage = { notPage, strays };
 })(typeof globalThis !== "undefined" ? globalThis : this);

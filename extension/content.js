@@ -200,10 +200,22 @@
   // loads: onImgLoad checks again. Nor is an image whose address names it a cover, a thumbnail or
   // a logo (notpage.js, the chapter fetcher's rule): the series' covers at a chapter's end passed
   // the size check and were translated as pages (a MangaDex chapter, 2.14.2).
+  const bigEnough = (img) => { const r = img.getBoundingClientRect(); return r.width >= MIN_W && r.height >= MIN_H; };
   function isEligible(img) {
     if (!(img instanceof HTMLImageElement)) return false;
-    const r = img.getBoundingClientRect(), src = srcOf(img);
-    return r.width >= MIN_W && r.height >= MIN_H && !!src && !globalThis.GyNotPage?.notPage(src);
+    const src = srcOf(img);
+    return bigEnough(img) && !!src && !globalThis.GyNotPage?.notPage(src) && !strayNow().has(src);
+  }
+  // the page-sized images alone beside a chapter's (notpage.js strays): worked out again when the
+  // number of images on the page changes, else at most once a second
+  let strayCache = null;
+  function strayNow() {
+    const n = document.images.length, t = performance.now();
+    if (strayCache && strayCache.n === n && t - strayCache.t < 1000) return strayCache.set;
+    const srcs = [];
+    for (const img of document.images) { const s = srcOf(img); if (s && bigEnough(img) && !globalThis.GyNotPage?.notPage(s)) srcs.push(s); }
+    strayCache = { n, t, set: globalThis.GyNotPage?.strays ? globalThis.GyNotPage.strays(srcs) : new Set() };
+    return strayCache.set;
   }
 
   function viewportDistance(img, key = WHOLE) {
