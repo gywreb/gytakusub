@@ -116,14 +116,15 @@ export function getFallbackDetector() {
 
 let segmenterReady = null;
 /**
- * Resolves to the learned bubble segmenter (engine/segment.js), loaded once by
- * ONNX Runtime from the files next to this module: vendor/segment.json (its
- * description) and one of two variants of the model — vendor/segment-gpu.onnx
- * (weight-only int8, float compute) on WebGPU when available, vendor/segment.onnx
- * (int8 QDQ, integer kernels) on the CPU otherwise. Resolves to null when there
- * is no model (the analysis then decides bubbles from pixel statistics) or when
+ * Resolves to the learned bubble segmenter (engine/segment.js), loaded once by ONNX Runtime from
+ * the files next to this module: vendor/segment.json (its description) and vendor/segment.onnx,
+ * one model for both backends (weight-only int8, float compute): on WebGPU when available, else
+ * on the CPU. Until 3.0 the CPU had a model of its own (int8 activations, faster there), and the
+ * two drew bubbles a few pixels apart: the same page came out differently on a graphics card than
+ * on the CPU, and a report replayed on the CPU did not reproduce the page (ADR 0020). Resolves to
+ * null when there is no model (the analysis then decides bubbles from pixel statistics) or when
  * it fails to load.
- * @param {object} [overrides] tests pass `modelBytes` / `gpuModelBytes`, `config`, `wasmBinary`, `gpu`
+ * @param {object} [overrides] tests pass `modelBytes`, `config`, `wasmBinary`, `gpu`
  */
 export function getSegmenter(overrides = {}) {
   if (ortBroken()) return Promise.resolve(null);
@@ -137,15 +138,13 @@ export function getSegmenter(overrides = {}) {
           config = res && res.ok ? await res.json() : {};
         }
         const ort = getOrt(overrides.wasmBinary ? { wasmBinary: overrides.wasmBinary } : {});
-        const wantGpu = (overrides.gpu ?? prefs.gpu) && (overrides.gpuModelBytes || config.gpu) && await gpuAvailable();
-        if (wantGpu) {
-          try {
-            const bytes = overrides.gpuModelBytes || await read("segment-gpu.onnx");
-            if (bytes) return await loadSegmenter(ort, bytes, { ...config, executionProviders: ["webgpu"] });
-          } catch (e) { console.warn("Gytakusub: bubble segmenter could not start on the GPU, using the CPU", e); }
-        }
         const bytes = overrides.modelBytes || await read("segment.onnx");
-        return bytes ? await loadSegmenter(ort, bytes, { ...config, executionProviders: ["wasm"] }) : null;
+        if (!bytes) return null;
+        if ((overrides.gpu ?? prefs.gpu) && await gpuAvailable()) {
+          try { return await loadSegmenter(ort, bytes, { ...config, executionProviders: ["webgpu"] }); }
+          catch (e) { console.warn("Gytakusub: bubble segmenter could not start on the GPU, using the CPU", e); }
+        }
+        return await loadSegmenter(ort, bytes, { ...config, executionProviders: ["wasm"] });
       } catch (e) { console.warn("Gytakusub: bubble segmenter unavailable, deciding bubbles from pixels", e); return null; }
     })();
   }

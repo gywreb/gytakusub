@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
-"""Two int8 variants of a YOLO-seg ONNX export, one per ONNX Runtime backend
-(the pattern transformers.js uses: quantised for wasm, float compute for WebGPU):
+"""Two int8 variants of a YOLO-seg ONNX export. Since 3.0 the extension ships only
+the weight-only one, on both backends: the two drew bubbles a few pixels apart, so
+the same page came out differently on the CPU and on a graphics card (ADR 0020).
+The static one stays here for measuring.
 
   CPU (wasm):  static int8 QDQ, activations and weights, calibrated on real
                pages; ORT fuses it into integer convolutions — fastest on CPU.

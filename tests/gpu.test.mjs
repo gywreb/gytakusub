@@ -1,6 +1,7 @@
 // The GPU path, end to end, against the CPU path: both models (text detector and
 // bubble segmenter) run on ONNX Runtime's WebGPU backend and must find the same
-// text lines and the same bubbles as on the CPU, on every fixture page.
+// text lines and the same bubbles as on the CPU, on every fixture page, and the
+// page's analysis and layout must come out the same (3.0).
 //
 // Node has no WebGPU of its own; the `webgpu` package provides Google's Dawn
 // (the implementation inside Chrome), and Mesa's lavapipe gives it a software
@@ -36,7 +37,9 @@ console.log("GPU adapter:", adapter.info?.description || adapter.info?.device ||
 const { createCanvas, loadImage } = await import("canvas");
 const { cv } = await import("./cv-node.mjs");
 const { getOrt } = await import("../extension/engine/ort.js");
-const { loadDetector, detectText } = await import("../extension/engine/detect.js");
+const { loadDetector, detectText, detectInEmptyBubbles, detectInDarkShapes } = await import("../extension/engine/detect.js");
+const { analyze } = await import("../extension/engine/analyze.js");
+const { layout } = await import("../extension/engine/layout.js");
 const { loadSegmenter, segment } = await import("../extension/engine/segment.js");
 
 const vendor = (f) => path.join(here, "../extension/vendor", f);
@@ -45,9 +48,11 @@ const ort = getOrt({ wasmBinary });
 const config = JSON.parse(fs.readFileSync(vendor("segment.json"), "utf8"));
 const detBytes = new Uint8Array(fs.readFileSync(vendor("ppocr-det.onnx")));
 const det = { cpu: await loadDetector(cv, detBytes, { ort, gpu: false, wasmBinary }), gpu: await loadDetector(cv, detBytes, { ort, gpu: true, wasmBinary }) };
+// one bubble model for both backends (3.0, ADR 0020)
+const segBytes = new Uint8Array(fs.readFileSync(vendor("segment.onnx")));
 const seg = {
-  cpu: await loadSegmenter(ort, new Uint8Array(fs.readFileSync(vendor("segment.onnx"))), { ...config, executionProviders: ["wasm"] }),
-  gpu: await loadSegmenter(ort, new Uint8Array(fs.readFileSync(vendor("segment-gpu.onnx"))), { ...config, executionProviders: ["webgpu"] }),
+  cpu: await loadSegmenter(ort, segBytes, { ...config, executionProviders: ["wasm"] }),
+  gpu: await loadSegmenter(ort, segBytes, { ...config, executionProviders: ["webgpu"] }),
 };
 
 let passed = 0;
@@ -76,12 +81,41 @@ for (const f of pages) {
     assert.ok(Math.abs(lines.gpu.length - lines.cpu.length) <= 1, `${lines.gpu.length} vs ${lines.cpu.length}`);
     assert.ok(matched(lines.cpu, lines.gpu, 0.7) >= 0.95, `only ${(100 * matched(lines.cpu, lines.gpu, 0.7)).toFixed(0)}% of CPU lines found on the GPU`);
   });
-  // The two variants differ in quantisation (activations int8 on the CPU, float on
-  // the GPU), so a borderline bubble may come and go; the confident ones must agree.
-  await test(`[${f}] GPU bubbles match the CPU's (${bubbles.cpu.length} bubbles)`, () => {
-    const sure = (l) => l.filter((b) => b.score >= 0.5).map((b) => b.box);
-    const a = sure(bubbles.cpu), b = sure(bubbles.gpu);
-    assert.ok(matched(a, b, 0.75) >= 0.9 && matched(b, a, 0.75) >= 0.9, `CPU→GPU ${matched(a, b, 0.75).toFixed(2)}, GPU→CPU ${matched(b, a, 0.75).toFixed(2)} (${a.length} vs ${b.length} confident bubbles)`);
+  // One model on both backends: the same bubbles, their masks a pixel apart at most (until 3.0 the
+  // CPU had a model of its own, and only the confident bubbles agreed, at IoU 0.75).
+  await test(`[${f}] GPU bubbles are the CPU's (${bubbles.cpu.length} bubbles)`, () => {
+    assert.equal(bubbles.gpu.length, bubbles.cpu.length);
+    for (const a of bubbles.cpu) {
+      const b = bubbles.gpu.find((q) => iou(a.box, q.box) >= 0.9);
+      assert.ok(b, `a CPU bubble at ${JSON.stringify(a.box)} has no GPU twin`);
+      let both = 0, either = 0;
+      const x0 = Math.min(a.box.x, b.box.x), y0 = Math.min(a.box.y, b.box.y), x1 = Math.max(a.box.x + a.box.w, b.box.x + b.box.w), y1 = Math.max(a.box.y + a.box.h, b.box.y + b.box.h);
+      const at = (q, x, y) => x >= q.box.x && y >= q.box.y && x < q.box.x + q.box.w && y < q.box.y + q.box.h && q.mask[(y - q.box.y) * q.box.w + (x - q.box.x)] > 0;
+      for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) { const p = at(a, x, y), q = at(b, x, y); if (p && q) both++; if (p || q) either++; }
+      assert.ok(both / Math.max(1, either) >= 0.98, `mask IoU ${(both / either).toFixed(3)}`);
+    }
+  });
+  // The whole page: the analysis and the layout on the GPU are the CPU's, box for box (a report
+  // replayed on the CPU reproduces the user's graphics card, and the same page reads the same).
+  await test(`[${f}] the page's regions and placements on the GPU are the CPU's`, async () => {
+    const run = async (d, s) => {
+      let ls = await detectText(cv, d, px);
+      ls = await detectInDarkShapes(cv, d, px, ls);
+      const sg = await segment(s, px);
+      ls = await detectInEmptyBubbles(cv, d, px, ls, sg.instances, s.bubbleClasses);
+      const an = analyze(cv, px, { detector: d, lines: ls, instances: sg.instances, bubbleClasses: s.bubbleClasses });
+      const items = an.regions.map((r, i) => ({ tag: r.id, box: [r.box.x / W, r.box.y / H, r.box.w / W, r.box.h / H], text: "Look over there, quickly!", kind: r.kind === "bubble" ? "bubble" : "narration", index: i }));
+      const { placements } = layout(an, items);
+      const out = { regions: an.regions.map((r) => ({ kind: r.kind, box: r.box })), placements: placements.map((p) => p.rect) };
+      an.dispose();
+      return out;
+    };
+    const a = await run(det.cpu, seg.cpu), b = await run(det.gpu, seg.gpu);
+    const d = (p, q) => Math.max(Math.abs(p.x - q.x), Math.abs(p.y - q.y), Math.abs(p.w - q.w), Math.abs(p.h - q.h));
+    assert.equal(b.regions.length, a.regions.length, "regions");
+    a.regions.forEach((r, i) => { assert.equal(b.regions[i].kind, r.kind); assert.ok(d(r.box, b.regions[i].box) <= 2, `region ${i}: ${JSON.stringify(r.box)} vs ${JSON.stringify(b.regions[i].box)}`); });
+    assert.equal(b.placements.length, a.placements.length, "placements");
+    a.placements.forEach((r, i) => assert.ok(d(r, b.placements[i]) <= 2, `placement ${i}: ${JSON.stringify(r)} vs ${JSON.stringify(b.placements[i])}`));
   });
 }
 // The learned eraser's inpainting model (2.12): it must start on the GPU (strict: no quiet

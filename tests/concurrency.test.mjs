@@ -42,7 +42,7 @@ for (const f of ["demo-page.png", "gen-00.png", "gen-01.png"]) {
 let passed = 0;
 for (const backend of hasGpu ? ["webgpu", "wasm"] : ["wasm"]) {
   const det = await loadDetector(cv, new Uint8Array(fs.readFileSync(vendor("ppocr-det.onnx"))), { ort, gpu: backend === "webgpu", wasmBinary });
-  const seg = await loadSegmenter(ort, new Uint8Array(fs.readFileSync(vendor(backend === "webgpu" ? "segment-gpu.onnx" : "segment.onnx"))), { ...config, executionProviders: [backend] });
+  const seg = await loadSegmenter(ort, new Uint8Array(fs.readFileSync(vendor("segment.onnx"))), { ...config, executionProviders: [backend] });
   assert.equal(det.ep, backend); assert.equal(seg.ep, backend);
   const one = async (px) => { const lines = await detectText(cv, det, px); const { instances } = await segment(seg, px); return { lines: lines.length, bubbles: instances.length }; };
   const sequential = []; for (const px of pages) sequential.push(await one(px));
