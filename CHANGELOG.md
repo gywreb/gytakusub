@@ -61,6 +61,10 @@ You chose to ship 3.0 with the size goals restated (23 Nov): they count with the
 - **`gpu.test.mjs` requires the same page on both backends**: the same bubbles (mask IoU 0.98 or more) and the page's regions and placements within 2 px, on every fixture page, in CI.
 - `scripts/vendor-segment.mjs` vendors one bubble model; `quantize-segment.py` keeps the static variant for measuring.
 
+### Store
+- **Ready to publish publicly**: the listing text, the five screenshots (made again with this engine) and the steps for this release (`store/LISTING.md`, `store/RELEASE-CHECKLIST.md`). The store zip loads in Chromium as built, and asks for no permission 2.10.0 didn't have.
+- **Privacy policy:** a line Claude gives back untranslated is sent once more, as text, to translate it (since 2.14.0; now written down).
+
 ## [2.15.0] — 2026-11-22
 
 ### Fixed
