@@ -454,7 +454,7 @@
       if (Math.max(...letters) > Math.min(...letters) * 1.2) continue; // lettering of two sizes: a shout beside a whisper keeps both
       const least = Math.min(...group.map((q) => q.fit.size));
       for (const q of group) {
-        const size = Math.max(Math.floor(1.2 * least), Math.floor(0.7 * q.target));
+        const size = Math.max(Math.floor(1.2 * least), Math.ceil(0.7 * q.target)); // (never pulled under 0.7 of its size: a floor took it to 0.67)
         if (q.fit.size > size) Object.assign(q, fitBest(q.text, q.p, true, { ...q.how, maxSize: size, minSize: Math.min(q.how.minSize, size) }));
       }
     }

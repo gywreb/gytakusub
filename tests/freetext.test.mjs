@@ -223,6 +223,20 @@ await test("two captions' lettering merged into one paragraph: each line takes i
   assert.ok(cx(first.rect) > 300 && cx(then.rect) < 270, `centres ${cx(first.rect).toFixed(0)} and ${cx(then.rect).toFixed(0)}`);
 });
 
+await test("two captions merged into one paragraph, Claude's first box over its first line only: each item takes a whole caption (2.15)", () => {
+  // the same L-shaped caption; the first item's box covers the first caption's top line only, the
+  // second's the rest of it and all of the second caption. Line by line, the first caption's last three
+  // lines went to the second item, and the first item's text was set in one line's room (page 6, 16 px)
+  const lines = [[300, 110], [300, 140], [300, 170], [300, 200], [130, 220], [130, 250], [130, 280]].map(([x, y]) => ({ x, y, w: 120, h: 22 }));
+  const merged = para(130, 110, 290, 192, { bubble: 1, region: 1, parts: lines, lineLetters: lines.map(() => 24) });
+  const an = boxShapes(analysis([bubbleAt(1, { x: 110, y: 90, w: 330, h: 230 }, [merged])], [merged]));
+  const { placements } = layout(an, [item([120, 105, 300, 28], "First, I need to leave the city", 1, "bubble"), item([120, 140, 300, 165], "Once I've lost them, I strike back", 1, "bubble")]);
+  const first = placements.find((p) => p.text.startsWith("First")), then = placements.find((p) => p.text.startsWith("Once"));
+  const cx = (r) => r.x + r.w / 2;
+  assert.ok(first.rect.h >= 100 && cx(first.rect) > 300, `the first caption's room ${JSON.stringify(first.rect)}: all four of its lines (one line's, 40 px tall, before)`);
+  assert.ok(cx(then.rect) < 270 && then.rect.x + then.rect.w <= 300, `the second caption's room ${JSON.stringify(then.rect)}: its own lines (across both captions, before)`);
+});
+
 await test("two boxes one region, a border across it: each line's room stays its side of the border (2.15)", () => {
   // one white region 200 × 100 (the bubble model's mask over two caption boxes drawn side by side); the
   // left box's border at x = 170 runs across it from top to bottom, in the ink mask: not midway between

@@ -602,6 +602,21 @@ function shareBlocks(anchors, members) {
     groups.get(best).push(i);
   });
   for (const [g, idx] of groups) {
+    // Lettering of as many paragraphs as members (two captions merged into one block): each member
+    // takes a whole paragraph, the one-to-one choice its boxes overlap most. Claude's box can cover a
+    // caption's first line only, and taken line by line, the caption's other lines went to the next
+    // member (2.15, the owner's French chapter, page 6: the first caption's text set at 16 px).
+    const runs = g.parts?.length > 1 ? paragraphs(g.parts, !!g.vertical) : [];
+    if (runs.length === idx.length && idx.length > 1 && idx.length <= 4) {
+      const boxes = runs.map((r) => union(r));
+      let best = null, most = 0;
+      for (const order of permutations(idx.length)) {
+        const os = order.map((r, k) => overlap(members[idx[k]].px, boxes[r]));
+        const sum = os.reduce((a, b) => a + b, 0);
+        if (os.every((o) => o > 0) && sum > most) { most = sum; best = order; }
+      }
+      if (best) { idx.forEach((i, k) => { anchors[i] = { ...boxes[best[k]], fromLettering: true, vertical: g.vertical, parts: runs[best[k]] }; }); continue; }
+    }
     if (g.parts?.length > 1) {
       const mine = idx.map(() => []);
       for (const part of g.parts) {
@@ -624,6 +639,38 @@ function shareBlocks(anchors, members) {
       start = end;
     });
   }
+}
+
+/**
+ * A block's lines (or columns, `vertical`) in the paragraphs they read as: a line belongs with the one
+ * before it when it follows it (a gap under a line's height) and overlaps it across at least half the
+ * narrower one (LAYOUT.most). Two captions side by side, merged into one block, come apart.
+ */
+export function paragraphs(parts, vertical) {
+  const [x, w, y, h] = vertical ? ["y", "h", "x", "w"] : ["x", "w", "y", "h"];
+  const order = [...parts].sort((a, b) => vertical ? (b.x + b.w) - (a.x + a.w) : a.y - b.y);
+  const runs = [];
+  for (const p of order) {
+    let best = null, most = 0;
+    for (const r of runs) {
+      const q = r[r.length - 1];
+      const gap = vertical ? q.x - (p.x + p.w) : p.y - (q.y + q.h);
+      if (gap > Math.max(p[h], q[h])) continue;
+      const o = Math.min(p[x] + p[w], q[x] + q[w]) - Math.max(p[x], q[x]);
+      const share = o / Math.max(1, Math.min(p[w], q[w]));
+      if (share >= LAYOUT.most && share > most) { most = share; best = r; }
+    }
+    if (best) best.push(p); else runs.push([p]);
+  }
+  return runs;
+}
+
+/** The orders of 0..n-1 (n ≤ 4: a bubble's members). */
+function permutations(n) {
+  if (n <= 1) return [[0]];
+  const out = [];
+  for (const p of permutations(n - 1)) for (let k = 0; k <= p.length; k++) out.push([...p.slice(0, k), n - 1, ...p.slice(k)]);
+  return out;
 }
 
 /**

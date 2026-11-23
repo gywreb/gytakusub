@@ -62,9 +62,16 @@ Four causes:
 3. **A paragraph several lines share is divided by their boxes, line by line** (`shareBlocks`).
    When each of its lines lies under one line's box, each line takes its own lines. Otherwise the
    paragraph is cut midway between the boxes, as before.
+   - A block the analysis merged from several paragraphs (two captions' lettering in one L-shaped
+     region) is split into its paragraphs when as many items share it: a line belongs with the one
+     before it when the gap is under a line's height and they overlap across half the narrower one
+     (`paragraphs`). Each item takes the whole paragraph its box overlaps most, one each. Claude's box
+     for a caption can cover its first line only, and split line by line by the boxes, the caption's
+     other lines went to the next item (page 6 in the owner's browser: its text at 16 px). Where the
+     paragraphs don't pair with the items, the lines are shared by the boxes as before.
 4. **The fitter sets text to the shape, and to the box only where it stays in the room.**
-   - The box's fit is used when it is larger and at most 3% of its letters lie past the room as the
-     bubble's ink bounds it (`bound`). Each line's letters are its width by the middle 0.8 of its
+   - The box's fit is used when it is larger and at most 3% of its letters lie within the shape's
+     margin or past it (the shape is read on the ink, below). Each line's letters are its width by the middle 0.8 of its
      size. The bubble model's mask is smooth and reaches past a burst's outline, so judged on the
      mask, such fits crossed the outline: on 18 generated pages, 6 lines past their bubble, and 2
      judged on the ink.
