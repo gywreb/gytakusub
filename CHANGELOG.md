@@ -4,6 +4,58 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
 
 ## [Unreleased]
 
+## [3.1.0] — 2026-11-24
+
+What 3.0 left: text set larger where its bubble holds it, the margin kept; lines that follow a slanted bubble; an eraser that leaves the art beside large lettering. Also a smaller fill model, and one image fewer sent to Claude.
+
+### Pages
+- **Text set larger where its bubble holds it, margin kept.** A line is now judged over the rows its letters reach, not its whole line slot. Before, the bubble's narrowing above a first line's letters and below a last line's counted against them: about a fifth of the size, on top of the margin. On real pages never looked at, lines set under 0.7 of their size went from 11.1% to 8.9%. [ADR 0021](docs/adr/0021-fitted-where-its-letters-are.md)
+- **Lines follow a slanted bubble.** Each line is centred in its own row of the bubble, as a letterer sets them, instead of all lines on one centre line. In slanted bubbles, lines under 0.7 of their size went from 8 to 3 of 72.
+- **The margin off the outline is 3 px at least** (it was 2). Lines now fill their room up to the margin, and 2 px was within a pixel of touching the outline.
+- **The eraser leaves the art beside large lettering.** Next to a title in brush lettering 158 px tall, the panel's frame lines, a cloud's outline and part of a sound effect were erased with it: near lettering that large, every mark counted as "letter-sized". A mark beside a line is now erased only when it's drawn with the line's own pen; a stroke far thinner than the lettering's is art. Dialogue lettering is too thin a pen for this rule to judge, so it's erased as before. On that page, art damage went from 12.3 to 5.4 per thousand pixels (2.15.0: 3.3).
+- **Naver's ad after an episode is no longer translated.** An image alone in its site and folder beside a chapter's pages isn't a page. The chapter fetcher already left such images out. Checked on all 36 of your debug reports: no page is left out. Besides Naver's ad, the rule also skips rawkuma's series covers.
+
+**Measured on pages never looked at** (held-out halves, both versions on the same bench, 3.0.0 → 3.1.0):
+
+| | 3.0.0 | 3.1.0 |
+|---|---|---|
+| Real pages (Manga109-s, 333 pages): lines under 0.7 of their size | 11.1% | 8.9% |
+| Real pages: lines with over 3% of their ink on the outline or the art past it | 73 (2.7%) | 72 (2.6%) |
+| Real pages: lettering the independent detector still sees after erasing | 1.66% | 1.69% |
+| Real pages: art damage (pixels changed away from any text) | 0.115% | 0.098% |
+| Real pages: sound effects changed | 0.25% | 0.19% |
+| Real pages: lines found before Claude answers | 97.1% | 97.1% |
+| Lines under 0.7 of their size: generated (810 lines) | 111 (13.7%) | 95 (11.7%) |
+| The same, the new shapes (1,165 lines) | 172 (14.8%) | 144 (12.4%) |
+| Lines a bubble could hold at 0.7 of their size, keeping clear of the outline, set smaller: generated | 5 (0.6%) | 1 (0.1%) |
+| The same, the new shapes | 16 (1.4%) | 6 (0.5%) |
+| Lines touching their outline: generated (671 lines in bubbles) | 20 (3.0%) | 22 (3.3%) |
+| The same, the new shapes (1,026 lines in bubbles) | 28 (2.7%) | 32 (3.1%) |
+| Text past its bubble: generated, the new shapes | 10, 11 | 9, 10 |
+| Lines over 1/0.7 of their size: generated and new shapes | 125 | 150 |
+| Lettering left untouched: generated, the new shapes | 42, 39 | 42, 39 |
+| Bubble outline pixels erased: generated, the new shapes | 1,940, 3,691 | 1,062, 2,817 |
+| Art damage: generated, the new shapes | 0.056%, 0.057% | 0.051%, 0.054% |
+
+Page by page, art damage fell on 70 of the 333 real pages and rose on none. On generated pages it rose on one page of each half and fell on 18 and 17.
+
+**The goals set for 3.1:**
+- Real lines under 0.7 of their size at most 10.3%, with no more lines over the outline or art: met (8.9%; 72 lines against 73).
+- Lines a bubble could hold at 0.7 set smaller at most 1% on the new shapes: met (0.5%).
+- Lines touching their outline no worse: **not met** on the pages never looked at: 2.7% → 3.1% on the new shapes (28 → 32 lines), 3.0% → 3.3% generated (20 → 22). On the pages looked at, the 3 px margin brought both back: 29 → 25 and 14 → 14. Across both halves: 57 → 57 and 34 → 36.
+- Art damage and outlines erased no worse on either half: met on both.
+- The webtoon cases are on the bench (below). Dark bubbles with coloured lettering aren't fixed: the bubble model's mask of a dark bubble is wrong, and the eraser can't mend that. They move to the learned mask (3.2).
+
+### Smaller
+- **The CPU's fill model (AOT) is half the size**: 23 MB → 12 MB. Its weights are stored in half precision and computed in full precision, as LaMa's are. In the area it fills, it is 0.0003 from the full model on a 0 to 1 scale (LaMa's bar was 0.001). The extension is about 190 MB unpacked.
+
+### Development
+- **The bench has the webtoon's cases** (`synth-run.mjs --webtoon`): dark bubbles filled with a gradient from near black to a deep colour, with red or white lettering, as in your Naver episode; and bubbles cut by the image's top or bottom edge. On 100 held-out pages with them, 3.0.0 and 3.1.0 alike: in dark bubbles, 51 of 173 lines run past their bubble; of all 789 lines, 88% are found before Claude answers (95% on the other generated pages), and 18.5% keep their lettering untouched (5.2%). That's what the learned mask (3.2) is measured against.
+- `scripts/half_weights.py`: the half-precision step, now shared by both fill models.
+
+### Setup guide
+- The chapter-link guide was checked against Cloudflare's three changed pages: no step, button name or limit changed (#39).
+
 ## [3.0.0] — 2026-11-23
 
 The core, measured. 3.0 is the release of the work since 2.10.0 (2.11 to 2.15 were not released on their own), and the last step of its plan: text that fits its bubble, and the same page on the CPU and on a graphics card.
