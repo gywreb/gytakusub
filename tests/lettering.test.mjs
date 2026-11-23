@@ -256,6 +256,21 @@ test("a box whose lines stay inside the outline but cross the margin is set to t
   setFont(fit.size);
   assert.ok(GyText.outsideRoom(fit, rect, shape, measure) <= 0.001, "every line keeps the margin");
 });
+test("a shape keeps its own centre line when the box is trimmed afterwards: the lines stay in the room", () => {
+  // layout.js separate() trims two overlapping boxes on their facing sides after their shapes are read;
+  // centred on the trimmed box, the text sat 8 px off its room, against a caption's border (page 6)
+  const room = { x: 0, y: 0, w: 120, h: 100 };
+  const shape = { dy: 0, step: 2, half: Array(50).fill(54), edge: 6, cx: 60, top: 0 };
+  const trimmed = { x: 16, y: 0, w: 104, h: 100 }; // its centre 68, the room's 60
+  const text = "Even though losing these three hurts";
+  const { setFont, measure, opts } = fitter(text);
+  const fit = GyText.fitText(text, trimmed, setFont, measure, { ...opts, shape });
+  assert.equal(fit.cx, 60, "drawn on the room's centre line, not the box's");
+  setFont(fit.size);
+  assert.ok(GyText.outsideRoom(fit, trimmed, shape, measure) <= 0.001, "every line inside the room, margin kept");
+  // the guard: the same lines centred on the trimmed box leave the room
+  assert.ok(GyText.outsideRoom({ ...fit, cx: undefined }, trimmed, shape, measure) > 0.001, "the guard: centred on the box, they cross");
+});
 test("a room that narrows under the lettering: the block moves to where the room is wide, every line inside", () => {
   // a caption box whose room is wide over its top 80 px and a strip below (the bubble's tail, a
   // corner): centred on the box, the block could take 60 px at most; above, it takes up to 80

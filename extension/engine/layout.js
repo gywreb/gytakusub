@@ -241,7 +241,9 @@ const area = (b) => b.w * b.h;
  * between them, lines left as drawn). Text centred on that line stays inside. `{dy, step, half}`:
  * rows from rect.y + dy, one every `step` px, half[k] the half-width there (0: none), less `edge`:
  * a bubble's shape from the segmentation model takes in its outline, and lines set to it touched
- * the outline (2.14.1). Relative to the rect, so it moves with it. null without the bubble's shape,
+ * the outline (2.14.1). Its centre line and top are kept too (`cx`, `top`): separate() trims the
+ * placements' rects afterwards, and text centred on a trimmed rect sat off its room by up to 8 px,
+ * against a caption's border (2.15, page 6 in the owner's browser). null without the bubble's shape,
  * or when the centre line is out.
  */
 export function roomShape(inside, bbox, rect, own, exclude, edge = 0) {
@@ -263,7 +265,7 @@ export function roomShape(inside, bbox, rect, own, exclude, edge = 0) {
   while (a < b && !half[a]) a++;
   while (b > a && !half[b - 1]) b--;
   if (a >= b) return null;
-  return { dy: y0 + a * step - rect.y, step, half: half.slice(a, b), edge };
+  return { dy: y0 + a * step - rect.y, step, half: half.slice(a, b), edge, cx, top: y0 + a * step };
 }
 
 /** How far apart two boxes are (0 when they touch or overlap). */

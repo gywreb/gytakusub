@@ -254,9 +254,14 @@
    * box). A rectangle in an oval leaves its widest rows unused: 140 of the 171 lines set under 0.7
    * of their original size sat in boxes under 5 letters wide (2.14.1).
    */
+  // where a shape sits: its own centre line and top when it has them (layout.js roomShape), else
+  // the box's centre and the box's top with the shape's offset (older reports)
+  const shapeTop = (shape, rect) => shape.top ?? rect.y + shape.dy;
+  const shapeCx = (shape, rect) => shape.cx ?? rect.x + rect.w / 2;
+
   function fitShape(text, rect, shape, setFont, measure, opts) {
     const lh = opts.lineHeightRatio ?? 1.15;
-    const top0 = rect.y + shape.dy, bottom0 = top0 + shape.half.length * shape.step;
+    const top0 = shapeTop(shape, rect), bottom0 = top0 + shape.half.length * shape.step;
     const mid = rect.y + rect.h / 2; // the lettering's centre: the block's first place
     const minSize = Math.max(6, Math.round(opts.minSize ?? 8));
     const maxSize = Math.floor(Math.min(opts.maxSize ?? 72, (bottom0 - top0) / lh));
@@ -309,7 +314,7 @@
       return found;
     };
     const plain = largest(false), hy = largest(true);
-    const pick = (f, hyphens) => f && { size: f.size, lines: f.w.lines, lineHeight: f.size * lh, hyphens, shaped: true, cy: f.w.cy };
+    const pick = (f, hyphens) => f && { size: f.size, lines: f.w.lines, lineHeight: f.size * lh, hyphens, shaped: true, cy: f.w.cy, cx: shapeCx(shape, rect) };
     if (plain && (!hy || !hy.w.hyphens || plain.size >= hy.size * (opts.hyphenRatio ?? 0.75))) { setFont(plain.size); return pick(plain, 0); }
     if (hy && hy.w.hyphens) { setFont(hy.size); return pick(hy, hy.w.hyphens); }
     return null;
@@ -363,7 +368,8 @@
    */
   function outsideRoom(fit, rect, shape, measure, toOutline = false) {
     const total = fit.lines.length * fit.lineHeight, top = (fit.cy ?? rect.y + rect.h / 2) - total / 2;
-    const top0 = shape ? rect.y + shape.dy : rect.y, bottom0 = shape ? top0 + shape.half.length * shape.step : rect.y + rect.h;
+    const top0 = shape ? shapeTop(shape, rect) : rect.y, bottom0 = shape ? top0 + shape.half.length * shape.step : rect.y + rect.h;
+    const sx = shape ? shapeCx(shape, rect) : rect.x + rect.w / 2, lx = fit.cx ?? rect.x + rect.w / 2; // the room's centre line, the lines'
     const more = toOutline ? shape?.edge || 0 : 0; // (the shape keeps a margin off the outline: up to the outline itself)
     const halfAt = (y0, y1) => {
       if (!shape) return rect.w / 2;
@@ -376,7 +382,8 @@
     fit.lines.forEach((line, k) => {
       const body = 0.8 * fit.size, y0 = top + k * fit.lineHeight + (fit.lineHeight - body) / 2, y1 = y0 + body, w = measure(line), a = w * body;
       const iy0 = Math.max(y0, top0), iy1 = Math.min(y1, bottom0), half = iy1 > iy0 ? halfAt(iy0, iy1) : 0;
-      all += a; out += a - Math.max(0, iy1 - iy0) * Math.min(w, 2 * half);
+      const across = Math.max(0, Math.min(lx + w / 2, sx + half) - Math.max(lx - w / 2, sx - half));
+      all += a; out += a - Math.max(0, iy1 - iy0) * across;
     });
     return all ? +(out / all).toFixed(3) : 0;
   }
@@ -386,7 +393,7 @@
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     const total = fit.lines.length * fit.lineHeight;
     let y = (fit.cy ?? rect.y + rect.h / 2) - total / 2 + fit.lineHeight / 2; // (a shape's fit may sit off the box's centre: fitShape)
-    const cx = rect.x + rect.w / 2;
+    const cx = fit.cx ?? rect.x + rect.w / 2; // (a shape's fit on the shape's centre line)
     for (const line of fit.lines) {
       if (halo) { ctx.lineJoin = "round"; ctx.lineWidth = Math.max(2, fit.size * 0.22); ctx.strokeStyle = color === "#fff" ? "rgba(0,0,0,.85)" : "rgba(255,255,255,.92)"; ctx.strokeText(line, cx, y); }
       ctx.fillStyle = color; ctx.fillText(line, cx, y); y += fit.lineHeight;

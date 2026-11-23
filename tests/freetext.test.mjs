@@ -155,8 +155,8 @@ await test("a line in an oval gets the oval's room row by row, short of its outl
   an.insideOf = () => (x, y) => ((x - 160) / 60) ** 2 + ((y - 190) / 90) ** 2 <= 1;
   const [p] = layout(an, [item([140, 150, 40, 80], "Does that mean it's because I'm an idiot?", 1, "bubble")]).placements;
   assert.ok(p.shape, "a shape");
-  const row = (y) => p.shape.half[Math.floor((y - (p.rect.y + p.shape.dy)) / p.shape.step)];
-  const edge = Math.max(LAYOUT.edgeMinPx, LAYOUT.edgeLetters * 24), cx = p.rect.x + p.rect.w / 2;
+  const row = (y) => p.shape.half[Math.floor((y - p.shape.top) / p.shape.step)];
+  const edge = Math.max(LAYOUT.edgeMinPx, LAYOUT.edgeLetters * 24), cx = p.shape.cx;
   const inOval = (y) => Math.min(cx - (160 - 60 * Math.sqrt(1 - ((y - 190) / 90) ** 2)), 160 + 60 * Math.sqrt(1 - ((y - 190) / 90) ** 2) - cx);
   for (const y of [130, 160, 190, 220, 250]) assert.ok(Math.abs(row(y) - (inOval(y) - edge)) <= 2.5, `row ${y}: ${row(y)} against ${(inOval(y) - edge).toFixed(1)}`);
   assert.ok(row(190) > p.rect.w / 2, "wider than the box at the oval's middle");
@@ -171,10 +171,10 @@ await test("a slanted bubble: the room row by row stays inside its outline where
   an.insideOf = () => inside;
   const [p] = layout(an, [item([150, 120, 100, 120], "It's leaning, the whole thing is leaning!", 1, "bubble")]).placements;
   assert.ok(p.shape, "a shape");
-  const cx = p.rect.x + p.rect.w / 2;
+  const cx = p.shape.cx;
   p.shape.half.forEach((h, k) => {
     if (!h) return;
-    const y = p.rect.y + p.shape.dy + (k + 0.5) * p.shape.step;
+    const y = p.shape.top + (k + 0.5) * p.shape.step;
     assert.ok(inside(cx - h, y) && inside(cx + h, y), `row ${y.toFixed(0)}: ${(cx - h).toFixed(0)} to ${(cx + h).toFixed(0)} past the outline`);
   });
 });
@@ -192,10 +192,10 @@ await test("a steeply slanted bubble whose lettering's box reaches past its side
   assert.ok(boxHeld < 0.85, `the guard: the block's box is ${boxHeld.toFixed(2)} held`);
   const [p] = layout(an, [item([145, 120, 202, 128], "It's leaning, the whole thing is leaning!", 1, "bubble")]).placements;
   assert.ok(p.shape, "a shape, not the box");
-  const cx = p.rect.x + p.rect.w / 2;
+  const cx = p.shape.cx;
   p.shape.half.forEach((h, k) => {
     if (!h) return;
-    const y = p.rect.y + p.shape.dy + (k + 0.5) * p.shape.step;
+    const y = p.shape.top + (k + 0.5) * p.shape.step;
     assert.ok(inside(cx - h, y) && inside(cx + h, y), `row ${y.toFixed(0)}: ${(cx - h).toFixed(0)} to ${(cx + h).toFixed(0)} past the outline`);
   });
 });
@@ -249,7 +249,7 @@ await test("two boxes one region, a border across it: each line's room stays its
   an.polarities = [{ dark: false, inkMask: { data: inkData, cols: W2, rows: H2 } }, { dark: true, inkMask: { data: new Uint8Array(W2 * H2), cols: W2, rows: H2 } }];
   const { placements } = layout(an, [item([105, 125, 50, 50], "Left side", 1, "bubble"), item([235, 125, 50, 50], "Right side", 1, "bubble")]);
   for (const p of placements) {
-    const cx = p.rect.x + p.rect.w / 2, side = p.text.startsWith("Left") ? -1 : 1;
+    const cx = p.shape.cx, side = p.text.startsWith("Left") ? -1 : 1;
     for (const h of p.shape.half) if (h) assert.ok(side < 0 ? cx + h < 169 : cx - h > 171, `${p.text}: ${(cx - h).toFixed(0)} to ${(cx + h).toFixed(0)} across the border`);
   }
 });
