@@ -96,6 +96,10 @@ Four causes:
    - Within its room, a block stays centred on the lettering when it fits there. Otherwise it goes
      where its narrowest row is widest, nearest the lettering's centre on a tie (`fitShape`). Page
      6's middle captions, whose room narrowed under the lettering: 17 and 20 px before, 26 and 29.
+   - A room keeps its own centre line and top (`roomShape` returns `cx`, `top`), and the fit, the
+     drawing and the outside measure use them. Overlapping boxes are trimmed apart (`separate`) after
+     their rooms are read, and text centred on the trimmed box sat up to 8 px off its room on page 6,
+     against a caption's border.
    - A line may end after a hyphen between letters, no hyphen added, with 3 letters at least on each
      side as for a hyphenation point (`compound`). Page 9's right lobe held "remote-controlled" on
      one line only at 19 px.
