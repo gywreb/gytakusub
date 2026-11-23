@@ -357,6 +357,40 @@ test("a placement's other room (centred on the lettering) is used when the text 
   assert.ok(s2[0] > s1[0], `${s2[0]} px with the other room, ${s1[0]} px without`);
 });
 
+// ---------- a line is judged where its letters are (3.1) ----------
+// the ink of a line as drawLines() sets it (centred, its middle on the line's middle)
+const inkOf = (s) => { const a0 = ctx.textAlign, b0 = ctx.textBaseline; ctx.textAlign = "center"; ctx.textBaseline = "middle"; const m = ctx.measureText(s); ctx.textAlign = a0; ctx.textBaseline = b0; return { l: m.actualBoundingBoxLeft, r: m.actualBoundingBoxRight, a: m.actualBoundingBoxAscent, d: m.actualBoundingBoxDescent }; };
+test("in a bubble, each line is judged over the rows its letters span, not its whole line slot: larger, every letter inside", () => {
+  // the oval as roomShape reads it, a margin of 3 px off its outline: judged over each line's slot,
+  // the room's narrowing above the first line's letters and below the last's counted against them
+  const rect = { x: 0, y: 0, w: 120, h: 180 }, shape = oval(3, rect), text = "Does that mean it's because I'm an idiot, then?";
+  const { setFont, measure, opts } = fitter(text);
+  const slots = GyText.fitText(text, rect, setFont, measure, { ...opts, shape });
+  const ink = GyText.fitText(text, rect, setFont, measure, { ...opts, shape, ink: inkOf });
+  assert.ok(slots.shaped && ink.shaped, "both set to the shape");
+  assert.ok(ink.size > slots.size, `${ink.size} px judged by the letters, ${slots.size} px by the slots`);
+  setFont(ink.size);
+  assert.ok(GyText.outsideRoom(ink, rect, shape, measure, false, inkOf) <= 0.001, "every letter within the room, margin kept");
+});
+test("in a slanted bubble, each line is centred in its own row of the room: larger, every line inside; an even room moves none", () => {
+  // a room slanting right going down: each row's run [x - 30 + slant, x + 30 + slant], centred on the
+  // lettering's box at the top; around the box's centre line, the nearer side shrinks row by row
+  const rect = { x: 0, y: 0, w: 120, h: 120 }, step = 2, rows = 60, half = [], left = [], right = [];
+  for (let k = 0; k < rows; k++) { const shift = (k - rows / 2) * step * 0.4; left.push(Math.max(0, Math.floor(50 - shift))); right.push(Math.max(0, Math.floor(50 + shift))); half.push(Math.min(left[k], right[k])); }
+  const shape = { dy: 0, step, half, left, right, edge: 0, cx: 60, top: 0 };
+  const text = "Then we go together, all of us, right now!";
+  const { setFont, measure, opts } = fitter(text);
+  const centred = GyText.fitText(text, rect, setFont, measure, { ...opts, shape: { dy: 0, step, half, edge: 0, cx: 60, top: 0 }, ink: inkOf });
+  const shifted = GyText.fitText(text, rect, setFont, measure, { ...opts, shape, ink: inkOf });
+  assert.ok(shifted.size > centred.size, `${shifted.size} px following the slant, ${centred.size} px on one centre line`);
+  assert.ok(shifted.dx && shifted.dx.some((d) => d < 0) && shifted.dx.some((d) => d > 0), `lines shifted both ways: ${shifted.dx}`);
+  setFont(shifted.size);
+  assert.ok(GyText.outsideRoom(shifted, rect, shape, measure, false, inkOf) <= 0.001, "every line within its row room");
+  // a room as wide on both sides: no line is moved
+  const even = GyText.fitText(text, rect, setFont, measure, { ...opts, shape: { dy: 0, step, half: Array(rows).fill(50), left: Array(rows).fill(50), right: Array(rows).fill(50), edge: 0, cx: 60, top: 0 }, ink: inkOf });
+  assert.ok(!even.dx, "centred");
+});
+
 // ---------- Claude's size label scales only a guessed size (2.15) ----------
 test("a line on measured lettering is drawn at its size whatever Claude's label; a guessed size follows the label", () => {
   const at = (size, measured) => { const sizes = []; GyText.draw(createCanvas(600, 400).getContext("2d"), [{ text: "Hey!", rect: { x: 10, y: 10, w: 500, h: 300 }, letter: 30, size, tag: measured ? 1 : null, halo: false, color: "#000", ...(measured ? { measured: true } : {}) }], { sizes }); return sizes[0]; };

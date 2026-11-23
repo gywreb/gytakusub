@@ -242,25 +242,28 @@
 
   // the narrowest row of a shape between rows i and j, in constant time (a sparse table, kept per shape)
   const rowMins = new WeakMap();
-  function rowMin(shape) {
-    let q = rowMins.get(shape);
-    if (q) return q;
-    const levels = [shape.half.slice()];
-    for (let w = 1; 2 * w <= shape.half.length; w *= 2) {
+  function rowMin(shape, key = "half") {
+    const rows = shape[key] || shape.half; // (older reports' shapes have only `half`)
+    let byKey = rowMins.get(shape);
+    if (!byKey) rowMins.set(shape, (byKey = {}));
+    if (byKey[key]) return byKey[key];
+    const levels = [rows.slice()];
+    for (let w = 1; 2 * w <= rows.length; w *= 2) {
       const p = levels[levels.length - 1], next = [];
-      for (let i = 0; i + 2 * w <= shape.half.length; i++) next.push(Math.min(p[i], p[i + w]));
+      for (let i = 0; i + 2 * w <= rows.length; i++) next.push(Math.min(p[i], p[i + w]));
       levels.push(next);
     }
-    q = (i, j) => { const k = 31 - Math.clz32(j - i + 1); return Math.min(levels[k][i], levels[k][j - (1 << k) + 1]); };
-    rowMins.set(shape, q);
+    const q = (i, j) => { const k = 31 - Math.clz32(j - i + 1); return Math.min(levels[k][i], levels[k][j - (1 << k) + 1]); };
+    byKey[key] = q;
     return q;
   }
 
   /**
-   * fitText() in a bubble's shape (engine/layout.js roomShape): each line as wide as the room on
-   * both sides of the box's centre line over that line's height (the shape keeps its own margin off
-   * the outline: before 2.15 a fifth of the size more came off each side, and lines a bubble could
-   * hold at 0.7 of their size came out smaller). The block is centred on the box (the lettering's
+   * fitText() in a bubble's shape (engine/layout.js roomShape): each line as wide as its row of the
+   * room over the rows its letters span, and centred in that row (`dx`, from the box's centre line;
+   * 3.1: lines judged over their whole line slot, and centred on one line, came out smaller than the
+   * bubble held, most in slanted bubbles). The shape keeps its own margin off the outline: before
+   * 2.15 a fifth of the size more came off each side. The block is centred on the box (the lettering's
    * centre) when it fits there; else where the room is widest for it: the place where its narrowest
    * row is widest, nearest the box's centre on a tie. The fit then carries that centre (`cy`), and
    * drawLines() and outsideRoom() use it. (2.15: a caption whose room narrowed under its lettering
@@ -279,44 +282,71 @@
     const top0 = shapeTop(shape, rect), bottom0 = top0 + shape.half.length * shape.step;
     const mid = rect.y + rect.h / 2; // the lettering's centre: the block's first place
     const minSize = Math.max(6, Math.round(opts.minSize ?? 8));
+    // How far a line's letters reach above and below its middle, where drawLines() centres it: the
+    // text's own ink, accents and descenders included, when the caller can measure it; else the whole
+    // line slot. Each line is judged over the rows its letters span: the margin is from their ink to
+    // the outline's (roomShape). Judged over its slot, the room's narrowing above a first line's
+    // letters and below a last line's counted against them, a fifth of the size beyond the margin
+    // (3.1: real lines set small 11.1%, 7.9% with no margin at all).
+    const reach = (size) => {
+      const m = opts.ink ? opts.ink(text) : null;
+      return m && m.a + m.d > 0 ? { a: m.a, d: m.d } : { a: (size * lh) / 2, d: (size * lh) / 2 };
+    };
+    // the block of n lines centred (as drawn) on cy: from its first line's letters to its last's
+    const span = (n, size, r) => ({ up: ((n - 1) * size * lh) / 2 + r.a, down: ((n - 1) * size * lh) / 2 + r.d });
     const maxSize = Math.floor(Math.min(opts.maxSize ?? 72, (bottom0 - top0) / lh));
     if (!(maxSize >= minSize)) return null;
-    const least = rowMin(shape);
-    const halfOver = (y0, y1) => {
-      if (y0 < top0 - 1e-6 || y1 > bottom0 + 1e-6) return 0;
+    const leastL = rowMin(shape, "left"), leastR = rowMin(shape, "right");
+    const rowsOver = (y0, y1) => {
+      if (y0 < top0 - 1e-6 || y1 > bottom0 + 1e-6) return null;
       const k0 = Math.max(0, Math.floor((y0 - top0) / shape.step)), k1 = Math.min(shape.half.length - 1, Math.floor((y1 - top0) / shape.step));
-      return k1 >= k0 ? least(k0, k1) : 0;
+      return k1 >= k0 ? [k0, k1] : null;
     };
-    // where a block `tall` high goes: centred on the lettering, or where its narrowest row is widest
-    const centres = (tall) => {
+    // the room left and right of the centre line over those rows: each line is centred in its own
+    // row of the room, so lines follow a slanted bubble (3.1)
+    const sidesOver = (y0, y1) => { const k = rowsOver(y0, y1); return k ? [leastL(k[0], k[1]), leastR(k[0], k[1])] : [0, 0]; };
+    // where a block goes: centred on the lettering, or where its narrowest row is widest
+    const across = (y0, y1) => { const [l, r] = sidesOver(y0, y1); return l + r; };
+    const centres = ({ up, down }) => {
       const out = [];
-      if (halfOver(mid - tall / 2, mid + tall / 2) > 0) out.push(mid);
+      if (across(mid - up, mid + down) > 0) out.push(mid);
       let best = null, most = 0;
-      for (let j = 0; top0 + j * shape.step + tall <= bottom0 + 1e-6; j++) {
-        const c = top0 + j * shape.step + tall / 2, h = halfOver(c - tall / 2, c + tall / 2);
+      for (let j = 0; top0 + j * shape.step + up + down <= bottom0 + 1e-6; j++) {
+        const c = top0 + j * shape.step + up, h = across(c - up, c + down);
         if (h > most || (h === most && h > 0 && Math.abs(c - mid) < Math.abs(best - mid))) { most = h; best = c; }
       }
       if (best !== null && best !== mid) out.push(best);
       return out;
     };
-    const widths = (n, size, cy) => {
+    // each line's room: [left, right] of the centre line (the shape already keeps its margin off the
+    // outline: layout.js roomShape, LAYOUT.edgeLetters)
+    const rooms = (n, size, cy, r) => {
       const line = size * lh, top = cy - (n * line) / 2;
-      // (the shape already keeps its margin off the outline: layout.js roomShape, LAYOUT.edgeLetters)
-      return Array.from({ length: n }, (_, k) => Math.max(0, 2 * halfOver(top + k * line, top + (k + 1) * line)));
+      return Array.from({ length: n }, (_, k) => { const yc = top + (k + 0.5) * line; return sidesOver(yc - r.a, yc + r.d); });
     };
+    const widths = (n, size, cy, r) => rooms(n, size, cy, r).map(([l, rr]) => Math.max(0, l + rr));
     const how = { lang: opts.lang, hyphenator: opts.hyphenator };
     const linesAt = (size, hyphenate) => {
       setFont(size);
-      for (let n = 1; n * size * lh <= bottom0 - top0 + 1e-6; n++) {
-        const at = centres(n * size * lh);
+      const r = reach(size);
+      for (let n = 1; span(n, size, r).up + span(n, size, r).down <= bottom0 - top0 + 1e-6; n++) {
+        const at = centres(span(n, size, r));
         if (!at.length) break; // nowhere in the shape: more lines only need more
         for (const cy of at) {
-          const ws = widths(n, size, cy);
+          const ws = widths(n, size, cy, r);
           if (ws.some((w) => w <= 0)) continue;
           const w = wrapInfo(measure, text, (k) => ws[Math.min(k, n - 1)], { ...how, hyphenate });
           if (w.broken || w.lines.length > n) continue;
-          const got = w.lines.length === n ? ws : widths(w.lines.length, size, cy); // fewer lines sit closer to the middle
-          if (w.lines.every((l, j) => measure(l) <= got[j])) return { ...w, cy };
+          const sides = rooms(w.lines.length, size, cy, r); // (fewer lines sit closer to the middle)
+          // each line's letters left and right of its middle (their ink when it can be measured)
+          const across = w.lines.map((l) => { const m = opts.ink ? opts.ink(l) : null; return m ? [m.l, m.r] : [measure(l) / 2, measure(l) / 2]; });
+          if (w.lines.every((l, j) => measure(l) <= sides[j][0] + sides[j][1] && across[j][0] + across[j][1] <= sides[j][0] + sides[j][1])) {
+            // each line centred in its own row of the room, as a letterer follows a bubble's middle
+            // row by row (shifted only as far as it must be, a line hugged one side: lines in boxes
+            // came to touch their border)
+            const dx = across.map(([a, b], j) => Math.min(sides[j][1] - b, Math.max(a - sides[j][0], (sides[j][1] - sides[j][0]) / 2)));
+            return { ...w, cy, ...(dx.some((d) => Math.abs(d) > 0.01) ? { dx: dx.map((d) => +d.toFixed(2)) } : {}) };
+          }
         }
       }
       return null;
@@ -330,7 +360,7 @@
       return found;
     };
     const plain = largest(false), hy = largest(true);
-    const pick = (f, hyphens) => f && { size: f.size, lines: f.w.lines, lineHeight: f.size * lh, hyphens, shaped: true, cy: f.w.cy, cx: shapeCx(shape, rect) };
+    const pick = (f, hyphens) => f && { size: f.size, lines: f.w.lines, lineHeight: f.size * lh, hyphens, shaped: true, cy: f.w.cy, cx: shapeCx(shape, rect), ...(f.w.dx ? { dx: f.w.dx } : {}) };
     if (plain && (!hy || !hy.w.hyphens || plain.size >= hy.size * (opts.hyphenRatio ?? 0.75))) { setFont(plain.size); return pick(plain, 0); }
     if (hy && hy.w.hyphens) { setFont(hy.size); return pick(hy, hy.w.hyphens); }
     return null;
@@ -387,23 +417,27 @@
     const top0 = shape ? shapeTop(shape, rect) : rect.y, bottom0 = shape ? top0 + shape.half.length * shape.step : rect.y + rect.h;
     const sx = shape ? shapeCx(shape, rect) : rect.x + rect.w / 2, lx = fit.cx ?? rect.x + rect.w / 2; // the room's centre line, the lines'
     const more = toOutline ? shape?.edge || 0 : 0; // (the shape keeps a margin off the outline: up to the outline itself)
-    const halfAt = (y0, y1) => {
-      if (!shape) return rect.w / 2;
-      let h = Infinity;
-      for (let k = Math.max(0, Math.floor((y0 - top0) / shape.step)); k <= Math.min(shape.half.length - 1, Math.floor((y1 - top0) / shape.step)); k++) h = Math.min(h, shape.half[k] ? shape.half[k] + more : 0);
-      return h === Infinity ? 0 : h;
+    // the room left and right of its centre line over rows y0..y1
+    const sidesAt = (y0, y1) => {
+      if (!shape) return [rect.w / 2, rect.w / 2];
+      const L = shape.left || shape.half, R = shape.right || shape.half;
+      let l = Infinity, r = Infinity;
+      for (let k = Math.max(0, Math.floor((y0 - top0) / shape.step)); k <= Math.min(shape.half.length - 1, Math.floor((y1 - top0) / shape.step)); k++) {
+        l = Math.min(l, shape.half[k] ? L[k] + more : 0); r = Math.min(r, shape.half[k] ? R[k] + more : 0);
+      }
+      return l === Infinity ? [0, 0] : [l, r];
     };
     // each line's letters: their ink as drawn (centred on the line's middle) when the caller can
     // measure it, else the line's width and the middle 0.8 of its size. (3.0: the middle 0.8 left out
     // descenders and accents, and box fits judged inside touched a bubble's bottom curve.)
     let all = 0, out = 0;
     fit.lines.forEach((line, k) => {
-      const yc = top + (k + 0.5) * fit.lineHeight, m = ink ? ink(line) : null;
+      const yc = top + (k + 0.5) * fit.lineHeight, m = ink ? ink(line) : null, x = lx + (fit.dx?.[k] || 0);
       const y0 = m ? yc - m.a : yc - 0.4 * fit.size, y1 = m ? yc + m.d : yc + 0.4 * fit.size;
-      const x0 = m ? lx - m.l : lx - measure(line) / 2, x1 = m ? lx + m.r : lx + measure(line) / 2, a = (x1 - x0) * (y1 - y0);
+      const x0 = m ? x - m.l : x - measure(line) / 2, x1 = m ? x + m.r : x + measure(line) / 2, a = (x1 - x0) * (y1 - y0);
       if (!(a > 0)) return;
-      const iy0 = Math.max(y0, top0), iy1 = Math.min(y1, bottom0), half = iy1 > iy0 ? halfAt(iy0, iy1) : 0;
-      const across = Math.max(0, Math.min(x1, sx + half) - Math.max(x0, sx - half));
+      const iy0 = Math.max(y0, top0), iy1 = Math.min(y1, bottom0), [hl, hr] = iy1 > iy0 ? sidesAt(iy0, iy1) : [0, 0];
+      const across = Math.max(0, Math.min(x1, sx + hr) - Math.max(x0, sx - hl));
       all += a; out += a - Math.max(0, iy1 - iy0) * across;
     });
     return all ? +(out / all).toFixed(3) : 0;
@@ -415,10 +449,11 @@
     const total = fit.lines.length * fit.lineHeight;
     let y = (fit.cy ?? rect.y + rect.h / 2) - total / 2 + fit.lineHeight / 2; // (a shape's fit may sit off the box's centre: fitShape)
     const cx = fit.cx ?? rect.x + rect.w / 2; // (a shape's fit on the shape's centre line)
-    for (const line of fit.lines) {
-      if (halo) { ctx.lineJoin = "round"; ctx.lineWidth = Math.max(2, fit.size * 0.22); ctx.strokeStyle = color === "#fff" ? "rgba(0,0,0,.85)" : "rgba(255,255,255,.92)"; ctx.strokeText(line, cx, y); }
-      ctx.fillStyle = color; ctx.fillText(line, cx, y); y += fit.lineHeight;
-    }
+    fit.lines.forEach((line, k) => {
+      const x = cx + (fit.dx?.[k] || 0); // (a line of a shape's fit may stand off its centre line: fitShape)
+      if (halo) { ctx.lineJoin = "round"; ctx.lineWidth = Math.max(2, fit.size * 0.22); ctx.strokeStyle = color === "#fff" ? "rgba(0,0,0,.85)" : "rgba(255,255,255,.92)"; ctx.strokeText(line, x, y); }
+      ctx.fillStyle = color; ctx.fillText(line, x, y); y += fit.lineHeight;
+    });
   }
 
   const upper = (text, lang) => { try { return text.toLocaleUpperCase(lang || undefined); } catch { return text.toUpperCase(); } };
