@@ -10,7 +10,7 @@ The learned text mask: a setting, off by default, that erases the lettering the 
 
 ### Pages
 - **Learned text mask (preview)**, in Options (Settings in the web app). With it on, a model trained on comic text finds the lettering to erase on free text and in bubbles whose surface isn't plain: dark, toned or gradient bubbles. Plain bubbles keep the rules, which already find their lettering whole. The eraser checks the model's mask before taking it: only pieces of it on the lines Gytakusub found, never a bubble's outline, and the rules instead where the model took a bubble or a shape for lettering. On pages never looked at, free-text lines left untouched went from 24.5% to 10.8%, and on webtoon pages lines left untouched went from 18.5% to 5.6%. [ADR 0022](docs/adr/0022-learned-text-mask.md)
-- **Why it's off by default:** without a graphics card it's slower. On one CPU thread the mask takes about 4 s a page (median; 7 s on webtoon pages), up to 30 s on the busiest pages. It runs while Claude reads the page. With a graphics card it runs there; its mask is the CPU's, but its speed there isn't measured here.
+- **Why it's off by default:** without a graphics card it's slower. On one CPU thread the mask takes about 4 s a page (median; 7 s on webtoon pages); the slowest tenth of pages take from 8 to 12 s up (by kind of page), and the slowest page measured took 43 s. It runs while Claude reads the page. With a graphics card it runs there; its mask is the CPU's, but its speed there isn't measured here.
 
 **Measured on pages never looked at** (held-out halves, the same bench, 3.1.0 against 3.2.0 with the setting on; with it off, 3.2.0 erases exactly as 3.1.0):
 
@@ -24,10 +24,11 @@ The learned text mask: a setting, off by default, that erases the lettering the 
 | Generated: art damage | 0.051% | 0.020% |
 | Generated: bubble outline pixels erased | 1,062 | 950 |
 | The new shapes (1,165 lines): free-text lines left untouched | 31 of 139 (22.3%) | 14 (10.1%) |
-| The new shapes: art damage | 0.055% | 0.025% |
+| The new shapes: art damage | 0.054% | 0.025% |
 | The new shapes: bubble outline pixels erased | 2,817 | 1,437 |
 | Webtoon (789 lines): lines left untouched | 146 (18.5%) | 44 (5.6%) |
-| Webtoon: in bubbles, most of them dark | 128 of 701 (18.3%) | 37 (5.3%) |
+| Webtoon: in dark bubbles | 103 of 173 (59.5%) | 27 (15.6%) |
+| Webtoon: in the other bubbles | 25 of 528 (4.7%) | 10 (1.9%) |
 | Webtoon: free text | 18 of 88 (20.5%) | 7 (8.0%) |
 | Webtoon: art damage | 0.053% | 0.048% |
 | Webtoon: bubble outline pixels erased | 2,635 | 5,026 |
@@ -36,14 +37,14 @@ Text sizes, placement and the lines found don't change: the mask only changes wh
 
 **The goals set for 3.2:**
 - Free-text lettering left at least halved: met (24.5% → 10.8% generated, 22.3% → 10.1% the new shapes, 20.5% → 8.0% webtoon).
-- The webtoon's dark bubbles erased: in bubbles, lines left untouched 18.3% → 5.3%.
+- The webtoon's dark bubbles erased: mostly, not all. Lines in them left untouched 59.5% → 15.6% (103 → 27 of 173).
 - Real pages no worse: lettering still seen 1.69% → 1.06% (more on 7 pages, less on 20); art damage 0.098% → 0.045% (worse on 8 pages, better on 55).
 - Within a size and speed budget: the model adds 29 MB (the extension is about 220 MB unpacked), and on a CPU it takes about as long again as the rest of the engine; it's off by default for that.
 
 **Not fixed:** on webtoon pages the mask erases nearly twice as many bubble outline pixels (2,635 → 5,026). The bubble model misses many dark bubbles; read as free text, they have no interior to keep the mask inside, and the model sees lettering where a dark bubble meets its outline. A small dark bubble the bubble model misses can be erased whole. Finding those bubbles is the comic detector's work (3.3).
 
 ### Development
-- `--textmask` on both benches: the learned mask, as the setting; each page's row has the mask's time.
+- `--textmask` on both benches: the learned mask, as the setting; each page's row has the mask's time. Generated pages' rows count the lines in dark bubbles and those left untouched there (`darkLines`, `darkStays`).
 - `scripts/vendor-textmask.mjs` vendors the model (comic-text-mask, TareHimself, MIT) at a pinned revision and checks it; `scripts/textmask-onnx.py` builds the ONNX graph from the published weights.
 - Tests: `textmask.test.mjs` (the crops, the model on drawn lettering, the eraser's checks), the mask on the GPU against the CPU (`gpu.test.mjs`), and the extension and the web app with the setting on (`browser/run.mjs --learned-mask`, `browser/web.mjs --learned-mask`).
 

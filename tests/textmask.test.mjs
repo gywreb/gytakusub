@@ -6,7 +6,7 @@ import { createRequire } from "node:module";
 import { createCanvas } from "canvas";
 globalThis.require ??= createRequire(import.meta.url);
 const { cv, analyzePage, textMasksFor } = await import("./cv-node.mjs");
-const { textCrops, maskText, textMasker, INPUT } = await import("../extension/engine/textmask.js");
+const { textCrops, maskText, masksFor, textMasker, INPUT } = await import("../extension/engine/textmask.js");
 const { createSession } = await import("../extension/engine/ort.js");
 const { layout } = await import("../extension/engine/layout.js");
 const { erase } = await import("../extension/engine/erase.js");
@@ -75,6 +75,29 @@ await test("a lettering's outline is in its mask whole: white round black letter
     for (let y = 0; y < m.h; y++) for (let x = 0; x < m.w; x++) { const p = ((m.y + y) * img.width + m.x + x) * 4; if (want(p)) { n++; hit += m.mask[y * m.w + x]; } }
     assert.ok(n > 500 && hit > 0.97 * n, `${outline} outline ${lw}px: ${hit} of ${n} pixels in the mask`);
   }
+});
+
+await test("a region's mask is made once for its crop, and again when the layout adopts lines into it", async () => {
+  const img = page((x) => { x.fillStyle = "#000"; x.font = "bold 26px 'Gytakusub Comic'"; x.fillText("FIRST LINE", 100, 120); x.fillText("SECOND LINE", 100, 160); x.fillText("A SIGN", 500, 300); });
+  const an = { regions: [
+    { id: 1, kind: "free", letter: 20, ref: { gbox: { x: 98, y: 100, w: 150, h: 26 } } },
+    { id: 2, kind: "free", letter: 20, ref: { gbox: { x: 498, y: 280, w: 100, h: 26 } } },
+  ], lines: [] };
+  const cache = new Map(), ids = new Set([1, 2]);
+  const first = await masksFor(masker, img, an, ids, cache);
+  assert.equal(first.made, 2);
+  // the prefill's masks again: none made
+  const again = await masksFor(masker, img, an, ids, cache);
+  assert.equal(again.made, 0);
+  assert.ok(again.masks[1] === first.masks[1]);
+  // the layout adopts the second line into region 1 (a new ref, a wider box): its mask is made again and takes the line
+  an.regions[0].ref = { ...an.regions[0].ref, gbox: { x: 98, y: 100, w: 165, h: 66 }, parts: [{ x: 98, y: 100, w: 150, h: 26 }, { x: 98, y: 140, w: 165, h: 26 }] };
+  const after = await masksFor(masker, img, an, ids, cache);
+  assert.equal(after.made, 1, "only the region whose crop changed");
+  assert.ok(after.masks[1] === first.masks[1], "the other keeps its mask");
+  const m = after.masks[0]; let low = 0;
+  for (let y = 140 - m.y; y < 166 - m.y; y++) for (let x = 0; x < m.w; x++) low += m.mask[y * m.w + x];
+  assert.ok(low > 300, `${low} pixels of the adopted line in the mask`);
 });
 
 await test("a crop larger than the input is run scaled down, its mask at its own size", async () => {

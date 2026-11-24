@@ -3,7 +3,7 @@
 // original lettering, hand back a cleaned page plus text placements).
 // Used by the extension's service worker and by the web app's Web Worker.
 import { getCV, getDetector, getSegmenter, getFallbackDetector, getInpainter, getTextMasker, inpainterSide, setEnginePrefs, lamaEvent } from "./cv.js";
-import { textCrops, maskText } from "./textmask.js";
+import { masksFor } from "./textmask.js";
 import { ortBroken, gpuIsSoftware } from "./ort.js";
 import { analyze } from "./analyze.js";
 import { segment } from "./segment.js";
@@ -112,23 +112,17 @@ export async function preparePage(bitmap, settings, opts = {}) {
 /**
  * The learned text mask's crops (engine/textmask.js) for a slice's regions `ids`, each with its
  * mask, for erase.js (opts.textMasks); null when the page doesn't use it (or the model failed to
- * load). Each region is masked once: prefillPage() asks for all, finishPage() then for those the
- * layout added.
+ * load). prefillPage() asks for all; finishPage() again, and only regions whose crop the layout
+ * or looking again changed (or that the layout added) are masked again (textmask.js masksFor).
  */
 async function textMasksOf(job, s, ids) {
   if (!job.textMask) return null;
   const masker = await getTextMasker();
   if (!masker) return null;
-  const have = s.textMasks || (s.textMasks = new Map());
-  const want = new Set([...ids].filter((id) => !have.has(id)));
-  if (want.size) {
-    const t0 = performance.now();
-    for (const id of want) have.set(id, []);
-    for (const c of await maskText(masker, s.imageData, textCrops(s.analysis, want, s.imageData))) have.get(c.region).push(c);
-    job.maskMs = (job.maskMs || 0) + Math.round(performance.now() - t0);
-    job.maskEp = masker.ep;
-  }
-  return [...ids].flatMap((id) => have.get(id) || []);
+  const t0 = performance.now(), { masks, made } = await masksFor(masker, s.imageData, s.analysis, ids, s.textMasks || (s.textMasks = new Map()));
+  if (made) job.maskMs = (job.maskMs || 0) + Math.round(performance.now() - t0);
+  job.maskEp = masker.ep;
+  return masks;
 }
 
 /**

@@ -87,6 +87,21 @@ export async function maskText(masker, img, crops) {
   return out;
 }
 
+/**
+ * The masks of the regions `ids`, each made once for its crop: a region masked before at the same
+ * crop keeps its mask (`cache`, a Map per slice, region id to mask), one whose crop has changed is
+ * masked again. Between the prefill (every region, while Claude reads the page) and the page's
+ * finish, the layout adopts lines into a region and looking again finds more: a mask kept from
+ * before would leave their lettering, which the rules, skipped there, would have erased.
+ * @returns {Promise<{masks: Array, made: number}>} the masks, and how many were made now
+ */
+export async function masksFor(masker, img, analysis, ids, cache) {
+  const same = (a, b) => a && a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
+  const crops = textCrops(analysis, ids, img), fresh = crops.filter((c) => !same(cache.get(c.region), c));
+  for (const m of await maskText(masker, img, fresh)) cache.set(m.region, m);
+  return { masks: crops.map((c) => cache.get(c.region)), made: fresh.length };
+}
+
 // The crop `c` of `img` scaled by `s` to w x h: each pixel's colour to `put(index in a row of
 // INPUT, r, g, b)`. Scaled down, a pixel is the mean of the crop's pixels under it; up, bilinear.
 function sample(img, c, s, w, h, put) {

@@ -213,6 +213,8 @@ for (let seed = +first; seed < +first + +count; seed++) {
       const ids = pg.blocks.map((b, i) => (told[i] && of(b) ? i : -1)).filter((i) => i >= 0);
       return [[`${g}Lines`, ids.length], [`${g}Stays`, ids.filter((i) => rows[i].stays).length]];
     })),
+    // in dark bubbles (--webtoon): what the learned text mask (3.2) is for, and the comic detector (3.3)
+    darkLines: pg.blocks.filter((b, i) => told[i] && b.bubble && b.shape === "dark").length, darkStays: pg.blocks.filter((b, i) => told[i] && b.bubble && b.shape === "dark" && rows[i].stays).length,
     restore: +(rows.reduce((s, x, i) => s + (told[i] ? x.restore : 0), 0) / Math.max(1, n)).toFixed(2),
     letterFar: per.filter((e, i) => told[i] && e.letter != null && (e.letter < 0.6 || e.letter > 1.6)).length,
     small: per.filter((e, i) => told[i] && e.drawn != null && e.drawn < 0.7).length,

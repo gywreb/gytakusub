@@ -53,10 +53,10 @@ A setting, off by default (ADR 0022): a model trained on comic text finds the le
 |---|---|---|---|---|---|---|
 | Real, held out | 2,752 | 1.69% → 1.06% | not measured | 0.098% → 0.045% | not measured | 4.2 s |
 | Generated, held out | 810 | 5.2% → 2.7% | 24.5% → 10.8% | 0.051% → 0.020% | 1,062 → 950 | 4.2 s |
-| The new shapes, held out | 1,165 | 3.3% → 1.8% | 22.3% → 10.1% | 0.055% → 0.025% | 2,817 → 1,437 | 6.7 s |
+| The new shapes, held out | 1,165 | 3.3% → 1.8% | 22.3% → 10.1% | 0.054% → 0.025% | 2,817 → 1,437 | 6.7 s |
 | Webtoon, held out | 789 | 18.5% → 5.6% | 20.5% → 8.0% | 0.053% → 0.048% | 2,635 → 5,026 | 6.7 s |
 
-On the webtoon pages the mask erases more of the outlines of dark bubbles the bubble model misses (ADR 0022).
+On the webtoon pages, lines in dark bubbles left untouched went from 59.5% to 15.6% (`darkStays`); the mask also erases more of the outlines of dark bubbles the bubble model misses (ADR 0022).
 
 ## What is measured
 
