@@ -46,6 +46,7 @@ Text sizes, placement and the lines found don't change: the mask only changes wh
 ### Development
 - `--textmask` on both benches: the learned mask, as the setting; each page's row has the mask's time. Generated pages' rows count the lines in dark bubbles and those left untouched there (`darkLines`, `darkStays`).
 - `scripts/vendor-textmask.mjs` vendors the model (comic-text-mask, TareHimself, MIT) at a pinned revision and checks it; `scripts/textmask-onnx.py` builds the ONNX graph from the published weights.
+- Debug reports say whether the learned text mask was on (`settings.learnedMask`); each page's `timing.textMask` says where it ran and for how long.
 - Tests: `textmask.test.mjs` (the crops, the model on drawn lettering, the eraser's checks), the mask on the GPU against the CPU (`gpu.test.mjs`), and the extension and the web app with the setting on (`browser/run.mjs --learned-mask`, `browser/web.mjs --learned-mask`).
 
 ## [3.1.0] — 2026-11-24
