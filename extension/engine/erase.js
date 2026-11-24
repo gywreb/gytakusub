@@ -93,6 +93,58 @@ function eraseRegions(cv, img, analysis, regionIds, opts, own) {
   let pens = [];
   const regionPen = () => (pens.length ? pens.slice().sort((p, q) => p - q)[pens.length >> 1] : 0);
   const extend = (x0, y0, x1, y1) => { painted = painted ? { x0: Math.min(painted.x0, x0), y0: Math.min(painted.y0, y0), x1: Math.max(painted.x1, x1), y1: Math.max(painted.y1, y1) } : { x0, y0, x1, y1 }; };
+  // The learned text mask (engine/textmask.js), in place of the rules below: what the model calls
+  // lettering in each of the region's crops, as pieces (connected), inside the bubble's interior
+  // for a bubble. Only a piece that reaches into the region's lines (its blocks' boxes and the
+  // detector's lines in the crop), as the rules keep to marks reaching into the lettering's zone:
+  // along the edge of a dark bubble the model sees a ring of lettering, away from the lines. Never
+  // the bubble's outline where the interior takes it in (outlineOf). True when it painted anything.
+  // Nothing, and false, when it took a shape for lettering: when in a bubble it calls most of the
+  // interior lettering (ERASE.modelBubbleShare), or when a piece is thicker than the detector's
+  // lines under it are high (ERASE.modelThickLines). Lettering never fills its bubble, and a stroke
+  // of it, outline and all, lies about within its line's box; the model takes a small dark bubble
+  // whole for a glyph, read as a bubble or as free text.
+  const piecesOf = (c, boxes) => {
+    const m = own(cv.matFromArray(c.h, c.w, cv.CV_8UC1, c.mask)), lab = own(new cv.Mat()), st = own(new cv.Mat()), ce = own(new cv.Mat());
+    const n = cv.connectedComponentsWithStats(m, lab, st, ce, 8, cv.CV_32S);
+    const thick = thicknessOf(m, lab.data32S, n, c.w, c.h), labels = Int32Array.from(lab.data32S), onLine = new Uint8Array(n);
+    m.delete(); lab.delete(); st.delete(); ce.delete();
+    for (const b of boxes) {
+      const x0 = Math.max(0, Math.floor(b.x - c.x)), y0 = Math.max(0, Math.floor(b.y - c.y)), x1 = Math.min(c.w, Math.ceil(b.x + b.w - c.x)), y1 = Math.min(c.h, Math.ceil(b.y + b.h - c.y));
+      for (let yy = y0; yy < y1; yy++) for (let xx = x0; xx < x1; xx++) onLine[labels[yy * c.w + xx]] = 1;
+    }
+    return { n, labels, thick, onLine };
+  };
+  const paintLearned = (crops, blocks, inside, dark) => {
+    const pieces = crops.map((c) => {
+      const lines = (analysis.lines || []).filter((l) => { const cx = l.x + l.w / 2, cy = l.y + l.h / 2; return cx >= c.x && cx < c.x + c.w && cy >= c.y && cy < c.y + c.h; });
+      const P = piecesOf(c, blocks.flatMap((b) => b.parts || [b.gbox]).concat(lines));
+      P.across = Math.max(0, ...lines.map((l) => (l.vertical ? l.w : l.h)));
+      return P;
+    });
+    for (const P of pieces) if (P.across) for (let i = 1; i < P.n; i++) if (P.onLine[i] && P.thick[i] > ERASE.modelThickLines * P.across) return false;
+    const keep = crops.map((c, k) => {
+      const edge = inside ? outlineOf({ ...c, inside, dark }, img.data, W) : null, P = pieces[k];
+      return (xx, yy) => { const i = yy * c.w + xx, l = P.labels[i]; return l > 0 && P.onLine[l] && !(edge && edge[i]) && (!inside || inside(c.x + xx, c.y + yy)); };
+    });
+    if (inside) {
+      let interior = 0, lettering = 0;
+      crops.forEach((c, k) => { for (let yy = 0; yy < c.h; yy++) for (let xx = 0; xx < c.w; xx++) if (inside(c.x + xx, c.y + yy)) { interior++; if (keep[k](xx, yy)) lettering++; } });
+      if (lettering > ERASE.modelBubbleShare * interior) return false;
+    }
+    let any = false;
+    crops.forEach((c, k) => {
+      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+      for (let yy = 0; yy < c.h; yy++) for (let xx = 0; xx < c.w; xx++) {
+        if (!keep[k](xx, yy)) continue;
+        const X = c.x + xx, Y = c.y + yy;
+        md[Y * W + X] = 255;
+        if (X < x0) x0 = X; if (Y < y0) y0 = Y; if (X > x1) x1 = X; if (Y > y1) y1 = Y;
+      }
+      if (x1 >= x0) { extend(x0, y0, x1 + 1, y1 + 1); any = true; }
+    });
+    return any;
+  };
   const paintTextBox = (pols, b, letter, inside = null, withColour = true) => {
     pols = (Array.isArray(pols) ? pols : [pols]).filter(Boolean);
     const across = Math.max(ERASE.padAcrossMinPx, Math.round(letter * ERASE.padAcross)), along = Math.max(ERASE.padAlongMinPx, Math.round(letter * ERASE.padAlong));
@@ -192,19 +244,8 @@ function eraseRegions(cv, img, analysis, regionIds, opts, own) {
     return m;
   };
 
-  // In a bubble with a plain surface: whatever stands out from the surface near the lettering, in
-  // marks wholly inside the interior. The text detector finds a line of coloured (or faint) lettering,
-  // but the analysis sizes it by its dark ink, which in a blue or orange letter is a thin core; this
-  // takes the whole letter. Marks touching the interior's edge (the outline) and specks far from the
-  // text (decoration) stay.
-  // The zone a bubble's lettering lies in: its lines as the analysis sized them and as the detector
-  // boxed them (a coloured line it sized by its dark core, or dropped for having none, is still the
-  // detector's), each grown by a letter.
-  const bubbleZone = (blocks, letter, inside) => {
-    const cxIn = (l) => inside(l.x + l.w / 2, l.y + l.h / 2);
-    const lines = blocks.flatMap((b) => [b.gbox, b.line, ...(b.lineBoxes || [])]).concat((analysis.lines || []).filter(cxIn)).filter(Boolean);
-    return lines.map((b) => ({ x: b.x - letter, y: b.y - letter, w: b.w + 2 * letter, h: b.h + 2 * letter, v: b.vertical ?? b.h > b.w }));
-  };
+  // The zone a bubble's lettering lies in (bubbleZoneOf)
+  const bubbleZone = (blocks, letter, inside) => bubbleZoneOf(analysis, blocks, letter, inside);
   // Marks of a mask over a bubble's box (`m`, w × h at x, y) that are the bubble's lettering: wholly
   // inside the interior (never the outline, nor art past it), reaching into the lettering's zone,
   // and letter-sized — or a stroke as thin as a letter, however long (a stretched long vowel mark,
@@ -233,21 +274,8 @@ function eraseRegions(cv, img, analysis, regionIds, opts, own) {
     lab.delete(); st.delete(); ce.delete();
   };
 
-  // A bubble's surface colour when it is plain (the interior away from its edge and from the
-  // lettering, nearly all one colour), else null: tone, a gradient, or art taken for a bubble.
-  const plainSurface = (r, zone, inside) => {
-    const { x, y, w, h } = r.box;
-    const inZone = (xx, yy) => zone.some((z) => xx >= z.x && xx < z.x + z.w && yy >= z.y && yy < z.y + z.h);
-    const e = ERASE.depthPx, deep = (xx, yy) => inside(xx, yy) && inside(xx - e, yy) && inside(xx + e, yy) && inside(xx, yy - e) && inside(xx, yy + e);
-    const rs = [], gs = [], bs = [];
-    for (let yy = y; yy < y + h; yy += 2) for (let xx = x; xx < x + w; xx += 2) if (deep(xx, yy) && !inZone(xx, yy)) { const p = (yy * W + xx) * 4; rs.push(pix[p]); gs.push(pix[p + 1]); bs.push(pix[p + 2]); }
-    if (rs.length < ERASE.surfaceSamples) return null;
-    const med = (a) => a.slice().sort((p, q) => p - q)[a.length >> 1];
-    const c = [med(rs), med(gs), med(bs)];
-    let near = 0;
-    for (let i = 0; i < rs.length; i++) if (Math.max(Math.abs(rs[i] - c[0]), Math.abs(gs[i] - c[1]), Math.abs(bs[i] - c[2])) <= COLOUR_PLAIN) near++;
-    return near >= PLAIN_SHARE * rs.length ? c : null;
-  };
+  // A bubble's surface colour when it is plain, else null (plainSurfaceOf)
+  const plainSurface = (r, zone, inside) => plainSurfaceOf(img, r, zone, inside);
 
   // In a bubble with a plain surface: whatever stands out from the surface near the lettering, in
   // marks wholly inside the interior. The text detector finds a line of coloured (or faint) lettering,
@@ -317,7 +345,11 @@ function eraseRegions(cv, img, analysis, regionIds, opts, own) {
       const blocks = r.kind === "bubble" ? r.ref.blocks : [r.ref];
       let roi;
       painted = null; pens = [];
-      if (blocks.length) {
+      // the learned text mask where it was run and saw lettering in the region's crops; the rules
+      // where it saw none (they find what they found before it)
+      const learned = opts.textMasks ? opts.textMasks.filter((c) => c.region === r.id) : null;
+      const byModel = !!(blocks.length && learned?.length && paintLearned(learned, blocks, inside, r.dark));
+      if (!byModel && blocks.length) {
         // Free text: line by line (`parts`, the detected lines a paragraph was merged from), not
         // the paragraph's whole box: lines chained across a picture make a box that holds the art
         // between them, and every small stroke in it would pass for lettering.
@@ -337,6 +369,8 @@ function eraseRegions(cv, img, analysis, regionIds, opts, own) {
             paintTextBox(null, { gbox: g, line: g, vertical: !!l.vertical }, Math.max(letter, ERASE.lineLetter * (l.vertical ? g.w : g.h)), inside, true);
           }
         }
+      }
+      if (blocks.length) {
         const pad = Math.round(letter * ERASE.fillPad);
         // around the lettering's boxes, and whatever of it the masks found beyond them (a coloured
         // line read whole, the rest of an adopted line)
@@ -348,8 +382,8 @@ function eraseRegions(cv, img, analysis, regionIds, opts, own) {
       } else if (r.kind === "bubble" && r.ref.fill && paintInsideMask(pol, r.ref, letter)) {
         roi = { ...r.box };
       } else continue;
-      if (r.kind === "bubble") rois.push({ ...roi, radius: ERASE.bubbleRadius, inside: analysis.insideOf(r.id), dark: r.dark, letter });
-      else rois.push({ ...roi, radius: teleaRadius(letter), letter });
+      if (r.kind === "bubble") rois.push({ ...roi, radius: ERASE.bubbleRadius, inside: analysis.insideOf(r.id), dark: r.dark, letter, byModel });
+      else rois.push({ ...roi, radius: teleaRadius(letter), letter, byModel });
       continue;
     }
     const glyphLabels = pol.glyphLabels.data32S, regionLabels = pol.regionLabels.data32S;
@@ -393,9 +427,13 @@ function eraseRegions(cv, img, analysis, regionIds, opts, own) {
     const grown = own(new cv.Mat()); cv.dilate(mask, grown, k); k.delete();
     const gd = grown.data, px = img.data;
     for (const r of rois) {
+      // (in a bubble the learned mask painted, not over its outline where the interior takes it
+      // in either: the fringe of lettering run close to a burst's spikes took them)
+      if (r.byModel && r.inside) r.edge = outlineOf(r, px, W);
+      const edge = r.byModel ? r.edge : null;
       for (let yy = r.y; yy < r.y + r.h; yy++) for (let xx = r.x; xx < r.x + r.w; xx++) {
         const p = yy * W + xx;
-        if (!gd[p] || md[p]) continue;
+        if (!gd[p] || md[p] || (edge && edge[(yy - r.y) * r.w + xx - r.x])) continue;
         if (r.inside && !r.inside(xx, yy)) {
           // Not bubble surface: admit the anti-aliased fringe of a stroke, never
           // the outline itself (solid ink of the bubble's own colour polarity).
@@ -412,7 +450,7 @@ function eraseRegions(cv, img, analysis, regionIds, opts, own) {
       // growOutline, and is filled flat below.
       for (const r of rois) {
         if (!r.inside) continue;
-        r.edge = outlineOf(r, px, W);
+        r.edge = r.edge || outlineOf(r, px, W);
         const rect = new cv.Rect(r.x, r.y, r.w, r.h), rc = own(copyOf(rgb, rect)), mc = own(copyOf(mask, rect));
         r.flat = flatSurface(rc, mc, (x, y) => r.inside(r.x + x, r.y + y) && !r.edge[y * r.w + x]);
         rc.delete(); mc.delete();
@@ -471,6 +509,47 @@ function eraseRegions(cv, img, analysis, regionIds, opts, own) {
 }
 
 /**
+ * The zone a bubble's lettering lies in: its lines as the analysis sized them and as the detector
+ * boxed them (a coloured line it sized by its dark core, or dropped for having none, is still the
+ * detector's), each grown by a letter.
+ */
+function bubbleZoneOf(analysis, blocks, letter, inside) {
+  const cxIn = (l) => inside(l.x + l.w / 2, l.y + l.h / 2);
+  const lines = blocks.flatMap((b) => [b.gbox, b.line, ...(b.lineBoxes || [])]).concat((analysis.lines || []).filter(cxIn)).filter(Boolean);
+  return lines.map((b) => ({ x: b.x - letter, y: b.y - letter, w: b.w + 2 * letter, h: b.h + 2 * letter, v: b.vertical ?? b.h > b.w }));
+}
+
+/**
+ * A bubble's surface colour when it is plain (the interior away from its edge and from the
+ * lettering's zone, nearly all one colour), else null: tone, a gradient, or art taken for a bubble.
+ */
+function plainSurfaceOf(img, r, zone, inside) {
+  const { width: W, data: pix } = img, { x, y, w, h } = r.box;
+  const inZone = (xx, yy) => zone.some((z) => xx >= z.x && xx < z.x + z.w && yy >= z.y && yy < z.y + z.h);
+  const e = ERASE.depthPx, deep = (xx, yy) => inside(xx, yy) && inside(xx - e, yy) && inside(xx + e, yy) && inside(xx, yy - e) && inside(xx, yy + e);
+  const rs = [], gs = [], bs = [];
+  for (let yy = y; yy < y + h; yy += 2) for (let xx = x; xx < x + w; xx += 2) if (deep(xx, yy) && !inZone(xx, yy)) { const p = (yy * W + xx) * 4; rs.push(pix[p]); gs.push(pix[p + 1]); bs.push(pix[p + 2]); }
+  if (rs.length < ERASE.surfaceSamples) return null;
+  const med = (a) => a.slice().sort((p, q) => p - q)[a.length >> 1];
+  const c = [med(rs), med(gs), med(bs)];
+  let near = 0;
+  for (let i = 0; i < rs.length; i++) if (Math.max(Math.abs(rs[i] - c[0]), Math.abs(gs[i] - c[1]), Math.abs(bs[i] - c[2])) <= COLOUR_PLAIN) near++;
+  return near >= PLAIN_SHARE * rs.length ? c : null;
+}
+
+/**
+ * Whether a region is a bubble with a plain surface, whose lettering the rules find whole: by its
+ * polarity, and by its colour against that surface. The learned text mask is run on the rest
+ * (engine/textmask.js textCrops).
+ * @param {ImageData} img the slice @param {object} analysis @param {object} r a region of it
+ */
+export function plainBubble(img, analysis, r) {
+  const inside = r.kind === "bubble" ? analysis.insideOf?.(r.id) : null;
+  if (!inside || !r.ref?.blocks?.length) return false;
+  return !!plainSurfaceOf(img, r, bubbleZoneOf(analysis, r.ref.blocks, Math.max(ERASE.minLetterPx, r.letter), inside), inside);
+}
+
+/**
  * A line's pen: the thickness (`t`) most of the ink (`a`) of its marks has, the median weighted by
  * ink; 0 with no marks.
  * @param {Array<{t:number,a:number}>} marks
@@ -521,10 +600,15 @@ function outlineOf(r, px, W) {
  * outlineOf): the interior the bubble model gives takes in its outline, and the growth, set by the
  * letter size, reached it wherever lettering ran close. On tone or art, ink at the interior's edge
  * is the surface too, and the growth takes it as before: leaving it in pieces, the fill smeared it.
+ * Not an area the learned text mask painted (`byModel`): its mask takes in a lettering's outline
+ * whole (tests/textmask.test.mjs), and grown by a letter size the analysis may have got wrong (a
+ * dark bubble read as free text 53 px tall where its letters were 21), the area spread over the
+ * art beside it.
  */
 function growOutline(cv, mask, rois, W, k) {
   return owning((own) => {
     for (const r of rois) {
+      if (r.byModel) continue;
       const g = Math.max(1, Math.round((r.letter || ERASE.defaultLetter) * k));
       const sub = own(mask.roi(new cv.Rect(r.x, r.y, r.w, r.h))), m = own(sub.clone()), grown = own(new cv.Mat()); // clones: continuous rows
       const kern = own(cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(2 * g + 1, 2 * g + 1)));

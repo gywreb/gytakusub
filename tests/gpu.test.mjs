@@ -147,5 +147,20 @@ for (const f of pages) {
   la.delete(); lcpu.delete();
   a.delete(); b.delete(); rgb.delete(); hole.delete();
 }
+// The learned text mask (3.2): it must start on the GPU and see the lettering the CPU sees.
+{
+  const { createSession } = await import("../extension/engine/ort.js");
+  const { textMasker, maskText } = await import("../extension/engine/textmask.js");
+  const bytes = new Uint8Array(fs.readFileSync(vendor("textmask.onnx")));
+  const g = await createSession(bytes, { gpu: true, strict: true }), c = await createSession(bytes, { gpu: false });
+  const can = createCanvas(400, 200), x = can.getContext("2d");
+  const grad = x.createLinearGradient(0, 0, 400, 200); grad.addColorStop(0, "#0b0506"); grad.addColorStop(1, "#8a0d12");
+  x.fillStyle = grad; x.fillRect(0, 0, 400, 200); x.fillStyle = "#ff2a2a"; x.font = "bold 28px sans-serif"; x.fillText("WHERE ARE", 60, 90); x.fillText("YOU GOING?", 55, 130);
+  const img = x.getImageData(0, 0, 400, 200), crop = [{ region: 1, x: 20, y: 40, w: 300, h: 120 }];
+  const [mg] = await maskText(textMasker(g.session, { ep: g.ep }), img, crop), [mc] = await maskText(textMasker(c.session, { ep: c.ep }), img, crop);
+  let differ = 0, on = 0; for (let i = 0; i < mg.mask.length; i++) { if (mg.mask[i] !== mc.mask[i]) differ++; on += mc.mask[i]; }
+  await test("the text mask starts on the GPU", () => assert.equal(g.ep, "webgpu"));
+  await test(`its mask is the CPU's (${differ} of ${mg.mask.length} pixels differ; ${on} lettering)`, () => assert.ok(on > 1000 && differ < 0.01 * mg.mask.length));
+}
 console.log(`GPU TESTS PASSED (${passed})`);
 process.exit(0); // Dawn keeps the event loop alive

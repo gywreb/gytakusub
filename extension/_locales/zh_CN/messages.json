@@ -449,6 +449,12 @@
  "opt_finds_text_and_bubbles_much": {
   "message": "查找文字和对话框快得多。只有当页面显示错误或浏览器运行异常时才关闭。"
  },
+ "opt_learned_text_mask": {
+  "message": "学习型文字遮罩(预览)"
+ },
+ "opt_learned_text_mask_desc": {
+  "message": "在规则无法完整识别文字的地方（气泡外的文字、深色或带网点的气泡），用以漫画文字训练的模型找出要擦除的文字。没有显卡时会更慢。"
+ },
  "opt_peek_at_the_original_while": {
   "message": "悬停时查看原文"
  },

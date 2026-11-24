@@ -29,7 +29,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createCanvas } from "canvas";
 process.chdir(path.dirname(new URL(import.meta.url).pathname) + "/..");
-const { cv, detector, analyzePage } = await import("../cv-node.mjs");
+const { cv, detector, analyzePage, textMasksFor } = await import("../cv-node.mjs");
 const { lookAgain } = await import("../../extension/engine/page.js");
 const { layout, tells, roomShape } = await import("../../extension/engine/layout.js");
 const { erase, fillTexture } = await import("../../extension/engine/erase.js");
@@ -45,6 +45,9 @@ const dump = opt("--dump"), printedPages = argv.includes("--printed"), readerPag
 if (printedPages) argv.splice(argv.indexOf("--printed"), 1);
 if (readerPages) argv.splice(argv.indexOf("--readers"), 1);
 if (webtoonPages) argv.splice(argv.indexOf("--webtoon"), 1);
+// --textmask: the eraser takes the learned text mask in place of its rules (engine/textmask.js)
+const learnedMask = argv.includes("--textmask");
+if (learnedMask) argv.splice(argv.indexOf("--textmask"), 1);
 const most = Number(opt("--max") || 0); let ran = 0; // (--max N: stop after N pages; rerun to go on)
 const fillWith = opt("--fill");
 // --fill aot: textured areas filled by the learned model the extension runs on the CPU (AOT), as a
@@ -79,7 +82,8 @@ for (let seed = +first; seed < +first + +count; seed++) {
   });
   await lookAgain(cv, pixels, an, items, detector);
   const { placements, regionIds } = layout(an, items);
-  const res = erase(cv, pixels, an, regionIds, { keepMask: true, outline: 0.3 });
+  const tMask = Date.now(), textMasks = learnedMask ? await textMasksFor(pixels, an, regionIds) : null, maskMs = Date.now() - tMask;
+  const res = erase(cv, pixels, an, regionIds, { keepMask: true, outline: 0.3, textMasks });
   const clean = await fillTexture(cv, inpainter, res.image, res);
   res.mask.delete(); res.surface.delete();
   const ms = Date.now() - t0;
@@ -199,7 +203,7 @@ for (let seed = +first; seed < +first + +count; seed++) {
   const limits = sizeLimits(GyText, placements, sizes, [...placements.keys()].filter((k) => placements[k].item != null && told[placements[k].item] && per[placements[k].item].drawn < 0.7), W, H);
   const n = told.filter(Boolean).length;
   const row = {
-    seed, script: pg.script, printed: printedPages, readers: readerPages, webtoon: webtoonPages, colour: pg.colour, ms, lines: n,
+    seed, script: pg.script, printed: printedPages, readers: readerPages, webtoon: webtoonPages, textMask: learnedMask, colour: pg.colour, ms, maskMs, lines: n,
     found: found.filter((f, i) => f && told[i]).length,
     placed: pg.blocks.filter((b, i) => told[i] && per[i].letter != null).length,
     left: rows.filter((x, i) => told[i] && x.left).length, stays: rows.filter((x, i) => told[i] && x.stays).length,

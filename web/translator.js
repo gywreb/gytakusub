@@ -56,6 +56,7 @@ export const DEFAULT_SETTINGS = {
   uppercase: false,
   fontFamily: "",
   rtlSpreads: true,
+  learnedMask: false, // the eraser finds lettering with the learned text mask where the rules are weak (engine/textmask.js, ADR 0022; off by default: slower without a graphics card)
   fetcherUrl: "", // your chapter fetcher (fetcher/worker.js on Cloudflare), e.g. https://gytakusub.<you>.workers.dev
   fetcherKey: "", // its access key (the Worker's GYT_KEY secret)
   maxLongEdge: 1600,
@@ -139,7 +140,7 @@ async function translateRows(img, settings, ctx, part) {
   const rows = () => (part ? createImageBitmap(img, 0, part.y0, part.W, part.h) : createImageBitmap(img));
   const prepare = async () => {
     const bitmap = await rows();
-    return rpc({ type: "prepare", bitmap, settings: { maxLongEdge: settings.maxLongEdge, stripWidth: settings.stripWidth, sliceHeight: settings.sliceHeight }, ...(part ? { part: { W: part.W, H: part.H, index: part.index, y0: part.y0 } } : {}) }, [bitmap]);
+    return rpc({ type: "prepare", bitmap, settings: { maxLongEdge: settings.maxLongEdge, stripWidth: settings.stripWidth, sliceHeight: settings.sliceHeight, learnedMask: !!settings.learnedMask }, ...(part ? { part: { W: part.W, H: part.H, index: part.index, y0: part.y0 } } : {}) }, [bitmap]);
   };
   let prep = await onFreshEngine(prepare);
   lap("analyze");
@@ -172,6 +173,7 @@ async function translateRows(img, settings, ctx, part) {
   if (fin.fill) timing.fill = fin.fill;
   if (fin.dropped?.length) timing.dropped = fin.dropped; // the lines labelled sound effects or logos, left as drawn
   if (fin.look?.boxes) timing.look = fin.look;
+  if (fin.textMask) timing.textMask = fin.textMask; // the learned text mask, when on: where it ran, its time
   if (fin.modelWait != null) timing.modelWait = fin.modelWait; // (waiting for the learned fill's model to load)
   const page = { items: fin.items, placements: fin.placements, regions: fin.regions, work: fin.work, letter: fin.letter, patches: fin.patches, width: prep.width, height: prep.height, engine: fin.engine, timing };
   return { page, usage, terms };

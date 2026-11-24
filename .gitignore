@@ -29,3 +29,5 @@ tests/bench/models/
 tests/bench/runs/
 tests/bench/data/
 extension/dev-reload.txt
+# Python bytecode of the scripts (scripts/*.py)
+__pycache__/

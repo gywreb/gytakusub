@@ -504,12 +504,13 @@ function fillSettings() {
   $("sTargetOtherField").hidden = !!listed;
   $("sGlossary").value = settings.glossary; $("sCustomPrompt").value = settings.customPrompt;
   $("sUseContext").checked = settings.useContext; $("sUppercase").checked = settings.uppercase; $("sRtl").checked = settings.rtlSpreads;
+  $("sLearnedMask").checked = !!settings.learnedMask;
   $("sMsg").textContent = "";
 }
 function readSettings() {
   return { ...settings, apiKey: $("sApiKey").value.trim(), model: $("sModel").value, targetLang: $("sTargetLang").value === OTHER_LANG ? $("sTargetOther").value.trim() || "English" : $("sTargetLang").value,
     glossary: $("sGlossary").value, customPrompt: $("sCustomPrompt").value, useContext: $("sUseContext").checked,
-    uppercase: $("sUppercase").checked, rtlSpreads: $("sRtl").checked };
+    uppercase: $("sUppercase").checked, rtlSpreads: $("sRtl").checked, learnedMask: $("sLearnedMask").checked };
 }
 $("btnSettings").onclick = () => { fillSettings(); dlg.showModal(); };
 $("sShow").onclick = () => { const i = $("sApiKey"); i.type = i.type === "password" ? "text" : "password"; $("sShow").textContent = t(i.type === "password" ? "opt_show" : "opt_hide"); };

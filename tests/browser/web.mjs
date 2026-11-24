@@ -47,7 +47,9 @@ const page = await browser.newPage({ viewport: { width: 900, height: 1200 } });
 const errors = [];
 page.on("pageerror", (e) => errors.push(String(e)));
 page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
-await page.addInitScript(() => localStorage.setItem("gytakusub.settings", JSON.stringify({ apiKey: "sk-ant-test", useContext: false })));
+// --learned-mask: the learned text mask on (3.2), as a user who turned it on in Settings
+const learnedMask = process.argv.includes("--learned-mask");
+await page.addInitScript((learnedMask) => localStorage.setItem("gytakusub.settings", JSON.stringify({ apiKey: "sk-ant-test", useContext: false, learnedMask })), learnedMask);
 await page.goto(`http://127.0.0.1:${WEB_PORT}/`);
 await page.setInputFiles("#file", pageImage);
 await page.waitForSelector(".page canvas.translated", { timeout: 60000 });
@@ -154,6 +156,7 @@ try {
   if (!rep.work?.W || !rep.items?.length || !rep.regions?.length || !rep.placements?.length) fail("the report lacks the page's answer, regions or placements");
   if (![t.analyze, t.model, t.finish].every(Number.isFinite) || !t.fill || !Number.isFinite(t.fill.ready)) fail("the report lacks the timings: " + JSON.stringify(t));
   if (JSON.stringify(rep).includes("sk-ant")) fail("the report must never hold the API key");
+  if (learnedMask ? !t.textMask?.ep : t.textMask) fail(`the learned text mask ${learnedMask ? "was on but did not run" : "ran while off"}: ` + JSON.stringify(t.textMask));
   console.log(`web report: ${names.length} files, ${(fs.statSync(zipPath).size / 1e6).toFixed(1)} MB, timing ${JSON.stringify(t)}`);
 } catch (e) { fail("the debug report could not be read: " + e.message); }
 

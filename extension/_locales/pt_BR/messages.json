@@ -449,6 +449,12 @@
  "opt_finds_text_and_bubbles_much": {
   "message": "Encontra texto e balões muito mais rápido. Desligue só se as páginas saírem erradas ou o navegador se comportar mal."
  },
+ "opt_learned_text_mask": {
+  "message": "Máscara de texto aprendida (prévia)"
+ },
+ "opt_learned_text_mask_desc": {
+  "message": "Encontra as letras a apagar com um modelo treinado em texto de quadrinhos onde as regras não as veem inteiras: texto livre e balões escuros ou com retícula. Mais lento sem placa de vídeo."
+ },
  "opt_peek_at_the_original_while": {
   "message": "Ver o original ao passar o mouse"
  },

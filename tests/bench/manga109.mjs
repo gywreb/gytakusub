@@ -23,7 +23,7 @@ import "./tune-env.mjs"; // first: GYT_TUNE must be set before the engine loads
 import fs from "node:fs";
 import path from "node:path";
 import { createCanvas, loadImage, ImageData } from "canvas";
-import { cv, detector, analyzePage } from "../cv-node.mjs";
+import { cv, detector, analyzePage, textMasksFor } from "../cv-node.mjs";
 import { lookAgain } from "../../extension/engine/page.js";
 import { layout, tells } from "../../extension/engine/layout.js";
 import { erase, fillTexture } from "../../extension/engine/erase.js";
@@ -35,6 +35,9 @@ import { sizeLabel } from "./labels.mjs";
 const argv = process.argv.slice(2), opt = (k) => { const i = argv.indexOf(k); return i >= 0 ? argv.splice(i, 2)[1] : null; };
 const pickFile = opt("--pick"), half = opt("--half"), dump = opt("--dump"), limit = Number(opt("--limit") || 0), most = Number(opt("--max") || 0);
 const fillWith = opt("--fill");
+// --textmask: the eraser takes the learned text mask in place of its rules (engine/textmask.js)
+const learnedMask = argv.includes("--textmask");
+if (learnedMask) argv.splice(argv.indexOf("--textmask"), 1);
 // --fill aot: textured areas filled by the learned model the extension runs on the CPU (AOT), as a
 // user without a graphics card gets; by default Telea, which is faster and much worse over art
 const inpainter = fillWith === "aot" ? await (async () => {
@@ -132,7 +135,8 @@ for (const [split, book, file] of picks) {
     });
     await lookAgain(cv, pixels, an, items, detector);
     const { placements, regionIds } = layout(an, items);
-    const res = erase(cv, pixels, an, regionIds, { keepMask: true, outline: 0.3 });
+    const tMask = Date.now(), textMasks = learnedMask ? await textMasksFor(pixels, an, regionIds) : null, maskMs = Date.now() - tMask;
+    const res = erase(cv, pixels, an, regionIds, { keepMask: true, outline: 0.3, textMasks });
     const clean = await fillTexture(cv, inpainter, res.image, res);
     res.mask.delete(); res.surface.delete();
     const ms = Date.now() - t0;
@@ -208,7 +212,7 @@ for (const [split, book, file] of picks) {
     }
     const limits = sizeLimits(GyText, placements, sizes, [...placements.keys()].filter((k) => { const p = placements[k]; return p.item != null && told[p.item] && sizes[k] / 1.45 < 0.7 * p.letter; }), W, H);
     const row = {
-      split, page: id, ms, lines: lines.length, told: told.filter(Boolean).length, found: found.filter((f, i) => f && told[i]).length,
+      split, page: id, textMask: learnedMask, ms, maskMs, lines: lines.length, told: told.filter(Boolean).length, found: found.filter((f, i) => f && told[i]).length,
       placed: new Set(placements.filter((p) => p.item != null).map((p) => p.item)).size,
       seen, left, damage: +(1000 * changed / (W * H)).toFixed(2), sfxArea, sfxChanged: changedSfx,
       letterFar: letters.filter((x) => x.letter > 2 * x.est || x.letter < 0.5 * x.est).length, small: letters.filter((x) => x.drawn < 0.7 * x.est).length, big: letters.filter((x) => x.drawn > x.est / 0.7).length, smallL: letters.filter((x) => x.drawn < 0.7 * x.letter).length, measured: letters.length, ...limitCounts(limits),
