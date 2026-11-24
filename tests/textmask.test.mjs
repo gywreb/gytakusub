@@ -9,7 +9,7 @@ const { cv, analyzePage, textMasksFor } = await import("./cv-node.mjs");
 const { textCrops, maskText, masksFor, textMasker, INPUT } = await import("../extension/engine/textmask.js");
 const { createSession } = await import("../extension/engine/ort.js");
 const { layout } = await import("../extension/engine/layout.js");
-const { erase } = await import("../extension/engine/erase.js");
+const { erase, interiorToEdge } = await import("../extension/engine/erase.js");
 const { loadLettering } = await import("./lettering-setup.mjs");
 loadLettering();
 
@@ -193,6 +193,74 @@ await test("only pieces of the mask that reach into the region's lines are lette
   er.mask.delete(); er.surface.delete();
   assert.ok(lettering >= 140, "the lettering is erased");
   assert.equal(ring, 0, "the ring is left");
+});
+
+await test("a bubble model's interior runs to the image's edge across a gap of one of its input pixels, not a wider one", () => {
+  const W = 900, H = 600, box = (x0, y0) => (x, y) => x >= 100 && x < 200 && y >= y0 && y < 300;
+  const near = interiorToEdge(box(0, 2), 2.8, W, H); // stops 2 px short of the top: the model's pixel is 2.8
+  assert.ok(near(150, 0) && near(150, 1) && near(150, 2), "the gap to the top is inside");
+  assert.ok(!near(99, 0) && !near(200, 1) && !near(150, -1), "beside the bubble, and off the image, is not");
+  assert.ok(!interiorToEdge(box(0, 3), 2.8, W, H)(150, 0), "3 px short: a gap the model can tell");
+  const corner = interiorToEdge((x, y) => x >= 1 && y >= 1 && x < 50 && y < 50, 2.8, W, H);
+  assert.ok(corner(0, 0) && corner(0, 10) && corner(10, 0), "a corner's gaps both ways");
+  const fromPixels = box(0, 2);
+  assert.equal(interiorToEdge(fromPixels, undefined, W, H), fromPixels, "an interior from the pixels as it is");
+});
+
+await test("the image's edge cutting a bubble is no outline: letters run into the cut are erased, the outline the cut runs by is kept", () => {
+  // a light bubble the image's top cuts, its lettering cut by it too; the bubble model's interior
+  // stopping a pixel short of the edge (its box's), the model seeing the page at 1 px in 2.8
+  const E = { cx: 450, cy: 20, rx: 200, ry: 130 };
+  const img = page((x) => {
+    x.fillStyle = "#fff"; x.strokeStyle = "#000"; x.lineWidth = 4;
+    x.beginPath(); x.ellipse(E.cx, E.cy, E.rx, E.ry, 0, 0, 2 * Math.PI); x.fill(); x.stroke();
+    x.fillStyle = "#000"; x.font = "bold 34px 'Gytakusub Comic'"; x.textBaseline = "top";
+    x.fillText("WAIT FOR ME", 340, -8); x.fillText("PLEASE", 395, 34);
+  });
+  const ellipse = (X, Y, grow = 0) => ((X - E.cx) / (E.rx + grow)) ** 2 + ((Y - E.cy) / (E.ry + grow)) ** 2 <= 1;
+  const inside = (X, Y) => X >= 0 && X < 900 && Y >= 1 && Y < 600 && ellipse(X, Y, 2);
+  const dark = (X, Y) => img.data[(Y * 900 + X) * 4] < 70;
+  const letter = (X, Y) => dark(X, Y) && X > 330 && X < 570 && Y < 75 && ellipse(X, Y, -6);
+  const ring = (X, Y) => dark(X, Y) && !ellipse(X, Y, -6);
+  // the model's mask: the lettering, and the outline beside it, joined to it in one piece along a
+  // row (as the model joins an outline to lettering run close to it): a piece on the lines
+  const c = { region: 1, x: 220, y: 0, w: 460, h: 90, mask: new Uint8Array(460 * 90) };
+  for (let y = 0; y < c.h; y++) for (let x = 0; x < c.w; x++) if (letter(c.x + x, y) || ring(c.x + x, y) || (y === 12 && c.x + x > 240 && c.x + x < 660)) c.mask[y * c.w + x] = 1;
+  const blocks = [{ gbox: { x: 335, y: 0, w: 230, h: 26 } }, { gbox: { x: 390, y: 34, w: 125, h: 30 } }];
+  const an = { W: 900, H: 600, letter: 17, learned: true, lines: [], polarities: [{}, {}], insideOf: (id) => (id === 1 ? inside : null),
+    regions: [{ id: 1, kind: "bubble", letter: 26, dark: false, box: { x: 248, y: 1, w: 404, h: 150 }, ref: { blocks, box: { x: 248, y: 1, w: 404, h: 150 }, cell: 2.8 } }] };
+  const er = erase(cv, img, an, new Set([1]), { keepMask: true, outline: 0.3, textMasks: [c] });
+  let letters = 0, erased = 0, rim = 0, rimErased = 0;
+  for (let y = 0; y < 90; y++) for (let x = 220; x < 680; x++) {
+    const m = er.mask.data[y * 900 + x] ? 1 : 0;
+    if (letter(x, y)) { letters++; erased += m; } else if (ring(x, y)) { rim++; rimErased += m; }
+  }
+  er.mask.delete(); er.surface.delete();
+  assert.ok(erased === letters, `${erased} of ${letters} letter pixels erased`);
+  assert.ok(rim > 100 && rimErased === 0, `${rimErased} of ${rim} outline pixels erased`);
+});
+
+await test("a bubble the image cuts, the model's mask over most of the part left: still the model taking it for lettering, the rules erase it", () => {
+  // as a whole bubble (above): a small dark bubble the image cuts is taken whole by the model as
+  // readily, and the part left is all the eraser sees of it (tried without this check, on generated
+  // webtoon pages: such a bubble was filled whole, its outline with it)
+  const E = { cx: 450, cy: 0, rx: 150, ry: 52 };
+  const img = page((x) => {
+    x.fillStyle = "#fff"; x.strokeStyle = "#000"; x.lineWidth = 4;
+    x.beginPath(); x.ellipse(E.cx, E.cy, E.rx, E.ry, 0, 0, 2 * Math.PI); x.fill(); x.stroke();
+    x.fillStyle = "#000"; x.font = "bold 30px 'Gytakusub Comic'"; x.textBaseline = "top"; x.textAlign = "center"; x.fillText("NO! NO!!", 450, -4);
+  });
+  const inside = (X, Y) => X >= 0 && X < 900 && Y >= 1 && Y < 600 && ((X - E.cx) / (E.rx + 2)) ** 2 + ((Y - E.cy) / (E.ry + 2)) ** 2 <= 1;
+  const zero = () => new cv.Mat(600, 900, cv.CV_8UC1, new cv.Scalar(0));
+  const pols = [{ dark: false, inkMask: zero() }, { dark: true, inkMask: zero() }];
+  const blocks = [{ gbox: { x: 385, y: 0, w: 130, h: 24 } }];
+  const an = { W: 900, H: 600, letter: 17, learned: true, lines: [], polarities: pols, insideOf: (id) => (id === 1 ? inside : null),
+    regions: [{ id: 1, kind: "bubble", letter: 24, dark: false, box: { x: 298, y: 1, w: 304, h: 53 }, ref: { blocks, box: { x: 298, y: 1, w: 304, h: 53 }, cell: 2.8 } }] };
+  const all = { region: 1, x: 320, y: 0, w: 260, h: 46, mask: new Uint8Array(260 * 46).fill(1) };
+  const byRules = erase(cv, img, an, new Set([1]), { outline: 0.3 }).image, withMask = erase(cv, img, an, new Set([1]), { outline: 0.3, textMasks: [all] }).image;
+  for (const p of pols) p.inkMask.delete();
+  let differ = 0; for (let i = 0; i < byRules.data.length; i++) if (byRules.data[i] !== withMask.data[i]) differ++;
+  assert.equal(differ, 0, `${differ} values differ from the rules' erasing`);
 });
 
 console.log(`TEXTMASK TESTS PASSED (${n})`);

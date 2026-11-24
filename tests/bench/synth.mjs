@@ -49,6 +49,9 @@ const W = 1000, H = 1420;
  * dark bubbles, filled with a gradient from near black to a deep colour, with a coloured outline and
  * red or white lettering; and a bubble cut by the image's top or bottom edge, as a webtoon episode
  * served in several images cuts one (white or dark). Also from a stream of their own.
+ * opts.cutLettering: bubbles the image's top or bottom edge cuts at their lettering, through its
+ * nearest row or just short of it (the owner's real run of 3.2 with the learned mask, a debug
+ * report: letters left where the cut ran by them), white or dark. Also from a stream of their own.
  */
 export function makePage(seed, opts = {}) {
   const r = rng(seed * 7919 + 17);
@@ -127,6 +130,7 @@ export function makePage(seed, opts = {}) {
   if (opts.printed) printed(rng(seed * 104729 + 3), { t, k, k2, panels, occupied, blocks, script, vertical, colour });
   if (opts.readers) readers(rng(seed * 7727 + 5), { t, k, panels, occupied, bubbles, blocks, script, vertical, colour });
   if (opts.webtoon) webtoon(rng(seed * 6553 + 11), { t, k, panels, occupied, bubbles, blocks, script, vertical });
+  if (opts.cutLettering) webtoon(rng(seed * 4099 + 7), { t, k, panels, occupied, bubbles, blocks, script, vertical }, true);
   // a sound effect over the art (stays as drawn), on a third of the pages
   const sfx = [];
   if (r() < 0.33 && panels.length) {
@@ -326,7 +330,7 @@ function readers(r, { t, k, panels, occupied, bubbles, blocks, script, vertical,
   for (const p of panels) if (r() < 0.55) r.pick(kinds)(p);
 }
 // ---------- what a webtoon episode showed (opts.webtoon) ----------
-function webtoon(r, { t, k, panels, occupied, bubbles, blocks, script, vertical }) {
+function webtoon(r, { t, k, panels, occupied, bubbles, blocks, script, vertical }, cutsAtLettering = false) {
   const sizeOf = () => Math.round(vertical ? r.range(16, 30) : r.range(12, 24) * (script === "ko" ? 1.1 : 1));
   const DEEP = ["#8a0d12", "#5b0f6e", "#0d3f7a", "#7a4a0d"]; // deep red (as seen), purple, blue, brown
   const ellPath = (c, e) => { c.beginPath(); c.ellipse(e.cx, e.cy, e.rx, e.ry, 0, 0, Math.PI * 2); };
@@ -358,19 +362,26 @@ function webtoon(r, { t, k, panels, occupied, bubbles, blocks, script, vertical 
     }
   };
   // A bubble cut by the image's top or bottom edge: a third to a half of it past the edge, its
-  // lettering in the part left (white, or dark as above)
-  const cutOne = () => {
+  // lettering in the part left (white, or dark as above). At the lettering (`atLettering`,
+  // opts.cutLettering): the cut falls from a sixth of a letter before the lettering's nearest row
+  // to half a letter into it, as the images an episode is served in are cut with no regard to it.
+  const cutOne = (atLettering = false) => {
     const size = sizeOf(), l = lettering(r, script, vertical, size, "bubble"), top = r() < 0.5;
     // the part left holds the lettering with room around it; the whole is as much again past the edge
-    const vis = l.h + 2 * size * r.range(0.8, 1.2), f = r.range(0.3, 0.5), ry = vis / (2 * (1 - f));
-    const far = Math.max(Math.abs(vis / 2 - l.h / 2 - ry * (1 - 2 * f)), Math.abs(vis / 2 + l.h / 2 - ry * (1 - 2 * f))) / ry; // the farthest row of lettering from the centre, in radii
+    // (`off`: from the cut to the lettering's nearest row; less than 0 where the cut runs through it)
+    let vis, off;
+    if (atLettering) { off = size * r.range(-0.5, 1 / 6); vis = l.h + off + size * r.range(0.8, 1.2); }
+    else vis = l.h + 2 * size * r.range(0.8, 1.2);
+    const f = r.range(0.3, 0.5), ry = vis / (2 * (1 - f));
+    const far = atLettering ? Math.max(Math.abs(Math.max(0, off) - ry * (1 - 2 * f)), Math.abs(off + l.h - ry * (1 - 2 * f))) / ry // the farthest row of lettering left from the centre, in radii
+      : Math.max(Math.abs(vis / 2 - l.h / 2 - ry * (1 - 2 * f)), Math.abs(vis / 2 + l.h / 2 - ry * (1 - 2 * f))) / ry;
     if (far >= 0.95) return;
     const e = { rx: (l.w / 2 + size * 0.8) / Math.sqrt(1 - far * far), ry };
     if (2 * e.rx > W - 40) return;
     const past = 2 * ry * f;
     e.cx = r.range(e.rx + 10, W - e.rx - 10); e.cy = top ? ry - past : H - ry + past;
     const seen = { x: e.cx - e.rx, y: top ? 0 : H - vis, w: 2 * e.rx, h: vis };
-    const ly = seen.y + vis / 2 - l.h / 2;
+    const ly = !atLettering ? seen.y + vis / 2 - l.h / 2 : top ? off : H - off - l.h;
     if (occupied.some((o) => overlaps(o, seen, 8))) return;
     occupied.push(seen);
     const lw = r.range(1.5, 3.5), d = r() < 0.5 ? dark(e) : { fill: "#fff", line: "#111", letters: "#111" };
@@ -378,8 +389,9 @@ function webtoon(r, { t, k, panels, occupied, bubbles, blocks, script, vertical 
     const b = { box: seen, lw, shape: "cut", kind: "bubble", id: bubbles.length + 1, inside: maskFrom((c) => { ellPath(c, e); c.fill(); c.lineWidth = lw + 1; c.globalCompositeOperation = "destination-out"; c.stroke(); }), outline: maskFrom((c) => { ellPath(c, e); c.lineWidth = lw; c.stroke(); }) };
     bubbles.push(b);
     const at = drawLettering(k, l, e.cx - l.w / 2, ly, d.letters, false);
-    blocks.push({ id: blocks.length, kind: "bubble", script, vertical: l.vertical, letter: l.letter, size: l.size, box: at, text: l.text, bubble: b.id, two: false, shape: "cut" });
+    blocks.push({ id: blocks.length, kind: "bubble", script, vertical: l.vertical, letter: l.letter, size: l.size, box: at, text: l.text, bubble: b.id, two: false, shape: atLettering ? "cutLettering" : "cut", dark: d.fill !== "#fff" });
   };
+  if (cutsAtLettering) { for (let i = 0; i < 2; i++) if (r() < 0.8) cutOne(true); return; }
   for (const p of panels) if (r() < 0.4) darkOne(p);
   for (let i = 0; i < 2; i++) if (r() < 0.6) cutOne(); // (the top edge and the bottom, each may be taken)
 }

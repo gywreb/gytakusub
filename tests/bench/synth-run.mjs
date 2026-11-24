@@ -3,6 +3,7 @@
 // --printed: pages with lettering printed on objects and slanted free text too (synth.mjs opts.printed)
 // --readers, --webtoon: the bubble shapes the owner's chapters showed, and what a webtoon episode
 // showed: dark bubbles with coloured lettering, a bubble cut by the image's edge (synth.mjs opts)
+// --cut-lettering: bubbles the image's edge cuts at their lettering (synth.mjs opts.cutLettering)
 // Seeds 0–9999 may be looked at when something fails; seeds from 100000 on are only ever counted.
 // Per line to translate:
 //   found     its centre lies in a region the engine found before any second look
@@ -41,10 +42,11 @@ const { sizeLimits, limitCounts, fitsInside, erodeGrid } = await import("./limit
 
 const argv = process.argv.slice(2), opt = (k) => { const i = argv.indexOf(k); return i >= 0 ? argv.splice(i, 2)[1] : null; };
 const whyFile = opt("--why"); // (--why file: each avoidable line refitted with one cause removed at a time, as JSON lines)
-const dump = opt("--dump"), printedPages = argv.includes("--printed"), readerPages = argv.includes("--readers"), webtoonPages = argv.includes("--webtoon");
+const dump = opt("--dump"), printedPages = argv.includes("--printed"), readerPages = argv.includes("--readers"), webtoonPages = argv.includes("--webtoon"), cutPages = argv.includes("--cut-lettering");
 if (printedPages) argv.splice(argv.indexOf("--printed"), 1);
 if (readerPages) argv.splice(argv.indexOf("--readers"), 1);
 if (webtoonPages) argv.splice(argv.indexOf("--webtoon"), 1);
+if (cutPages) argv.splice(argv.indexOf("--cut-lettering"), 1);
 // --textmask: the eraser takes the learned text mask in place of its rules (engine/textmask.js)
 const learnedMask = argv.includes("--textmask");
 if (learnedMask) argv.splice(argv.indexOf("--textmask"), 1);
@@ -66,7 +68,7 @@ const lum = (d, q) => (d[q * 4] + d[q * 4 + 1] + d[q * 4 + 2]) / 3;
 
 for (let seed = +first; seed < +first + +count; seed++) {
   if (done.has(seed)) continue;
-  const pg = makePage(seed, { printed: printedPages, readers: readerPages, webtoon: webtoonPages }), { W, H } = pg, r = rng(seed + 99);
+  const pg = makePage(seed, { printed: printedPages, readers: readerPages, webtoon: webtoonPages, cutLettering: cutPages }), { W, H } = pg, r = rng(seed + 99);
   const labelRnd = rng(seed * 7919 + 17); // Claude's size labels: a stream of their own (bench/labels.mjs)
   const pixels = new ImageData(new Uint8ClampedArray(pg.input.data), W, H);
   const t0 = Date.now();
@@ -100,7 +102,7 @@ for (let seed = +first; seed < +first + +count; seed++) {
       if (Math.abs(lum(inp, q) - lum(tr, q)) > 60) { lit++; if (Math.abs(lum(o, q) - lum(inp, q)) < 30) same++; }
     }
     let sum = 0; for (const q of b.foot) sum += Math.abs(lum(o, q) - lum(tr, q));
-    return { left: b.core.length ? off / b.core.length > 0.25 : false, stays: lit ? same / lit > 0.25 : false, restore: b.foot.length ? sum / b.foot.length : 0 };
+    return { left: b.core.length ? off / b.core.length > 0.25 : false, stays: lit ? same / lit > 0.25 : false, restore: b.foot.length ? sum / b.foot.length : 0, lit, same };
   });
   // damage away from every block (footprint grown by 3 px), outline erased, kept changed
   const near = new Uint8Array(W * H);
@@ -203,7 +205,7 @@ for (let seed = +first; seed < +first + +count; seed++) {
   const limits = sizeLimits(GyText, placements, sizes, [...placements.keys()].filter((k) => placements[k].item != null && told[placements[k].item] && per[placements[k].item].drawn < 0.7), W, H);
   const n = told.filter(Boolean).length;
   const row = {
-    seed, script: pg.script, printed: printedPages, readers: readerPages, webtoon: webtoonPages, textMask: learnedMask, colour: pg.colour, ms, maskMs, lines: n,
+    seed, script: pg.script, printed: printedPages, readers: readerPages, webtoon: webtoonPages, cutLettering: cutPages, textMask: learnedMask, colour: pg.colour, ms, maskMs, lines: n,
     found: found.filter((f, i) => f && told[i]).length,
     placed: pg.blocks.filter((b, i) => told[i] && per[i].letter != null).length,
     left: rows.filter((x, i) => told[i] && x.left).length, stays: rows.filter((x, i) => told[i] && x.stays).length,
@@ -215,6 +217,14 @@ for (let seed = +first; seed < +first + +count; seed++) {
     })),
     // in dark bubbles (--webtoon): what the learned text mask (3.2) is for, and the comic detector (3.3)
     darkLines: pg.blocks.filter((b, i) => told[i] && b.bubble && b.shape === "dark").length, darkStays: pg.blocks.filter((b, i) => told[i] && b.bubble && b.shape === "dark" && rows[i].stays).length,
+    // in bubbles the image's edge cuts at their lettering (--cut-lettering), and of those the dark ones
+    cutLines: pg.blocks.filter((b, i) => told[i] && b.shape === "cutLettering").length, cutStays: pg.blocks.filter((b, i) => told[i] && b.shape === "cutLettering" && rows[i].stays).length,
+    cutLeft: pg.blocks.filter((b, i) => told[i] && b.shape === "cutLettering" && rows[i].left).length,
+    // (and in pixels: of the glyphs' pixels that stood out from the art, those still as drawn; a line
+    // whose row at the cut is left stays under a quarter of its pixels)
+    cutLitPx: pg.blocks.reduce((s, b, i) => s + (told[i] && b.shape === "cutLettering" ? rows[i].lit : 0), 0), cutSamePx: pg.blocks.reduce((s, b, i) => s + (told[i] && b.shape === "cutLettering" ? rows[i].same : 0), 0),
+    litPx: rows.reduce((s, x, i) => s + (told[i] ? x.lit : 0), 0), samePx: rows.reduce((s, x, i) => s + (told[i] ? x.same : 0), 0),
+    cutDarkLines: pg.blocks.filter((b, i) => told[i] && b.shape === "cutLettering" && b.dark).length, cutDarkStays: pg.blocks.filter((b, i) => told[i] && b.shape === "cutLettering" && b.dark && rows[i].stays).length,
     restore: +(rows.reduce((s, x, i) => s + (told[i] ? x.restore : 0), 0) / Math.max(1, n)).toFixed(2),
     letterFar: per.filter((e, i) => told[i] && e.letter != null && (e.letter < 0.6 || e.letter > 1.6)).length,
     small: per.filter((e, i) => told[i] && e.drawn != null && e.drawn < 0.7).length,

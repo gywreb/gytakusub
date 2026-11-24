@@ -98,7 +98,8 @@ function eraseRegions(cv, img, analysis, regionIds, opts, own) {
   // for a bubble. Only a piece that reaches into the region's lines (its blocks' boxes and the
   // detector's lines in the crop), as the rules keep to marks reaching into the lettering's zone:
   // along the edge of a dark bubble the model sees a ring of lettering, away from the lines. Never
-  // the bubble's outline where the interior takes it in (outlineOf). True when it painted anything.
+  // the bubble's outline where the interior takes it in (outlineOf), where the image's edge cutting a
+  // bubble is no outline and its interior runs to that edge (interiorToEdge). True when it painted anything.
   // Nothing, and false, when it took a shape for lettering: when in a bubble it calls most of the
   // interior lettering (ERASE.modelBubbleShare), or when a piece is thicker than the detector's
   // lines under it are high (ERASE.modelThickLines). Lettering never fills its bubble, and a stroke
@@ -124,7 +125,7 @@ function eraseRegions(cv, img, analysis, regionIds, opts, own) {
     });
     for (const P of pieces) if (P.across) for (let i = 1; i < P.n; i++) if (P.onLine[i] && P.thick[i] > ERASE.modelThickLines * P.across) return false;
     const keep = crops.map((c, k) => {
-      const edge = inside ? outlineOf({ ...c, inside, dark }, img.data, W) : null, P = pieces[k];
+      const edge = inside ? outlineOf({ ...c, inside, dark, cut: true }, img.data, W) : null, P = pieces[k];
       return (xx, yy) => { const i = yy * c.w + xx, l = P.labels[i]; return l > 0 && P.onLine[l] && !(edge && edge[i]) && (!inside || inside(c.x + xx, c.y + yy)); };
     });
     if (inside) {
@@ -348,7 +349,8 @@ function eraseRegions(cv, img, analysis, regionIds, opts, own) {
       // the learned text mask where it was run and saw lettering in the region's crops; the rules
       // where it saw none (they find what they found before it)
       const learned = opts.textMasks ? opts.textMasks.filter((c) => c.region === r.id) : null;
-      const byModel = !!(blocks.length && learned?.length && paintLearned(learned, blocks, inside, r.dark));
+      const toEdge = inside && learned?.length ? interiorToEdge(inside, r.ref.cell, W, H) : null;
+      const byModel = !!(blocks.length && learned?.length && paintLearned(learned, blocks, toEdge, r.dark));
       if (!byModel && blocks.length) {
         // Free text: line by line (`parts`, the detected lines a paragraph was merged from), not
         // the paragraph's whole box: lines chained across a picture make a box that holds the art
@@ -382,7 +384,7 @@ function eraseRegions(cv, img, analysis, regionIds, opts, own) {
       } else if (r.kind === "bubble" && r.ref.fill && paintInsideMask(pol, r.ref, letter)) {
         roi = { ...r.box };
       } else continue;
-      if (r.kind === "bubble") rois.push({ ...roi, radius: ERASE.bubbleRadius, inside: analysis.insideOf(r.id), dark: r.dark, letter, byModel });
+      if (r.kind === "bubble") rois.push({ ...roi, radius: ERASE.bubbleRadius, inside: byModel ? toEdge : analysis.insideOf(r.id), dark: r.dark, letter, byModel });
       else rois.push({ ...roi, radius: teleaRadius(letter), letter, byModel });
       continue;
     }
@@ -429,7 +431,7 @@ function eraseRegions(cv, img, analysis, regionIds, opts, own) {
     for (const r of rois) {
       // (in a bubble the learned mask painted, not over its outline where the interior takes it
       // in either: the fringe of lettering run close to a burst's spikes took them)
-      if (r.byModel && r.inside) r.edge = outlineOf(r, px, W);
+      if (r.byModel && r.inside) r.edge = outlineOf({ ...r, cut: true }, px, W);
       const edge = r.byModel ? r.edge : null;
       for (let yy = r.y; yy < r.y + r.h; yy++) for (let xx = r.x; xx < r.x + r.w; xx++) {
         const p = yy * W + xx;
@@ -565,12 +567,36 @@ export function penOf(marks) {
 export const ofPen = (t, pen) => !(pen * ERASE.penShare >= ERASE.penMinPx && t < pen * ERASE.penShare);
 
 /**
+ * A bubble's interior as the learned text mask's areas take it: where the bubble model's interior
+ * (`cell`: one of the model's input pixels, in the slice's) stops no further than `cell` pixels short
+ * of the image's edge, it runs on to that edge, a gap the model cannot tell from none. Where the
+ * image cuts a bubble, the model's box stops a pixel or two short of it, and the lettering the cut
+ * runs by with it. Each pixel of the gap is inside where the interior is just past the gap. An
+ * interior found from the pixels themselves (no `cell`) as it is.
+ */
+export function interiorToEdge(inside, cell, W, H) {
+  const k = Math.floor(cell || 0);
+  if (!(k > 0)) return inside;
+  return (x, y) => {
+    if (x < 0 || y < 0 || x >= W || y >= H) return false;
+    if (inside(x, y)) return true;
+    const xi = x < k ? k : x >= W - k ? W - 1 - k : x, yi = y < k ? k : y >= H - k ? H - 1 - k : y;
+    return (xi !== x || yi !== y) && inside(xi, yi);
+  };
+}
+
+/**
  * The bubble's outline inside an area, where the bubble's interior takes it in: ink of the
  * outline's colour (dark in a light bubble, light in a dark one) joined, through such ink, to the
  * interior's edge. Lettering run into the outline joins it. A Uint8Array over the area (1: outline).
+ * With `r.cut` (the learned mask's areas): not from the image's edge, which cuts a bubble and is no
+ * line drawn round it; lettering the cut runs by is no outline, and an outline the cut runs by still
+ * joins the rest of its ring.
  */
 function outlineOf(r, px, W) {
-  const { x: X, y: Y, w, h } = r, ink = new Uint8Array(w * h), edge = new Uint8Array(w * h), stack = [];
+  const { x: X, y: Y, w, h } = r, ink = new Uint8Array(w * h), edge = new Uint8Array(w * h), stack = [], H = px.length / 4 / W;
+  // past the interior there (gx, gy); with `r.cut`, on the image
+  const out = r.cut ? (gx, gy) => gx >= 0 && gy >= 0 && gx < W && gy < H && !r.inside(gx, gy) : (gx, gy) => !r.inside(gx, gy);
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     const gx = X + x, gy = Y + y;
     if (!r.inside(gx, gy)) continue;
@@ -578,7 +604,7 @@ function outlineOf(r, px, W) {
     if (r.dark ? lum <= ERASE.outlineLight : lum >= ERASE.outlineDark) continue;
     const i = y * w + x;
     ink[i] = 1;
-    if (!r.inside(gx - 1, gy) || !r.inside(gx + 1, gy) || !r.inside(gx, gy - 1) || !r.inside(gx, gy + 1)) { edge[i] = 1; stack.push(i); }
+    if (out(gx - 1, gy) || out(gx + 1, gy) || out(gx, gy - 1) || out(gx, gy + 1)) { edge[i] = 1; stack.push(i); }
   }
   while (stack.length) {
     const i = stack.pop(), x = i % w, y = (i / w) | 0;
