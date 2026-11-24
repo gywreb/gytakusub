@@ -29,4 +29,19 @@ is("data:image/png;base64,iVBORw0KGgo=", false);
 is("https://cdn.site.com/series/ad-astra/chapter-3/01.jpg", false); // a series named "Ad Astra"
 is("https://cdn.site.com/manga/avatar-the-last/12/003.webp", false);
 is("https://uploads.mangadex.org/data/abc123/1-0123456789abcdef.png", false);
+// an image alone in its site and folder beside a chapter's pages is not a page (Naver's
+// end-of-episode ad, 2.15); two chapters at once, and folders of fewer than three, are left alone
+const { strays } = ctx.globalThis.GyNotPage;
+const strayIs = (srcs, want, why) => { assert.deepEqual([...strays(srcs)].sort(), [...want].sort(), why); checks++; };
+const episode = Array.from({ length: 6 }, (_, i) => `https://image-comic.pstatic.net/webtoon/773797/279/2026_IMAG01_${i + 1}.jpg`);
+strayIs([...episode, "https://ssl.pstatic.net/melona/libs/1583/1583185/20d37c54548a.jpg"], ["https://ssl.pstatic.net/melona/libs/1583/1583185/20d37c54548a.jpg"], "the ad beside the episode");
+strayIs(episode, [], "the episode alone");
+strayIs(episode.map((u) => u.replace("image-comic", "image-comic2")), [], "pages from two hosts of one site are one group");
+strayIs([...episode.slice(0, 3), ...episode.slice(0, 3).map((u) => u.replace("/279/", "/280/"))], [], "two chapters at once");
+strayIs(["https://x.org/a/1.jpg", "https://ads.example.net/b/2.jpg"], [], "no chapter: nothing judged");
+strayIs(["https://x.org/a/1.jpg", "https://x.org/a/2.jpg", "https://ads.example.net/b/2.jpg"], [], "fewer than three pages: nothing judged");
+// one folder per page (Blogger): grouped by site and the first two folders
+const blogger = Array.from({ length: 4 }, (_, i) => `https://blogger.googleusercontent.com/img/b/R29v${i}/s1600/${i + 1}.jpg`);
+strayIs([...blogger, "https://cdn.other.com/promo/next.jpg"], ["https://cdn.other.com/promo/next.jpg"], "a promo beside per-page folders");
+strayIs([...blogger, "blob:https://x.org/1"], [], "blob: is never judged");
 console.log(`notpage: ${checks} checks passed`);

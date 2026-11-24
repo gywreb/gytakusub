@@ -270,18 +270,21 @@ export function roomShape(inside, bbox, rect, own, exclude, edge = 0) {
   const room = edge > 0 ? erode(grid, gw, gh, edge) : grid;
   const at = (x, y) => x >= 0 && y >= 0 && x < gw && y < gh && room[y * gw + x] === 1;
   const col = Math.floor(cx) - gx0, frac = cx - Math.floor(cx);
-  const half = [], mids = [];
+  // per row: the room left and right of the centre line over every pixel row it spans (`left`,
+  // `right`), and the nearer of the two (`half`)
+  const half = [], left = [], right = [], mids = [];
   for (let y = gy0; y < bbox.y + bbox.h; y += step) {
-    let h = Infinity, mid = null;
+    let h = Infinity, lo = Infinity, hi = Infinity, mid = null;
     for (let r = y - gy0; r < y - gy0 + step && r < gh; r++) {
-      if (!at(col, r)) { h = 0; break; }
+      if (!at(col, r)) { h = lo = hi = 0; break; }
       let l = 0, rr = 0;
       while (at(col - l - 1, r)) l++;
       while (at(col + rr + 1, r)) rr++;
       if (frac + l < h || 1 - frac + rr < h) mid = gx0 + col + (1 + rr - l) / 2; // the run's own middle
-      h = Math.min(h, frac + l, 1 - frac + rr);
+      h = Math.min(h, frac + l, 1 - frac + rr); lo = Math.min(lo, frac + l); hi = Math.min(hi, 1 - frac + rr);
     }
-    half.push(h === Infinity ? 0 : Math.max(0, Math.floor(h)));
+    const f = (v) => (v === Infinity ? 0 : Math.max(0, Math.floor(v)));
+    half.push(f(h)); left.push(f(lo)); right.push(f(hi));
     mids.push(h > 0 && h !== Infinity ? mid : null);
   }
   let a = 0, b = half.length;
@@ -291,7 +294,7 @@ export function roomShape(inside, bbox, rect, own, exclude, edge = 0) {
   // the room's own centre line: the middle of its rows' runs (the median), where text centred in
   // the bubble would stand
   const ms = mids.slice(a, b).filter((m) => m != null).sort((p, q) => p - q);
-  return { dy: gy0 + a * step - rect.y, step, half: half.slice(a, b), edge, cx, top: gy0 + a * step, axis: ms.length ? ms[ms.length >> 1] : cx };
+  return { dy: gy0 + a * step - rect.y, step, half: half.slice(a, b), left: left.slice(a, b), right: right.slice(a, b), edge, cx, top: gy0 + a * step, axis: ms.length ? ms[ms.length >> 1] : cx };
 }
 
 /**

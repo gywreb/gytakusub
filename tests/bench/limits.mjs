@@ -16,7 +16,9 @@ export function sizeLimits(GyText, placements, sizes, which, W, H) {
   const ctx = createCanvas(W, H).getContext("2d"), pageTexts = placements.map((p) => p.text);
   const fit = (ps) => { const s = []; GyText.draw(ctx, ps, { sizes: s, pageTexts }); return s; };
   const pick = which.map((k) => placements[k]);
-  const wider = fit(pick.map((p) => ({ ...p, rect: { ...p.rect, x: p.rect.x - p.rect.w / 8, w: p.rect.w * 1.25 }, shape: p.shape && { ...p.shape, half: p.shape.half.map((h) => h * 1.25) } })));
+  // (each side of a row's room too, since 3.1 fits a line to its row's whole width: roomShape left, right)
+  const wide = (a) => a && a.map((h) => h * 1.25);
+  const wider = fit(pick.map((p) => ({ ...p, rect: { ...p.rect, x: p.rect.x - p.rect.w / 8, w: p.rect.w * 1.25 }, shape: p.shape && { ...p.shape, half: wide(p.shape.half), left: wide(p.shape.left), right: wide(p.shape.right) } })));
   const taller = fit(pick.map((p) => ({ ...p, rect: { ...p.rect, y: p.rect.y - p.rect.h / 8, h: p.rect.h * 1.25 }, shape: p.shape && { ...p.shape, dy: p.shape.dy * 1.25, step: p.shape.step * 1.25, top: p.rect.y - p.rect.h / 8 + p.shape.dy * 1.25 } })));
   which.forEach((k, j) => {
     const gw = wider[j] / sizes[k], gh = taller[j] / sizes[k];

@@ -1,8 +1,9 @@
 {
   "source": "https://huggingface.co/lemondouble/lemon-manga-translator/blob/e8c08f38f188db684fdc32c4cf88627c7df92096/onnx/aot-inpainting/aot_folded.onnx",
   "upstreamSha256": "e0d8f438ca9567eccc9d358963427601b6f64a650cbe6189ec82fc43830a0390",
+  "made": "scripts/half_weights.py",
   "license": "GPL-3.0",
-  "what": "AOT-GAN inpainting trained on manga (float32)",
-  "bytes": 23009155,
-  "sha256": "e0d8f438ca9567eccc9d358963427601b6f64a650cbe6189ec82fc43830a0390"
+  "what": "AOT-GAN inpainting trained on manga, float16 weights",
+  "bytes": 11670562,
+  "sha256": "36dffb5bcbb843fae39863de1485834b5a3bff5b327dda003a73fef3f61fe961"
 }

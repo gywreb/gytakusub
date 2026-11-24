@@ -61,7 +61,7 @@ To update, unzip the new release over the same folder and press the reload butto
 
 ### Web app (iPhone, Android, desktop)
 
-Open [gywreb.github.io/gytakusub](https://gywreb.github.io/gytakusub/). On iPhone, open it in Safari and choose **Share → Add to Home Screen**. The first page downloads the engine and its models (about 75 MB, cached afterwards), and the eraser's model comes the first time a page needs it (23 MB, or 103 MB on a graphics card). Use Wi-Fi the first time.
+Open [gywreb.github.io/gytakusub](https://gywreb.github.io/gytakusub/). On iPhone, open it in Safari and choose **Share → Add to Home Screen**. The first page downloads the engine and its models (about 75 MB, cached afterwards), and the eraser's model comes the first time a page needs it (12 MB, or 103 MB on a graphics card). Use Wi-Fi the first time.
 
 ## Quick start
 
@@ -112,8 +112,8 @@ Claude's answers are simulated in these tests (from the marked boxes, moved and 
 |---|---|
 | Lines found on the page before Claude answers | 97.1% |
 | Lettering the independent detector still sees after erasing | 1.7% |
-| Lines set under 0.7 of the original lettering's size | 11.1% |
-| Pixels changed away from any text (art damage) | 0.12% |
+| Lines set under 0.7 of the original lettering's size | 8.9% |
+| Pixels changed away from any text (art damage) | 0.10% |
 
 Real pages from the held-out books: 333 pages, 2,752 lines.
 <!-- quality:end -->
@@ -148,7 +148,7 @@ You pay Anthropic per page through your own key. One page is one request: the im
 - Sound effects stay as drawn.
 - Translations are set horizontally, also into Japanese and Chinese. Right-to-left languages (Arabic, Hebrew, Persian) are not lettered right yet.
 - Chapter links can't be read from sites behind a login, a "checking your browser" wall, or pages built by a script. Screenshots work for those.
-- The extension is large (about 200 MB unpacked) because the models are bundled.
+- The extension is large (about 190 MB unpacked) because the models are bundled.
 
 More in [`extension/README.md`](extension/README.md#known-limitations).
 

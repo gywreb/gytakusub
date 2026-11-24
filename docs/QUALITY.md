@@ -12,21 +12,21 @@ the engine's rules cannot bend.
 
 | Books | Pages | Lines | Found before Claude answers | Lettering still seen | Set under 0.7 of its size | Art damage | Sound effects changed |
 |---|---|---|---|---|---|---|---|
-| held out | 333 | 2,752 | 97.1% | 1.7% | 11.1% | 0.12% | 0.25% |
-| looked at | 321 | 2,572 | 96.7% | 1.7% | 11.9% | 0.15% | 0.62% |
+| held out | 333 | 2,752 | 97.1% | 1.7% | 8.9% | 0.10% | 0.19% |
+| looked at | 321 | 2,572 | 96.7% | 1.6% | 9.4% | 0.12% | 0.57% |
 
 ### Generated pages
 
 | Script | Pages | Lines | Found before Claude answers | Lettering left untouched | Set under 0.7 of its size | Size measured outside 0.6–1.6× | Text past its bubble | Touching its outline | Art damage |
 |---|---|---|---|---|---|---|---|---|---|
-| all | 300 | 1,615 | 95.1% | 4.8% | 12.9% | 2.7% | 0.9% | 2.5% | 0.053% |
-| Japanese | 76 | 419 | 95.7% | 4.5% | 30.3% | 0.7% | 0.6% | 3.6% | 0.062% |
-| Chinese | 38 | 178 | 95.5% | 4.5% | 27.0% | 1.1% | 0.0% | 1.4% | 0.043% |
-| Korean | 38 | 197 | 95.9% | 6.6% | 11.2% | 3.6% | 0.6% | 1.2% | 0.073% |
-| English | 38 | 199 | 93.5% | 7.0% | 1.0% | 5.0% | 0.6% | 2.4% | 0.030% |
-| Spanish | 38 | 223 | 95.5% | 2.7% | 2.2% | 2.7% | 2.2% | 2.2% | 0.050% |
-| Portuguese | 36 | 194 | 94.8% | 3.1% | 0.0% | 2.1% | 0.0% | 2.4% | 0.015% |
-| Vietnamese | 36 | 205 | 94.1% | 5.4% | 2.0% | 5.4% | 2.2% | 2.8% | 0.090% |
+| all | 300 | 1,615 | 95.1% | 4.7% | 11.0% | 2.7% | 0.8% | 2.7% | 0.047% |
+| Japanese | 76 | 419 | 95.7% | 5.0% | 25.8% | 0.7% | 0.6% | 4.2% | 0.056% |
+| Chinese | 38 | 178 | 95.5% | 4.5% | 25.3% | 1.1% | 0.0% | 2.9% | 0.040% |
+| Korean | 38 | 197 | 95.9% | 6.1% | 8.1% | 3.6% | 0.0% | 0.0% | 0.068% |
+| English | 38 | 199 | 93.5% | 6.0% | 1.0% | 5.0% | 0.6% | 2.4% | 0.014% |
+| Spanish | 38 | 223 | 95.5% | 2.7% | 1.8% | 2.7% | 2.2% | 2.2% | 0.047% |
+| Portuguese | 36 | 194 | 94.8% | 3.1% | 0.0% | 2.1% | 0.0% | 2.4% | 0.012% |
+| Vietnamese | 36 | 205 | 94.1% | 5.4% | 1.5% | 5.4% | 2.2% | 2.8% | 0.083% |
 
 ### Where text size is lost
 
@@ -34,15 +34,15 @@ What holds each line set under 0.7 of its size small: the same line fitted again
 
 | Pages | Lines set small | Width (a long word across a narrow room) | Height | Either | Not the room |
 |---|---|---|---|---|---|
-| Real, held out | 11.1% | 49.2% | 5.6% | 39.6% | 7.6% |
-| Real, looked at | 11.9% | 51.1% | 5.6% | 38.0% | 6.9% |
-| Generated | 12.9% | 62.5% | 1.0% | 30.3% | 6.3% |
+| Real, held out | 8.9% | 52.9% | 5.7% | 37.3% | 5.3% |
+| Real, looked at | 9.4% | 56.2% | 6.2% | 35.5% | 4.1% |
+| Generated | 11.0% | 68.5% | 1.1% | 24.7% | 5.6% |
 
 On generated pages, where every letter size and bubble is known exactly:
 
-- **The size estimate:** with the true letter size, 12.1% of lines are set small, against 12.9%.
-- **The translation's length:** of the lines set small that are alone in their bubble, 75.4% could not be set at 0.7 of their size in that bubble however they were laid out, with no margin from the outline. The rest (35 lines) could have been; 12 of them (0.7% of all lines) keeping their letters clear of the outline, as the engine does since 2.15. The others fit only by touching it.
-- Not judged: 28 small lines that share their bubble with another line, and 38 over the art.
+- **The size estimate:** with the true letter size, 10.5% of lines are set small, against 11.0%.
+- **The translation's length:** of the lines set small that are alone in their bubble, 85.2% could not be set at 0.7 of their size in that bubble however they were laid out, with no margin from the outline. The rest (18 lines) could have been; 4 of them (0.2% of all lines) keeping their letters clear of the outline, as the engine does since 2.15. The others fit only by touching it.
+- Not judged: 19 small lines that share their bubble with another line, and 37 over the art.
 <!-- results:end -->
 
 ## What is measured
@@ -137,7 +137,9 @@ node bench/report.mjs --real 'bench/runs/m109*.jsonl' --generated 'bench/runs/sy
 `--dump <dir>` writes each looked-at page's render and details for examining failures. A run can
 be stopped and started again: pages already counted are skipped. `--max N` stops after N pages
 (node's memory grows over a long run; a loop that restarts it is in the bench's header).
-`--printed` adds lettering printed on objects and slanted free text to the generated pages.
+`--printed` adds lettering printed on objects and slanted free text to the generated pages;
+`--readers` the bubble shapes the owner's chapters showed; `--webtoon` dark bubbles with coloured
+lettering and bubbles cut by the image's edge, as a webtoon episode has them.
 
 The numbers the engine decides with are in `extension/engine/tuning.js`. `GYT_TUNE` changes some
 for one run, to see what a result hangs on; a name that is not a tuning value stops the run:

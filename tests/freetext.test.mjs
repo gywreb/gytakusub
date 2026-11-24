@@ -11,7 +11,7 @@ import { createCanvas } from "canvas";
 import { cv, analyzePage } from "./cv-node.mjs";
 import { layout, roomShape, erode } from "../extension/engine/layout.js";
 import { LAYOUT } from "../extension/engine/tuning.js";
-import { erase } from "../extension/engine/erase.js";
+import { erase, penOf, ofPen } from "../extension/engine/erase.js";
 import { loadLettering } from "./lettering-setup.mjs";
 
 let passed = 0;
@@ -380,6 +380,17 @@ await test("lettering close to a white bubble's outline is erased without the ou
   assert.ok(before > 100, `the outline is there (${before} px)`);
   assert.ok(outline(out) > 0.9 * before, `${outline(out)} of ${before} outline pixels left`);
   assert.ok(letters < 40, `${letters} lettering pixels left`);
+});
+
+await test("a mark swept up beside a line is its lettering only when drawn with its pen; a thin pen judges nothing (3.1)", () => {
+  // brush lettering: strokes about 20 px thick (most of the ink), a few thin hairs at their ends
+  const pen = penOf([{ t: 22, a: 5000 }, { t: 20, a: 4000 }, { t: 3, a: 100 }]);
+  assert.ok(pen >= 20 && pen <= 22, `the pen ${pen}`);
+  assert.ok(!ofPen(3, pen), "a panel's frame line, 3 px, beside it is art");
+  assert.ok(ofPen(12, pen), "a dash of the same brush, thinner, is lettering");
+  // dialogue: a pen of 4 px; a 2 px mark is not judged (the share would be under 2 px)
+  assert.ok(ofPen(2, penOf([{ t: 4, a: 300 }])), "a thin pen judges nothing");
+  assert.equal(penOf([]), 0);
 });
 
 // ---------- 3.0: the margin in every direction, each row read over all its pixel rows ----------

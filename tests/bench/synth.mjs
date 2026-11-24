@@ -45,6 +45,10 @@ const W = 1000, H = 1420;
  * the other; a bubble of two lobes, one speaker each, set diagonally; a bubble with straight slanted
  * sides, its lines set along the slant; a narrow bubble with a line broken into short rows. Also
  * from a stream of their own.
+ * opts.webtoon: also what the owner's Naver episode showed the bench lacked (debug reports, 2.15):
+ * dark bubbles, filled with a gradient from near black to a deep colour, with a coloured outline and
+ * red or white lettering; and a bubble cut by the image's top or bottom edge, as a webtoon episode
+ * served in several images cuts one (white or dark). Also from a stream of their own.
  */
 export function makePage(seed, opts = {}) {
   const r = rng(seed * 7919 + 17);
@@ -122,6 +126,7 @@ export function makePage(seed, opts = {}) {
   const ink2 = createCanvas(W, H), k2 = ink2.getContext("2d"); // printed lettering (light glyphs count too)
   if (opts.printed) printed(rng(seed * 104729 + 3), { t, k, k2, panels, occupied, blocks, script, vertical, colour });
   if (opts.readers) readers(rng(seed * 7727 + 5), { t, k, panels, occupied, bubbles, blocks, script, vertical, colour });
+  if (opts.webtoon) webtoon(rng(seed * 6553 + 11), { t, k, panels, occupied, bubbles, blocks, script, vertical });
   // a sound effect over the art (stays as drawn), on a third of the pages
   const sfx = [];
   if (r() < 0.33 && panels.length) {
@@ -320,6 +325,65 @@ function readers(r, { t, k, panels, occupied, bubbles, blocks, script, vertical,
   const kinds = [captions, lobes, slanted, narrow];
   for (const p of panels) if (r() < 0.55) r.pick(kinds)(p);
 }
+// ---------- what a webtoon episode showed (opts.webtoon) ----------
+function webtoon(r, { t, k, panels, occupied, bubbles, blocks, script, vertical }) {
+  const sizeOf = () => Math.round(vertical ? r.range(16, 30) : r.range(12, 24) * (script === "ko" ? 1.1 : 1));
+  const DEEP = ["#8a0d12", "#5b0f6e", "#0d3f7a", "#7a4a0d"]; // deep red (as seen), purple, blue, brown
+  const ellPath = (c, e) => { c.beginPath(); c.ellipse(e.cx, e.cy, e.rx, e.ry, 0, 0, Math.PI * 2); };
+  // a bubble as an ellipse: its fill (a colour or a gradient), its outline's colour, its lettering's
+  const put = (e, l, fill, line, letters, kind) => {
+    const lw = r.range(1.5, 3.5);
+    ellPath(t, e); t.fillStyle = fill; t.fill(); t.lineWidth = lw; t.strokeStyle = line; t.stroke();
+    const box = { x: e.cx - e.rx, y: e.cy - e.ry, w: 2 * e.rx, h: 2 * e.ry };
+    const b = { box, lw, shape: kind, kind: "bubble", id: bubbles.length + 1, inside: maskFrom((c) => { ellPath(c, e); c.fill(); c.lineWidth = lw + 1; c.globalCompositeOperation = "destination-out"; c.stroke(); }), outline: maskFrom((c) => { ellPath(c, e); c.lineWidth = lw; c.stroke(); }) };
+    bubbles.push(b);
+    const at = drawLettering(k, l, e.cx - l.w / 2, e.cy - l.h / 2, letters, false);
+    blocks.push({ id: blocks.length, kind: "bubble", script, vertical: l.vertical, letter: l.letter, size: l.size, box: at, text: l.text, bubble: b.id, two: false, shape: kind });
+  };
+  const dark = (e) => {
+    const deep = r.pick(DEEP), g = r() < 0.5 ? t.createLinearGradient(e.cx - e.rx, e.cy - e.ry, e.cx + e.rx * 0.5, e.cy + e.ry) : t.createRadialGradient(e.cx, e.cy + e.ry * 0.3, e.rx * 0.1, e.cx, e.cy, Math.max(e.rx, e.ry));
+    g.addColorStop(0, "#0b0506"); g.addColorStop(1, deep);
+    return { fill: g, line: r() < 0.6 ? "#e0141c" : deep, letters: r() < 0.6 ? "#ff2a2a" : "#fff" };
+  };
+  const ellFor = (l, size) => ({ rx: l.w / 2 + size * r.range(1.1, 1.6), ry: l.h / 2 + size * r.range(1.0, 1.4) });
+  // A dark bubble in a panel
+  const darkOne = (p) => {
+    const size = sizeOf(), l = lettering(r, script, vertical, size, "bubble"), e = ellFor(l, size);
+    for (let tries = 0; tries < 25; tries++) {
+      const cand = { x: p.x + r.range(5, Math.max(6, p.w - 2 * e.rx - 5)), y: p.y + r.range(5, Math.max(6, p.h - 2 * e.ry - 5)), w: 2 * e.rx, h: 2 * e.ry };
+      if (cand.x + cand.w < p.x + p.w - 4 && cand.y + cand.h < p.y + p.h - 4 && !occupied.some((o) => overlaps(o, cand, 8))) {
+        occupied.push(cand); e.cx = cand.x + e.rx; e.cy = cand.y + e.ry;
+        const d = dark(e); put(e, l, d.fill, d.line, d.letters, "dark"); return;
+      }
+    }
+  };
+  // A bubble cut by the image's top or bottom edge: a third to a half of it past the edge, its
+  // lettering in the part left (white, or dark as above)
+  const cutOne = () => {
+    const size = sizeOf(), l = lettering(r, script, vertical, size, "bubble"), top = r() < 0.5;
+    // the part left holds the lettering with room around it; the whole is as much again past the edge
+    const vis = l.h + 2 * size * r.range(0.8, 1.2), f = r.range(0.3, 0.5), ry = vis / (2 * (1 - f));
+    const far = Math.max(Math.abs(vis / 2 - l.h / 2 - ry * (1 - 2 * f)), Math.abs(vis / 2 + l.h / 2 - ry * (1 - 2 * f))) / ry; // the farthest row of lettering from the centre, in radii
+    if (far >= 0.95) return;
+    const e = { rx: (l.w / 2 + size * 0.8) / Math.sqrt(1 - far * far), ry };
+    if (2 * e.rx > W - 40) return;
+    const past = 2 * ry * f;
+    e.cx = r.range(e.rx + 10, W - e.rx - 10); e.cy = top ? ry - past : H - ry + past;
+    const seen = { x: e.cx - e.rx, y: top ? 0 : H - vis, w: 2 * e.rx, h: vis };
+    const ly = seen.y + vis / 2 - l.h / 2;
+    if (occupied.some((o) => overlaps(o, seen, 8))) return;
+    occupied.push(seen);
+    const lw = r.range(1.5, 3.5), d = r() < 0.5 ? dark(e) : { fill: "#fff", line: "#111", letters: "#111" };
+    ellPath(t, e); t.fillStyle = d.fill; t.fill(); t.lineWidth = lw; t.strokeStyle = d.line; t.stroke();
+    const b = { box: seen, lw, shape: "cut", kind: "bubble", id: bubbles.length + 1, inside: maskFrom((c) => { ellPath(c, e); c.fill(); c.lineWidth = lw + 1; c.globalCompositeOperation = "destination-out"; c.stroke(); }), outline: maskFrom((c) => { ellPath(c, e); c.lineWidth = lw; c.stroke(); }) };
+    bubbles.push(b);
+    const at = drawLettering(k, l, e.cx - l.w / 2, ly, d.letters, false);
+    blocks.push({ id: blocks.length, kind: "bubble", script, vertical: l.vertical, letter: l.letter, size: l.size, box: at, text: l.text, bubble: b.id, two: false, shape: "cut" });
+  };
+  for (const p of panels) if (r() < 0.4) darkOne(p);
+  for (let i = 0; i < 2; i++) if (r() < 0.6) cutOne(); // (the top edge and the bottom, each may be taken)
+}
+
 /** A mask (1 inside) drawn by `draw` in white on a page-sized canvas. */
 function maskFrom(draw) {
   const m = createCanvas(W, H), c = m.getContext("2d");
