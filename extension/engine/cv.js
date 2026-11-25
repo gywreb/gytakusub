@@ -5,6 +5,7 @@ import { loadDetector } from "./detect.js"; // static: MV3 service workers do no
 import { getOrt, gpuAvailable, gpuIsSoftware, ortBroken, createSession, run } from "./ort.js";
 import { LAMA_SIDE } from "./inpaint.js";
 import { loadSegmenter } from "./segment.js";
+import { textMasker } from "./textmask.js";
 
 let ready = null, loaded = null, cvOverrides = {};
 // The most memory OpenCV can have: the vendored build's maximum (vendor/opencv.js; a test holds
@@ -64,8 +65,27 @@ export function onLama(fn) { lamaEvents = fn; }
 export function lamaEvent(state) { try { lamaEvents?.(state); } catch {} }
 export function setEnginePrefs(next = {}) {
   const gpu = next.gpu !== false, lama = next.lama ?? prefs.lama;
-  if (gpu !== prefs.gpu) { prefs.gpu = gpu; detectorReady = null; segmenterReady = null; inpainterReady = null; }
+  if (gpu !== prefs.gpu) { prefs.gpu = gpu; detectorReady = null; segmenterReady = null; inpainterReady = null; textMaskerReady = null; }
   if (lama !== prefs.lama) { prefs.lama = lama; inpainterReady = null; }
+}
+
+let textMaskerReady = null;
+/**
+ * Resolves to the learned text mask (engine/textmask.js: vendor/textmask.onnx and its record
+ * vendor/textmask.json), loaded the first time a page asks for it: on WebGPU when available, else on
+ * the CPU. Null when the file is missing or fails to load (the eraser then finds lettering by its
+ * rules, as before 3.2).
+ * @param {object} [overrides] tests pass `modelBytes`, `wasmBinary`, `gpu`
+ */
+export function getTextMasker(overrides = {}) {
+  if (ortBroken()) return Promise.resolve(null);
+  if (!textMaskerReady) textMaskerReady = (async () => {
+    const res = await fetch(new URL("../vendor/textmask.json", import.meta.url)).catch(() => null);
+    const info = res && res.ok ? await res.json().catch(() => ({})) : {};
+    const m = await loadModel("textmask.onnx", overrides);
+    return m && textMasker(m.session, { ep: m.ep, threshold: info.threshold });
+  })();
+  return textMaskerReady;
 }
 
 let detectorReady = null;

@@ -45,6 +45,20 @@ On generated pages, where every letter size and bubble is known exactly:
 - Not judged: 19 small lines that share their bubble with another line, and 37 over the art.
 <!-- results:end -->
 
+### With the learned text mask
+
+A setting, off by default (ADR 0022): a model trained on comic text finds the lettering to erase on free text and in bubbles whose surface isn't plain. Pages never looked at, the rules (3.1.0, the same as with the setting off) against the mask (3.2.0). It changes only what is erased: the other numbers above stay as they are.
+
+| Pages | Lines | Lettering left untouched (real: still seen) | Free text left untouched | Art damage | Bubble outline pixels erased | The mask's time a page, one CPU thread (median) |
+|---|---|---|---|---|---|---|
+| Real, held out | 2,752 | 1.69% → 1.09% | not measured | 0.098% → 0.045% | not measured | 4.2 s |
+| Generated, held out | 810 | 5.2% → 2.7% | 24.5% → 10.8% | 0.051% → 0.020% | 1,062 → 950 | 4.2 s |
+| The new shapes, held out | 1,165 | 3.3% → 1.8% | 22.3% → 10.1% | 0.054% → 0.025% | 2,817 → 1,437 | 6.7 s |
+| Webtoon, held out | 789 | 18.5% → 5.6% | 20.5% → 8.0% | 0.053% → 0.048% | 2,635 → 5,026 | 6.7 s |
+| Lettering at the image's cut, held out | 979 | 10.5% → 3.9% | 23.7% → 10.8% | 0.053% → 0.022% | 1,157 → 1,779 | 4.7 s |
+
+On the webtoon pages, lines in dark bubbles left untouched went from 59.5% to 15.6% (`darkStays`); the mask also erases more of the outlines of dark bubbles the bubble model misses (ADR 0022). On the pages with lettering at the image's cut, lines in the bubbles cut there left untouched went from 37.9% to 10.1% (`cutStays`), their glyph pixels left as drawn from 33.7% to 7.3% (`cutSamePx`); where the rules erase (plain bubbles), the cut still leaves them (ADR 0022). On a graphics card (a real episode, WebGPU) the mask took 37 ms a page (median of the 47 pages it ran on), 352 ms the most.
+
 ## What is measured
 
 ### Real pages: Manga109-s
@@ -139,7 +153,10 @@ be stopped and started again: pages already counted are skipped. `--max N` stops
 (node's memory grows over a long run; a loop that restarts it is in the bench's header).
 `--printed` adds lettering printed on objects and slanted free text to the generated pages;
 `--readers` the bubble shapes the owner's chapters showed; `--webtoon` dark bubbles with coloured
-lettering and bubbles cut by the image's edge, as a webtoon episode has them.
+lettering and bubbles cut by the image's edge, as a webtoon episode has them; `--cut-lettering`
+bubbles the image's edge cuts at their lettering, through its nearest row or just short of it. `--textmask` (both
+benches) erases with the learned text mask, as the setting of that name does; each row then has
+`maskMs`, the mask's time on one CPU thread.
 
 The numbers the engine decides with are in `extension/engine/tuning.js`. `GYT_TUNE` changes some
 for one run, to see what a result hangs on; a name that is not a tuning value stops the run:

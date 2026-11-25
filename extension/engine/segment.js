@@ -172,6 +172,7 @@ export function nms(cands, iouThr) {
  * @property {number} score
  * @property {{x:number,y:number,w:number,h:number}} box image pixels
  * @property {Uint8Array|null} mask box.w × box.h, 255 inside the instance (null when the model has no mask head)
+ * @property {number} cell one of the model's input pixels, in image pixels: the finest the model sees
  */
 
 function toInstance(c, protos, lb, W, H, thr) {
@@ -181,8 +182,8 @@ function toInstance(c, protos, lb, W, H, thr) {
   const x2 = Math.min(W, Math.ceil(ix2)), y2 = Math.min(H, Math.ceil(iy2));
   const w = x2 - x, h = y2 - y;
   if (w < 2 || h < 2) return null;
-  const box = { x, y, w, h };
-  if (!protos) return { cls: c.cls, score: c.score, box, mask: null };
+  const box = { x, y, w, h }, cell = 1 / lb.r;
+  if (!protos) return { cls: c.cls, score: c.score, box, mask: null, cell };
   const [, K, mh, mw] = protos.dims, P = protos.data, plane = mh * mw;
   const sx = mw / lb.size, sy = mh / lb.size;
   // image pixel → prototype grid coordinate (continuous)
@@ -206,5 +207,5 @@ function toInstance(c, protos, lb, W, H, thr) {
       if (sigmoid(top * (1 - fy) + bot * fy) >= thr) mask[yy * w + xx] = 255;
     }
   }
-  return { cls: c.cls, score: c.score, box, mask };
+  return { cls: c.cls, score: c.score, box, mask, cell };
 }

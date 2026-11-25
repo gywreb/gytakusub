@@ -61,7 +61,7 @@ To update, unzip the new release over the same folder and press the reload butto
 
 ### Web app (iPhone, Android, desktop)
 
-Open [gywreb.github.io/gytakusub](https://gywreb.github.io/gytakusub/). On iPhone, open it in Safari and choose **Share → Add to Home Screen**. The first page downloads the engine and its models (about 75 MB, cached afterwards), and the eraser's model comes the first time a page needs it (12 MB, or 103 MB on a graphics card). Use Wi-Fi the first time.
+Open [gywreb.github.io/gytakusub](https://gywreb.github.io/gytakusub/). On iPhone, open it in Safari and choose **Share → Add to Home Screen**. The first page downloads the engine and its models (about 75 MB, cached afterwards), and the eraser's model comes the first time a page needs it (12 MB, or 103 MB on a graphics card), as does the learned text mask when you turn it on (29 MB). Use Wi-Fi the first time.
 
 ## Quick start
 
@@ -92,7 +92,7 @@ flowchart LR
 
 1. **Find.** A text detector (PaddleOCR) and a speech-bubble model run in your browser through ONNX Runtime and OpenCV, on the graphics card where WebGPU is available.
 2. **Translate.** Claude gets the page with each piece of text numbered, and gives back the original and the translation of every line, with what kind of line it is. Sound effects and logos are left as drawn.
-3. **Erase.** Each line's lettering is removed: bubbles are filled with their own white, screentone is continued, and other surfaces are inpainted (LaMa on a graphics card, AOT-GAN otherwise).
+3. **Erase.** Each line's lettering is removed: bubbles are filled with their own white, screentone is continued, and other surfaces are inpainted (LaMa on a graphics card, AOT-GAN otherwise). With **Learned text mask** on (a setting, off by default: slower without a graphics card), a model trained on comic text finds the lettering on free text and in dark or toned bubbles.
 4. **Letter.** The translation is fitted to the bubble's shape, at a size taken from the original lettering, and drawn over the page at your screen's resolution.
 
 Module by module: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Why it is built this way: [`docs/adr/`](docs/adr/).
@@ -148,7 +148,7 @@ You pay Anthropic per page through your own key. One page is one request: the im
 - Sound effects stay as drawn.
 - Translations are set horizontally, also into Japanese and Chinese. Right-to-left languages (Arabic, Hebrew, Persian) are not lettered right yet.
 - Chapter links can't be read from sites behind a login, a "checking your browser" wall, or pages built by a script. Screenshots work for those.
-- The extension is large (about 190 MB unpacked) because the models are bundled.
+- The extension is large (about 220 MB unpacked) because the models are bundled.
 
 More in [`extension/README.md`](extension/README.md#known-limitations).
 

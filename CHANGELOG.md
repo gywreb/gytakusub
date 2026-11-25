@@ -4,6 +4,58 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
 
 ## [Unreleased]
 
+## [3.2.0] — 2026-11-25
+
+The learned text mask: a setting, off by default, that erases the lettering the eraser's rules can't see whole. Free text over art, the webtoon's dark bubbles, white lettering on dark ground.
+
+### Pages
+- **Learned text mask (preview)**, in Options (Settings in the web app). With it on, a model trained on comic text finds the lettering to erase on free text and in bubbles whose surface isn't plain: dark, toned or gradient bubbles. Plain bubbles keep the rules, which already find their lettering whole. The eraser checks the model's mask before taking it: only pieces of it on the lines Gytakusub found, never a bubble's outline, and the rules instead where the model took a bubble or a shape for lettering. On pages never looked at, free-text lines left untouched went from 24.5% to 10.8%, and on webtoon pages lines left untouched went from 18.5% to 5.6%. [ADR 0022](docs/adr/0022-learned-text-mask.md)
+- **Lettering the image's edge cuts through** (a webtoon is served in several images, and the cut falls anywhere): where the mask erases, the letters the cut runs by go too (where the rules erase, they don't yet: below). The image's edge is no outline of the bubble, and the bubble's interior runs on to the edge across the pixel or two the bubble model can't place. On pages never looked at with lettering at the cut, lines in those bubbles left untouched: 37.9% with the setting off, 10.1% with it on.
+- **Why it's off by default:** without a graphics card it's slower. On one CPU thread the mask takes about 4 s a page (median; 7 s on webtoon pages); the slowest tenth of pages take from 8 to 12 s up (by kind of page), and the slowest page measured took 43 s. It runs while Claude reads the page. With a graphics card it runs there, its mask the CPU's: on a real episode (WebGPU, 47 pages where it ran) 37 ms a page (median), 68 ms for the slowest tenth, 352 ms the most.
+
+**Measured on pages never looked at** (held-out halves, the same bench, 3.1.0 against 3.2.0 with the setting on; with it off, 3.2.0 erases exactly as 3.1.0):
+
+| | 3.1.0 | 3.2.0, learned mask |
+|---|---|---|
+| Real pages (Manga109-s, 333 pages, 2,752 lines): lettering the independent detector still sees | 1.69% | 1.09% |
+| Real pages: art damage (pixels changed away from any text) | 0.098% | 0.045% |
+| Real pages: sound effects changed | 0.19% | 0.16% |
+| Generated (810 lines): free-text lines left untouched | 34 of 139 (24.5%) | 15 (10.8%) |
+| Generated: all lines left untouched | 42 (5.2%) | 22 (2.7%) |
+| Generated: art damage | 0.051% | 0.020% |
+| Generated: bubble outline pixels erased | 1,062 | 950 |
+| The new shapes (1,165 lines): free-text lines left untouched | 31 of 139 (22.3%) | 14 (10.1%) |
+| The new shapes: art damage | 0.054% | 0.025% |
+| The new shapes: bubble outline pixels erased | 2,817 | 1,437 |
+| Webtoon (789 lines): lines left untouched | 146 (18.5%) | 44 (5.6%) |
+| Webtoon: in dark bubbles | 103 of 173 (59.5%) | 27 (15.6%) |
+| Webtoon: in the other bubbles | 25 of 528 (4.7%) | 10 (1.9%) |
+| Webtoon: free text | 18 of 88 (20.5%) | 7 (8.0%) |
+| Webtoon: art damage | 0.053% | 0.048% |
+| Webtoon: bubble outline pixels erased | 2,635 | 5,026 |
+| Lettering at the image's cut (979 lines; 169 in bubbles the image cuts at their lettering): those left untouched | 64 (37.9%) | 17 (10.1%) |
+| Lettering at the cut: their glyph pixels left as drawn | 33.7% | 7.3% |
+
+Text sizes, placement and the lines found don't change: the mask only changes what is erased.
+
+**The goals set for 3.2:**
+- Free-text lettering left at least halved: met (24.5% → 10.8% generated, 22.3% → 10.1% the new shapes, 20.5% → 8.0% webtoon).
+- The webtoon's dark bubbles erased: mostly, not all. Lines in them left untouched 59.5% → 15.6% (103 → 27 of 173).
+- Real pages no worse: lettering still seen 1.69% → 1.09% (more on 8 pages, less on 20); art damage 0.098% → 0.045% (worse on 8 pages, better on 55).
+- Within a size and speed budget: the model adds 29 MB (the extension is about 220 MB unpacked), and on a CPU it takes about as long again as the rest of the engine; it's off by default for that.
+
+**Not fixed:**
+- On webtoon pages the mask erases nearly twice as many bubble outline pixels (2,635 → 5,026). The bubble model misses many dark bubbles; read as free text, they have no interior to keep the mask inside, and the model sees lettering where a dark bubble meets its outline. A small dark bubble the bubble model misses can be erased whole. Finding those bubbles is the comic detector's work (3.3).
+- Lettering the image's edge cuts, where the rules erase it: with the setting off, and on plain bubbles with it on. The rules keep marks that stay inside their line's window, and at the image's edge the window ends: a letter the cut runs through reads as a mark crossing it, and stays (3.1 does the same). On those pages never looked at, 64 of 169 lines with the setting off. Fixing it changes what the default erases, so it's its own patch.
+- Lettering with a grey drop shadow beside it (the same episode): the mask takes the letters and leaves thin edges of the shadow, which the independent detector still reads.
+
+### Development
+- `--textmask` on both benches: the learned mask, as the setting; each page's row has the mask's time. Generated pages' rows count the lines in dark bubbles and those left untouched there (`darkLines`, `darkStays`).
+- `--cut-lettering` on the generated bench: bubbles the image's top or bottom edge cuts at their lettering, through its nearest row or just short of it, white or dark (from a stream of its own: the other pages stay as they were). Rows count those lines (`cutLines`, `cutStays`) and, in pixels, the glyphs still as drawn (`cutLitPx`, `cutSamePx`; `litPx`, `samePx` for all lines): a line whose row at the cut is left stays under a quarter of its pixels.
+- `scripts/vendor-textmask.mjs` vendors the model (comic-text-mask, TareHimself, MIT) at a pinned revision and checks it; `scripts/textmask-onnx.py` builds the ONNX graph from the published weights.
+- Debug reports say whether the learned text mask was on (`settings.learnedMask`); each page's `timing.textMask` says where it ran and for how long.
+- Tests: `textmask.test.mjs` (the crops, the model on drawn lettering, the eraser's checks, a bubble the image's edge cuts), the mask on the GPU against the CPU (`gpu.test.mjs`), and the extension and the web app with the setting on (`browser/run.mjs --learned-mask`, `browser/web.mjs --learned-mask`).
+
 ## [3.1.0] — 2026-11-24
 
 What 3.0 left: text set larger where its bubble holds it, the margin kept; lines that follow a slanted bubble; an eraser that leaves the art beside large lettering. Also a smaller fill model, and one image fewer sent to Claude.

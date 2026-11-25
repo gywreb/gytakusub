@@ -141,6 +141,8 @@ export const ERASE = tune("ERASE", {
   outlineLight: 200,      // ...never over a dark bubble's outline (grey above this)...
   outlineDark: 70,        // ...or a light bubble's (below this)
   defaultLetter: 8,       // an area with no letter size
+  modelBubbleShare: 0.5,  // the learned text mask over more of a bubble's interior than this took the bubble for lettering
+  modelThickLines: 1.5,   // ...as did a piece of it thicker than this many times the height of the lines it lies on
 
   // The fill
   fillPad: 0.8,           // the area filled reaches this many letters past the lettering

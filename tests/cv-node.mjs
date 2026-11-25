@@ -57,3 +57,20 @@ export async function analyzePage(img, opts = {}) {
   an.segmentMs = seg ? seg.ms : 0; an.detectMs = detectMs;
   return an;
 }
+
+// The learned text mask (engine/textmask.js), loaded the first time a bench asks for it (--textmask):
+// extension/vendor/textmask.onnx, or the file named by GYT_TEXTMASK.
+let masker = null;
+/** The learned text mask's crops for the regions to erase, each with its mask (erase.js opts.textMasks). */
+export async function textMasksFor(img, an, regionIds) {
+  const tm = await import("../extension/engine/textmask.js");
+  if (!masker) {
+    const { createSession } = await import("../extension/engine/ort.js");
+    const file = process.env.GYT_TEXTMASK || path.join(here, "../extension/vendor/textmask.onnx");
+    const info = (() => { const j = file.replace(/\.onnx$/, ".json"); return fs.existsSync(j) ? JSON.parse(fs.readFileSync(j, "utf8")) : {}; })();
+    const { session, ep } = await createSession(new Uint8Array(fs.readFileSync(file)), { gpu: false });
+    masker = tm.textMasker(session, { ep, threshold: info.threshold });
+    console.error(`[cv-node] text mask: ${path.basename(file)}`);
+  }
+  return tm.maskText(masker, img, tm.textCrops(an, regionIds, img));
+}

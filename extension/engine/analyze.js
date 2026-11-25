@@ -584,7 +584,7 @@ function bubblesFromInstances(instances, bubbleClasses, paragraphs, pageLetter, 
     let inkArea = 0; for (const p of blocks) inkArea += p.inkArea || 0;
     const dark = lum / Math.max(1, area) < ANALYZE.darkSurface;
     const letter = bubbleLetter(blocks, pageLetter, { w, h });
-    const bubble = { id: 0, box: { x, y, w, h }, area, color: dark ? [0, 0, 0] : [255, 255, 255], dark, letter, blocks, labelId: 0, labels: null, fill: m, score: inst.score, segmented: true };
+    const bubble = { id: 0, box: { x, y, w, h }, area, color: dark ? [0, 0, 0] : [255, 255, 255], dark, letter, blocks, labelId: 0, labels: null, fill: m, score: inst.score, segmented: true, cell: inst.cell };
     for (const p of blocks) p.bubble = bubble;
     bubbles.push(bubble);
     trace("bubble", bubble.box, "segment accepted", { score: inst.score, blocks: blocks.length, dark, letter, inkArea });

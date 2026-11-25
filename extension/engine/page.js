@@ -2,7 +2,8 @@
 // text regions for the model) and finish (place the translations, erase the
 // original lettering, hand back a cleaned page plus text placements).
 // Used by the extension's service worker and by the web app's Web Worker.
-import { getCV, getDetector, getSegmenter, getFallbackDetector, getInpainter, inpainterSide, setEnginePrefs, lamaEvent } from "./cv.js";
+import { getCV, getDetector, getSegmenter, getFallbackDetector, getInpainter, getTextMasker, inpainterSide, setEnginePrefs, lamaEvent } from "./cv.js";
+import { masksFor } from "./textmask.js";
 import { ortBroken, gpuIsSoftware } from "./ort.js";
 import { analyze } from "./analyze.js";
 import { segment } from "./segment.js";
@@ -53,7 +54,9 @@ export async function preparePage(bitmap, settings, opts = {}) {
   const checkpoint = opts.checkpoint || (async () => {});
   setEnginePrefs({ gpu: settings?.useGpu !== false });
   const cv = await getCV();
-  const [detector, segmenter] = await Promise.all([getDetector(), getSegmenter()]);
+  // the learned text mask (settings.learnedMask, off by default: 3.2), loaded with the other models
+  const textMask = settings?.learnedMask === true;
+  const [detector, segmenter] = await Promise.all([getDetector(), getSegmenter(), textMask ? getTextMasker() : null]);
   // a part of a tall image (opts.part): `bitmap` holds its rows from y0, the geometry is the whole image's
   const part = opts.part || null;
   const W = part ? part.W : bitmap.width, H = part ? part.H : bitmap.height, y0 = part ? part.y0 : 0;
@@ -103,7 +106,23 @@ export async function preparePage(bitmap, settings, opts = {}) {
     throw e;
   }
   // (cv: the OpenCV the analyses live in, which the prefill and the finish use even after a fresh one started)
-  return { width: W, height: H, work, scale, slices, part: part ? part.index : null, cv };
+  return { width: W, height: H, work, scale, slices, part: part ? part.index : null, cv, textMask };
+}
+
+/**
+ * The learned text mask's crops (engine/textmask.js) for a slice's regions `ids`, each with its
+ * mask, for erase.js (opts.textMasks); null when the page doesn't use it (or the model failed to
+ * load). prefillPage() asks for all; finishPage() again, and only regions whose crop the layout
+ * or looking again changed (or that the layout added) are masked again (textmask.js masksFor).
+ */
+async function textMasksOf(job, s, ids) {
+  if (!job.textMask) return null;
+  const masker = await getTextMasker();
+  if (!masker) return null;
+  const t0 = performance.now(), { masks, made } = await masksFor(masker, s.imageData, s.analysis, ids, s.textMasks || (s.textMasks = new Map()));
+  if (made) job.maskMs = (job.maskMs || 0) + Math.round(performance.now() - t0);
+  job.maskEp = masker.ep;
+  return masks;
 }
 
 /**
@@ -162,7 +181,7 @@ async function finishSlices(job, results, opts) {
     let clean = { image: s.imageData, rois: [] };
     try {
       if (regionIds.size) {
-        clean = erase(cv, s.imageData, an, regionIds, { keepMask: true, outline: OUTLINE });
+        clean = erase(cv, s.imageData, an, regionIds, { keepMask: true, outline: OUTLINE, textMasks: await textMasksOf(job, s, regionIds) });
         // textured areas at the size the page was analysed at (when that is its own size, the
         // patches come from here; else the full-size pass below does them)
         if (!full) clean.image = await fillTexture(cv, inpainter, clean.image, clean, { cache, side });
@@ -202,7 +221,9 @@ async function finishSlices(job, results, opts) {
   if (job.preRuns?.length) fill.preRuns = job.preRuns;
   if (inpainterTimes.load != null) fill.model = { ...inpainterTimes }; // its load and first run, once per worker
   job.fills = null;
-  return { items, placements, regions, work, letter, canvas, canvasTop: top, patches, fullSize: full, engine, segmentMs, detectMs, backend, fill, look, dropped };
+  // the learned text mask, when the page used it: where it ran and its time (the debug report)
+  const mask = job.textMask ? { ep: job.maskEp || null, ms: job.maskMs || 0 } : null;
+  return { items, placements, regions, work, letter, canvas, canvasTop: top, patches, fullSize: full, engine, segmentMs, detectMs, backend, fill, look, dropped, ...(mask ? { textMask: mask } : {}) };
 }
 
 /**
@@ -329,7 +350,8 @@ export async function prefillPage(job, opts = {}) {
     for (const s of job.slices) {
       const an = s.analysis;
       if (!an.regions.length) continue;
-      const clean = erase(cv, s.imageData, an, new Set(an.regions.map((r) => r.id)), { keepMask: true, outline: OUTLINE });
+      const ids = new Set(an.regions.map((r) => r.id));
+      const clean = erase(cv, s.imageData, an, ids, { keepMask: true, outline: OUTLINE, textMasks: await textMasksOf(job, s, ids) });
       try {
         if (!full) {
           await fillTexture(cv, inpainter, clean.image, clean, { cache, checkpoint, side });

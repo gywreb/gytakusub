@@ -1,0 +1,11 @@
+{
+  "source": "https://huggingface.co/TareHimself/comic-text-mask/tree/ebd37f1a9ae9298519678fb96a796573fb602977",
+  "upstreamSha256": "ab28dd8450462c4f87ddfd05d13601813bb90414f26bea5590bf6a0a7540f988",
+  "made": "scripts/textmask-onnx.py",
+  "license": "MIT",
+  "what": "comic-text-mask: text vs not-text per pixel of a text region's crop; a U-Net on a ResNet-18, float16 weights",
+  "inputSize": 384,
+  "threshold": 0.5,
+  "bytes": 28656087,
+  "sha256": "91fd55f74ff6d52a2227d613a99d3de9f9db49cb07fb4a4925fd80900c165d7c"
+}

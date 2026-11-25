@@ -460,6 +460,7 @@ async function answerPage(msg, settings, tabId, work, { job, natural, cached, ca
   if (page.fill) timing.fill = page.fill; // part of "finish": the erased areas by fill, and the texture fills' time
   if (page.dropped?.length) timing.dropped = page.dropped; // the lines labelled sound effects or logos, left as drawn
   if (page.look?.boxes) timing.look = page.look; // part of "finish": the second look at lines with no lettering found (boxes, lines found, ms)
+  if (page.textMask) timing.textMask = page.textMask; // the learned text mask, when on: where it ran, its time (in the prefill, else "finish")
   return {
     items: page.items, placements: page.placements, regions: page.regions, letter: page.letter, engine: page.engine,
     work: page.work, width: job.width, height: job.height, usage, timing,

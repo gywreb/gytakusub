@@ -46,10 +46,12 @@ let sw = context.serviceWorkers()[0] || (await context.waitForEvent("servicework
 // the worker's own warnings (a GPU session that fails to start, a model that will not load)
 context.on("console", (m) => { if (m.type() === "warning" && /Gytakusub/.test(m.text())) console.log("  [worker]", m.text().slice(0, 300)); });
 await agree(sw);
-await sw.evaluate(async () => {
-  await chrome.storage.sync.set({ enabled: true, enabledSites: ["127.0.0.1"], debugOverlay: true, peekOnHover: true, useContext: false, includeSource: false, model: "claude-sonnet-5-5" });
+// --learned-mask: the learned text mask on (3.2), as a user who turned it on in Options
+const learnedMask = process.argv.includes("--learned-mask");
+await sw.evaluate(async (learnedMask) => {
+  await chrome.storage.sync.set({ enabled: true, enabledSites: ["127.0.0.1"], debugOverlay: true, peekOnHover: true, useContext: false, includeSource: false, model: "claude-sonnet-5-5", learnedMask });
   await chrome.storage.local.set({ apiKey: "sk-ant-test" });
-});
+}, learnedMask);
 await new Promise((r) => setTimeout(r, 300)); // let syncRegistration run
 
 const page = await context.newPage();
@@ -225,6 +227,8 @@ for (const d of debugLogs.filter((d) => d.timing?.model > 1000 && d.timing.fill)
   const f = d.timing.fill, textured = (f.tone || 0) + (f.learned || 0) + (f.telea || 0);
   if (f.ready !== textured) { failures++; console.log(`FAIL: ${f.ready} of ${textured} textured areas were filled ahead of the answer: ${JSON.stringify(f)}`); }
 }
+if (learnedMask && !debugLogs.every((d) => d.timing?.textMask?.ep)) { failures++; console.log(`FAIL: the learned text mask was on but did not run: ${JSON.stringify(debugLogs.map((d) => d.timing?.textMask))}`); }
+if (!learnedMask && debugLogs.some((d) => d.timing?.textMask)) { failures++; console.log("FAIL: the learned text mask ran while off"); }
 if (process.argv.includes("--require-gpu") && !debugLogs.every((d) => /detect:webgpu/.test(d.timing?.backend || "") && /segment:webgpu/.test(d.timing?.backend || ""))) { failures++; console.log(`FAIL: --require-gpu but the models ran on ${debugLogs.map((d) => d.timing?.backend).join(" | ")}`); }
 if (!reportOk) { failures++; console.log("FAIL: diagnostic report incomplete: " + JSON.stringify(rep).slice(0, 200)); }
 if (!zipOk) { failures++; console.log("FAIL: export zip missing files or corrupt: " + JSON.stringify(exp).slice(0, 200)); }

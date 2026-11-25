@@ -449,6 +449,12 @@
  "opt_finds_text_and_bubbles_much": {
   "message": "文字や吹き出しの検出がずっと速くなります。ページの表示がおかしい、またはブラウザの動作が不安定な場合にだけオフにしてください。"
  },
+ "opt_learned_text_mask": {
+  "message": "学習済みテキストマスク(プレビュー)"
+ },
+ "opt_learned_text_mask_desc": {
+  "message": "ルールでは文字全体を捉えられない所（吹き出しの外の文字、暗い吹き出しやトーンのある吹き出し）で、漫画の文字で学習したモデルを使って消す文字を見つけます。グラフィックカードがないと遅くなります。"
+ },
  "opt_peek_at_the_original_while": {
   "message": "ホバーで原文を表示"
  },
