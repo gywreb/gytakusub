@@ -4,6 +4,20 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
 
 ## [Unreleased]
 
+## [3.2.1] — 2026-11-25
+
+Lettering the image's edge cuts through is erased with the setting off too.
+
+### Pages
+- **Lettering the image's edge cuts through**, where the rules erase it: with the setting off, and in plain bubbles with it on (a webtoon is served in several images, and the cut falls anywhere). The rules keep the marks that stay inside a window round each line; a stroke of art crossing the window touches its edge. Where the image's edge clipped the window, a letter the cut runs through touched it too, and stayed. Now the image's edge is no edge of the window; and a mark it cuts, whose size past the edge isn't seen, is lettering only on the line's own box. On pages never looked at with lettering at the cut, lines in the bubbles cut there left untouched: with the setting off 37.9% → 30.8% (in white bubbles, 12 of 83 → none), with it on 10.1% → 5.9%. On the owner's webtoon episode replayed, lines the independent detector still reads after erasing: 8 → 2 with the setting off, 7 → 2 with it on. On real pages never looked at, the lettering left is the same; five of 333 pages changed a little in art damage, two for the worse. [ADR 0023](docs/adr/0023-the-image-edge-cuts.md)
+
+**Not fixed:**
+- A stroke of art the image's edge cuts, which the detector's own box for a line takes in, drawn with the lettering's pen: the rules can't tell it from a cut letter. On a real page looked at, a lobe of a burst bubble's outline hanging from the page's top was erased.
+- Dark bubbles cut at their lettering, with the setting off: the rules leave dark bubbles' lettering there as anywhere (52 of 86 lines); the learned text mask is for them.
+
+### Development
+- Tests: `freetext.test.mjs` (lettering the image's edge cuts through, erased by the rules; a stroke the edge cuts beside a line's box, left).
+
 ## [3.2.0] — 2026-11-25
 
 The learned text mask: a setting, off by default, that erases the lettering the eraser's rules can't see whole. Free text over art, the webtoon's dark bubbles, white lettering on dark ground.

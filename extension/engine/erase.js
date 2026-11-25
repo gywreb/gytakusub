@@ -176,7 +176,9 @@ function eraseRegions(cv, img, analysis, regionIds, opts, own) {
         if (pen) pens.push(pen);
         for (let i = 1; i < n; i++) {
           const cx = S[i * 5], cy = S[i * 5 + 1], cw = S[i * 5 + 2], ch = S[i * 5 + 3];
-          const touches = cx <= 0 || cy <= 0 || cx + cw >= w || cy + ch >= h;
+          // (not where the image's edge clipped the window: the image cuts a letter there, as where
+          // a webtoon's images part, and the mark has crossed nothing)
+          const touches = (cx <= 0 && x0 > 0) || (cy <= 0 && y0 > 0) || (cx + cw >= w && x0 + w < W) || (cy + ch >= h && y0 + h < H);
           // size across the line only: along it a mark may be long (a wave dash, a
           // long vowel mark in a column) and still be lettering — a stroke of art or
           // an outline crossing the window touches its edge instead
@@ -187,7 +189,11 @@ function eraseRegions(cv, img, analysis, regionIds, opts, own) {
           if (colour && inside && !(inside(X0 - 1, Y0 - 1) && inside(X0 + cw, Y0 - 1) && inside(X0 - 1, Y0 + ch) && inside(X0 + cw, Y0 + ch))) continue;
           // (a mark on the line's own box is its lettering whatever its pen: a typeface's thin strokes)
           const onBox = X0 < b.gbox.x + b.gbox.w && X0 + cw > b.gbox.x && Y0 < b.gbox.y + b.gbox.h && Y0 + ch > b.gbox.y;
-          if (!touches && (b.vertical ? cw : ch) <= ERASE.markLetters * letter && (onBox || ofPen(thick[i], pen))) { keep[i] = 1; extend(X0, Y0, X0 + cw, Y0 + ch); }
+          // a mark the image's edge cuts: how far it runs past the edge isn't seen, nor so whether it
+          // is lettering by its pen and size (a stroke of art cut there passes both); only the line's
+          // own box says it is
+          const cut = (cx <= 0 && x0 === 0) || (cy <= 0 && y0 === 0) || (cx + cw >= w && x0 + w === W) || (cy + ch >= h && y0 + h === H);
+          if (!touches && (b.vertical ? cw : ch) <= ERASE.markLetters * letter && (onBox || (!cut && ofPen(thick[i], pen)))) { keep[i] = 1; extend(X0, Y0, X0 + cw, Y0 + ch); }
         }
         for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) { const l = Lb[yy * w + xx]; if (l && keep[l]) md[(y0 + yy) * W + x0 + xx] = 255; }
         roi.delete(); lab.delete(); st.delete(); ce.delete();

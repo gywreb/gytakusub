@@ -57,7 +57,7 @@ A setting, off by default (ADR 0022): a model trained on comic text finds the le
 | Webtoon, held out | 789 | 18.5% → 5.6% | 20.5% → 8.0% | 0.053% → 0.048% | 2,635 → 5,026 | 6.7 s |
 | Lettering at the image's cut, held out | 979 | 10.5% → 3.9% | 23.7% → 10.8% | 0.053% → 0.022% | 1,157 → 1,779 | 4.7 s |
 
-On the webtoon pages, lines in dark bubbles left untouched went from 59.5% to 15.6% (`darkStays`); the mask also erases more of the outlines of dark bubbles the bubble model misses (ADR 0022). On the pages with lettering at the image's cut, lines in the bubbles cut there left untouched went from 37.9% to 10.1% (`cutStays`), their glyph pixels left as drawn from 33.7% to 7.3% (`cutSamePx`); where the rules erase (plain bubbles), the cut still leaves them (ADR 0022). On a graphics card (a real episode, WebGPU) the mask took 37 ms a page (median of the 47 pages it ran on), 352 ms the most.
+On the webtoon pages, lines in dark bubbles left untouched went from 59.5% to 15.6% (`darkStays`); the mask also erases more of the outlines of dark bubbles the bubble model misses (ADR 0022). On the pages with lettering at the image's cut, lines in the bubbles cut there left untouched went from 37.9% to 10.1% (`cutStays`), their glyph pixels left as drawn from 33.7% to 7.3% (`cutSamePx`). Since 3.2.1 the rules erase lettering the image's edge cuts too (ADR 0023): those lines left untouched with the setting off 37.9% → 30.8% (none left in white bubbles), with it on 10.1% → 5.9%. On a graphics card (a real episode, WebGPU) the mask took 37 ms a page (median of the 47 pages it ran on), 352 ms the most.
 
 ## What is measured
 

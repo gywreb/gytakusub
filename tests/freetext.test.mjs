@@ -382,6 +382,53 @@ await test("lettering close to a white bubble's outline is erased without the ou
   assert.ok(letters < 40, `${letters} lettering pixels left`);
 });
 
+await test("lettering the image's edge cuts through is erased by the rules: the image's edge is no edge of a line's window (3.2.1)", async () => {
+  // a webtoon's images part anywhere, through lettering too; the window round a line ends at the
+  // image's edge, and a letter the cut runs through touched it as a stroke crossing the window does
+  const E = { cx: 450, cy: 10, rx: 230, ry: 120 };
+  const img = page((x) => {
+    x.fillStyle = "#fff"; x.strokeStyle = "#000"; x.lineWidth = 4;
+    x.beginPath(); x.ellipse(E.cx, E.cy, E.rx, E.ry, 0, 0, 2 * Math.PI); x.fill(); x.stroke();
+    x.fillStyle = "#000"; x.font = "bold 34px 'Gytakusub Comic'"; x.textBaseline = "top";
+    x.fillText("WAIT FOR ME", 340, -9); x.fillText("PLEASE!", 380, 32);
+    x.fillRect(318, 0, 6, 100); // a stroke of art from the image's edge down through the lines and past them
+  });
+  const inner = (X, Y) => ((X - E.cx) / (E.rx - 8)) ** 2 + ((Y - E.cy) / (E.ry - 8)) ** 2 <= 1;
+  const an = await analyzePage(img);
+  const reg = an.regions.find((r) => r.box.y < 10 && r.box.x < 450 && r.box.x + r.box.w > 450);
+  assert.ok(reg, "the lettering's region is found");
+  const { regionIds } = layout(an, [{ tag: reg.id, box: [335 / 900, 0, 240 / 900, 70 / 600], text: "Wait for me, please!", size: "normal", kind: reg.kind === "bubble" ? "bubble" : "sign" }]);
+  const out = erase(cv, img, an, regionIds).image;
+  an.dispose();
+  let letters = 0, top = 0, stroke = 0;
+  for (let y = 0; y < 70; y++) for (let x = 335; x < 580; x++) if (inner(x, y) && out.data[(y * 900 + x) * 4] < 100) { letters++; if (y < 6) top++; }
+  for (let y = 0; y < 100; y++) for (let x = 318; x < 324; x++) if (out.data[(y * 900 + x) * 4] < 100) stroke++;
+  assert.ok(letters < 40, `${letters} lettering pixels left (${top} in the rows the cut runs by)`);
+  assert.ok(stroke > 0.9 * 600, `${stroke} of 600 pixels of the stroke left: it crosses its window's far side`);
+});
+
+await test("a stroke the image's edge cuts, in a line's window but off its box, is left: past the edge its size isn't seen (3.2.1)", () => {
+  // hair over a column at the top of a real page (Manga109, looked at): it passes for a mark of the
+  // line by its pen and size; the line's own box (here given) says what lettering is
+  const img = page((x) => {
+    x.fillStyle = "#000"; x.font = "36px 'Noto Sans CJK JP', sans-serif";
+    ["な", "に", "が", "あ"].forEach((ch, i) => x.fillText(ch, 432, 44 + i * 40));
+    x.fillRect(471, 0, 4, 8); // a stroke of art the image's top cuts, beside the column's box, in its window
+  });
+  const ink = new cv.Mat(600, 900, cv.CV_8UC1, new cv.Scalar(0)), none = new cv.Mat(600, 900, cv.CV_8UC1, new cv.Scalar(0));
+  for (let i = 0; i < 900 * 600; i++) if (img.data[i * 4] < 128) ink.data[i] = 255;
+  const g = { x: 434, y: 6, w: 33, h: 160 }; // the column's box: its window reaches the image's top
+  const an = { W: 900, H: 600, letter: 29, learned: true, lines: [], polarities: [{ dark: false, inkMask: ink }, { dark: true, inkMask: none }], insideOf: () => null,
+    regions: [{ id: 1, kind: "block", letter: 29, dark: false, box: g, ref: { gbox: g, letter: 29, vertical: true, parts: [g], lineBoxes: [g] } }] };
+  const out = erase(cv, img, an, new Set([1])).image;
+  ink.delete(); none.delete();
+  let stroke = 0, letters = 0;
+  for (let y = 0; y < 8; y++) for (let x = 471; x < 475; x++) if (out.data[(y * 900 + x) * 4] < 100) stroke++;
+  for (let y = 8; y < 170; y++) for (let x = 425; x < 470; x++) if (out.data[(y * 900 + x) * 4] < 100) letters++;
+  assert.ok(letters < 20, `${letters} lettering pixels left`);
+  assert.equal(stroke, 32, `${stroke} of 32 pixels of the stroke left`);
+});
+
 await test("a mark swept up beside a line is its lettering only when drawn with its pen; a thin pen judges nothing (3.1)", () => {
   // brush lettering: strokes about 20 px thick (most of the ink), a few thin hairs at their ends
   const pen = penOf([{ t: 22, a: 5000 }, { t: 20, a: 4000 }, { t: 3, a: 100 }]);
