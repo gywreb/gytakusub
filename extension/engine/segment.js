@@ -95,7 +95,7 @@ export async function segment(seg, img) {
   // the prototype tensor is the 4-D one; the detections the other
   const protos = tensors.find((t) => t.dims.length === 4), dets = tensors.find((t) => t !== protos);
   if (!dets) throw new Error("segmenter: no detection output");
-  const cands = decode(dets, seg);
+  const cands = decode(dets, seg, !!protos);
   const kept = cands[0]?.nms ? nms(cands, seg.iou) : cands;
   const instances = dedupe(kept.map((c) => toInstance(c, protos, lb, img.width, img.height, seg.maskThreshold)).filter(Boolean));
   return { instances, ms: Date.now() - t0 };
@@ -109,12 +109,13 @@ export async function segment(seg, img) {
 export function dedupe(instances) {
   const sorted = instances.slice().sort((p, q) => q.score - p.score), kept = [];
   for (const inst of sorted) {
+    if (!inst.mask) { kept.push(inst); continue; } // a box detector's: overlaps were settled by box NMS
     const { x, y, w, h } = inst.box; let covered = 0, total = 0;
     for (let yy = 0; yy < h; yy += 2) for (let xx = 0; xx < w; xx += 2) {
       if (!inst.mask[yy * w + xx]) continue;
       total++;
       const px = x + xx, py = y + yy;
-      if (kept.some((k) => { const lx = px - k.box.x, ly = py - k.box.y; return lx >= 0 && ly >= 0 && lx < k.box.w && ly < k.box.h && k.mask[ly * k.box.w + lx]; })) covered++;
+      if (kept.some((k) => { if (!k.mask) return false; const lx = px - k.box.x, ly = py - k.box.y; return lx >= 0 && ly >= 0 && lx < k.box.w && ly < k.box.h && k.mask[ly * k.box.w + lx]; })) covered++;
     }
     if (total && covered / total >= SEGMENT.dupCover) continue;
     kept.push(inst);
@@ -122,8 +123,9 @@ export function dedupe(instances) {
   return kept;
 }
 
-/** Candidates in model-input coordinates: {x1,y1,x2,y2,score,cls,coefs,nms}. */
-function decode(dets, seg) {
+/** Candidates in model-input coordinates: {x1,y1,x2,y2,score,cls,coefs,nms}. `masks`: the model has a
+ * prototype output (a box detector has none: its rows carry no mask coefficients). */
+function decode(dets, seg, masks = true) {
   const d = dets.data, dims = dets.dims, out = [];
   if (dims.length !== 3) throw new Error(`segmenter: unexpected output shape ${dims}`);
   const a = dims[1], b = dims[2];
@@ -136,16 +138,16 @@ function decode(dets, seg) {
     }
     return out;
   }
-  // YOLOv8: channels-first [C, N] with C = 4 + nc + 32 (or transposed [N, C])
-  const channelsFirst = a < b, C = channelsFirst ? a : b, N = channelsFirst ? b : a, nc = C - 36;
-  if (nc < 1) throw new Error(`segmenter: cannot read ${C} channels as YOLOv8-seg`);
+  // YOLOv8: channels-first [C, N] with C = 4 + nc + 32 (or transposed [N, C]); a box detector's C = 4 + nc
+  const channelsFirst = a < b, C = channelsFirst ? a : b, N = channelsFirst ? b : a, K = masks ? 32 : 0, nc = C - 4 - K;
+  if (nc < 1) throw new Error(`segmenter: cannot read ${C} channels as YOLOv8${masks ? "-seg" : ""}`);
   const at = channelsFirst ? (c, i) => d[c * N + i] : (c, i) => d[i * C + c];
   for (let i = 0; i < N; i++) {
     let best = 0, cls = 0;
     for (let k = 0; k < nc; k++) { const v = at(4 + k, i); if (v > best) { best = v; cls = k; } }
     if (best < seg.conf) continue;
     const cx = at(0, i), cy = at(1, i), w = at(2, i), h = at(3, i);
-    const coefs = new Float32Array(32); for (let k = 0; k < 32; k++) coefs[k] = at(4 + nc + k, i);
+    const coefs = new Float32Array(K); for (let k = 0; k < K; k++) coefs[k] = at(4 + nc + k, i);
     out.push({ x1: cx - w / 2, y1: cy - h / 2, x2: cx + w / 2, y2: cy + h / 2, score: best, cls, coefs, nms: true });
   }
   return out;

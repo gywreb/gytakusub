@@ -158,6 +158,11 @@ bubbles the image's edge cuts at their lettering, through its nearest row or jus
 benches) erases with the learned text mask, as the setting of that name does; each row then has
 `maskMs`, the mask's time on one CPU thread.
 
+`bench/detectors.mjs` measures what a candidate detector finds, not what the engine makes of it:
+a text detector's lines against today's line finding, on generated pages or a debug report, and
+a bubble model's bubbles by kind (dark, light, cut by the image's edge), masks or boxes, the model
+named in `GYT_SEGMENT`. ADR 0024 has what it measured for 3.3.
+
 The numbers the engine decides with are in `extension/engine/tuning.js`. `GYT_TUNE` changes some
 for one run, to see what a result hangs on; a name that is not a tuning value stops the run:
 

@@ -4,6 +4,16 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
 
 ## [Unreleased]
 
+## [3.2.2] — 2026-11-25
+
+No change to pages: two detectors trained on comics measured against today's (the roadmap's 3.3). Neither is adopted.
+
+### Development
+- **A text detector trained on comics** (comic-text-detector) finds fewer lines than today's. Of 784 lines Claude translated on the owner's pages it found 89.8%, today's 95.3%. Together they found 96.2%, at about 10 s more a page on the CPU. [ADR 0024](docs/adr/0024-comic-detectors-measured.md)
+- **A bubble detector trained on comics and webtoons** (ogkalu's, boxes only) finds 77% of the generated pages' dark bubbles, today's bubble model 34%. Turned into bubbles inside the engine, its boxes put more lines in their bubble, but the bubble outline erased grew 1.5 to 3 times and art damage by 16–29%, at 3–4 s more a page. Dark bubbles go to 4.0's learned core: a bubble model trained on generated pages, which know a dark bubble's exact interior.
+- `bench/detectors.mjs`: what a candidate detector finds (lines, or bubbles by kind, masks or boxes). The model reader reads a box detector's output (no mask head), so one can be measured.
+- Tests: `segment.test.mjs` (a box detector's output comes back as boxes with no mask).
+
 ## [3.2.1] — 2026-11-25
 
 Lettering the image's edge cuts through is erased with the setting off too.
