@@ -360,7 +360,7 @@ async function askClaude(settings, job, tabId, cacheKey) {
   };
   const raw = await Promise.all(job.slices.map(withRetry));
   recordPage(raw);
-  const results = raw.map((r) => ({ items: r.items }));
+  const results = raw.map((r) => ({ items: r.items, ...(r.cut != null ? { cut: r.cut } : {}) }));
   const usage = { input_tokens: 0, output_tokens: 0 }, newTerms = [];
   for (const r of raw) { newTerms.push(...r.terms); if (r.usage) { usage.input_tokens += r.usage.input_tokens || 0; usage.output_tokens += r.usage.output_tokens || 0; } }
   try { await chrome.storage.session.set({ [cacheKey]: { results, usage } }); }
@@ -459,6 +459,7 @@ async function answerPage(msg, settings, tabId, work, { job, natural, cached, ca
   if (page.backend) timing.backend = page.backend; // where the models ran: webgpu / wasm / opencv
   if (page.fill) timing.fill = page.fill; // part of "finish": the erased areas by fill, and the texture fills' time
   if (page.dropped?.length) timing.dropped = page.dropped; // the lines labelled sound effects or logos, left as drawn
+  if (page.answer?.length) timing.answer = page.answer; // what the answer contract repaired (engine/contract.js checkAnswer)
   if (page.look?.boxes) timing.look = page.look; // part of "finish": the second look at lines with no lettering found (boxes, lines found, ms)
   if (page.textMask) timing.textMask = page.textMask; // the learned text mask, when on: where it ran, its time (in the prefill, else "finish")
   return {

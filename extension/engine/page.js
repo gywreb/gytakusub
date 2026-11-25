@@ -16,7 +16,7 @@ import { owning } from "./owner.js";
 
 // How far the mask grows over a lettering's outline, as a share of its letter size (ADR 0013).
 export const OUTLINE = PAGE.outline;
-import { sliceGeometry, normalizeItems } from "./contract.js";
+import { sliceGeometry, checkAnswer } from "./contract.js";
 
 /**
  * Text lines (and bubbles, with a segmenter) for one slice, then the analysis.
@@ -156,6 +156,7 @@ async function finishSlices(job, results, opts) {
   // the second look at translated lines with no lettering found under them: boxes looked at, lines found, time
   const look = { boxes: 0, lines: 0, ms: 0 };
   const dropped = []; // lines Claude labelled sound effects or logos (left as drawn), for the debug report
+  const answer = []; // what the answer contract repaired (contract.js checkAnswer), for the debug report
   // areas prefillPage() already filled while the translation was on the way (same inputs, same result)
   const cache = job.fills || null;
   // the cleaned page at work size; a part's own rows only (a whole tall image's would be tens of MB)
@@ -168,7 +169,11 @@ async function finishSlices(job, results, opts) {
   const newId = () => nextId++;
   for (const [idx, s] of job.slices.entries()) {
     const an = s.analysis;
-    const norm = normalizeItems(results[idx]?.items || [], s, width, height, dropped); // tag + box as page fractions
+    // the answer checked and repaired (contract.js), tag + box as page fractions
+    const checked = checkAnswer(results[idx]?.items ?? [], s, width, height, { regions: an.regions, lines: an.lines || [] }, dropped);
+    const norm = checked.items;
+    if (results[idx]?.cut != null) answer.push({ slice: idx, what: "answer cut off", kept: results[idx].cut });
+    for (const p of checked.problems) answer.push({ slice: idx, ...p });
     const first = items.length;
     items.push(...norm);
     // layout wants boxes as fractions of this slice; `index` ties a placement back to its item (edits)
@@ -223,7 +228,7 @@ async function finishSlices(job, results, opts) {
   job.fills = null;
   // the learned text mask, when the page used it: where it ran and its time (the debug report)
   const mask = job.textMask ? { ep: job.maskEp || null, ms: job.maskMs || 0 } : null;
-  return { items, placements, regions, work, letter, canvas, canvasTop: top, patches, fullSize: full, engine, segmentMs, detectMs, backend, fill, look, dropped, ...(mask ? { textMask: mask } : {}) };
+  return { items, placements, regions, work, letter, canvas, canvasTop: top, patches, fullSize: full, engine, segmentMs, detectMs, backend, fill, look, dropped, ...(answer.length ? { answer } : {}), ...(mask ? { textMask: mask } : {}) };
 }
 
 /**

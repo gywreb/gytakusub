@@ -1,6 +1,8 @@
 // The engine on generated pages (bench/synth.mjs), scored against their exact answers.
 //   node bench/synth-run.mjs <out.jsonl> <first seed> <count> [--dump dir] [--printed] [--fill aot]
 // --printed: pages with lettering printed on objects and slanted free text too (synth.mjs opts.printed)
+// --reader strong|weak: Claude's answer as a reader that errs gives it (bench/reader.mjs), through the
+// answer contract (engine/contract.js) as a real answer goes; without it, every line, boxes moved a little
 // --readers, --webtoon: the bubble shapes the owner's chapters showed, and what a webtoon episode
 // showed: dark bubbles with coloured lettering, a bubble cut by the image's edge (synth.mjs opts)
 // --cut-lettering: bubbles the image's edge cuts at their lettering (synth.mjs opts.cutLettering)
@@ -14,6 +16,8 @@
 //   overflow  over 3% of a bubble line's translation drawn outside its bubble
 //   touch     a bubble line's letters within a tenth of a letter (2 px at least) of its bubble's edge
 //   big       the translation drawn over 1/0.7 (1.43) of the original lettering's size
+//   delivered its lettering not left as drawn, and a translation of it inside its own bubble (the
+//             centre of its text's box on the bubble's inside), or for free text, over its own lettering
 // Where the size is lost (the same text and fitter each time):
 //   smallLetter  small again with the true letter size in the engine's room: what the analysis's
 //                size estimate costs is small − smallLetter
@@ -37,6 +41,8 @@ const { erase, fillTexture } = await import("../../extension/engine/erase.js");
 const { loadLettering } = await import("../lettering-setup.mjs");
 const GyText = loadLettering();
 const { makePage, englishFor, rng } = await import("./synth.mjs");
+const { readAnswer, READERS } = await import("./reader.mjs");
+const contract = await import("../../extension/engine/contract.js"); // (an engine before 3.3 has no checkAnswer)
 const { sizeLabel } = await import("./labels.mjs");
 const { sizeLimits, limitCounts, fitsInside, erodeGrid } = await import("./limits.mjs");
 
@@ -51,6 +57,8 @@ if (cutPages) argv.splice(argv.indexOf("--cut-lettering"), 1);
 const learnedMask = argv.includes("--textmask");
 if (learnedMask) argv.splice(argv.indexOf("--textmask"), 1);
 const most = Number(opt("--max") || 0); let ran = 0; // (--max N: stop after N pages; rerun to go on)
+const readerName = opt("--reader"), reader = readerName ? READERS[readerName] : null;
+if (readerName && !reader) throw new Error(`--reader ${readerName}: ${Object.keys(READERS).join(" or ")}`);
 const fillWith = opt("--fill");
 // --fill aot: textured areas filled by the learned model the extension runs on the CPU (AOT), as a
 // user without a graphics card gets; by default Telea, which is faster and much worse over art
@@ -82,8 +90,31 @@ for (let seed = +first; seed < +first + +count; seed++) {
     const reg = regionAt(b.box);
     return { tag: reg ? reg.id : null, box: [bx.x / W, bx.y / H, bx.w / W, bx.h / H].map((v) => Math.max(0, Math.min(1, v))), text: englishFor(b, r), source: b.text, size: sizeLabel(b.letter / median, labelRnd), kind: b.kind === "free" ? "sign" : b.kind, index: i };
   });
-  await lookAgain(cv, pixels, an, items, detector);
-  const { placements, regionIds } = layout(an, items);
+  // the answer: the exact one, or a reader's through the contract; carry[k]: the page's lines answer item k carries
+  let answer = items, carry = items.map((it, i) => [i]), answerFacts = null, readerErrs = null, readerCut = null;
+  if (reader) {
+    const ids = an.regions.map((q) => q.id), slice = { x: 0, y: 0, w: W, h: H, cw: W, ch: H, tagFrom: ids.length ? Math.min(...ids) : 1, tagTo: ids.length ? Math.max(...ids) : 0 };
+    const raw = readAnswer(items, an.regions, reader, seed * 104729 + 11, W, H);
+    readerErrs = raw.errs; readerCut = raw.cut;
+    if (raw.cut != null) {
+      // cut off: its text ends partway; before 3.3 such an answer was unreadable and the page failed
+      const text = JSON.stringify({ items: raw.items, terms: [] }), part = text.slice(0, Math.floor(raw.cut * text.length));
+      let kept = [];
+      try { kept = contract.parseAnswer ? contract.parseAnswer(part).items : []; } catch { kept = []; }
+      raw.items = kept; raw.carry = raw.carry.slice(0, kept.length);
+    }
+    answer = []; carry = [];
+    let problems = [];
+    if (contract.checkAnswer) {
+      const c = contract.checkAnswer(raw.items, slice, W, H, { regions: an.regions, lines: an.lines || [] });
+      answer = c.items.map((it, k) => ({ ...it, index: k })); carry = c.from.map((k) => raw.carry[k]); problems = c.problems;
+    } else raw.items.forEach((it, k) => { const n = contract.normalizeItems([it], slice, W, H); if (n.length) { answer.push({ ...n[0], index: answer.length }); carry.push(raw.carry[k]); } });
+    answerFacts = { convention: raw.convention, cut: raw.cut, answered: raw.items.length, kept: answer.length, ...(problems.length ? { repaired: problems.map((p) => p.what + (p.way ? ` ${p.way}` : "")) } : {}) };
+  }
+  await lookAgain(cv, pixels, an, answer, detector);
+  const { placements, regionIds } = layout(an, answer);
+  // placements by the page's line (the first an answer item carries), its answer item kept
+  for (const p of placements) { p.answer = p.item; if (p.item != null) p.item = carry[p.item][0] ?? null; }
   const tMask = Date.now(), textMasks = learnedMask ? await textMasksFor(pixels, an, regionIds) : null, maskMs = Date.now() - tMask;
   const res = erase(cv, pixels, an, regionIds, { keepMask: true, outline: 0.3, textMasks });
   const clean = await fillTexture(cv, inpainter, res.image, res);
@@ -202,6 +233,13 @@ for (let seed = +first; seed < +first + +count; seed++) {
     fs.appendFileSync(whyFile, JSON.stringify({ seed, item: p.item, touch: true, shape: b.shape, letter: +(p.letter / b.letter).toFixed(2), drawn: +per[p.item].drawn.toFixed(3), hadShape: !!p.shape, ...fits[k], text: p.text }) + "\n");
   }
   const told = pg.blocks.map((b, i) => tells(items[i]));
+  // delivered: not left as drawn, and an answer item carrying the line placed where the line is
+  const placedRight = (p, b) => {
+    const cx = Math.round(p.rect.x + p.rect.w / 2), cy = Math.round(p.rect.y + p.rect.h / 2);
+    if (b.bubble) return cx >= 0 && cy >= 0 && cx < W && cy < H && pg.bubbles[b.bubble - 1].inside[cy * W + cx] === 1;
+    const g = b.letter; return cx >= b.box.x - g && cx <= b.box.x + b.box.w + g && cy >= b.box.y - g && cy <= b.box.y + b.box.h + g;
+  };
+  const delivered = pg.blocks.map((b, i) => told[i] && !rows[i].stays && placements.some((p) => p.answer != null && carry[p.answer].includes(i) && placedRight(p, b)));
   const limits = sizeLimits(GyText, placements, sizes, [...placements.keys()].filter((k) => placements[k].item != null && told[placements[k].item] && per[placements[k].item].drawn < 0.7), W, H);
   const n = told.filter(Boolean).length;
   const row = {
@@ -209,6 +247,7 @@ for (let seed = +first; seed < +first + +count; seed++) {
     found: found.filter((f, i) => f && told[i]).length,
     placed: pg.blocks.filter((b, i) => told[i] && per[i].letter != null).length,
     left: rows.filter((x, i) => told[i] && x.left).length, stays: rows.filter((x, i) => told[i] && x.stays).length,
+    delivered: delivered.filter(Boolean).length, ...(readerName ? { reader: readerName, ...answerFacts } : {}),
     // by kind of lettering: in bubbles (and captions), free over the art, printed on objects, slanted free
     ...Object.fromEntries(["bubble", "free", "printed", "slanted"].flatMap((g) => {
       const of = (b) => (g === "printed" ? b.printed : g === "slanted" ? b.shape === "slanted" : g === "free" ? b.kind === "free" && b.shape !== "slanted" : !!b.bubble);
@@ -244,7 +283,7 @@ for (let seed = +first; seed < +first + +count; seed++) {
     damage: +(1000 * damage / (W * H)).toFixed(2), outline,
   };
   if (dump && seed < 100000) {
-    fs.writeFileSync(path.join(dump, `s${seed}.json`), JSON.stringify({ row, blocks: pg.blocks.map((b, i) => ({ kind: b.kind, script: b.script, vertical: b.vertical, letter: +b.letter.toFixed(1), box: b.box, bubble: b.bubble, shape: b.shape, two: b.two, found: found[i], ...rows[i], ...per[i], text: items[i].text })), regions: an.regions.map((q) => ({ id: q.id, kind: q.kind, box: q.box, letter: q.letter })) }));
+    fs.writeFileSync(path.join(dump, `s${seed}.json`), JSON.stringify({ row, blocks: pg.blocks.map((b, i) => ({ kind: b.kind, script: b.script, vertical: b.vertical, letter: +b.letter.toFixed(1), box: b.box, bubble: b.bubble, shape: b.shape, two: b.two, found: found[i], delivered: delivered[i], ...(readerErrs ? { errs: readerErrs[i], cut: readerCut } : {}), ...rows[i], ...per[i], text: items[i].text })), regions: an.regions.map((q) => ({ id: q.id, kind: q.kind, box: q.box, letter: q.letter })) }));
     const s = createCanvas(W * 2 + 10, H), sx = s.getContext("2d"); sx.fillStyle = "#888"; sx.fillRect(0, 0, s.width, H);
     const ic = createCanvas(W, H); ic.getContext("2d").putImageData(pg.input, 0, 0); sx.drawImage(ic, 0, 0); sx.drawImage(tc, W + 10, 0);
     fs.writeFileSync(path.join(dump, `s${seed}.png`), s.toBuffer("image/png"));

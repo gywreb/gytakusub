@@ -164,7 +164,7 @@ async function translateRows(img, settings, ctx, part) {
   const fin = await onFreshEngine(async () => {
     if (!first) prep = await prepare();
     first = false;
-    return rpc({ type: "finish", jobId: prep.jobId, results: results.map((r) => ({ items: r.items })) });
+    return rpc({ type: "finish", jobId: prep.jobId, results: results.map((r) => ({ items: r.items, ...(r.cut != null ? { cut: r.cut } : {}) })) });
   });
   lap("finish");
   if (fin.detectMs) timing.detect = fin.detectMs;
@@ -172,6 +172,7 @@ async function translateRows(img, settings, ctx, part) {
   if (fin.backend) timing.backend = fin.backend;
   if (fin.fill) timing.fill = fin.fill;
   if (fin.dropped?.length) timing.dropped = fin.dropped; // the lines labelled sound effects or logos, left as drawn
+  if (fin.answer?.length) timing.answer = fin.answer; // what the answer contract repaired (engine/contract.js checkAnswer)
   if (fin.look?.boxes) timing.look = fin.look;
   if (fin.textMask) timing.textMask = fin.textMask; // the learned text mask, when on: where it ran, its time
   if (fin.modelWait != null) timing.modelWait = fin.modelWait; // (waiting for the learned fill's model to load)

@@ -90,6 +90,18 @@ with the region found there. An English stand-in for the translation, about as l
 translation is (2.3 times the characters of Japanese or Chinese, 2 times Korean, about the same
 for Latin scripts). So the numbers measure Gytakusub, not Claude's reading.
 
+`--reader strong|weak` (generated pages, 3.3) makes the answer a reader that errs would give, in
+the answer's own form (boxes in pixels, marks as stamp numbers), and passes it through the answer
+contract as a real answer goes (`bench/reader.mjs`). The strong reader makes the errors Haiku made
+on the owner's reports, at their measured rates: a line left out (3.2%), the mark of another region
+(1.3%), no mark for a line in a stamped region (5.4%), a box on no lettering (1.9%). The weak reader
+makes them three times as often, and the errors other readers make: dialogue labelled a sound
+effect, two lines given as one or one as two, the same line twice, a line for a region with no
+lettering, every box in another convention (half its answers), an answer cut off (one in twenty).
+Its numbers are mine until 5.0's reading check measures real models. Every generated row counts
+`delivered`: lines whose lettering was erased and whose translation sits inside their own bubble
+(or over their own free text).
+
 ### The measures
 
 | Measure | Real pages | Generated pages |
