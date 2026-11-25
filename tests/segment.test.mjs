@@ -79,4 +79,18 @@ for (const [layoutName, file] of Object.entries(models)) {
     an.dispose();
   });
 }
+// A box detector (bubbles as boxes only, YOLOv8 without prototypes: 3.3 measured one, ADR 0024)
+const boxModel = "/tmp/gyt-fake-boxes.onnx";
+execFileSync("python3", ["make-fake-seg.py", page, truthPath, boxModel, "--boxes"]);
+await test("a box detector's output comes back as boxes, once each, with no mask", async () => {
+  const seg = await loadSegmenter(ort, new Uint8Array(fs.readFileSync(boxModel)), { classes: ["text_bubble", "text_free"] });
+  const { instances } = await segment(seg, pixels);
+  assert.equal(instances.length, truth.length);
+  for (const t of truth) {
+    const tb = { x: t.box[0], y: t.box[1], w: t.box[2], h: t.box[3] };
+    const m = instances.find((i) => iou(i.box, tb) > 0.95);
+    assert.ok(m, `missing ${JSON.stringify(tb)}`);
+    assert.equal(m.mask, null); assert.equal(m.cls, 0);
+  }
+});
 console.log(`SEGMENT TESTS PASSED (${passed})`);

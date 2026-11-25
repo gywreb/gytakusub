@@ -9,6 +9,8 @@ are not redistributable from here. Not a detector: it ignores its input.
     python3 make-fake-seg.py fixtures/demo-page.png fixtures/demo-truth.json fixtures/fake-seg.onnx [--e2e]
 
 --e2e writes the end-to-end row layout instead (output0 [1, N, 6+32]).
+--boxes writes a box detector's layout (output0 [1, 4+nc, N], two classes, the bubbles in the first;
+no prototypes): bubbles as boxes only.
 """
 import json
 import sys
@@ -20,6 +22,7 @@ from PIL import Image
 
 page, truth_path, out = sys.argv[1], sys.argv[2], sys.argv[3]
 e2e = "--e2e" in sys.argv
+boxes = "--boxes" in sys.argv
 S, K = 640, 32
 W, H = Image.open(page).size
 r = min(S / W, S / H)
@@ -59,6 +62,15 @@ if e2e:
         rows[0, i, :6] = [x1, y1, x2, y2, score, 0]
         rows[0, i, 6:] = coefs
     out0 = rows
+elif boxes:
+    N = 5376
+    arr = np.zeros((1, 4 + 2, N), dtype=np.float32)
+    for i, (x1, y1, x2, y2, score, coefs) in enumerate(dets):
+        for j, jitter in enumerate((0.0, 1.5)):
+            a = i * 2 + j
+            arr[0, 0:4, a] = [(x1 + x2) / 2 + jitter, (y1 + y2) / 2, x2 - x1, y2 - y1]
+            arr[0, 4, a] = score - 0.05 * j
+    out0 = arr
 else:
     N = 8400
     arr = np.zeros((1, 4 + nc + K, N), dtype=np.float32)
@@ -76,14 +88,14 @@ o0 = helper.make_tensor_value_info("output0", TensorProto.FLOAT, list(out0.shape
 o1 = helper.make_tensor_value_info("output1", TensorProto.FLOAT, list(protos.shape))
 nodes = [
     helper.make_node("Constant", [], ["output0"], value=numpy_helper.from_array(out0, "c0")),
-    helper.make_node("Constant", [], ["output1"], value=numpy_helper.from_array(protos, "c1")),
+] + ([] if boxes else [helper.make_node("Constant", [], ["output1"], value=numpy_helper.from_array(protos, "c1"))]) + [
     # consume the input so the graph is well-formed
     helper.make_node("Shape", ["images"], ["unused_shape"]),
 ]
 unused = helper.make_tensor_value_info("unused_shape", TensorProto.INT64, [4])
-graph = helper.make_graph(nodes, "fake_seg", [images], [o0, o1, unused])
+graph = helper.make_graph(nodes, "fake_seg", [images], [o0, unused] if boxes else [o0, o1, unused])
 model = helper.make_model(graph, opset_imports=[helper.make_opsetid("", 17)], producer_name="gytakusub-tests")
 model.ir_version = 8
 onnx.checker.check_model(model)
 onnx.save(model, out)
-print(f"wrote {out}: {len(dets)} bubbles, layout {'end-to-end' if e2e else 'yolov8'}, input {S}")
+print(f"wrote {out}: {len(dets)} bubbles, layout {'end-to-end' if e2e else 'boxes' if boxes else 'yolov8'}, input {S}")
