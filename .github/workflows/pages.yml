@@ -14,10 +14,10 @@ concurrency:
   group: pages
   cancel-in-progress: true
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  # Built and deployed in two jobs, as deploy-pages asks: in one job it looked the artifact up half a
+  # second after the upload finished and found none (2026-11-25, twice: 3.2.0 and 3.2.2 not
+  # deployed), and a re-run of that job uploads a second artifact, which deploy-pages refuses.
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -29,6 +29,13 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: web
+  deploy:
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
       - id: deployment
         uses: actions/deploy-pages@v4
         # GitHub's default is 10 minutes. On 2026-11-09, during GitHub's Actions incident, the
