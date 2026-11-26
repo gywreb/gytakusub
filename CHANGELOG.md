@@ -4,6 +4,36 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
 
 ## [Unreleased]
 
+## [3.3.0] — 2026-11-26
+
+One answer contract: every answer Claude gives is checked and repaired in one place, whoever sends it, and the bench now reads pages the way readers that make mistakes do.
+
+### Pages
+- **An answer cut off partway keeps its complete lines.** Before, a page whose answer ran past its length limit, or whose JSON broke partway, failed whole. Now the lines complete before the break are placed and erased. [ADR 0025](docs/adr/0025-one-answer-contract.md)
+- **A line in a speech bubble that Claude labelled a sound effect is translated.** Its mark and its box must both put it in the bubble. The prompt asks for sound effects drawn as part of the artwork; lettering in a speech bubble is said by someone, and it was left as drawn (2.14.1 found one such line lost).
+- **Boxes written another way are read that way:** a 0–1000 grid with y first (Gemini's documented boxes), fractions of the image, or corners in place of a size. The way that puts the boxes on the lettering found wins, and the contract's own way stands unless another fits clearly better. Haiku writes its boxes the contract's way; this is for 5.0's other readers, and the bench's weak one.
+- **The same line given twice** (same words and translation, in the same place) is placed once.
+- On the owner's 746 report pages the contract changes none of Haiku's 3,154 lines.
+
+**Measured on generated pages looked at** (520 lines on 100 plain pages):
+- Haiku-like answers (the strong reader): delivered 91.3% both before and after; nothing changed.
+- The weak reader: lines delivered 68.1% → 81.7%, lines lost 166 → 95. Of the lines its answers carried, those lost went 98 → 35. The rest it left out, or they came after its answer was cut off, so no repair can bring them back.
+- Exact answers: unchanged.
+
+**Counted on pages never looked at** (seeds 100000+):
+- Exact and Haiku-like answers: every page the same as before.
+- Weak reader: plain pages delivered 71.5% → 81.8% (lines lost 155 → 99), webtoon pages 62.0% → 68.7% (120 → 99). 50 of 52 answers with boxes written another way were read that way, none wrongly. One page lost a line (not looked at; on the looked-at page that lost one, a box the reader had put off its lettering, read the right way, overruled its mark: the layout's rule).
+- **Not met:** the plan's gate asked the weak reader's lost lines to halve (−36% plain, −18% webtoon). Lines a reader leaves out, or that come after its answer is cut off, aren't in the answer, so the contract can't bring them back. Asking again for them would cost a second call on a quarter of real pages to find little.
+
+### Debug report
+- `timing.answer` lists what the contract repaired on the page. A line left as a sound effect or logo (`timing.dropped`) now carries its mark and box, so a report shows whether it sat in a bubble.
+
+### Development
+- **Claude's errors, measured** on the owner's reports (826 pages, 3,505 lines, Haiku): a mark its own box overrules 1.3%, no mark 5.4% (of lines in a region), a box on no lettering at most 1.9%, bubble text no line names at most 3.2%.
+- `bench/reader.mjs` and `synth-run.mjs --reader strong|weak`. The strong reader makes Haiku's errors at those rates. The weak one makes them three times as often, plus the errors other readers make; its numbers are mine until 5.0's reading check. Every generated row counts `delivered`: lines erased and translated inside their own bubble, or over their own free text.
+- `engine/contract.js`: `checkAnswer`, `boxWay`, `parseAnswer`; `wordsOf` moves there from `prompt.js`.
+- Tests: `engine.test.mjs` (boxes written another way; the contract's way standing with a box off its lettering; the same line twice; a sound effect in a bubble; answers not a list; a cut-off answer's complete items).
+
 ## [3.2.3] — 2026-11-25
 
 No change to pages or the extension: the web app's deployment is fixed.

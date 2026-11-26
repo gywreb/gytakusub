@@ -122,7 +122,8 @@ test("extractJson tolerates fences and prose", () => {
       const s2 = { x: 0, y: 0, w: 100, h: 100, cw: 100, ch: 100, tagFrom: 1, tagTo: 1 }, dropped = [];
       const kept = prompt.normalizeItems([line("ESTRANHO...", "Strange...", "sfx"), line("BAM", "BAM", "sfx"), line("¡Ahí estás!", "There you are!")], s2, 100, 100, dropped);
       assert.deepEqual(kept.map((i) => i.text), ["There you are!"]);
-      assert.deepEqual(dropped, [{ kind: "sfx", source: "ESTRANHO...", text: "Strange..." }, { kind: "sfx", source: "BAM", text: "BAM" }]);
+      assert.deepEqual(dropped.map(({ kind, source, text }) => ({ kind, source, text })), [{ kind: "sfx", source: "ESTRANHO...", text: "Strange..." }, { kind: "sfx", source: "BAM", text: "BAM" }]);
+      assert.ok(dropped.every((d) => "tag" in d && "box" in d), "with where it was (3.3)");
     });
   }
   const fails = async (...replies) => { try { await prompt.callClaude(settings, slice, ctx, fake(...replies)); return "no error"; } catch (e) { return e.message; } };
@@ -130,6 +131,10 @@ test("extractJson tolerates fences and prose", () => {
   const cut = await fails([200, { content: [{ type: "text", text: '{"items":[{"tag":1,' }], stop_reason: "max_tokens", usage: { output_tokens: 8192 } }]);
   const empty = await fails([200, { content: [], stop_reason: "end_turn" }]);
   const garbled = await fails([200, { content: [{ type: "text", text: '{"items":[{"text":"a" "b"}]}' }], stop_reason: "end_turn" }]);
+  const kept = await prompt.callClaude(settings, slice, ctx, fake([200, { content: [{ type: "text", text: '{"items":[{"tag":1,"box":[1,2,3,4],"kind":"bubble","size":"normal","source":"a","text":"Hi there."},{"tag":2,"box":[5,6' }], stop_reason: "max_tokens", usage: { output_tokens: 8192 } }]));
+  test("an answer cut off keeps its complete items, and says how many (3.3)", () => {
+    assert.equal(kept.items.length, 1); assert.equal(kept.items[0].text, "Hi there."); assert.equal(kept.cut, 1);
+  });
   test("callClaude names why an answer cannot be read (refusal, cut off, empty, garbled)", () => {
     assert.match(refusal, /declined/);
     assert.match(cut, /cut off \(max_tokens, 8192/);
@@ -151,6 +156,58 @@ test("normalizeItems maps slice pixels to page fractions and validates tags", ()
   assert.deepEqual(a.box, [0.1, 0.15, 0.2, 0.1]); assert.equal(a.tag, 4);
   assert.equal(b.tag, null, "tag outside the slice's range is dropped");
 });
+
+// ---------- the answer contract (engine/contract.js, 3.3) ----------
+{
+  const { checkAnswer, parseAnswer, boxWay } = await import("../extension/engine/contract.js");
+  // a 400 × 300 image with three regions, each with a line of lettering
+  const s = { x: 0, y: 0, w: 400, h: 300, cw: 400, ch: 300, tagFrom: 1, tagTo: 3 };
+  const found = { regions: [{ id: 1, box: { x: 20, y: 20, w: 100, h: 60 } }, { id: 2, box: { x: 250, y: 40, w: 120, h: 80 } }, { id: 3, box: { x: 60, y: 200, w: 140, h: 70 } }], lines: [{ x: 30, y: 35, w: 80, h: 20 }, { x: 260, y: 60, w: 90, h: 20 }, { x: 80, y: 220, w: 100, h: 25 }] };
+  const px = [[30, 35, 80, 20], [260, 60, 90, 20], [80, 220, 100, 25]];
+  const answer = (boxes) => boxes.map((box, i) => ({ tag: i + 1, box, kind: "bubble", size: "normal", source: `line ${i}`, text: `Line ${i}.` }));
+  const ways = {
+    "grid-yx-corners": px.map(([x, y, w, h]) => [y / 300 * 1000, x / 400 * 1000, (y + h) / 300 * 1000, (x + w) / 400 * 1000]),
+    "frac-xy-size": px.map(([x, y, w, h]) => [x / 400, y / 300, w / 400, h / 300]),
+    "px-xy-corners": px.map(([x, y, w, h]) => [x, y, x + w, y + h]),
+  };
+  test("boxes written another way are read that way (a 0–1000 grid y first, fractions, corners)", () => {
+    for (const [way, boxes] of Object.entries(ways)) {
+      const c = checkAnswer(answer(boxes), s, 400, 300, found);
+      assert.equal(c.problems[0]?.way, way, way);
+      c.items.forEach((it, i) => assert.ok(Math.abs(it.box[0] * 400 - px[i][0]) < 1 && Math.abs(it.box[1] * 300 - px[i][1]) < 1 && Math.abs(it.box[2] * 400 - px[i][2]) < 1, `${way}: box ${i}`));
+    }
+  });
+  test("boxes in the contract's way stand, even with one off its lettering", () => {
+    assert.equal(boxWay(answer(px), s, found).way, "px-xy-size");
+    const off = answer([px[0], px[1], [330, 230, 40, 30]]);
+    const c = checkAnswer(off, s, 400, 300, found);
+    assert.deepEqual(c.problems, []); assert.deepEqual(c.items[2].box.map((v, k) => Math.round(v * (k % 2 ? 300 : 400))), [330, 230, 40, 30]);
+    assert.equal(boxWay(answer([[30, 35, 80, 20]]), s, { regions: [], lines: [] }).way, "px-xy-size", "nothing found: the contract's way");
+  });
+  test("the same line twice is kept once; the same words elsewhere are another line", () => {
+    const a = answer(px), twice = [a[0], { ...a[0] }, a[1], { ...a[1], box: [80, 220, 100, 25], tag: 3 }];
+    const c = checkAnswer(twice, s, 400, 300, found);
+    assert.equal(c.items.length, 3); assert.deepEqual(c.from, [0, 2, 3]);
+    assert.equal(c.problems.filter((p) => p.what === "the same line twice").length, 1);
+  });
+  test("a line in a bubble labelled a sound effect is dialogue; one outside a bubble stays a sound effect", () => {
+    const f2 = { ...found, regions: found.regions.map((r, i) => ({ ...r, kind: i === 0 ? "bubble" : "block" })) };
+    const a = answer(px).map((it) => ({ ...it, kind: "sfx" })), dropped = [];
+    const c = checkAnswer(a, s, 400, 300, f2, dropped);
+    assert.deepEqual(c.items.map((it) => it.kind), ["bubble"]); assert.equal(dropped.length, 2);
+    assert.equal(c.problems[0].what, "a line in a bubble labelled a sound effect");
+  });
+  test("an answer whose items are not a list gives none, and says so", () => {
+    assert.deepEqual(checkAnswer({ oops: 1 }, s, 400, 300, found).items, []);
+    assert.equal(checkAnswer(null, s, 400, 300, found).problems[0].what, "items not a list");
+  });
+  test("parseAnswer reads a whole answer, and the complete items of one broken partway", () => {
+    assert.deepEqual(parseAnswer('```json\n{"items":[{"text":"a"}],"terms":[]}\n```'), { items: [{ text: "a" }], terms: [], salvaged: null });
+    assert.deepEqual(parseAnswer('{"items":[{"text":"a \\"b\\" {c}"},{"text":"d"},{"text":"e'), { items: [{ text: 'a "b" {c}' }, { text: "d" }], terms: [], salvaged: 2 });
+    assert.throws(() => parseAnswer('{"items":[{"text":'), /No complete item/);
+    assert.throws(() => parseAnswer("no json here"));
+  });
+}
 
 test("sound effects and logos are labelled, then left as drawn", () => {
   const s = { x: 0, y: 0, w: 100, h: 100, cw: 100, ch: 100, tagFrom: 1, tagTo: 0 };

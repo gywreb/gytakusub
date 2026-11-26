@@ -1,10 +1,10 @@
 // Gytakusub – shared prompt + response parsing (extension background + web app).
 // ES module.
 import { explainApiError, limitsOf } from "./usage.js";
-import { LEFT_AS_DRAWN, normalizeItems, sliceGeometry } from "./engine/contract.js";
+import { LEFT_AS_DRAWN, normalizeItems, sliceGeometry, wordsOf, parseAnswer } from "./engine/contract.js";
 
 // The model-answer contract lives in the engine (engine/contract.js); kept here for callers.
-export { LEFT_AS_DRAWN, normalizeItems, sliceGeometry };
+export { LEFT_AS_DRAWN, normalizeItems, sliceGeometry, wordsOf, parseAnswer };
 
 export const MODELS = [
   { id: "claude-haiku-5-5", label: "Claude Haiku 5.5 — fastest, cheapest" },
@@ -137,19 +137,21 @@ export async function callClaude(settings, slice, ctx, fetchFn = fetch) {
   const text = (data.content || []).filter((c) => c.type === "text").map((c) => c.text).join("\n");
   // Say why there is nothing to read, rather than failing on the parse.
   if (data.stop_reason === "refusal") throw new Error("Claude declined to translate this page (refusal)");
-  if (data.stop_reason === "max_tokens") throw new Error(`Claude's answer was cut off (max_tokens, ${data.usage?.output_tokens ?? "?"} tokens)`);
   if (!text.trim()) throw new Error(`Empty model response (stop_reason: ${data.stop_reason ?? "none"})`);
+  // (an answer cut off, or whose JSON breaks partway, keeps its complete items: engine/contract.js)
   let parsed;
-  try { parsed = extractJson(text); }
+  try { parsed = parseAnswer(text); }
   catch (e) {
+    if (data.stop_reason === "max_tokens") throw new Error(`Claude's answer was cut off (max_tokens, ${data.usage?.output_tokens ?? "?"} tokens)`);
     console.warn("Gytakusub: unreadable model answer:", text.slice(0, 4000));
     throw new Error(`Unreadable model answer (${e.message}; stop_reason: ${data.stop_reason ?? "none"})`);
   }
-  const items = Array.isArray(parsed.items) ? parsed.items : [];
+  const items = parsed.items;
   const again = await checkCopies(settings, items, fetchFn);
   return {
     items,
-    terms: Array.isArray(parsed.terms) ? parsed.terms : [],
+    terms: parsed.terms,
+    ...(parsed.salvaged != null ? { cut: parsed.salvaged } : {}), // its complete items, kept
     usage: addUsage(data.usage || null, again),
     model: data.model || settings.model,
     limits: limitsOf(res.headers),
@@ -158,8 +160,6 @@ export async function callClaude(settings, slice, ctx, fetchFn = fetch) {
 
 const addUsage = (a, b) => (!b ? a : { ...(a || {}), input_tokens: (a?.input_tokens || 0) + (b.input_tokens || 0), output_tokens: (a?.output_tokens || 0) + (b.output_tokens || 0) });
 
-/** A line's words for comparing a translation with its original: letters and digits, lower case, no accents. */
-export const wordsOf = (s) => String(s || "").normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase().match(/[\p{L}\p{N}]+/gu)?.join(" ") || "";
 
 /**
  * Lines Claude returned word for word as they are drawn (its "text" is its "source"). Haiku left a
