@@ -4,6 +4,13 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
 
 ## [Unreleased]
 
+## [3.2.3] — 2026-11-25
+
+No change to pages or the extension: the web app's deployment is fixed.
+
+### Development
+- **The web app wasn't deployed after 3.2.0 and 3.2.2.** GitHub's deploy step looked for the uploaded site half a second after the upload finished and found nothing. Re-running that job doesn't help: a re-run uploads a second copy, which the deploy step refuses (reported in actions/deploy-pages#338). The workflow now builds and deploys in two jobs, as the deploy step's documentation recommends. Merging this deploys the web app as of 3.2.3.
+
 ## [3.2.2] — 2026-11-25
 
 No change to pages: two detectors trained on comics measured against today's (the roadmap's 3.3). Neither is adopted.
