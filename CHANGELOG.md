@@ -33,6 +33,12 @@ One answer contract: every answer Claude gives is checked and repaired in one pl
 - `bench/reader.mjs` and `synth-run.mjs --reader strong|weak`. The strong reader makes Haiku's errors at those rates. The weak one makes them three times as often, plus the errors other readers make; its numbers are mine until 5.0's reading check. Every generated row counts `delivered`: lines erased and translated inside their own bubble, or over their own free text.
 - `engine/contract.js`: `checkAnswer`, `boxWay`, `parseAnswer`; `wordsOf` moves there from `prompt.js`.
 - Tests: `engine.test.mjs` (boxes written another way; the contract's way standing with a box off its lettering; the same line twice; a sound effect in a bubble; answers not a list; a cut-off answer's complete items).
+## [3.2.3] — 2026-11-25
+
+No change to pages or the extension: the web app's deployment is fixed.
+
+### Development
+- **The web app wasn't deployed after 3.2.0 and 3.2.2.** GitHub's deploy step looked for the uploaded site half a second after the upload finished and found nothing. Re-running that job doesn't help: a re-run uploads a second copy, which the deploy step refuses (reported in actions/deploy-pages#338). The workflow now builds and deploys in two jobs, as the deploy step's documentation recommends. Merging this deploys the web app as of 3.2.3.
 
 ## [3.2.2] — 2026-11-25
 
