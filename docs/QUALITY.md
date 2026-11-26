@@ -45,9 +45,9 @@ On generated pages, where every letter size and bubble is known exactly:
 - Not judged: 19 small lines that share their bubble with another line, and 37 over the art.
 <!-- results:end -->
 
-### With the learned text mask
+### The learned text mask against the rules
 
-A setting, off by default (ADR 0022): a model trained on comic text finds the lettering to erase on free text and in bubbles whose surface isn't plain. Pages never looked at, the rules (3.1.0, the same as with the setting off) against the mask (3.2.0). It changes only what is erased: the other numbers above stay as they are.
+A setting, on by default since 3.4 (ADR 0022, 0026): a model trained on comic text finds the lettering to erase on free text and in bubbles whose surface isn't plain. The numbers above are with it on. Here, on pages never looked at, are the rules alone (the setting off) against the mask. It changes only what is erased: the other numbers stay as they are.
 
 | Pages | Lines | Lettering left untouched (real: still seen) | Free text left untouched | Art damage | Bubble outline pixels erased | The mask's time a page, one CPU thread (median) |
 |---|---|---|---|---|---|---|
@@ -166,9 +166,9 @@ be stopped and started again: pages already counted are skipped. `--max N` stops
 `--printed` adds lettering printed on objects and slanted free text to the generated pages;
 `--readers` the bubble shapes the owner's chapters showed; `--webtoon` dark bubbles with coloured
 lettering and bubbles cut by the image's edge, as a webtoon episode has them; `--cut-lettering`
-bubbles the image's edge cuts at their lettering, through its nearest row or just short of it. `--textmask` (both
-benches) erases with the learned text mask, as the setting of that name does; each row then has
-`maskMs`, the mask's time on one CPU thread.
+bubbles the image's edge cuts at their lettering, through its nearest row or just short of it. Both benches erase
+with the learned text mask, as the product does since 3.4; `--rules` erases with the rules alone
+(the setting off). Each row has `textMask` and `maskMs`, the mask's time on one CPU thread.
 
 `bench/detectors.mjs` measures what a candidate detector finds, not what the engine makes of it:
 a text detector's lines against today's line finding, on generated pages or a debug report, and

@@ -53,9 +53,11 @@ if (printedPages) argv.splice(argv.indexOf("--printed"), 1);
 if (readerPages) argv.splice(argv.indexOf("--readers"), 1);
 if (webtoonPages) argv.splice(argv.indexOf("--webtoon"), 1);
 if (cutPages) argv.splice(argv.indexOf("--cut-lettering"), 1);
-// --textmask: the eraser takes the learned text mask in place of its rules (engine/textmask.js)
-const learnedMask = argv.includes("--textmask");
-if (learnedMask) argv.splice(argv.indexOf("--textmask"), 1);
+// the eraser takes the learned text mask in place of its rules where they are weak (engine/textmask.js),
+// as the product does from 3.4; --rules: the rules alone (the setting off). (--textmask, the flag
+// before 3.4, is still taken: on.)
+const learnedMask = !argv.includes("--rules");
+for (const f of ["--rules", "--textmask"]) if (argv.includes(f)) argv.splice(argv.indexOf(f), 1);
 const most = Number(opt("--max") || 0); let ran = 0; // (--max N: stop after N pages; rerun to go on)
 const readerName = opt("--reader"), reader = readerName ? READERS[readerName] : null;
 if (readerName && !reader) throw new Error(`--reader ${readerName}: ${Object.keys(READERS).join(" or ")}`);

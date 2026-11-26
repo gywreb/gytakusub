@@ -47,9 +47,9 @@ const page = await browser.newPage({ viewport: { width: 900, height: 1200 } });
 const errors = [];
 page.on("pageerror", (e) => errors.push(String(e)));
 page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
-// --learned-mask: the learned text mask on (3.2), as a user who turned it on in Settings
-const learnedMask = process.argv.includes("--learned-mask");
-await page.addInitScript((learnedMask) => localStorage.setItem("gytakusub.settings", JSON.stringify({ apiKey: "sk-ant-test", useContext: false, learnedMask })), learnedMask);
+// the learned text mask is on unless --rules (3.4: on by default; --rules as a user who turned it off in Settings)
+const learnedMask = !process.argv.includes("--rules");
+await page.addInitScript((learnedMask) => localStorage.setItem("gytakusub.settings", JSON.stringify({ apiKey: "sk-ant-test", useContext: false, learnedTextMask: learnedMask })), learnedMask);
 await page.goto(`http://127.0.0.1:${WEB_PORT}/`);
 await page.setInputFiles("#file", pageImage);
 await page.waitForSelector(".page canvas.translated", { timeout: 60000 });

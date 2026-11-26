@@ -46,10 +46,10 @@ let sw = context.serviceWorkers()[0] || (await context.waitForEvent("servicework
 // the worker's own warnings (a GPU session that fails to start, a model that will not load)
 context.on("console", (m) => { if (m.type() === "warning" && /Gytakusub/.test(m.text())) console.log("  [worker]", m.text().slice(0, 300)); });
 await agree(sw);
-// --learned-mask: the learned text mask on (3.2), as a user who turned it on in Options
-const learnedMask = process.argv.includes("--learned-mask");
+// the learned text mask is on unless --rules (3.4: on by default; --rules as a user who turned it off in Options)
+const learnedMask = !process.argv.includes("--rules");
 await sw.evaluate(async (learnedMask) => {
-  await chrome.storage.sync.set({ enabled: true, enabledSites: ["127.0.0.1"], debugOverlay: true, peekOnHover: true, useContext: false, includeSource: false, model: "claude-sonnet-5-5", learnedMask });
+  await chrome.storage.sync.set({ enabled: true, enabledSites: ["127.0.0.1"], debugOverlay: true, peekOnHover: true, useContext: false, includeSource: false, model: "claude-sonnet-5-5", learnedTextMask: learnedMask });
   await chrome.storage.local.set({ apiKey: "sk-ant-test" });
 }, learnedMask);
 await new Promise((r) => setTimeout(r, 300)); // let syncRegistration run

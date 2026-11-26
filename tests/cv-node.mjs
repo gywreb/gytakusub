@@ -58,7 +58,7 @@ export async function analyzePage(img, opts = {}) {
   return an;
 }
 
-// The learned text mask (engine/textmask.js), loaded the first time a bench asks for it (--textmask):
+// The learned text mask (engine/textmask.js), loaded the first time a bench asks for it (every run but --rules):
 // extension/vendor/textmask.onnx, or the file named by GYT_TEXTMASK.
 let masker = null;
 /** The learned text mask's crops for the regions to erase, each with its mask (erase.js opts.textMasks). */
