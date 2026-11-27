@@ -65,7 +65,8 @@ const tabId = await sw.evaluate(async () => (await chrome.tabs.query({ url: "htt
 const translate = (force) => sw.evaluate(async ({ tabId, force }) => chrome.tabs.sendMessage(tabId, { type: "TRANSLATE_VISIBLE", force }), { tabId, force });
 // a software GPU is slow (the bubble model takes ~10 s on lavapipe): give the --gpu run time;
 // on the CPU a render takes 5–8 s on a CI runner, more on a busy machine
-const waitTicks = process.argv.includes("--gpu") ? 3000 : 300;
+// (and the learned text mask, on by default from 3.4, took 84 s of a page there on CI: up to 15 minutes a page)
+const waitTicks = process.argv.includes("--gpu") ? 9000 : 300;
 const waitLogs = async (n) => { for (let i = 0; i < waitTicks && debugLogs.length < n; i++) await page.waitForTimeout(100); if (debugLogs.length < n) throw new Error(`timeout waiting for render ${n}`); await page.waitForTimeout(400); };
 
 const r = await translate(false); if (!r?.ok) throw new Error("content script did not answer: " + JSON.stringify(r));
@@ -230,6 +231,7 @@ for (const d of debugLogs.filter((d) => d.timing?.model > 1000 && d.timing.fill)
 if (learnedMask && !debugLogs.every((d) => d.timing?.textMask?.ep)) { failures++; console.log(`FAIL: the learned text mask was on but did not run: ${JSON.stringify(debugLogs.map((d) => d.timing?.textMask))}`); }
 if (!learnedMask && debugLogs.some((d) => d.timing?.textMask)) { failures++; console.log("FAIL: the learned text mask ran while off"); }
 if (process.argv.includes("--require-gpu") && !debugLogs.every((d) => /detect:webgpu/.test(d.timing?.backend || "") && /segment:webgpu/.test(d.timing?.backend || ""))) { failures++; console.log(`FAIL: --require-gpu but the models ran on ${debugLogs.map((d) => d.timing?.backend).join(" | ")}`); }
+if (process.argv.includes("--require-gpu") && learnedMask && !debugLogs.every((d) => d.timing?.textMask?.ep === "webgpu")) { failures++; console.log(`FAIL: --require-gpu but the learned text mask ran on ${debugLogs.map((d) => d.timing?.textMask?.ep).join(" | ")}`); }
 if (!reportOk) { failures++; console.log("FAIL: diagnostic report incomplete: " + JSON.stringify(rep).slice(0, 200)); }
 if (!zipOk) { failures++; console.log("FAIL: export zip missing files or corrupt: " + JSON.stringify(exp).slice(0, 200)); }
 if (tocOk === false) { failures++; console.log("FAIL: the Options side nav did not stay on screen or mark the section in view"); }
