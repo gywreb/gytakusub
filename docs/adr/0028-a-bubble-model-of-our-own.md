@@ -28,4 +28,6 @@ The generated held-out pages come from the same generator as the training pages,
 
 ## Measured
 
-To come, after training.
+**The export path.** Today's weights, exported on the owner's machine by the training script (Ultralytics 8.4.220, PyTorch 2.14.1 with CUDA 13.0), match kitsumed's ONNX within 0.00002 in float32. After the same quantization, confidences differ by at most 0.0009. The files aren't byte-identical: 28.7 MB against 27.9 MB, from a newer exporter's graph. On 35 webtoon pages looked at, the two find the same bubbles on every page, with the same 5 false ones. A candidate's numbers below therefore come from its weights, not from the export.
+
+The candidates: to come, after training.
