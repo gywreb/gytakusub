@@ -94,6 +94,7 @@ def main():
     ap.add_argument("--smoke", action="store_true", help="one short pass on 2%% of the set, to check the setup")
     ap.add_argument("--cpu", action="store_true", help="allow training on the CPU (about 8 hours)")
     ap.add_argument("--workers", type=int, default=4)
+    ap.add_argument("--batch", type=int, default=SETTINGS["batch"], help="images a step (16; 8 if the card runs out of memory)")
     args = ap.parse_args()
 
     import torch
@@ -129,6 +130,7 @@ def main():
         sys.exit(f"base.pt checksum {sha256(base)} is not the pinned {BASE_SHA256}")
 
     settings = dict(SETTINGS)
+    settings["batch"] = args.batch
     if args.smoke:
         settings.update(epochs=1, patience=1, fraction=0.02)
     summary = {

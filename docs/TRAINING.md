@@ -56,6 +56,8 @@ In PowerShell, in your clone of the repo:
    python .bubble-train\train-bubbles.py --set .bubble-train
    ```
 
+If it stops with `CUDA out of memory`, close what else uses the card (a live wallpaper, games) or add `--batch 8`. The batch size goes into `summary.json`.
+
 When it ends, `.bubble-train\out\onnx` holds `base.onnx`, `all.onnx` and `frozen.onnx`, and
 `.bubble-train\out\summary.json` holds the versions, settings and each candidate's best pass.
 `base.onnx` is today's weights through the same export, to check the path against today's model.
