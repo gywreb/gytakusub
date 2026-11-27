@@ -120,8 +120,24 @@ function eraseRegions(cv, img, analysis, regionIds, opts, own) {
     const pieces = crops.map((c) => {
       const lines = (analysis.lines || []).filter((l) => { const cx = l.x + l.w / 2, cy = l.y + l.h / 2; return cx >= c.x && cx < c.x + c.w && cy >= c.y && cy < c.y + c.h; });
       const P = piecesOf(c, blocks.flatMap((b) => b.parts || [b.gbox]).concat(lines));
-      P.across = Math.max(0, ...lines.map((l) => (l.vertical ? l.w : l.h)));
+      // (a region from a translated line's box alone has no detected lines: its lines' height as the
+      // page's letter makes it, layout.js adoptLettering)
+      P.across = Math.max(0, ...lines.map((l) => (l.vertical ? l.w : l.h)), ...blocks.map((b) => b.across || 0));
       return P;
+    });
+    // A region made from a translated line's box alone (layout.js adoptLettering): the box is all
+    // that says where its lettering is. A piece lying mostly outside it is not that line's lettering
+    // but what borders it, the outline of a bubble the bubble model missed or a stroke of art; a
+    // piece mostly inside it is kept whole, as a reader's box may stop short of its line.
+    const boxed = blocks.filter((b) => b.fromBox).map((b) => b.gbox);
+    if (boxed.length) crops.forEach((c, k) => {
+      const P = pieces[k], area = new Float64Array(P.n), held = new Float64Array(P.n);
+      for (let yy = 0; yy < c.h; yy++) for (let xx = 0; xx < c.w; xx++) {
+        const l = P.labels[yy * c.w + xx]; if (!l) continue;
+        area[l]++; const X = c.x + xx, Y = c.y + yy;
+        if (boxed.some((b) => X >= b.x && X < b.x + b.w && Y >= b.y && Y < b.y + b.h)) held[l]++;
+      }
+      for (let l = 1; l < P.n; l++) if (held[l] < ERASE.readerBoxShare * area[l]) P.onLine[l] = 0;
     });
     for (const P of pieces) if (P.across) for (let i = 1; i < P.n; i++) if (P.onLine[i] && P.thick[i] > ERASE.modelThickLines * P.across) return false;
     const keep = crops.map((c, k) => {
@@ -357,7 +373,8 @@ function eraseRegions(cv, img, analysis, regionIds, opts, own) {
       const learned = opts.textMasks ? opts.textMasks.filter((c) => c.region === r.id) : null;
       const toEdge = inside && learned?.length ? interiorToEdge(inside, r.ref.cell, W, H) : null;
       const byModel = !!(blocks.length && learned?.length && paintLearned(learned, blocks, toEdge, r.dark));
-      if (!byModel && blocks.length) {
+      // a region from a translated line's box alone: only what the mask found there (layout.js adoptLettering)
+      if (!byModel && blocks.length && !r.fromBox) {
         // Free text: line by line (`parts`, the detected lines a paragraph was merged from), not
         // the paragraph's whole box: lines chained across a picture make a box that holds the art
         // between them, and every small stroke in it would pass for lettering.
@@ -378,6 +395,7 @@ function eraseRegions(cv, img, analysis, regionIds, opts, own) {
           }
         }
       }
+      if (r.fromBox && !byModel) continue; // (nothing the mask found: nothing to fill)
       if (blocks.length) {
         const pad = Math.round(letter * ERASE.fillPad);
         // around the lettering's boxes, and whatever of it the masks found beyond them (a coloured

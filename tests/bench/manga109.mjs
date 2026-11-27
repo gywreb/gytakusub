@@ -136,7 +136,7 @@ for (const [split, book, file] of picks) {
       return { tag: reg ? reg.id : null, box: [bx.x / W, bx.y / H, bx.w / W, bx.h / H].map((v) => Math.max(0, Math.min(1, v))), text: english(l.text, r), size: sizeLabel((cellOf(l) || pageCell) / pageCell, labelRnd), kind: reg?.kind === "bubble" ? "bubble" : "narration", index: i };
     });
     await lookAgain(cv, pixels, an, items, detector);
-    const { placements, regionIds } = layout(an, items);
+    const { placements, regionIds } = layout(an, items, { readerBoxes: learnedMask });
     const tMask = Date.now(), textMasks = learnedMask ? await textMasksFor(pixels, an, regionIds) : null, maskMs = Date.now() - tMask;
     const res = erase(cv, pixels, an, regionIds, { keepMask: true, outline: 0.3, textMasks });
     const clean = await fillTexture(cv, inpainter, res.image, res);

@@ -114,7 +114,7 @@ for (let seed = +first; seed < +first + +count; seed++) {
     answerFacts = { convention: raw.convention, cut: raw.cut, answered: raw.items.length, kept: answer.length, ...(problems.length ? { repaired: problems.map((p) => p.what + (p.way ? ` ${p.way}` : "")) } : {}) };
   }
   await lookAgain(cv, pixels, an, answer, detector);
-  const { placements, regionIds } = layout(an, answer);
+  const { placements, regionIds } = layout(an, answer, { readerBoxes: learnedMask });
   // placements by the page's line (the first an answer item carries), its answer item kept
   for (const p of placements) { p.answer = p.item; if (p.item != null) p.item = carry[p.item][0] ?? null; }
   const tMask = Date.now(), textMasks = learnedMask ? await textMasksFor(pixels, an, regionIds) : null, maskMs = Date.now() - tMask;

@@ -195,6 +195,32 @@ await test("only pieces of the mask that reach into the region's lines are lette
   assert.equal(ring, 0, "the ring is left");
 });
 
+await test("a region made from a reader's box alone takes the mask's pieces mostly inside the box, not one mostly outside it; nothing by the rules", () => {
+  // the box: 220..380 × 190..210. The lettering: a bar inside it, running a little past its right
+  // end (a reader's box stopping short of its line). A bubble's outline the bubble model missed: a
+  // piece mostly left of the box, reaching into it. Ink on the page under the box the mask does
+  // not mark: the rules would take it, a region from a box alone must not.
+  const img = page((x) => { x.fillStyle = "#000"; x.fillRect(240, 192, 30, 16); });
+  const box = { x: 220, y: 190, w: 160, h: 20 };
+  const an = { W: 900, H: 600, letter: 17, learned: true, lines: [], polarities: [{}, {}], insideOf: () => null,
+    regions: [{ id: 1, kind: "block", letter: 17, dark: null, adopted: true, fromBox: true, box, ref: { gbox: box, box, parts: [box], lineBoxes: [box], letter: 17, lineLetters: [17], glyphs: [], fromBox: true, adopted: true, across: 17 / 0.85 } }] };
+  const c = { region: 1, x: 180, y: 170, w: 240, h: 60, mask: new Uint8Array(240 * 60) };
+  for (let y = 28; y < 32; y++) c.mask.fill(1, y * 240 + 100, y * 240 + 210); // the lettering: x 280..390
+  for (let y = 10; y < 50; y++) c.mask.fill(1, y * 240 + 5, y * 240 + 45); // the outline: x 185..225, 5 px of it in the box
+  const er = erase(cv, img, an, new Set([1]), { keepMask: true, outline: 0.3, textMasks: [c] });
+  const on = (x, y) => !!er.mask.data[y * 900 + x];
+  const lettering = on(300, 200) && on(385, 200), outline = on(190, 185) || on(222, 200), ink = on(255, 200);
+  er.mask.delete(); er.surface.delete();
+  assert.ok(lettering, "the lettering is erased, past the box's end too");
+  assert.ok(!outline, "the piece mostly outside the box is left");
+  assert.ok(!ink, "ink the mask does not mark is left");
+  const none = { ...c, mask: new Uint8Array(240 * 60) };
+  const er2 = erase(cv, img, an, new Set([1]), { keepMask: true, outline: 0.3, textMasks: [none] });
+  let any = 0; for (const v of er2.mask.data) if (v) any++;
+  er2.mask.delete(); er2.surface.delete();
+  assert.equal(any, 0, "a mask that finds nothing there erases nothing");
+});
+
 await test("a bubble model's interior runs to the image's edge across a gap of one of its input pixels, not a wider one", () => {
   const W = 900, H = 600, box = (x0, y0) => (x, y) => x >= 100 && x < 200 && y >= y0 && y < 300;
   const near = interiorToEdge(box(0, 2), 2.8, W, H); // stops 2 px short of the top: the model's pixel is 2.8
