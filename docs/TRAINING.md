@@ -97,5 +97,16 @@ python .textmask-train\train-textmask.py --set .textmask-train
 ```
 
 Each candidate's best weights land in `.textmask-train\out\<candidate>` as `model.safetensors` and
-`config.json`, the authors' format. `scripts/textmask-onnx.py` turns them into the vendored ONNX
-without PyTorch: it rebuilds today's `textmask.onnx` byte for byte from the authors' file.
+`config.json`, the authors' format, and `.textmask-train\out\summary.json` holds the versions,
+settings and each candidate's passes. `scripts/textmask-onnx.py` turns them into the vendored ONNX
+without PyTorch: it rebuilds the authors' file's ONNX byte for byte. Files over 25 MB can't be fetched
+through the desktop app whole; `split-weights.py` (copied next to the set) cuts them into 8 MB parts.
+
+## What shipped (3.6)
+
+The candidate with the encoder frozen (ADR 0029). Its encoder is the authors' bit for bit, so the
+repository keeps only what training changed: `models/textmask-decoder.safetensors`, the decoder and
+head (62 tensors, 12.6 MB; the full file's SHA-256 was `543cdd51…`). `scripts/vendor-textmask.mjs`
+downloads the authors' pinned weights, lays the decoder over them and builds `vendor/textmask.onnx`
+(`textmask.json` records both checksums). To try another set of weights on the bench, build its ONNX
+and run with `GYT_TEXTMASK=<file.onnx>`.

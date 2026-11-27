@@ -111,9 +111,9 @@ Claude's answers are simulated in these tests (from the marked boxes, moved and 
 | Measure | Result |
 |---|---|
 | Lines found on the page before Claude answers | 97.1% |
-| Lettering the independent detector still sees after erasing | 0.8% |
+| Lettering the independent detector still sees after erasing | 0.9% |
 | Lines set under 0.7 of the original lettering's size | 8.9% |
-| Pixels changed away from any text (art damage) | 0.05% |
+| Pixels changed away from any text (art damage) | 0.04% |
 
 Real pages from the held-out books: 333 pages, 2,752 lines.
 <!-- quality:end -->

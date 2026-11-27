@@ -12,21 +12,21 @@ the engine's rules cannot bend.
 
 | Books | Pages | Lines | Found before Claude answers | Lettering still seen | Set under 0.7 of its size | Art damage | Sound effects changed |
 |---|---|---|---|---|---|---|---|
-| held out | 333 | 2,752 | 97.1% | 0.8% | 8.9% | 0.05% | 0.16% |
-| looked at | 321 | 2,572 | 96.7% | 1.0% | 9.4% | 0.08% | 0.47% |
+| held out | 333 | 2,752 | 97.1% | 0.9% | 8.9% | 0.04% | 0.15% |
+| looked at | 321 | 2,572 | 96.7% | 0.9% | 9.4% | 0.04% | 0.17% |
 
 ### Generated pages
 
 | Script | Pages | Lines | Found before Claude answers | Lettering left untouched | Set under 0.7 of its size | Size measured outside 0.6–1.6× | Text past its bubble | Touching its outline | Art damage |
 |---|---|---|---|---|---|---|---|---|---|
-| all | 300 | 1,615 | 95.1% | 1.9% | 11.0% | 2.7% | 0.8% | 2.7% | 0.020% |
-| Japanese | 76 | 419 | 95.7% | 1.7% | 25.8% | 0.7% | 0.6% | 4.2% | 0.025% |
-| Chinese | 38 | 178 | 95.5% | 0.0% | 25.3% | 1.1% | 0.0% | 2.9% | 0.021% |
-| Korean | 38 | 197 | 95.9% | 2.0% | 8.1% | 3.6% | 0.0% | 0.0% | 0.016% |
-| English | 38 | 199 | 93.5% | 4.5% | 1.0% | 5.0% | 0.6% | 2.4% | 0.011% |
-| Spanish | 38 | 223 | 95.5% | 2.2% | 1.8% | 2.7% | 2.2% | 2.2% | 0.021% |
-| Portuguese | 36 | 194 | 94.8% | 0.5% | 0.0% | 2.1% | 0.0% | 2.4% | 0.005% |
-| Vietnamese | 36 | 205 | 94.1% | 2.4% | 1.5% | 5.4% | 2.2% | 2.8% | 0.031% |
+| all | 300 | 1,615 | 95.1% | 1.4% | 11.0% | 2.7% | 0.8% | 2.7% | 0.017% |
+| Japanese | 76 | 419 | 95.7% | 1.2% | 25.8% | 0.7% | 0.6% | 4.2% | 0.022% |
+| Chinese | 38 | 178 | 95.5% | 1.1% | 25.3% | 1.1% | 0.0% | 2.9% | 0.020% |
+| Korean | 38 | 197 | 95.9% | 0.5% | 8.1% | 3.6% | 0.0% | 0.0% | 0.012% |
+| English | 38 | 199 | 93.5% | 3.5% | 1.0% | 5.0% | 0.6% | 2.4% | 0.010% |
+| Spanish | 38 | 223 | 95.5% | 1.3% | 1.8% | 2.7% | 2.2% | 2.2% | 0.016% |
+| Portuguese | 36 | 194 | 94.8% | 0.5% | 0.0% | 2.1% | 0.0% | 2.4% | 0.006% |
+| Vietnamese | 36 | 205 | 94.1% | 2.0% | 1.5% | 5.4% | 2.2% | 2.8% | 0.025% |
 
 ### Where text size is lost
 
@@ -70,6 +70,18 @@ Since 3.5 the mask also looks inside a translated line's box where nothing was f
 | Lettering at the image's cut, held out | 3.2% → 2.7% | 10.8% → 8.6% | — | 0.0218% → 0.0219% |
 
 Art damage rises only on pages where a line is newly erased, and each such line costs about what any erased line does (`synth-run.mjs --line-damage`).
+
+Since 3.6 the mask also looks across the box Claude gave for a free-text line, a piece of it mostly inside that box counts as the line's lettering however thick, and the mask is one fine-tuned on generated pages (ADR 0029). Against 3.5 on pages never looked at, the mask on in both:
+
+| Pages | Lines left untouched (real: lettering still seen) | Free text left untouched | Dark-bubble lines left untouched | Art damage | Bubble outline pixels erased |
+|---|---|---|---|---|---|
+| Real, held out | 0.85% → 0.88% | not measured | — | 0.0456% → 0.0433% | not measured |
+| Generated, held out | 2.3% → 1.6% | 8.6% → 5.0% | — | 0.0198% → 0.0157% | 950 → 581 |
+| Webtoon, held out | 3.5% → 1.9% | 6.8% → 3.4% | 8.1% → 3.5% | 0.0486% → 0.0192% | 5,043 → 836 |
+| The new shapes, held out | 1.6% → 1.1% | 8.6% → 4.3% | — | 0.0253% → 0.0219% | 1,437 → 1,063 |
+| Lettering at the image's cut, held out | 2.7% → 2.0% | 8.6% → 5.0% | — | 0.0219% → 0.0161% | 1,779 → 639 |
+
+On real pages one more line is still seen in all (8 pages more, 5 fewer). The mask's time a page on one CPU thread rose from 3.1 s to 4.3 s (median, real pages held out), as the boxes are masked too.
 
 ## What is measured
 

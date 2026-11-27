@@ -4,6 +4,29 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
 
 ## [Unreleased]
 
+## [3.6.0] — 2026-11-28
+
+4.0's second step, continued: free text over the art (roadmap, "4.0: the plan").
+
+### Pages
+- **More of a free-text paragraph is erased.** When the engine found only some lines of a paragraph Claude translated, the learned text mask now also looks across the box Claude gave for it and erases the lettering it finds there. A piece counts when at least half of it is inside the box and it's drawn with the pen of the lettering found on the line, so hatching beside it is left. [ADR 0029](docs/adr/0029-free-text-across-claudes-box.md)
+- **Outlined lettering is no longer mistaken for a dark bubble.** A rule threw away any piece of the mask thicker than 1.5 times its line's height, taking it for a dark bubble the mask had swallowed whole, and fell back to the rules for the whole region. The mask joins the lines of an outlined paragraph into one piece, so those paragraphs were left. A piece mostly inside the box Claude gave for a free-text line now counts as that line's lettering however thick. Everywhere else the rule stands.
+- **The text mask is trained further on generated pages**, with its encoder kept as the authors trained it, so it stops taking hatching and bubble outlines for lettering. On the real pages it was checked on first, it was no worse at finding lettering, and art damage fell. The decoder it learned is `models/textmask-decoder.safetensors`.
+
+**Counted on pages never looked at**, against 3.5.0:
+- generated pages: free text left untouched 8.6% → 5.0%, all lines left untouched 19 → 13 of 810, art damage 0.0198% → 0.0157%, bubble outline pixels erased 950 → 581;
+- webtoon pages: free text 6.8% → 3.4%, lines in dark bubbles left untouched 8.1% → 3.5%, art damage 0.0486% → 0.0192% (no page worse), bubble outline pixels erased 5,043 → 836;
+- the owner's bubble shapes: free text 8.6% → 4.3%; lettering at the image's cut: 8.6% → 5.0%;
+- real pages: lettering still seen 0.85% → 0.88% (one line more of 2,839: 8 pages more, 5 fewer), art damage 0.0456% → 0.0433%;
+- text sizes, text past its bubble and lines touching their outline are unchanged.
+- **Where it costs:** the mask runs on the boxes too, so without a graphics card it takes longer: a median of 4.3 s a page against 3.1 s on one CPU thread. 4.0's goal of at most 5% free text left is met on two generated sets and reached, not beaten, on the other two (7 lines of 139).
+
+### Development
+- `scripts/train-bubbles.py`, `tests/bench/bubble-data.mjs` and `scripts/pack-set.py`: a bubble model trained on generated pages, on the owner's graphics card. Measured, not shipped: both candidates did worse on real pages ([ADR 0028](docs/adr/0028-a-bubble-model-of-our-own.md)).
+- `scripts/train-textmask.py` and `tests/bench/textmask-data.mjs`: the text mask's training set and fine-tuning (docs/TRAINING.md). `scripts/textmask-onnx.py` takes a decoder file over the authors' weights. `scripts/vendor-textmask.mjs` builds the vendored model from both and checks them. `scripts/split-weights.py` cuts weights into parts small enough to fetch.
+- `synth-run.mjs --why-left file`: where each line left untouched has its lettering (in a crop the mask ran on, in the answer's box, or outside both). `detectors.mjs --max N` runs in chunks like the other benches.
+- Tests: `textmask.test.mjs` (a thick piece inside a free-text box erased whole, the same piece without the box left to the rules; the box's crops).
+
 ## [3.5.0] — 2026-11-27
 
 4.0's second step: what the learned text mask still leaves (roadmap, "4.0: the plan").

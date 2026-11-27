@@ -64,7 +64,9 @@ await test("the model: red lettering on a dark gradient is text, the gradient aw
   assert.ok(groundHit < 0.02 * ground, `${groundHit} of ${ground} gradient pixels away from the letters`);
 });
 
-await test("a lettering's outline is in its mask whole: white round black letters on dark art, dark round white on grey", async () => {
+await test("a lettering's outline is erased whole: white round black letters on dark art, dark round white on grey", async () => {
+  // (the eraser's mask, end to end: since 3.6 the mask, fine-tuned on generated pages, marks less of a
+  // thick dark outline round light letters, 89% of a 12 px one, and the eraser's mask still takes it whole)
   for (const [ground, outline, letters] of [["#111", "#fff", "#000"], ["#888", "#000", "#fff"]]) for (const lw of [4, 12]) {
     const img = page((x) => {
       x.fillStyle = ground; x.fillRect(300, 100, 400, 400);
@@ -72,11 +74,16 @@ await test("a lettering's outline is in its mask whole: white round black letter
       x.strokeStyle = outline; x.lineWidth = lw; x.strokeText("RUN NOW", 360, 320);
       x.fillStyle = letters; x.fillText("RUN NOW", 360, 320);
     });
-    const [m] = await maskText(masker, img, [{ region: 1, x: 330, y: 260, w: 280, h: 90 }]);
-    const want = outline === "#fff" ? (p) => img.data[p] > 200 : (p) => img.data[p] < 60;
+    const before = Uint8ClampedArray.from(img.data);
+    const an = await analyzePage(img);
+    const at = an.regions.find((q) => q.box.x <= 450 && 450 < q.box.x + q.box.w && q.box.y <= 305 && 305 < q.box.y + q.box.h);
+    const { regionIds } = layout(an, [{ tag: at?.id ?? null, box: [345 / 900, 270 / 600, 260 / 900, 65 / 600], text: "Go now", size: "normal", kind: "sign" }], { readerBoxes: true });
+    const er = erase(cv, img, an, regionIds, { keepMask: true, outline: 0.3, textMasks: await textMasksFor(img, an, regionIds) });
+    const want = outline === "#fff" ? (p) => before[p] > 200 : (p) => before[p] < 60;
     let n = 0, hit = 0;
-    for (let y = 0; y < m.h; y++) for (let x = 0; x < m.w; x++) { const p = ((m.y + y) * img.width + m.x + x) * 4; if (want(p)) { n++; hit += m.mask[y * m.w + x]; } }
-    assert.ok(n > 500 && hit > 0.97 * n, `${outline} outline ${lw}px: ${hit} of ${n} pixels in the mask`);
+    for (let y = 260; y < 350; y++) for (let x = 330; x < 610; x++) { const p = (y * 900 + x) * 4; if (want(p)) { n++; if (er.mask.data[y * 900 + x]) hit++; } }
+    er.mask.delete(); er.surface.delete(); an.dispose();
+    assert.ok(n > 500 && hit > 0.99 * n, `${outline} outline ${lw}px: ${hit} of ${n} pixels erased`);
   }
 });
 
