@@ -138,7 +138,7 @@ function eraseRegions(cv, img, analysis, regionIds, opts, own) {
     const crops = allCrops.filter((c) => !c.readerBox), boxCrops = allCrops.filter((c) => c.readerBox);
     const own = paintOwn(crops, blocks, inside, dark);
     // (the region's lines' height; with no line found there, as the region's letter makes it)
-    paintBoxes(boxCrops, readerBoxes, inside, dark, own.across || letter / ERASE.lineLetter);
+    paintBoxes(boxCrops, readerBoxes, inside, dark, own.across || letter / ERASE.lineLetter, own.pen);
     return own.any;
   };
   const paintOwn = (crops, blocks, inside, dark) => {
@@ -165,22 +165,27 @@ function eraseRegions(cv, img, analysis, regionIds, opts, own) {
       for (let l = 1; l < P.n; l++) if (held[l] < ERASE.readerBoxShare * area[l]) P.onLine[l] = 0;
     });
     const across = Math.max(0, ...pieces.map((P) => P.across || 0));
-    for (const P of pieces) if (P.across) for (let i = 1; i < P.n; i++) if (P.onLine[i] && P.thick[i] > ERASE.modelThickLines * P.across) return { any: false, across };
+    // the pen of the lettering on the region's lines (penOf): what the mask found on them
+    const marks = [];
+    crops.forEach((c, k) => { const P = pieces[k], area = new Float64Array(P.n); for (const l of P.labels) if (l && P.onLine[l]) area[l]++; for (let l = 1; l < P.n; l++) if (area[l]) marks.push({ t: P.thick[l], a: area[l] }); });
+    const pen = penOf(marks);
+    for (const P of pieces) if (P.across) for (let i = 1; i < P.n; i++) if (P.onLine[i] && P.thick[i] > ERASE.modelThickLines * P.across) return { any: false, across, pen };
     const keep = crops.map((c, k) => keeperOf(c, pieces[k], inside, dark));
     if (inside) {
       let interior = 0, lettering = 0;
       crops.forEach((c, k) => { for (let yy = 0; yy < c.h; yy++) for (let xx = 0; xx < c.w; xx++) if (inside(c.x + xx, c.y + yy)) { interior++; if (keep[k](xx, yy)) lettering++; } });
-      if (lettering > ERASE.modelBubbleShare * interior) return { any: false, across };
+      if (lettering > ERASE.modelBubbleShare * interior) return { any: false, across, pen };
     }
     let any = false;
     crops.forEach((c, k) => { if (paintKept(c, keep[k])) any = true; });
-    return { any, across };
+    return { any, across, pen };
   };
-  const paintBoxes = (boxCrops, readerBoxes, inside, dark, across) => {
+  const paintBoxes = (boxCrops, readerBoxes, inside, dark, across, pen) => {
     // The boxes of the lines Claude placed in the region as free text (layout.js readerBoxes), each
     // masked in its own crop (textmask.js textCrops): a piece there counts when most of it is inside
-    // the box (the rest of the line's paragraph, which the detector didn't find), unless it is
-    // thicker than lettering on the region's lines is (a shape, which stays). Painted after the
+    // the box (the rest of the line's paragraph, which the detector didn't find), drawn with the pen
+    // of the lettering the mask found on the region's lines (ofPen: hatching and other strokes far
+    // thinner stay), and no thicker than those lines are high (a shape, which stays). Painted after the
     // region's own crops, whatever came of them: nothing here changes what they found, costs the
     // region its mask, or stands in for it (`any` is theirs alone; when they gave up, the rules erase
     // the region's lines and this the rest of the box).
@@ -191,7 +196,7 @@ function eraseRegions(cv, img, analysis, regionIds, opts, own) {
         area[l]++; const X = c.x + xx, Y = c.y + yy;
         if (readerBoxes.some((b) => X >= b.x && X < b.x + b.w && Y >= b.y && Y < b.y + b.h)) held[l]++;
       }
-      for (let l = 1; l < P.n; l++) P.onLine[l] = area[l] && held[l] >= ERASE.readerBoxShare * area[l] && !(across && P.thick[l] > ERASE.modelThickLines * across) ? 1 : 0;
+      for (let l = 1; l < P.n; l++) P.onLine[l] = area[l] && held[l] >= ERASE.readerBoxShare * area[l] && !(across && P.thick[l] > ERASE.modelThickLines * across) && ofPen(P.thick[l], pen) ? 1 : 0;
       paintKept(c, keeperOf(c, P, inside, dark));
     }
   };
