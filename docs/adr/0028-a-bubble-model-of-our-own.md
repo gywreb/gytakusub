@@ -1,6 +1,6 @@
 # 0028. A bubble model of our own
 
-Status: proposed (3.6.0): the training is set up; the model is measured before it ships.
+Status: measured, not shipped (27 Nov 2026). Both candidates failed the gate on the real pages looked at, so neither was counted on held-out pages.
 
 ## Context
 
@@ -30,4 +30,36 @@ The generated held-out pages come from the same generator as the training pages,
 
 **The export path.** Today's weights, exported on the owner's machine by the training script (Ultralytics 8.4.220, PyTorch 2.14.1 with CUDA 13.0), match kitsumed's ONNX within 0.00002 in float32. After the same quantization, confidences differ by at most 0.0009. The files aren't byte-identical: 28.7 MB against 27.9 MB, from a newer exporter's graph. On 35 webtoon pages looked at, the two find the same bubbles on every page, with the same 5 false ones. A candidate's numbers below therefore come from its weights, not from the export.
 
-The candidates: to come, after training.
+The training run's own export of today's weights finds the same bubbles as today's model on 100 webtoon pages looked at, with the same 12 false ones.
+
+**Training** (the owner's RTX 3070 Ti, PyTorch 2.14.1 with CUDA 13.0): every layer trained stopped early after 33 passes (best: 31), in 23.5 minutes. With the backbone frozen it ran all 40 passes (best: 38), in 21.1 minutes. On Ultralytics' own check (generated pages, seeds from 2,000,000), mask mAP50 was 0.990 and 0.988.
+
+**Generated pages looked at** (`bench/detectors.mjs bubbles`):
+
+| | Dark bubbles found (webtoon) | Light found (webtoon) | Light found (plain) | Bubbles that weren't there |
+|---|---|---|---|---|
+| Today's model | 43.6% | 90.1% | 90.4% | 12 + 13 |
+| Every layer | 100% | 100% | 100% | 1 + 1 |
+| Backbone frozen | 100% | 99.8% | not run | 9 |
+
+End to end on the 100 webtoon pages looked at, against 3.5 (both candidates about the same): lines in dark bubbles left untouched went 18 → 11–12, text set under 0.7 of its size 90 → 78–79, and text past its bubble 53 → 28–31. But bubble outlines erased doubled (4,174 → 8,037–8,487), and art damage rose 39%.
+
+**Real pages looked at** (the first half, 167 pages), against 3.5:
+
+| | Lettering still seen | Art damage | Sound-effect pixels changed |
+|---|---|---|---|
+| Today's model | 13 lines | 50.7 | 8,855 |
+| Every layer | 18 | 92.2 (+82%) | 20,792 (+135%) |
+| Backbone frozen | 17 | 54.1 (+7%) | 10,817 (+22%) |
+
+**Why, on the pages looked at.** Comparing the bubbles each model finds on those 172 page halves: the frozen candidate found 211 that today's model doesn't, and missed 92 that it finds, 59 of them with a score of 0.7 or more. The new ones include eyes (a white oval round a dark pupil), faces, white patches in focus lines, plain white areas of a panel and sound effects. The missed ones are hand-drawn bubbles: wobbly or spiky outlines, and bubbles open to the panel's edge. The generated pages draw bubbles as clean geometric shapes, and nothing in their art looks like an eye or a face. Trained on them alone, the model learned that a clean white oval is a bubble and a hand-drawn one isn't.
+
+On generated pages, today's masks cover 75% of a bubble's outline and the frozen candidate's 87% (webtoon pages looked at). The label covered all of it. That may account for part of the doubled outline erasing. More bubbles found (dark ones among them) is the rest. This is reasoning, not measured apart.
+
+## What it leaves
+
+Today's model stays. What was learned:
+
+- **Generated pages alone don't teach real bubbles.** A second try would need generated pages with what real pages showed here: hand-drawn and open bubbles, and art that looks like bubbles (eyes, faces, focus lines).
+- **The label should end where today's masks do**, within the outline, not past it. The engine's eraser was tuned on today's masks.
+- **The tools stay:** `tests/bench/bubble-data.mjs`, `scripts/train-bubbles.py`, `scripts/pack-bubble-set.py`, docs/TRAINING.md and `bench/detectors.mjs --max`.
