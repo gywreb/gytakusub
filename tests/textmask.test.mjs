@@ -29,12 +29,15 @@ await test("crops: one per region erased, round its lines, padded by half a lett
   };
   // the bubble's surface a gradient (a webtoon's dark bubble): the model's
   const toned = page((x) => { const g = x.createLinearGradient(40, 40, 240, 200); g.addColorStop(0, "#0b0506"); g.addColorStop(1, "#8a0d12"); x.fillStyle = g; x.fillRect(40, 40, 200, 160); });
-  assert.deepEqual(textCrops(an, new Set([1, 2]), toned), [{ region: 1, x: 85, y: 90, w: 110, h: 74 }, { region: 2, x: 392, y: 42, w: 216, h: 136 }]);
+  assert.deepEqual(textCrops(an, new Set([1, 2]), toned), [{ region: 1, key: 1, x: 85, y: 90, w: 110, h: 74 }, { region: 2, key: 2, x: 392, y: 42, w: 216, h: 136 }]);
   // plain white: the rules'
   assert.deepEqual(textCrops(an, new Set([1, 2]), page(() => {})).map((c) => c.region), [2]);
   // a crop at the page's edge stops there
   const edge = textCrops({ regions: [{ id: 4, kind: "free", letter: 20, ref: { gbox: { x: 0, y: 590, w: 40, h: 10 } } }], lines: [] }, new Set([4]), page(() => {}));
-  assert.deepEqual(edge[0], { region: 4, x: 0, y: 580, w: 50, h: 20 });
+  assert.deepEqual(edge[0], { region: 4, key: 4, x: 0, y: 580, w: 50, h: 20 });
+  // the box of a line Claude placed there as free text (layout.js readerBoxes): a crop of its own, padded the same
+  const rb = textCrops({ regions: [{ id: 2, kind: "free", letter: 16, ref: { gbox: { x: 400, y: 50, w: 100, h: 18 } }, readerBoxes: [{ x: 390, y: 40, w: 160, h: 80 }] }], lines: [] }, new Set([2]), page(() => {}));
+  assert.deepEqual(rb, [{ region: 2, key: 2, x: 392, y: 42, w: 116, h: 34 }, { region: 2, key: "2:0", readerBox: true, x: 382, y: 32, w: 176, h: 96 }]);
 });
 
 const session = (await createSession(new Uint8Array(fs.readFileSync(new URL("../extension/vendor/textmask.onnx", import.meta.url))), { gpu: false })).session;
@@ -219,6 +222,35 @@ await test("a region made from a reader's box alone takes the mask's pieces most
   let any = 0; for (const v of er2.mask.data) if (v) any++;
   er2.mask.delete(); er2.surface.delete();
   assert.equal(any, 0, "a mask that finds nothing there erases nothing");
+});
+
+await test("in the crop of a free-text line's box: a piece mostly inside the box is painted, one mostly outside or a shape is not, and the region's own lines stay as they were", () => {
+  // a region found on one line (y 196..204); Claude's box for its paragraph runs below it (y 190..260).
+  // In the box's crop: the next line of the paragraph (a bar inside the box), a stroke of art mostly
+  // outside the box, and a filled shape inside it (thicker than the region's lines are high)
+  const img = page(() => {});
+  const box = { x: 220, y: 190, w: 160, h: 70 };
+  const ref = { gbox: { x: 220, y: 196, w: 160, h: 8 }, letter: 17 };
+  const an = { W: 900, H: 600, letter: 17, learned: true, lines: [], polarities: [{}, {}], insideOf: () => null,
+    regions: [{ id: 1, kind: "block", letter: 17, dark: false, box: { ...ref.gbox }, ref, readerBoxes: [box] }] };
+  const own = { region: 1, key: 1, x: 200, y: 186, w: 200, h: 28, mask: new Uint8Array(200 * 28) };
+  for (let y = 12; y < 16; y++) own.mask.fill(1, y * 200 + 30, y * 200 + 170); // the line found
+  const c = { region: 1, key: "1:0", readerBox: true, x: 210, y: 180, w: 180, h: 90, mask: new Uint8Array(180 * 90) };
+  for (let y = 40; y < 44; y++) c.mask.fill(1, y * 180 + 20, y * 180 + 160); // the next line: x 230..370, y 220..224
+  for (let y = 60; y < 90; y++) c.mask.fill(1, y * 180 + 2, y * 180 + 6); // art: x 212..216, y 240..270, mostly outside the box
+  for (let y = 66; y < 76; y++) c.mask[y * 180 + 2] = 1;
+  for (let y = 46; y < 90; y++) c.mask.fill(1, y * 180 + 90, y * 180 + 140); // a shape 44 px thick: x 300..350, y 226..270
+  const withBox = erase(cv, img, an, new Set([1]), { keepMask: true, outline: 0.3, textMasks: [own, c] });
+  const noBox = erase(cv, img, { ...an, regions: [{ ...an.regions[0], readerBoxes: undefined }] }, new Set([1]), { keepMask: true, outline: 0.3, textMasks: [own] });
+  const on = (m, x, y) => !!m.mask.data[y * 900 + x];
+  const next = on(withBox, 300, 222), art = on(withBox, 214, 262), shape = on(withBox, 325, 250), found = on(withBox, 300, 200) && on(noBox, 300, 200);
+  let differ = 0; for (let y = 186; y < 214; y++) for (let x = 200; x < 400; x++) if (on(withBox, x, y) !== on(noBox, x, y) && !(y >= 214)) differ++;
+  for (const m of [withBox, noBox]) { m.mask.delete(); m.surface.delete(); }
+  assert.ok(found, "the line found is erased, with or without the box");
+  assert.ok(next, "the next line of the paragraph is erased");
+  assert.ok(!art, "a stroke of art mostly outside the box is left");
+  assert.ok(!shape, "a shape thicker than the lines is left");
+  assert.equal(differ, 0, "around the line found, the eraser's mask is the same with or without the box");
 });
 
 await test("a bubble model's interior runs to the image's edge across a gap of one of its input pixels, not a wider one", () => {

@@ -30,8 +30,9 @@ export const tells = (it) => said(it.text) && !it.same;
  * @param {Array<{tag:(number|null), box:(number[]|null), text:string, size:string, kind:string}>} items normalized items (box as fractions of the page)
  * @param {{newId?: () => number, readerBoxes?: boolean}} [opts] newId: ids for regions made from adopted lettering
  *   (unique on the page; by default above the analysis's own). readerBoxes: a translated line whose box
- *   holds no lettering the analysis found has that box erased too, as a region of its own (adoptLettering):
- *   only when the eraser has the learned text mask, which finds the lettering's pixels there
+ *   holds no lettering the analysis found has that box erased too, as a region of its own (adoptLettering),
+ *   and a region's lines that Claude says aren't in a bubble give it their boxes (`readerBoxes`), where the
+ *   mask also looks: only when the eraser has the learned text mask, which finds the lettering's pixels there
  * @returns {{placements: Placement[], regionIds: Set<number>}}
  */
 export function layout(an, items, opts = {}) {
@@ -80,6 +81,15 @@ export function layout(an, items, opts = {}) {
   }
   shareStamp(an, groups);
   for (const [id, members] of groups) if (!members.some((m) => tells(m.it))) groups.delete(id);
+  // With the learned text mask (4.0 step 2, 3.6): the boxes of the lines Claude placed in a region and
+  // says aren't in a speech bubble (free text, a sign, narration). The mask also looks across them
+  // (textmask.js textCrops) and the eraser takes what it finds there, mostly inside a box (erase.js):
+  // Claude's box holds a whole paragraph where the detector may have found only some of its lines.
+  for (const r of an.regions) delete r.readerBoxes;
+  if (opts.readerBoxes) for (const [id, members] of groups) {
+    const boxes = members.filter((m) => tells(m.it) && m.px && m.it.kind !== "bubble").map((m) => clampRect(m.px, W, H));
+    if (boxes.length) byId.get(id).readerBoxes = boxes;
+  }
   // Lettering a translated line's box holds that no line of its own names is part of that line:
   // Claude read it there, and what Claude reads is erased (ADR 0015). The detector often splits one
   // line of large lettering into two regions (a title and its reading, a column each), and the

@@ -48,6 +48,19 @@ await test("with the learned mask, an untagged line's box holding nothing found 
   assert.equal(an.fromBoxes, undefined);
 });
 
+await test("with the learned mask, a region keeps the boxes of the lines Claude placed in it as free text, not its dialogue's", () => {
+  const items = () => [item([100, 100, 200, 50], "Sign text", 7, "sign"), item([500, 500, 200, 50], "Hello", 9, "bubble")];
+  const regions = () => [block(7, para(100, 100, 200, 40)), { ...block(9, para(500, 500, 200, 40)), kind: "bubble", ref: { blocks: [para(500, 500, 200, 40)] } }];
+  const an = analysis(regions(), []);
+  an.insideOf = () => () => true;
+  layout(an, items(), { readerBoxes: true });
+  assert.deepEqual(an.regions.find((r) => r.id === 7).readerBoxes, [{ x: 100, y: 100, w: 200, h: 50 }]);
+  assert.equal(an.regions.find((r) => r.id === 9).readerBoxes, undefined, "a line in a speech bubble gives none");
+  const off = analysis(regions(), []); off.insideOf = () => () => true;
+  layout(off, items());
+  assert.ok(off.regions.every((r) => r.readerBoxes === undefined), "none without the learned mask");
+});
+
 await test("the rest of a tagged title is added to its region (one line of two found)", () => {
   const found = para(100, 100, 60, 200, { vertical: true }), rest = para(40, 100, 55, 120, { vertical: true });
   const an = analysis([block(1, found)], [found, rest]);
