@@ -106,6 +106,7 @@ if (!process.argv.includes("--bad-boxes")) {
   const opt = await context.newPage(); await opt.goto(`chrome-extension://${extId}/options.html`);
   await opt.waitForFunction(() => /page/.test(document.getElementById("cuTodaySub").textContent), null, { timeout: 5000 }).catch(() => {});
   const optText = await opt.evaluate(() => [document.getElementById("cuTodayCost").textContent, document.getElementById("cuTodaySub").textContent, document.getElementById("cuModels").textContent, document.getElementById("cuLimits").textContent, document.getElementById("cuTodayTokens").textContent]);
+  const optAt = Date.now();
   await opt.screenshot({ path: path.join(out, "options-usage.png"), fullPage: true });
   // the side nav stays on screen while the page scrolls, and marks the section in view
   await opt.setViewportSize({ width: 1280, height: 720 });
@@ -127,7 +128,10 @@ if (!process.argv.includes("--bad-boxes")) {
   usageOk = m.requests === calls.length && Math.abs(m.cost - 0.004 * calls.length) < 1e-9 && log?.limits?.requests?.limit === 50
     && m.pages === calls.length && Math.abs(m.pageCost - 0.004 * calls.length) < 1e-9
     && popupText === `≈${fmtUsd(0.004 * calls.length)} today` && /Claude Sonnet 5\.5/.test(optText[2]) && optText[2].includes(`≈${fmtUsd(0.004)} a page · ${calls.length} page`)
-    && optText[1] === `${calls.length} page${calls.length === 1 ? "" : "s"}` && optText[4].startsWith(`${calls.length} request`) && /requests/.test(optText[3]);
+    && optText[1] === `${calls.length} page${calls.length === 1 ? "" : "s"}` && optText[4].startsWith(`${calls.length} request`)
+    // the speed limit while the latest answer's headers are under five minutes old (usage.js): on a
+    // software GPU the pages drawn after the last call can take longer than that
+    && (optAt - (log?.limits?.at || 0) < 5 * 60e3 ? /requests/.test(optText[3]) : optText[3] === "");
   console.log(`usage: ${m.requests} logged of ${calls.length} API calls, ≈$${m.cost}; popup "${popupText}"; options ${JSON.stringify(optText)}`);
 }
 
