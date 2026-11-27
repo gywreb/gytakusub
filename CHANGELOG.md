@@ -4,6 +4,26 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
 
 ## [Unreleased]
 
+## [3.5.0] — 2026-11-27
+
+4.0's second step: what the learned text mask still leaves (roadmap, "4.0: the plan").
+
+### Pages
+- **Lettering under a translated line where nothing was found is now erased.** Claude reads a line, but the engine found no lettering under its box: often free text over busy art, or a dark bubble the bubble model missed. The learned text mask now looks inside that box and erases what it finds there. It never uses the rules there, which would take strokes of art for lettering. A piece of the mask counts only when at least half of it is inside the box, so a bubble's outline or a stroke of art beside it is left. The line is placed where it was before. With the mask off, nothing changes. [ADR 0027](docs/adr/0027-reader-box-regions.md)
+
+**Counted on pages never looked at**, against 3.4.0:
+- generated pages: free-text lines left untouched 10.8% → 8.6%, all lines left untouched 22 → 19 of 810;
+- webtoon pages: lines in dark bubbles left untouched 15.6% → 8.1%, all lines 44 → 28 of 789;
+- the owner's bubble shapes and lettering at the image's cut: free text left 10.1% → 8.6% and 10.8% → 8.6%;
+- real pages: lettering still seen 1.09% → 0.85%, under 4.0's 1%. Art damage 0.0448% → 0.0456%;
+- art damage up 0.2–0.8% on generated pages, only on the pages where a line was newly erased. Per erased line it costs what any other erased line does: the fill can't redraw the art under lettering.
+- No page has more lines left untouched. Text sizes, text past its bubble and lines touching their outline are unchanged. Bubble outlines erased: unchanged, except 17 pixels more on 2 webtoon pages.
+- **Where it costs:** on one real page looked at, a box held hand-drawn lettering over a drawing. The mask took strokes of the drawing too, and the fill smeared them. No rule was found that keeps that page without losing lines elsewhere (ADR 0027).
+
+### Development
+- `synth-run.mjs --line-damage file`: each line's art damage (each changed pixel to the nearest line), and whether a region made from its box erased it. ADR 0027's per-line numbers come from it.
+- Tests: `freetext.test.mjs` (a box with nothing found erased, the line placed as without it, not with the mask off); `textmask.test.mjs` (a piece of the mask mostly outside the box left; nothing erased when the mask finds nothing).
+
 ## [3.4.0] — 2026-11-27
 
 The learned text mask is on by default: 4.0's first step (roadmap, "4.0: the plan").

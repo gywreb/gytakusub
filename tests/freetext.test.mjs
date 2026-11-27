@@ -33,6 +33,21 @@ await test("an untagged line's box holding set-aside lettering gets a region ove
   assert.equal(placements[0].tag, an.regions[0].id);
 });
 
+await test("with the learned mask, an untagged line's box holding nothing found is erased as a region of its own; the line is placed as without it", () => {
+  const items = () => [item([300, 300, 200, 60], "Over here!"), item([600, 600, 10, 10], "Hm."), item([100, 100, 200, 50], "Tagged", 7)];
+  const base = analysis([block(7, para(100, 100, 200, 40))], []), without = layout(base, items());
+  const an = analysis([block(7, para(100, 100, 200, 40))], []), withBoxes = layout(an, items(), { readerBoxes: true });
+  const made = an.regions.filter((r) => r.fromBox);
+  // the first line only: the second's box is under a letter, the third is tagged to a region
+  assert.equal(made.length, 1);
+  assert.deepEqual(made[0].box, { x: 300, y: 300, w: 200, h: 60 });
+  assert.ok(withBoxes.regionIds.has(made[0].id));
+  assert.deepEqual(withBoxes.placements, without.placements, "placed as without it");
+  assert.ok(!withBoxes.placements.some((p) => p.tag === made[0].id));
+  assert.equal(base.regions.filter((r) => r.fromBox).length, 0, "not without the learned mask");
+  assert.equal(an.fromBoxes, undefined);
+});
+
 await test("the rest of a tagged title is added to its region (one line of two found)", () => {
   const found = para(100, 100, 60, 200, { vertical: true }), rest = para(40, 100, 55, 120, { vertical: true });
   const an = analysis([block(1, found)], [found, rest]);

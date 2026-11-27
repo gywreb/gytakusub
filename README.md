@@ -92,7 +92,7 @@ flowchart LR
 
 1. **Find.** A text detector (PaddleOCR) and a speech-bubble model run in your browser through ONNX Runtime and OpenCV, on the graphics card where WebGPU is available.
 2. **Translate.** Claude gets the page with each piece of text numbered, and gives back the original and the translation of every line, with what kind of line it is. Sound effects and logos are left as drawn.
-3. **Erase.** Each line's lettering is removed: bubbles are filled with their own white, screentone is continued, and other surfaces are inpainted (LaMa on a graphics card, AOT-GAN otherwise). A model trained on comic text (**Learned text mask**, a setting, on by default) finds the lettering on free text and in dark or toned bubbles; it's slower without a graphics card.
+3. **Erase.** Each line's lettering is removed: bubbles are filled with their own white, screentone is continued, and other surfaces are inpainted (LaMa on a graphics card, AOT-GAN otherwise). A model trained on comic text (**Learned text mask**, a setting, on by default) finds the lettering on free text and in dark or toned bubbles, and under a translated line where nothing else found any; it's slower without a graphics card.
 4. **Letter.** The translation is fitted to the bubble's shape, at a size taken from the original lettering, and drawn over the page at your screen's resolution.
 
 Module by module: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Why it is built this way: [`docs/adr/`](docs/adr/).
@@ -111,9 +111,9 @@ Claude's answers are simulated in these tests (from the marked boxes, moved and 
 | Measure | Result |
 |---|---|
 | Lines found on the page before Claude answers | 97.1% |
-| Lettering the independent detector still sees after erasing | 1.1% |
+| Lettering the independent detector still sees after erasing | 0.8% |
 | Lines set under 0.7 of the original lettering's size | 8.9% |
-| Pixels changed away from any text (art damage) | 0.04% |
+| Pixels changed away from any text (art damage) | 0.05% |
 
 Real pages from the held-out books: 333 pages, 2,752 lines.
 <!-- quality:end -->

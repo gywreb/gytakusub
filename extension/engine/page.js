@@ -180,7 +180,7 @@ async function finishSlices(job, results, opts) {
     const local = norm.map((it, k) => ({ ...it, index: first + k, box: it.box ? [((it.box[0] * width) - s.x) / s.w, ((it.box[1] * height) - s.y) / s.h, (it.box[2] * width) / s.w, (it.box[3] * height) / s.h] : null }));
     const seen = await lookAgain(cv, s.imageData, an, local);
     for (const k of ["boxes", "lines", "ms"]) look[k] += seen[k];
-    const { placements: pl, regionIds } = layout(an, local, { newId });
+    const { placements: pl, regionIds } = layout(an, local, { newId, readerBoxes: !!job.textMask });
     for (const p of pl) placements.push({ ...p, rect: { x: p.rect.x + s.ox, y: p.rect.y + s.oy, w: p.rect.w, h: p.rect.h } });
     for (const r of an.regions) regions.push({ id: r.id, kind: r.kind, letter: r.letter, box: { x: r.box.x + s.ox, y: r.box.y + s.oy, w: r.box.w, h: r.box.h } });
     let clean = { image: s.imageData, rois: [] };

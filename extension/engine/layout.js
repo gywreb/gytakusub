@@ -28,8 +28,10 @@ export const tells = (it) => said(it.text) && !it.same;
 /**
  * @param {import("./analyze.js").Analysis} an (adoptLettering may add regions to it, or widen its free-text regions)
  * @param {Array<{tag:(number|null), box:(number[]|null), text:string, size:string, kind:string}>} items normalized items (box as fractions of the page)
- * @param {{newId?: () => number}} [opts] newId: ids for regions made from adopted lettering (unique on the page;
- *   by default above the analysis's own)
+ * @param {{newId?: () => number, readerBoxes?: boolean}} [opts] newId: ids for regions made from adopted lettering
+ *   (unique on the page; by default above the analysis's own). readerBoxes: a translated line whose box
+ *   holds no lettering the analysis found has that box erased too, as a region of its own (adoptLettering):
+ *   only when the eraser has the learned text mask, which finds the lettering's pixels there
  * @returns {{placements: Placement[], regionIds: Set<number>}}
  */
 export function layout(an, items, opts = {}) {
@@ -39,7 +41,7 @@ export function layout(an, items, opts = {}) {
   // only to draw it again loses the letterer's marks (dots too small to be found came out doubled).
   // It still takes its place among a bubble's lines, so the others keep off its lettering, which
   // the eraser then leaves (region.kept); a region given nothing else is not erased at all.
-  adoptLettering(an, items.filter((it) => !it.text || tells(it)), opts.newId);
+  adoptLettering(an, items.filter((it) => !it.text || tells(it)), opts.newId, !!opts.readerBoxes);
   const byId = new Map(an.regions.map((r) => [r.id, r]));
   const groups = new Map(); // region id → items
   const loose = [];
@@ -234,7 +236,12 @@ export function layout(an, items, opts = {}) {
   }
 
   separate(placements);
-  return { placements, regionIds: new Set([...groups.keys(), ...claimed.keys()]) };
+  // Regions made from a translated line's box alone (adoptLettering) are erased only: the line is
+  // placed as it was without them (its box, or the region nearest it), and no line is drawn into them.
+  const fromBoxes = an.fromBoxes || [];
+  delete an.fromBoxes;
+  an.regions.push(...fromBoxes);
+  return { placements, regionIds: new Set([...groups.keys(), ...claimed.keys(), ...fromBoxes.map((r) => r.id)]) };
 }
 
 const union = (bs) => { const x0 = Math.min(...bs.map((b) => b.x)), y0 = Math.min(...bs.map((b) => b.y)); return { x: x0, y: y0, w: Math.max(...bs.map((b) => b.x + b.w)) - x0, h: Math.max(...bs.map((b) => b.y + b.h)) - y0 }; };
@@ -351,15 +358,23 @@ const overlap = (a, b) => Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(
  * A line in a bubble takes nothing: a bubble's lettering is its own, and a loose box around it
  * must not reach the narration beside it. Lettering over LAYOUT.adoptMaxLetter times the dialogue size
  * (a sound effect drawn as art, which Claude is asked to leave alone) is never taken.
+ * With `readerBoxes` (the eraser has the learned text mask, 4.0), an untagged line whose box holds
+ * none of it, nor any region's, becomes a region of its own all the same, the box standing for its
+ * lettering (`fromBox`): the detector found nothing there, but Claude read a line there, and the
+ * mask is a witness of its own that finds which pixels are lettering. The eraser takes only what
+ * the mask finds in such a region, never its rules (erase.js): on busy art the rules would take any
+ * stroke in the box for lettering. Such a region is erased only, set aside in `an.fromBoxes` until
+ * the lines are placed (layout): the line is placed as it would be without it.
  * Adds to `an.regions` (and widens free-text regions there) in place.
  */
-export function adoptLettering(an, items, newId) {
+export function adoptLettering(an, items, newId, readerBoxes = false) {
   const { W, H } = an;
   if (!an.blocks || !items.some((it) => it.text && it.box)) return;
   const byId = new Map(an.regions.map((r) => [r.id, r]));
   let next = Math.max(0, ...an.regions.map((r) => r.id)) + 1;
   const fresh = newId || (() => next++);
   const held = (b) => an.regions.some((r) => overlap(r.box, b) > LAYOUT.most * area(b)); // already some region's
+  const fromBoxes = (an.fromBoxes = []); // regions made from a line's box alone: erased only (layout)
   // set-aside paragraphs, line by line (the lines of one paragraph may be several translated
   // lines: a block of credits), then detector lines no paragraph came from
   const pool = [];
@@ -382,7 +397,7 @@ export function adoptLettering(an, items, newId) {
     // polarity unknown (no grey contrast): erase.js reads the lettering against its surround
     pool.push({ box, gbox: { ...box }, parts: [{ ...box }], lineBoxes: [{ ...box }], letter, lineLetters: [letter], vertical: !!l.vertical, dark: null, score: l.score, glyphCount: Math.max(1, Math.round((l.vertical ? box.h : box.w) / letter)), lines: 1, glyphs: [] });
   }
-  if (!pool.length) return;
+  if (!pool.length && !readerBoxes) return;
   // each piece of lettering goes to the one line whose box holds it best (several boxes may reach
   // it: the model's boxes run loose, and a long caption's box can reach the credits beside it)
   const boxes = items.map((it) => (it.text && it.box ? { x: it.box[0] * W, y: it.box[1] * H, w: it.box[2] * W, h: it.box[3] * H } : null));
@@ -416,7 +431,19 @@ export function adoptLettering(an, items, newId) {
     }
     const zone = zones[k];
     const picks = pool.filter((p) => owner.get(p) === k);
-    if (!picks.length) continue;
+    if (!picks.length) {
+      // the box alone, when the mask can find its lettering: not a line tagged to a region, nor
+      // one whose box is already a region's, nor a box of under a letter (it says nothing of where)
+      if (!readerBoxes || stamped || held(px) || fromBoxes.some((r) => overlap(r.box, px) > LAYOUT.most * area(px)) || px.w < an.letter || px.h < an.letter) continue;
+      const box = { x: Math.round(px.x), y: Math.round(px.y), w: Math.round(px.w), h: Math.round(px.h) };
+      const letter = an.letter, vertical = box.h > 2 * box.w;
+      const ref = { gbox: box, box, parts: [box], lineBoxes: [box], letter, lineLetters: [letter], lineSyllables: [letter], syllable: letter, vertical, dark: null, glyphCount: Math.max(1, Math.round((vertical ? box.h : box.w) / letter)), lines: 1, glyphs: [], adopted: true, fromBox: true, across: letter / LAYOUT.lineLetter };
+      const r = { id: fresh(), kind: "block", ref, box, letter, dark: null, adopted: true, fromBox: true };
+      ref.region = r.id;
+      fromBoxes.push(r);
+      globalThis.GYT_TRACE?.("readerBox", box, `for line ${k}`, {});
+      continue;
+    }
     const lines = (p) => (p.parts || [p.gbox]).map((g, i) => ({ g, letter: p.lineLetters?.[i] || p.letter, syllable: p.lineSyllables?.[i] || p.syllable || p.lineLetters?.[i] || p.letter, line: p.lineBoxes?.[i] || (p.parts ? g : p.line || g) }));
     if (stamped && stamped.kind === "block" && overlap(stamped.box, zone) > 0) {
       // the rest of the tagged text: one region, its lines erased one by one (erase.js)
