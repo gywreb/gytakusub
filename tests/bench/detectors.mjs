@@ -2,7 +2,7 @@
 // finds, not what the engine makes of it (bench/synth-run.mjs does that).
 //   node bench/detectors.mjs lines <ctd.onnx> generated <first> <count> [--webtoon|--readers] <out.jsonl>
 //   node bench/detectors.mjs lines <ctd.onnx> report <report dir> <out.jsonl>
-//   node bench/detectors.mjs bubbles generated <first> <count> [--webtoon|--readers] <out.jsonl>
+//   node bench/detectors.mjs bubbles generated <first> <count> [--webtoon|--readers] <out.jsonl> [--max N]
 //   node bench/detectors.mjs summary <out.jsonl>...
 // lines: comic-text-detector's line map (mayocream/comic-text-detector-onnx, its `det` output)
 //   against today's line finding (the text detector and its second looks), and both together. On
@@ -26,6 +26,8 @@ const { createSession, getOrt, run } = await import("../../extension/engine/ort.
 const { makePage } = await import("./synth.mjs");
 
 const argv = process.argv.slice(2), flag = (k) => { const i = argv.indexOf(k); if (i < 0) return false; argv.splice(i, 1); return true; };
+// --max N: stop after N new pages, and run again to go on (the generator holds memory until its process ends)
+const most = (() => { const i = argv.indexOf("--max"); return i < 0 ? 0 : +argv.splice(i, 2)[1]; })(); let ran = 0;
 const pageOpts = { webtoon: flag("--webtoon"), readers: flag("--readers") };
 const what = argv.shift();
 const ortWasm = fs.readFileSync("../extension/vendor/ort/ort-wasm-simd-threaded.asyncify.wasm").buffer;
@@ -77,6 +79,7 @@ if (what === "lines") {
     const found = (b, lines, W) => { let hit = 0; for (const q of b.core) { const x = q % W, y = (q / W) | 0; if (lines.some((l) => x >= l.x && x < l.x + l.w && y >= l.y && y < l.y + l.h)) hit++; } return hit >= 0.5 * b.core.length; };
     for (let seed = first; seed < first + count; seed++) {
       if (seen.has(seed)) continue;
+      if (most && ran++ >= most) break;
       const pg = makePage(seed, pageOpts), img = new ImageData(new Uint8ClampedArray(pg.input.data), pg.W, pg.H);
       const today = await todayLines(img), { lines: comic, ms } = await comicLines(img);
       const blocks = pg.blocks.filter((b) => b.core.length).map((b) => ({ kind: kindOf(b), today: found(b, today, pg.W), comic: found(b, comic, pg.W), both: found(b, today.concat(comic), pg.W) }));
@@ -103,6 +106,7 @@ if (what === "lines") {
   const [first, count, out] = [+argv[0], +argv[1], argv[2]], seen = done(out, "seed");
   for (let seed = first; seed < first + count; seed++) {
     if (seen.has(seed)) continue;
+    if (most && ran++ >= most) break;
     const pg = makePage(seed, pageOpts), W = pg.W, H = pg.H, img = new ImageData(new Uint8ClampedArray(pg.input.data), W, H);
     const t0 = Date.now(), seg = await segment(segmenter, img), ms = Date.now() - t0;
     const inst = seg.instances.filter((s) => segmenter.bubbleClasses.has(s.cls));
