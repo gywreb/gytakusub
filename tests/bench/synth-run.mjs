@@ -1,5 +1,5 @@
 // The engine on generated pages (bench/synth.mjs), scored against their exact answers.
-//   node bench/synth-run.mjs <out.jsonl> <first seed> <count> [--dump dir] [--printed] [--fill aot]
+//   node bench/synth-run.mjs <out.jsonl> <first seed> <count> [--dump dir] [--printed] [--fill aot] [--line-damage file]
 // --printed: pages with lettering printed on objects and slanted free text too (synth.mjs opts.printed)
 // --reader strong|weak: Claude's answer as a reader that errs gives it (bench/reader.mjs), through the
 // answer contract (engine/contract.js) as a real answer goes; without it, every line, boxes moved a little
@@ -48,6 +48,7 @@ const { sizeLimits, limitCounts, fitsInside, erodeGrid } = await import("./limit
 
 const argv = process.argv.slice(2), opt = (k) => { const i = argv.indexOf(k); return i >= 0 ? argv.splice(i, 2)[1] : null; };
 const whyFile = opt("--why"); // (--why file: each avoidable line refitted with one cause removed at a time, as JSON lines)
+const lineDamageFile = opt("--line-damage"); // (--line-damage file: per page, each line's art damage, as JSON lines)
 const dump = opt("--dump"), printedPages = argv.includes("--printed"), readerPages = argv.includes("--readers"), webtoonPages = argv.includes("--webtoon"), cutPages = argv.includes("--cut-lettering");
 if (printedPages) argv.splice(argv.indexOf("--printed"), 1);
 if (readerPages) argv.splice(argv.indexOf("--readers"), 1);
@@ -141,6 +142,22 @@ for (let seed = +first; seed < +first + +count; seed++) {
   const near = new Uint8Array(W * H);
   for (const b of pg.blocks) for (const q of b.foot) { const x = q % W, y = (q / W) | 0; for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) { const xx = x + dx, yy = y + dy; if (xx >= 0 && yy >= 0 && xx < W && yy < H) near[yy * W + xx] = 1; } }
   let damage = 0; for (let q = 0; q < W * H; q++) if (!near[q] && Math.abs(lum(o, q) - lum(inp, q)) > 40) damage++;
+  if (lineDamageFile) {
+    // each damaged pixel to the nearest line's footprint (within 40 px): what erasing each line cost the
+    // art (3.5, ADR 0027); `fromBox`: a region made from the line's box alone erased it
+    const owner = new Int32Array(W * H).fill(-1), dist = new Int32Array(W * H).fill(1e9); let q = [];
+    pg.blocks.forEach((b, i) => { for (const p of b.foot) { owner[p] = i; dist[p] = 0; q.push(p); } });
+    for (let d = 0; d < 40 && q.length; d++) {
+      const nq = [];
+      for (const p of q) { const x = p % W, y = (p / W) | 0; for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const xx = x + dx, yy = y + dy; if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue; const k = yy * W + xx; if (dist[k] > d + 1) { dist[k] = d + 1; owner[k] = owner[p]; nq.push(k); } } }
+      q = nq;
+    }
+    const per = pg.blocks.map(() => 0);
+    for (let p = 0; p < W * H; p++) if (!near[p] && Math.abs(lum(o, p) - lum(inp, p)) > 40 && owner[p] >= 0) per[owner[p]]++;
+    const boxes = an.regions.filter((r) => r.fromBox).map((r) => r.box);
+    const ov = (a, b) => Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+    fs.appendFileSync(lineDamageFile, JSON.stringify({ seed, lines: pg.blocks.map((b, i) => ({ bubble: !!b.bubble, stays: rows[i].stays, damage: per[i], fromBox: boxes.some((r) => ov(r, b.box) > 0.3 * b.box.w * b.box.h) })) }) + "\n");
+  }
   let outline = 0; for (const bb of pg.bubbles) for (let q = 0; q < W * H; q++) if (bb.outline[q] && !near[q] && lum(tr, q) < 100 && lum(o, q) > lum(tr, q) + 80) outline++;
   // letter sizes, drawn sizes, overflow
   const tc = createCanvas(W, H), tctx = tc.getContext("2d"); tctx.putImageData(clean, 0, 0);
