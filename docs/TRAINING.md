@@ -22,7 +22,7 @@ cd tests
 # 40 pages a process: the generator holds about 75 MB a page until its process ends
 until node bench/bubble-data.mjs ../.bubble-train --train 3000 --val 300 --max 40 | grep -q '^done'; do :; done
 cd ..
-python3 scripts/pack-bubble-set.py .bubble-train .bubble-train/parts   # zip parts of 24 MB, to move to the computer that trains
+python3 scripts/pack-set.py .bubble-train .bubble-train/parts --name bubble-set   # zip parts of 24 MB, to move to the computer that trains
 ```
 
 Copy the parts into `.bubble-train` on the computer that trains. `scripts/train-bubbles.py` unpacks them.
@@ -68,3 +68,34 @@ The ONNX files are quantized as today's model is (`scripts/quantize-segment.py -
 ADR 0020) and measured on the bench. The pages looked at choose between the two candidates, and the
 held-out pages count the winner against the gate (ADR 0028). Only then is it vendored
 (`scripts/vendor-segment.mjs`).
+
+# Training the text mask
+
+The learned text mask (comic-text-mask, a U-Net on a ResNet-18, MIT) says which pixels of a crop are
+lettering. 3.6 fine-tunes it on generated crops, so it stops taking hatching and other art for
+lettering (roadmap, 4.0 step 2).
+
+- **Generated pages only** (`tests/bench/textmask-data.mjs`), from the same seeds as the bubble set. Pages with a sound effect are skipped: the generator draws it into the art, where the authors would label it text.
+- **The authors' label:** each glyph with its outline, grown by 2 px. On the check crops, today's mask agrees with it at IoU 0.85.
+- **The engine's crops:** round each line, round a box placed the way Claude's are, and crops of art with no lettering.
+- **The authors' recipe** (Dice + BCE, AdamW, cosine, their augmentation) at a quarter of their learning rate, at most 15 passes, stopping after 3 without gain. Two candidates: every layer, and the encoder frozen.
+
+Make the set on Linux and pack it:
+
+```sh
+cd tests
+until node bench/textmask-data.mjs ../.textmask-train --train 1500 --val 150 --max 25 | grep -q '^done'; do :; done
+cd .. && python3 scripts/pack-set.py .textmask-train .textmask-train/parts --name textmask-set --part-mb 23
+```
+
+On Windows, in the environment made for the bubble model (`.bubble-train\venv`, PyTorch with CUDA):
+
+```powershell
+pip install segmentation-models-pytorch==0.5.0
+python .textmask-train\train-textmask.py --set .textmask-train --smoke
+python .textmask-train\train-textmask.py --set .textmask-train
+```
+
+Each candidate's best weights land in `.textmask-train\out\<candidate>` as `model.safetensors` and
+`config.json`, the authors' format. `scripts/textmask-onnx.py` turns them into the vendored ONNX
+without PyTorch: it rebuilds today's `textmask.onnx` byte for byte from the authors' file.

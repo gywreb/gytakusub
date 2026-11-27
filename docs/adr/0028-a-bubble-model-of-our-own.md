@@ -62,4 +62,4 @@ Today's model stays. What was learned:
 
 - **Generated pages alone don't teach real bubbles.** A second try would need generated pages with what real pages showed here: hand-drawn and open bubbles, and art that looks like bubbles (eyes, faces, focus lines).
 - **The label should end where today's masks do**, within the outline, not past it. The engine's eraser was tuned on today's masks.
-- **The tools stay:** `tests/bench/bubble-data.mjs`, `scripts/train-bubbles.py`, `scripts/pack-bubble-set.py`, docs/TRAINING.md and `bench/detectors.mjs --max`.
+- **The tools stay:** `tests/bench/bubble-data.mjs`, `scripts/train-bubbles.py`, `scripts/pack-set.py`, docs/TRAINING.md and `bench/detectors.mjs --max`.
