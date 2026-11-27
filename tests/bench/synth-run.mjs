@@ -49,6 +49,7 @@ const { sizeLimits, limitCounts, fitsInside, erodeGrid } = await import("./limit
 const argv = process.argv.slice(2), opt = (k) => { const i = argv.indexOf(k); return i >= 0 ? argv.splice(i, 2)[1] : null; };
 const whyFile = opt("--why"); // (--why file: each avoidable line refitted with one cause removed at a time, as JSON lines)
 const lineDamageFile = opt("--line-damage"); // (--line-damage file: per page, each line's art damage, as JSON lines)
+const whyLeftFile = opt("--why-left"); // (--why-left file: per line left untouched, where its unerased lettering lies, as JSON lines)
 const dump = opt("--dump"), printedPages = argv.includes("--printed"), readerPages = argv.includes("--readers"), webtoonPages = argv.includes("--webtoon"), cutPages = argv.includes("--cut-lettering");
 if (printedPages) argv.splice(argv.indexOf("--printed"), 1);
 if (readerPages) argv.splice(argv.indexOf("--readers"), 1);
@@ -142,6 +143,26 @@ for (let seed = +first; seed < +first + +count; seed++) {
   const near = new Uint8Array(W * H);
   for (const b of pg.blocks) for (const q of b.foot) { const x = q % W, y = (q / W) | 0; for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) { const xx = x + dx, yy = y + dy; if (xx >= 0 && yy >= 0 && xx < W && yy < H) near[yy * W + xx] = 1; } }
   let damage = 0; for (let q = 0; q < W * H; q++) if (!near[q] && Math.abs(lum(o, q) - lum(inp, q)) > 40) damage++;
+  if (whyLeftFile) {
+    // each line left untouched: where its lettering that the eraser didn't change lies (4.0 step 2,
+    // 3.6). In a crop the learned text mask was run on (the mask looked there and missed it), or
+    // outside every crop: inside the answer's box for the line, or outside it too (the box fell short)
+    const crops = textMasks || [], inCrop = (x, y) => crops.some((c) => x >= c.x && x < c.x + c.w && y >= c.y && y < c.y + c.h);
+    const left = [];
+    pg.blocks.forEach((b, i) => {
+      if (!rows[i].stays) return;
+      const it = items[i], bx = it.box ? { x: it.box[0] * W, y: it.box[1] * H, w: it.box[2] * W, h: it.box[3] * H } : null;
+      const n = { crop: 0, box: 0, outside: 0 };
+      for (const q of b.core) {
+        if (!(Math.abs(lum(inp, q) - lum(tr, q)) > 60 && Math.abs(lum(o, q) - lum(inp, q)) < 30)) continue;
+        const x = q % W, y = (q / W) | 0;
+        if (inCrop(x, y)) n.crop++; else if (bx && x >= bx.x && x < bx.x + bx.w && y >= bx.y && y < bx.y + bx.h) n.box++; else n.outside++;
+      }
+      const tagged = it.tag != null ? an.regions.find((q) => q.id === it.tag) : null;
+      left.push({ line: i, kind: b.kind, bubble: !!b.bubble, shape: b.shape, script: b.script, found: found[i], tag: tagged ? tagged.kind : null, erased: tagged ? regionIds.has(tagged.id) : false, ...n });
+    });
+    fs.appendFileSync(whyLeftFile, JSON.stringify({ seed, left }) + "\n");
+  }
   if (lineDamageFile) {
     // each damaged pixel to the nearest line's footprint (within 40 px): what erasing each line cost the
     // art (3.5, ADR 0027); `fromBox`: a region made from the line's box alone erased it
