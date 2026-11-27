@@ -31,11 +31,7 @@ Copy the parts into `.bubble-train` on the computer that trains. `scripts/train-
 
 In PowerShell, in your clone of the repo:
 
-1. **Get the branch:**
-   ```powershell
-   git fetch origin
-   git checkout core/3.6.0
-   ```
+1. **The script:** `scripts\train-bubbles.py` from the branch (`git fetch origin; git checkout core/3.6.0`), or a copy next to the set (`.bubble-train\train-bubbles.py`). It needs nothing else from the repo.
 2. **Python 3.12** from [python.org](https://www.python.org/downloads/) (tick "Add python.exe to PATH"). Then make an environment for training:
    ```powershell
    py -3.12 -m venv .bubble-train\venv
@@ -53,11 +49,11 @@ In PowerShell, in your clone of the repo:
    ```
 5. **A smoke run first** (a few minutes: one short pass, checking the setup):
    ```powershell
-   python scripts\train-bubbles.py --set .bubble-train --smoke
+   python .bubble-train\train-bubbles.py --set .bubble-train --smoke
    ```
 6. **The training** (both candidates, then the export):
    ```powershell
-   python scripts\train-bubbles.py --set .bubble-train
+   python .bubble-train\train-bubbles.py --set .bubble-train
    ```
 
 When it ends, `.bubble-train\out\onnx` holds `base.onnx`, `all.onnx` and `frozen.onnx`, and
