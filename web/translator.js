@@ -56,7 +56,9 @@ export const DEFAULT_SETTINGS = {
   uppercase: false,
   fontFamily: "",
   rtlSpreads: true,
-  learnedMask: false, // the eraser finds lettering with the learned text mask where the rules are weak (engine/textmask.js, ADR 0022; off by default: slower without a graphics card)
+  // the eraser finds lettering with the learned text mask where the rules are weak (engine/textmask.js,
+  // ADR 0022). On by default from 3.4 (ADR 0026), under a new name so the old preview's saved "off" doesn't keep it off
+  learnedTextMask: true,
   fetcherUrl: "", // your chapter fetcher (fetcher/worker.js on Cloudflare), e.g. https://gytakusub.<you>.workers.dev
   fetcherKey: "", // its access key (the Worker's GYT_KEY secret)
   maxLongEdge: 1600,
@@ -140,7 +142,7 @@ async function translateRows(img, settings, ctx, part) {
   const rows = () => (part ? createImageBitmap(img, 0, part.y0, part.W, part.h) : createImageBitmap(img));
   const prepare = async () => {
     const bitmap = await rows();
-    return rpc({ type: "prepare", bitmap, settings: { maxLongEdge: settings.maxLongEdge, stripWidth: settings.stripWidth, sliceHeight: settings.sliceHeight, learnedMask: !!settings.learnedMask }, ...(part ? { part: { W: part.W, H: part.H, index: part.index, y0: part.y0 } } : {}) }, [bitmap]);
+    return rpc({ type: "prepare", bitmap, settings: { maxLongEdge: settings.maxLongEdge, stripWidth: settings.stripWidth, sliceHeight: settings.sliceHeight, learnedTextMask: settings.learnedTextMask !== false }, ...(part ? { part: { W: part.W, H: part.H, index: part.index, y0: part.y0 } } : {}) }, [bitmap]);
   };
   let prep = await onFreshEngine(prepare);
   lap("analyze");

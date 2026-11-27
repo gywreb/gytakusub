@@ -54,8 +54,8 @@ export async function preparePage(bitmap, settings, opts = {}) {
   const checkpoint = opts.checkpoint || (async () => {});
   setEnginePrefs({ gpu: settings?.useGpu !== false });
   const cv = await getCV();
-  // the learned text mask (settings.learnedMask, off by default: 3.2), loaded with the other models
-  const textMask = settings?.learnedMask === true;
+  // the learned text mask (settings.learnedTextMask: on unless turned off, from 3.4), loaded with the other models
+  const textMask = settings?.learnedTextMask !== false;
   const [detector, segmenter] = await Promise.all([getDetector(), getSegmenter(), textMask ? getTextMasker() : null]);
   // a part of a tall image (opts.part): `bitmap` holds its rows from y0, the geometry is the whole image's
   const part = opts.part || null;

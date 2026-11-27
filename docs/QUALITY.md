@@ -12,21 +12,21 @@ the engine's rules cannot bend.
 
 | Books | Pages | Lines | Found before Claude answers | Lettering still seen | Set under 0.7 of its size | Art damage | Sound effects changed |
 |---|---|---|---|---|---|---|---|
-| held out | 333 | 2,752 | 97.1% | 1.7% | 8.9% | 0.10% | 0.19% |
-| looked at | 321 | 2,572 | 96.7% | 1.6% | 9.4% | 0.12% | 0.57% |
+| held out | 333 | 2,752 | 97.1% | 1.1% | 8.9% | 0.04% | 0.16% |
+| looked at | 321 | 2,572 | 96.7% | 1.2% | 9.4% | 0.08% | 0.47% |
 
 ### Generated pages
 
 | Script | Pages | Lines | Found before Claude answers | Lettering left untouched | Set under 0.7 of its size | Size measured outside 0.6–1.6× | Text past its bubble | Touching its outline | Art damage |
 |---|---|---|---|---|---|---|---|---|---|
-| all | 300 | 1,615 | 95.1% | 4.7% | 11.0% | 2.7% | 0.8% | 2.7% | 0.047% |
-| Japanese | 76 | 419 | 95.7% | 5.0% | 25.8% | 0.7% | 0.6% | 4.2% | 0.056% |
-| Chinese | 38 | 178 | 95.5% | 4.5% | 25.3% | 1.1% | 0.0% | 2.9% | 0.040% |
-| Korean | 38 | 197 | 95.9% | 6.1% | 8.1% | 3.6% | 0.0% | 0.0% | 0.068% |
-| English | 38 | 199 | 93.5% | 6.0% | 1.0% | 5.0% | 0.6% | 2.4% | 0.014% |
-| Spanish | 38 | 223 | 95.5% | 2.7% | 1.8% | 2.7% | 2.2% | 2.2% | 0.047% |
-| Portuguese | 36 | 194 | 94.8% | 3.1% | 0.0% | 2.1% | 0.0% | 2.4% | 0.012% |
-| Vietnamese | 36 | 205 | 94.1% | 5.4% | 1.5% | 5.4% | 2.2% | 2.8% | 0.083% |
+| all | 300 | 1,615 | 95.1% | 2.5% | 11.0% | 2.7% | 0.8% | 2.7% | 0.019% |
+| Japanese | 76 | 419 | 95.7% | 1.9% | 25.8% | 0.7% | 0.6% | 4.2% | 0.025% |
+| Chinese | 38 | 178 | 95.5% | 0.6% | 25.3% | 1.1% | 0.0% | 2.9% | 0.021% |
+| Korean | 38 | 197 | 95.9% | 3.0% | 8.1% | 3.6% | 0.0% | 0.0% | 0.016% |
+| English | 38 | 199 | 93.5% | 5.0% | 1.0% | 5.0% | 0.6% | 2.4% | 0.010% |
+| Spanish | 38 | 223 | 95.5% | 2.2% | 1.8% | 2.7% | 2.2% | 2.2% | 0.021% |
+| Portuguese | 36 | 194 | 94.8% | 1.0% | 0.0% | 2.1% | 0.0% | 2.4% | 0.005% |
+| Vietnamese | 36 | 205 | 94.1% | 3.9% | 1.5% | 5.4% | 2.2% | 2.8% | 0.031% |
 
 ### Where text size is lost
 
@@ -45,9 +45,9 @@ On generated pages, where every letter size and bubble is known exactly:
 - Not judged: 19 small lines that share their bubble with another line, and 37 over the art.
 <!-- results:end -->
 
-### With the learned text mask
+### The learned text mask against the rules
 
-A setting, off by default (ADR 0022): a model trained on comic text finds the lettering to erase on free text and in bubbles whose surface isn't plain. Pages never looked at, the rules (3.1.0, the same as with the setting off) against the mask (3.2.0). It changes only what is erased: the other numbers above stay as they are.
+A setting, on by default since 3.4 (ADR 0022, 0026): a model trained on comic text finds the lettering to erase on free text and in bubbles whose surface isn't plain. The numbers above are with it on. Here, on pages never looked at, are the rules alone (the setting off) against the mask. It changes only what is erased: the other numbers stay as they are.
 
 | Pages | Lines | Lettering left untouched (real: still seen) | Free text left untouched | Art damage | Bubble outline pixels erased | The mask's time a page, one CPU thread (median) |
 |---|---|---|---|---|---|---|
@@ -166,9 +166,9 @@ be stopped and started again: pages already counted are skipped. `--max N` stops
 `--printed` adds lettering printed on objects and slanted free text to the generated pages;
 `--readers` the bubble shapes the owner's chapters showed; `--webtoon` dark bubbles with coloured
 lettering and bubbles cut by the image's edge, as a webtoon episode has them; `--cut-lettering`
-bubbles the image's edge cuts at their lettering, through its nearest row or just short of it. `--textmask` (both
-benches) erases with the learned text mask, as the setting of that name does; each row then has
-`maskMs`, the mask's time on one CPU thread.
+bubbles the image's edge cuts at their lettering, through its nearest row or just short of it. Both benches erase
+with the learned text mask, as the product does since 3.4; `--rules` erases with the rules alone
+(the setting off). Each row has `textMask` and `maskMs`, the mask's time on one CPU thread.
 
 `bench/detectors.mjs` measures what a candidate detector finds, not what the engine makes of it:
 a text detector's lines against today's line finding, on generated pages or a debug report, and

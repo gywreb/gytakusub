@@ -25,7 +25,7 @@ export async function buildReport(pages, settings) {
       work: res.work, letter: res.letter, fromCache: false, timing: res.timing || null, engine: res.engine || null,
       // (outside: each line's share of its text outside the room the layout gave it; 2.15)
       overlay: { dpr: window.devicePixelRatio || 1, backing: canvas ? [canvas.width, canvas.height] : null, outside: (page.fits || []).map((f) => f?.outside ?? null) },
-      settings: { model: settings.model, targetLang: settings.targetLang, fontFamily: settings.fontFamily, uppercase: settings.uppercase, useContext: settings.useContext, learnedMask: !!settings.learnedMask },
+      settings: { model: settings.model, targetLang: settings.targetLang, fontFamily: settings.fontFamily, uppercase: settings.uppercase, useContext: settings.useContext, learnedTextMask: settings.learnedTextMask !== false },
       lettering: page.look ? { lang: page.look.lang ?? null, hyphenation: !!page.look.hyphenator } : null,
       regions: res.regions, items: res.items, placements: res.placements,
     };

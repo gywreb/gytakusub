@@ -24,7 +24,10 @@ export const DEFAULT_SETTINGS = {
   excludedSites: "",
   debugOverlay: false, // draw detection boxes and log results (for diagnosing placement)
   useGpu: true, // run the page models on the GPU (WebGPU) when the browser offers one; CPU otherwise
-  learnedMask: false, // the eraser finds lettering with the learned text mask where the rules are weak (engine/textmask.js, ADR 0022; off by default: slower without a graphics card)
+  // the eraser finds lettering with the learned text mask where the rules are weak (engine/textmask.js,
+  // ADR 0022). On by default from 3.4 (ADR 0026): a new name, so the "off" every saved Options page
+  // wrote under the old one (learnedMask, a preview off by default) doesn't keep it off
+  learnedTextMask: true,
   peekOnHover: false, // hovering a translated bubble shows the original lettering (off by default: it flickers while reading)
   // Image prep
   maxLongEdge: 1600, // px sent to Claude for a normal page

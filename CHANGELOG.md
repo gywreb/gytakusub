@@ -4,6 +4,23 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
 
 ## [Unreleased]
 
+## [3.4.0] — 2026-11-27
+
+The learned text mask is on by default: 4.0's first step (roadmap, "4.0: the plan").
+
+### Pages
+- **The eraser finds lettering with the learned text mask unless you turn it off** (Options → Learned text mask, or Settings in the web app). On pages never looked at, against the rules alone:
+  - real pages: lettering still seen 1.69% → 1.09%, art damage 0.098% → 0.045%;
+  - generated pages: free text left untouched 24.5% → 10.8%;
+  - webtoon pages: lines in dark bubbles left untouched 59.5% → 15.6%.
+  It's slower without a graphics card (a median of about 4–6 s more a page on one CPU thread; 37 ms on a graphics card). [ADR 0026](docs/adr/0026-learned-text-mask-by-default.md)
+- **It's a new setting, so it's on for everyone once.** Saving Options since 3.2 stored the old preview's "off" whether you had touched it or not. To keep the rules alone, turn it off again.
+- It's no longer marked as a preview.
+
+### Development
+- The benches and browser tests run as the product does, with the mask. `--rules` turns it off (`--textmask` is still accepted, meaning on).
+- Measured: 3.3.0 with the mask on gives 3.2.0's numbers with it on, page by page, on every held-out set.
+
 ## [3.3.0] — 2026-11-26
 
 One answer contract: every answer Claude gives is checked and repaired in one place, whoever sends it, and the bench now reads pages the way readers that make mistakes do.

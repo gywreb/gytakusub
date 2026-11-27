@@ -391,7 +391,7 @@
         lineSizes: (e.sizes || []).map((v) => +(v * img.getBoundingClientRect().width / res.work.W).toFixed(1)),
         // each line's share of its text outside the room the layout gave it (0: all inside; 2.15)
         outside: (e.fits || []).map((f) => f?.outside ?? null) },
-      settings: { model: settings.model, targetLang: settings.targetLang, fontFamily: settings.fontFamily, uppercase: settings.uppercase, useContext: settings.useContext, learnedMask: !!settings.learnedMask },
+      settings: { model: settings.model, targetLang: settings.targetLang, fontFamily: settings.fontFamily, uppercase: settings.uppercase, useContext: settings.useContext, learnedTextMask: settings.learnedTextMask !== false },
       // how the page was lettered: the font chosen for its translations, and the language's rules
       lettering: { ...settings.lettering, hyphenation: !!hyphenation.fn, family: GyText.lettering(res.placements.map((p) => p.text), lettering(res)).family },
       regions: res.regions, items: res.items, placements: res.placements,

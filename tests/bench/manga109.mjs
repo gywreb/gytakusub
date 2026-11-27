@@ -35,9 +35,11 @@ import { sizeLabel } from "./labels.mjs";
 const argv = process.argv.slice(2), opt = (k) => { const i = argv.indexOf(k); return i >= 0 ? argv.splice(i, 2)[1] : null; };
 const pickFile = opt("--pick"), half = opt("--half"), dump = opt("--dump"), limit = Number(opt("--limit") || 0), most = Number(opt("--max") || 0);
 const fillWith = opt("--fill");
-// --textmask: the eraser takes the learned text mask in place of its rules (engine/textmask.js)
-const learnedMask = argv.includes("--textmask");
-if (learnedMask) argv.splice(argv.indexOf("--textmask"), 1);
+// the eraser takes the learned text mask in place of its rules where they are weak (engine/textmask.js),
+// as the product does from 3.4; --rules: the rules alone (the setting off). (--textmask, the flag
+// before 3.4, is still taken: on.)
+const learnedMask = !argv.includes("--rules");
+for (const f of ["--rules", "--textmask"]) if (argv.includes(f)) argv.splice(argv.indexOf(f), 1);
 // --fill aot: textured areas filled by the learned model the extension runs on the CPU (AOT), as a
 // user without a graphics card gets; by default Telea, which is faster and much worse over art
 const inpainter = fillWith === "aot" ? await (async () => {
