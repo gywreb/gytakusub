@@ -104,7 +104,10 @@ function eraseRegions(cv, img, analysis, regionIds, opts, own) {
   // interior lettering (ERASE.modelBubbleShare), or when a piece is thicker than the detector's
   // lines under it are high (ERASE.modelThickLines). Lettering never fills its bubble, and a stroke
   // of it, outline and all, lies about within its line's box; the model takes a small dark bubble
-  // whole for a glyph, read as a bubble or as free text.
+  // whole for a glyph, read as a bubble or as free text. A piece mostly inside the box Claude gave
+  // for a free-text line (readerBoxes, ERASE.readerBoxShare) is that line's lettering however thick:
+  // the mask joins a paragraph of outlined lettering into one piece, and a dark bubble taken whole
+  // reaches well past the box round its words (3.6).
   const piecesOf = (c, boxes) => {
     const m = own(cv.matFromArray(c.h, c.w, cv.CV_8UC1, c.mask)), lab = own(new cv.Mat()), st = own(new cv.Mat()), ce = own(new cv.Mat());
     const n = cv.connectedComponentsWithStats(m, lab, st, ce, 8, cv.CV_32S);
@@ -115,6 +118,17 @@ function eraseRegions(cv, img, analysis, regionIds, opts, own) {
       for (let yy = y0; yy < y1; yy++) for (let xx = x0; xx < x1; xx++) onLine[labels[yy * c.w + xx]] = 1;
     }
     return { n, labels, thick, onLine };
+  };
+  // the share of each piece of a crop's mask that lies inside `boxes`
+  const shareIn = (c, P, boxes) => {
+    const area = new Float64Array(P.n), held = new Float64Array(P.n);
+    for (let yy = 0; yy < c.h; yy++) for (let xx = 0; xx < c.w; xx++) {
+      const l = P.labels[yy * c.w + xx]; if (!l) continue;
+      area[l]++; const X = c.x + xx, Y = c.y + yy;
+      if (boxes.some((b) => X >= b.x && X < b.x + b.w && Y >= b.y && Y < b.y + b.h)) held[l]++;
+    }
+    for (let l = 1; l < P.n; l++) held[l] = area[l] ? held[l] / area[l] : 0;
+    return held;
   };
   // what of a crop's mask is kept: its pieces marked on a line, never the bubble's outline, inside its interior
   const keeperOf = (c, P, inside, dark) => {
@@ -133,15 +147,14 @@ function eraseRegions(cv, img, analysis, regionIds, opts, own) {
     if (x1 >= x0) { extend(x0, y0, x1 + 1, y1 + 1); return true; }
     return false;
   };
-  const paintLearned = (allCrops, blocks, inside, dark, readerBoxes = [], letter = 0) => {
+  const paintLearned = (allCrops, blocks, inside, dark, readerBoxes = []) => {
     // the region's own crop(s), as before 3.6; the crops of the boxes of its free-text lines, below
     const crops = allCrops.filter((c) => !c.readerBox), boxCrops = allCrops.filter((c) => c.readerBox);
-    const own = paintOwn(crops, blocks, inside, dark);
-    // (the region's lines' height; with no line found there, as the region's letter makes it)
-    paintBoxes(boxCrops, readerBoxes, inside, dark, own.across || letter / ERASE.lineLetter, own.pen);
+    const own = paintOwn(crops, blocks, inside, dark, readerBoxes);
+    paintBoxes(boxCrops, readerBoxes, inside, dark, own.pen);
     return own.any;
   };
-  const paintOwn = (crops, blocks, inside, dark) => {
+  const paintOwn = (crops, blocks, inside, dark, readerBoxes) => {
     const pieces = crops.map((c) => {
       const lines = (analysis.lines || []).filter((l) => { const cx = l.x + l.w / 2, cy = l.y + l.h / 2; return cx >= c.x && cx < c.x + c.w && cy >= c.y && cy < c.y + c.h; });
       const P = piecesOf(c, blocks.flatMap((b) => b.parts || [b.gbox]).concat(lines));
@@ -156,20 +169,16 @@ function eraseRegions(cv, img, analysis, regionIds, opts, own) {
     // piece mostly inside it is kept whole, as a reader's box may stop short of its line.
     const boxed = blocks.filter((b) => b.fromBox).map((b) => b.gbox);
     if (boxed.length) crops.forEach((c, k) => {
-      const P = pieces[k], area = new Float64Array(P.n), held = new Float64Array(P.n);
-      for (let yy = 0; yy < c.h; yy++) for (let xx = 0; xx < c.w; xx++) {
-        const l = P.labels[yy * c.w + xx]; if (!l) continue;
-        area[l]++; const X = c.x + xx, Y = c.y + yy;
-        if (boxed.some((b) => X >= b.x && X < b.x + b.w && Y >= b.y && Y < b.y + b.h)) held[l]++;
-      }
-      for (let l = 1; l < P.n; l++) if (held[l] < ERASE.readerBoxShare * area[l]) P.onLine[l] = 0;
+      const P = pieces[k], held = shareIn(c, P, boxed);
+      for (let l = 1; l < P.n; l++) if (held[l] < ERASE.readerBoxShare) P.onLine[l] = 0;
     });
     const across = Math.max(0, ...pieces.map((P) => P.across || 0));
     // the pen of the lettering on the region's lines (penOf): what the mask found on them
     const marks = [];
     crops.forEach((c, k) => { const P = pieces[k], area = new Float64Array(P.n); for (const l of P.labels) if (l && P.onLine[l]) area[l]++; for (let l = 1; l < P.n; l++) if (area[l]) marks.push({ t: P.thick[l], a: area[l] }); });
     const pen = penOf(marks);
-    for (const P of pieces) if (P.across) for (let i = 1; i < P.n; i++) if (P.onLine[i] && P.thick[i] > ERASE.modelThickLines * P.across) return { any: false, across, pen };
+    const free = crops.map((c, k) => (readerBoxes.length ? shareIn(c, pieces[k], readerBoxes) : null));
+    for (const [k, P] of pieces.entries()) if (P.across) for (let i = 1; i < P.n; i++) if (P.onLine[i] && P.thick[i] > ERASE.modelThickLines * P.across && !(free[k] && free[k][i] >= ERASE.readerBoxShare)) return { any: false, across, pen };
     const keep = crops.map((c, k) => keeperOf(c, pieces[k], inside, dark));
     if (inside) {
       let interior = 0, lettering = 0;
@@ -180,23 +189,18 @@ function eraseRegions(cv, img, analysis, regionIds, opts, own) {
     crops.forEach((c, k) => { if (paintKept(c, keep[k])) any = true; });
     return { any, across, pen };
   };
-  const paintBoxes = (boxCrops, readerBoxes, inside, dark, across, pen) => {
+  const paintBoxes = (boxCrops, readerBoxes, inside, dark, pen) => {
     // The boxes of the lines Claude placed in the region as free text (layout.js readerBoxes), each
     // masked in its own crop (textmask.js textCrops): a piece there counts when most of it is inside
     // the box (the rest of the line's paragraph, which the detector didn't find), drawn with the pen
     // of the lettering the mask found on the region's lines (ofPen: hatching and other strokes far
-    // thinner stay), and no thicker than those lines are high (a shape, which stays). Painted after the
+    // thinner stay), however thick (mostly inside the box, see above). Painted after the
     // region's own crops, whatever came of them: nothing here changes what they found, costs the
     // region its mask, or stands in for it (`any` is theirs alone; when they gave up, the rules erase
     // the region's lines and this the rest of the box).
     for (const c of boxCrops) {
-      const P = piecesOf(c, []), area = new Float64Array(P.n), held = new Float64Array(P.n);
-      for (let yy = 0; yy < c.h; yy++) for (let xx = 0; xx < c.w; xx++) {
-        const l = P.labels[yy * c.w + xx]; if (!l) continue;
-        area[l]++; const X = c.x + xx, Y = c.y + yy;
-        if (readerBoxes.some((b) => X >= b.x && X < b.x + b.w && Y >= b.y && Y < b.y + b.h)) held[l]++;
-      }
-      for (let l = 1; l < P.n; l++) P.onLine[l] = area[l] && held[l] >= ERASE.readerBoxShare * area[l] && !(across && P.thick[l] > ERASE.modelThickLines * across) && ofPen(P.thick[l], pen) ? 1 : 0;
+      const P = piecesOf(c, []), held = shareIn(c, P, readerBoxes);
+      for (let l = 1; l < P.n; l++) P.onLine[l] = held[l] >= ERASE.readerBoxShare && ofPen(P.thick[l], pen) ? 1 : 0;
       paintKept(c, keeperOf(c, P, inside, dark));
     }
   };
@@ -410,7 +414,7 @@ function eraseRegions(cv, img, analysis, regionIds, opts, own) {
       // where it saw none (they find what they found before it)
       const learned = opts.textMasks ? opts.textMasks.filter((c) => c.region === r.id) : null;
       const toEdge = inside && learned?.length ? interiorToEdge(inside, r.ref.cell, W, H) : null;
-      const byModel = !!(blocks.length && learned?.length && paintLearned(learned, blocks, toEdge, r.dark, r.readerBoxes, r.letter));
+      const byModel = !!(blocks.length && learned?.length && paintLearned(learned, blocks, toEdge, r.dark, r.readerBoxes));
       // a region from a translated line's box alone: only what the mask found there (layout.js adoptLettering)
       if (!byModel && blocks.length && !r.fromBox) {
         // Free text: line by line (`parts`, the detected lines a paragraph was merged from), not
