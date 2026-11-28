@@ -4,6 +4,22 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
 
 ## [Unreleased]
 
+## [4.0.0] — 2026-11-29
+
+4.0, the learned core: the release where 4.0's gate holds on pages never looked at ([ADR 0030](docs/adr/0030-four-point-oh-as-measured.md)). Pages come out as in 3.6.0.
+
+### Where 4.0 stands
+- **Lettering still seen on real pages: 0.88%** (gate: at most 1%). In 4.0's plan it started at 1.69% with the rules alone and 1.09% with the learned text mask.
+- **Free text left untouched on generated pages: 4.3%** (gate: at most 5%), as the extension fills pages on a CPU. With the bench's old fill it's 5.0%. It started at 24.5%, and 10.8% with the mask. Webtoon pages: 3.4%; the owner's bubble shapes: 4.3%; lettering at the image's cut: 5.0%.
+- **Measured and kept out, as they made pages worse:**
+  - Deleting the light-region bubble rules: text past its bubble went 2 → 14 lines, and lines touching their outline 14 → 33.
+  - Deleting the ink rules that erase where the mask finds nothing: free text left went 4.2% → 6.7%.
+  - A bubble model trained on generated pages (ADR 0028).
+
+### Development
+- **The bench reads free text as the app fills.** It filled textured areas with Telea, which the extension never uses where a learned fill runs. Telea pulled dark lines back into the shape of an erased line, so the line counted as left. 4.0's free-text numbers are read with `--fill aot`, with Telea beside them. `docs/QUALITY.md`'s generated tables are now AOT's.
+- `synth-run.mjs --why-left`: `masked` counts the pixels of a left line that lie inside the eraser's mask. Those pixels were erased, and the fill made them look like the lettering again.
+
 ## [3.6.0] — 2026-11-28
 
 4.0's second step, continued: free text over the art (roadmap, "4.0: the plan").
