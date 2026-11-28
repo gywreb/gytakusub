@@ -143,7 +143,7 @@ export const ERASE = tune("ERASE", {
   defaultLetter: 8,       // an area with no letter size
   modelBubbleShare: 0.5,  // the learned text mask over more of a bubble's interior than this took the bubble for lettering
   modelThickLines: 1.5,   // ...as did a piece of it thicker than this many times the height of the lines it lies on
-  readerBoxShare: 0.5,    // in a region made from a translated line's box alone, a piece of the mask with less of it inside the box is not its lettering
+  readerBoxShare: 0.5,    // a piece of the mask with less of it inside a translated line's box is not that line's lettering (a region made from the box alone; the rest of a free-text paragraph, 3.6)
 
   // The fill
   fillPad: 0.8,           // the area filled reaches this many letters past the lettering

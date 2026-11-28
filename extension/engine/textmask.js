@@ -49,7 +49,15 @@ export function textCrops(analysis, regionIds, img) {
     if (inside) for (const l of analysis.lines || []) if (inside(l.x + l.w / 2, l.y + l.h / 2)) boxes.push(l);
     const x = Math.max(0, Math.floor(Math.min(...boxes.map((b) => b.x)) - pad)), y = Math.max(0, Math.floor(Math.min(...boxes.map((b) => b.y)) - pad));
     const w = Math.min(W, Math.ceil(Math.max(...boxes.map((b) => b.x + b.w)) + pad)) - x, h = Math.min(H, Math.ceil(Math.max(...boxes.map((b) => b.y + b.h)) + pad)) - y;
-    if (w >= 4 && h >= 4) out.push({ region: r.id, x, y, w, h });
+    if (w >= 4 && h >= 4) out.push({ region: r.id, key: r.id, x, y, w, h });
+    // and a crop of its own for each box of a line Claude placed in the region as free text (layout.js
+    // readerBoxes), padded the same: the rest of a paragraph the detector found only some lines of.
+    // Its own crop, so the region's crop, and what the mask finds on the lines found, stay as they were.
+    (r.readerBoxes || []).forEach((q, k) => {
+      const qx = Math.max(0, Math.floor(q.x - pad)), qy = Math.max(0, Math.floor(q.y - pad));
+      const qw = Math.min(W, Math.ceil(q.x + q.w + pad)) - qx, qh = Math.min(H, Math.ceil(q.y + q.h + pad)) - qy;
+      if (qw >= 4 && qh >= 4) out.push({ region: r.id, key: `${r.id}:${k}`, readerBox: true, x: qx, y: qy, w: qw, h: qh });
+    });
   }
   return out;
 }
@@ -97,9 +105,9 @@ export async function maskText(masker, img, crops) {
  */
 export async function masksFor(masker, img, analysis, ids, cache) {
   const same = (a, b) => a && a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
-  const crops = textCrops(analysis, ids, img), fresh = crops.filter((c) => !same(cache.get(c.region), c));
-  for (const m of await maskText(masker, img, fresh)) cache.set(m.region, m);
-  return { masks: crops.map((c) => cache.get(c.region)), made: fresh.length };
+  const crops = textCrops(analysis, ids, img), fresh = crops.filter((c) => !same(cache.get(c.key), c));
+  for (const m of await maskText(masker, img, fresh)) cache.set(m.key, m);
+  return { masks: crops.map((c) => cache.get(c.key)), made: fresh.length };
 }
 
 // The crop `c` of `img` scaled by `s` to w x h: each pixel's colour to `put(index in a row of

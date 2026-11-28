@@ -3,7 +3,8 @@
 // comic text crops, MIT) at a pinned revision, checks its files' sha256, and writes
 // extension/vendor/textmask.onnx and its record textmask.json. The ONNX graph is built from the
 // published weights by scripts/textmask-onnx.py (numpy and onnx alone; float16 weights computed in
-// float32).
+// float32), with the decoder and head we trained on generated pages over the authors' encoder
+// (models/textmask-decoder.safetensors: scripts/train-textmask.py, the encoder frozen; ADR 0029).
 //
 //   node scripts/vendor-textmask.mjs           download and vendor (python3 with onnx and numpy)
 //   node scripts/vendor-textmask.mjs --check   the vendored file matches its record
@@ -23,6 +24,7 @@ const FILES = {
   "config.json": null, // (checked by textmask-onnx.py: a U-Net on resnet18, the decoder it builds)
   "tm_meta.json": null, // the authors' crop size and threshold, copied into the record
 };
+const DECODER = "models/textmask-decoder.safetensors", DECODER_SHA = "138744355871d9d87d9f5c0d4071f47d506a5a1245673930532df0baeb1cdecd";
 
 if (process.argv.includes("--check")) {
   const info = JSON.parse(fs.readFileSync(path.join(vendor, "textmask.json"), "utf8"));
@@ -42,22 +44,26 @@ try {
     if (want && ups[name] !== want) throw new Error(`${name}: sha256 ${ups[name]} is not the pinned ${want}`);
   }
   const meta = JSON.parse(fs.readFileSync(path.join(tmp, "tm_meta.json"), "utf8"));
+  const decoder = path.join(root, DECODER);
+  if (sha(fs.readFileSync(decoder)) !== DECODER_SHA) throw new Error(`${DECODER}: sha256 is not the pinned ${DECODER_SHA}`);
   const out = path.join(vendor, "textmask.onnx");
-  execFileSync("python3", ["-I", path.join(root, "scripts", "textmask-onnx.py"), tmp, out], { stdio: "inherit" });
+  execFileSync("python3", ["-I", path.join(root, "scripts", "textmask-onnx.py"), tmp, out, decoder], { stdio: "inherit" });
   const bytes = fs.readFileSync(out);
   const info = {
     source: `https://huggingface.co/${REPO}/tree/${REV}`,
     upstreamSha256: ups["model.safetensors"],
+    decoder: DECODER,
+    decoderSha256: DECODER_SHA,
     made: "scripts/textmask-onnx.py",
-    license: "MIT",
-    what: "comic-text-mask: text vs not-text per pixel of a text region's crop; a U-Net on a ResNet-18, float16 weights",
+    license: "MIT (the authors' weights); the decoder and head trained here are this project's, AGPL-3.0",
+    what: "comic-text-mask: text vs not-text per pixel of a text region's crop; a U-Net on a ResNet-18, float16 weights; its decoder and head fine-tuned on generated pages, encoder frozen",
     inputSize: meta.imgsz,
     threshold: meta.threshold,
     bytes: bytes.length,
     sha256: sha(bytes),
   };
   fs.writeFileSync(path.join(vendor, "textmask.json"), JSON.stringify(info, null, 2) + "\n");
-  console.log(`vendored textmask.onnx (${(bytes.length / 1e6).toFixed(1)} MB) from ${REPO}@${REV.slice(0, 7)}`);
+  console.log(`vendored textmask.onnx (${(bytes.length / 1e6).toFixed(1)} MB) from ${REPO}@${REV.slice(0, 7)} and ${DECODER}`);
 } finally {
   fs.rmSync(tmp, { recursive: true, force: true });
 }

@@ -11,7 +11,11 @@ detector's text-region crop into 384 x 384, padding with 0). Output `text`: (n, 
 the probability of text at each pixel (the authors threshold it at 0.5).
 
     pip install onnx numpy
-    python3 scripts/textmask-onnx.py <dir with model.safetensors and config.json> out.onnx
+    python3 scripts/textmask-onnx.py <dir with model.safetensors and config.json> out.onnx [decoder.safetensors]
+
+With a third file, its tensors replace the published ones of the same name and shape: the decoder and
+head trained on generated pages with the encoder frozen (models/textmask-decoder.safetensors,
+scripts/train-textmask.py), over the authors' encoder.
 """
 import json
 import os
@@ -136,7 +140,13 @@ if __name__ == "__main__":
     src, dst = sys.argv[1], sys.argv[2]
     cfg = json.load(open(os.path.join(src, "config.json")))
     assert cfg["encoder_name"] == "resnet18" and cfg["decoder_channels"] == [256, 128, 64, 32, 16] and cfg["decoder_interpolation"] == "nearest", cfg
-    m = build(read_safetensors(os.path.join(src, "model.safetensors")), cfg)
+    w = read_safetensors(os.path.join(src, "model.safetensors"))
+    if len(sys.argv) > 3:
+        own = read_safetensors(sys.argv[3])
+        for k, t in own.items():
+            assert k in w and w[k].shape == t.shape and not k.startswith("encoder."), k
+        w.update(own)
+    m = build(w, cfg)
     n = halve(m)
     onnx.checker.check_model(m)
     onnx.save(m, dst)

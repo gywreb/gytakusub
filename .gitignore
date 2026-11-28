@@ -28,6 +28,9 @@ tests/fixtures/real/
 tests/bench/models/
 tests/bench/runs/
 tests/bench/data/
+# training the bubble model (docs/TRAINING.md): the generated set, the runs and the weights
+.bubble-train/
+.textmask-train/
 extension/dev-reload.txt
 # Python bytecode of the scripts (scripts/*.py)
 __pycache__/
