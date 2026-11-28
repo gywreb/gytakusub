@@ -122,6 +122,7 @@ for (let seed = +first; seed < +first + +count; seed++) {
   const tMask = Date.now(), textMasks = learnedMask ? await textMasksFor(pixels, an, regionIds) : null, maskMs = Date.now() - tMask;
   const res = erase(cv, pixels, an, regionIds, { keepMask: true, outline: 0.3, textMasks });
   const clean = await fillTexture(cv, inpainter, res.image, res);
+  const erased = Uint8Array.from(res.mask.data); // the eraser's mask, for --why-left
   res.mask.delete(); res.surface.delete();
   const ms = Date.now() - t0;
   const o = clean.data, tr = pg.truth.data, inp = pg.input.data;
@@ -145,16 +146,18 @@ for (let seed = +first; seed < +first + +count; seed++) {
   let damage = 0; for (let q = 0; q < W * H; q++) if (!near[q] && Math.abs(lum(o, q) - lum(inp, q)) > 40) damage++;
   if (whyLeftFile) {
     // each line left untouched: where its lettering that the eraser didn't change lies (4.0 step 2,
-    // 3.6). In a crop the learned text mask was run on (the mask looked there and missed it), or
-    // outside every crop: inside the answer's box for the line, or outside it too (the box fell short)
+    // 3.6). In the eraser's mask (`masked`: erased, but the fill came out like the lettering, Telea
+    // pulling a dark line in), else in a crop the learned text mask was run on (the mask looked there
+    // and missed it), or outside every crop: inside the answer's box for the line, or outside it too
     const crops = textMasks || [], inCrop = (x, y) => crops.some((c) => x >= c.x && x < c.x + c.w && y >= c.y && y < c.y + c.h);
     const left = [];
     pg.blocks.forEach((b, i) => {
       if (!rows[i].stays) return;
       const it = items[i], bx = it.box ? { x: it.box[0] * W, y: it.box[1] * H, w: it.box[2] * W, h: it.box[3] * H } : null;
-      const n = { crop: 0, box: 0, outside: 0 };
+      const n = { crop: 0, box: 0, outside: 0, masked: 0 };
       for (const q of b.core) {
         if (!(Math.abs(lum(inp, q) - lum(tr, q)) > 60 && Math.abs(lum(o, q) - lum(inp, q)) < 30)) continue;
+        if (erased[q]) { n.masked++; continue; } // in the eraser's mask: the fill came out like the lettering
         const x = q % W, y = (q / W) | 0;
         if (inCrop(x, y)) n.crop++; else if (bx && x >= bx.x && x < bx.x + bx.w && y >= bx.y && y < bx.y + bx.h) n.box++; else n.outside++;
       }

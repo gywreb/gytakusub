@@ -19,14 +19,14 @@ the engine's rules cannot bend.
 
 | Script | Pages | Lines | Found before Claude answers | Lettering left untouched | Set under 0.7 of its size | Size measured outside 0.6–1.6× | Text past its bubble | Touching its outline | Art damage |
 |---|---|---|---|---|---|---|---|---|---|
-| all | 300 | 1,615 | 95.1% | 1.4% | 11.0% | 2.7% | 0.8% | 2.7% | 0.017% |
-| Japanese | 76 | 419 | 95.7% | 1.2% | 25.8% | 0.7% | 0.6% | 4.2% | 0.022% |
-| Chinese | 38 | 178 | 95.5% | 1.1% | 25.3% | 1.1% | 0.0% | 2.9% | 0.020% |
-| Korean | 38 | 197 | 95.9% | 0.5% | 8.1% | 3.6% | 0.0% | 0.0% | 0.012% |
-| English | 38 | 199 | 93.5% | 3.5% | 1.0% | 5.0% | 0.6% | 2.4% | 0.010% |
-| Spanish | 38 | 223 | 95.5% | 1.3% | 1.8% | 2.7% | 2.2% | 2.2% | 0.016% |
-| Portuguese | 36 | 194 | 94.8% | 0.5% | 0.0% | 2.1% | 0.0% | 2.4% | 0.006% |
-| Vietnamese | 36 | 205 | 94.1% | 2.0% | 1.5% | 5.4% | 2.2% | 2.8% | 0.025% |
+| all | 300 | 1,615 | 95.1% | 1.1% | 11.0% | 2.7% | 0.8% | 2.7% | 0.014% |
+| Japanese | 76 | 419 | 95.7% | 1.0% | 25.8% | 0.7% | 0.6% | 4.2% | 0.019% |
+| Chinese | 38 | 178 | 95.5% | 0.0% | 25.3% | 1.1% | 0.0% | 2.9% | 0.016% |
+| Korean | 38 | 197 | 95.9% | 1.0% | 8.1% | 3.6% | 0.0% | 0.0% | 0.010% |
+| English | 38 | 199 | 93.5% | 2.5% | 1.0% | 5.0% | 0.6% | 2.4% | 0.005% |
+| Spanish | 38 | 223 | 95.5% | 0.9% | 1.8% | 2.7% | 2.2% | 2.2% | 0.012% |
+| Portuguese | 36 | 194 | 94.8% | 0.5% | 0.0% | 2.1% | 0.0% | 2.4% | 0.005% |
+| Vietnamese | 36 | 205 | 94.1% | 1.5% | 1.5% | 5.4% | 2.2% | 2.8% | 0.023% |
 
 ### Where text size is lost
 
@@ -44,6 +44,8 @@ On generated pages, where every letter size and bubble is known exactly:
 - **The translation's length:** of the lines set small that are alone in their bubble, 85.2% could not be set at 0.7 of their size in that bubble however they were laid out, with no margin from the outline. The rest (18 lines) could have been; 4 of them (0.2% of all lines) keeping their letters clear of the outline, as the engine does since 2.15. The others fit only by touching it.
 - Not judged: 19 small lines that share their bubble with another line, and 37 over the art.
 <!-- results:end -->
+
+Since 4.0 the generated pages here are filled with AOT, as the extension fills them on a CPU (`--fill aot`); with Telea, the bench's fill before, the same 300 pages left 1.4% of lines untouched and damaged 0.017% of the art.
 
 ### The learned text mask against the rules
 
@@ -82,6 +84,17 @@ Since 3.6 the mask also looks across the box Claude gave for a free-text line, a
 | Lettering at the image's cut, held out | 2.7% → 2.0% | 8.6% → 5.0% | — | 0.0219% → 0.0161% | 1,779 → 639 |
 
 On real pages one more line is still seen in all (8 pages more, 5 fewer). The mask's time a page on one CPU thread rose from 3.1 s to 4.3 s (median, real pages held out), as the boxes are masked too.
+
+**4.0's free-text gate, read as the app fills.** The bench filled textured areas with Telea, which the app never uses where a learned fill runs. Telea pulls dark lines around an erased line back into the lettering's shape: of the 8 free-text lines left on the plain pages looked at, 3 had every unchanged pixel inside the eraser's mask (`synth-run.mjs --why-left`, `masked`). Since 4.0 the gate is read with AOT, the app's CPU fill (`--fill aot`; LaMa on a graphics card fills better still), with Telea beside it. Free text left untouched, held out, 3.5 → 3.6:
+
+| Pages | AOT | Telea |
+|---|---|---|
+| Generated (the gate's set, at most 5%) | 8.6% → 4.3% | 8.6% → 5.0% |
+| Webtoon | 6.8% → 3.4% | 6.8% → 3.4% |
+| The new shapes | 9.4% → 4.3% | 8.6% → 4.3% |
+| Lettering at the image's cut | 9.4% → 5.0% | 8.6% → 5.0% |
+
+With AOT, art damage is lower with 3.6 on all four (one page worse, on the new shapes). The free-text lines left on the pages looked at are the same 5 on the plain pages and the new shapes (4 on webtoon), from three causes of one or two lines each: free text over a shape the light-region rules call a bubble, lines never found, and a fill that still comes back like the lettering ([ADR 0030](adr/0030-four-point-oh-as-measured.md)).
 
 ## What is measured
 
@@ -150,12 +163,13 @@ western comic images. It is not part of Gytakusub.
 
 ## Limits of these numbers
 
-- **Textured areas are filled by Telea**, not by the inpainting models the extension runs (AOT on
-  the CPU, LaMa on a graphics card). Art damage and the look of fills over art are worse here than
-  in use. `--fill aot` fills them as on the CPU: on printed and slanted lettering it cut art damage
-  by 13 to 26% (three pages), at four to six times the time. Most of the damage that remains there is the
-  eraser's mask, which takes a line's whole box over tone or an object's surface, not only its
-  letters; any fill then changes those pixels.
+- **Textured areas are filled by Telea unless `--fill aot` is given**, and the extension never
+  fills with Telea where a learned model runs (AOT on the CPU, LaMa on a graphics card). Art damage
+  and the look of fills over art are worse with Telea than in use, and Telea can pull dark lines
+  back into an erased line's shape, which counts as the line left. 4.0's free-text numbers are read
+  with `--fill aot`, which on 3 generated pages now takes about Telea's time (28 s against 27 s).
+  Most of the damage that remains is the eraser's mask, which takes a line's whole box over tone or
+  an object's surface, not only its letters; any fill then changes those pixels.
 - **"Set under 0.7 of its size" counts lines the bubble can't hold at that size.** English runs 2.3
   times the characters of Japanese, and a tall, narrow bubble made for one column has no row wide
   enough for a long English word at the original size. "Could fit at 0.7" separates those.
