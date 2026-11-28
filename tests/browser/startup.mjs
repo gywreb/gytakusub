@@ -107,11 +107,15 @@ await sw.evaluate(() => {
   chrome.runtime.reload = () => { globalThis.__reloads++; chrome.storage.session.remove("devReloadMark"); };
 });
 const reloads = () => sw.evaluate(() => globalThis.__reloads);
+// (the worker answers the next page's request once it's free: the pages before are still being
+// translated, and how long that takes depends on the engine and the machine. So the count is
+// awaited, up to 30 s, rather than read after a fixed wait)
+const reloadsBy = async (ms) => { const t = Date.now(); let n = await reloads(); while (n < 1 && Date.now() - t < ms) { await wait(250); n = await reloads(); } return n; };
 await page.goto(`http://127.0.0.1:${PORT}/chapter?n=1&ch=5`); await wait(2500);
 const before5 = await reloads();
 fs.writeFileSync(path.join(ext, "dev-reload.txt"), "test 1\n");
-await page.goto(`http://127.0.0.1:${PORT}/chapter?n=1&ch=6`); await wait(2500);
-const after5 = await reloads();
+await page.goto(`http://127.0.0.1:${PORT}/chapter?n=1&ch=6`);
+const after5 = await reloadsBy(30000);
 await page.goto(`http://127.0.0.1:${PORT}/chapter?n=1&ch=7`); await wait(2500); // the new start takes the mark
 await page.goto(`http://127.0.0.1:${PORT}/chapter?n=1&ch=8`); await wait(2500);
 const again5 = await reloads();

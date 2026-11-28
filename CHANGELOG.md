@@ -26,6 +26,7 @@ All notable changes to Gytakusub are documented here. The format follows [Keep a
 - `scripts/train-textmask.py` and `tests/bench/textmask-data.mjs`: the text mask's training set and fine-tuning (docs/TRAINING.md). `scripts/textmask-onnx.py` takes a decoder file over the authors' weights. `scripts/vendor-textmask.mjs` builds the vendored model from both and checks them. `scripts/split-weights.py` cuts weights into parts small enough to fetch.
 - `synth-run.mjs --why-left file`: where each line left untouched has its lettering (in a crop the mask ran on, in the answer's box, or outside both). `detectors.mjs --max N` runs in chunks like the other benches.
 - Tests: `textmask.test.mjs` (a thick piece inside a free-text box erased whole, the same piece without the box left to the rules; the box's crops).
+- `browser/startup.mjs`: the dev-reload check waits up to 30 s for the worker to answer the next page, instead of reading the count after 2.5 s. With the boxes masked too, the pages before it are still being translated on CI's CPU (the first page there: 14 s → 20 s).
 
 ## [3.5.0] — 2026-11-27
 
